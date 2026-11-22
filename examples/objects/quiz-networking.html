@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz: networking basics</title>
+<!--
+  rupok Smart Object: ICT, networking basics quiz.
+  Size 1280 x 720, 4 steps:
+    0-3    question 1-4 (tap an answer; feedback and explanation appear)
+    4      score and summary
+  Each answer is sent with rupok.quiz.submit and saved with the lesson.
+-->
+<style>
+  :root {
+    --bg: var(--rupok-color-bg, #ffffff);
+    --fg: var(--rupok-color-fg, #1d2433);
+    --accent: var(--rupok-color-accent, #2563eb);
+    --accent2: var(--rupok-color-accent2, #7c3aed);
+    --muted: var(--rupok-color-muted, #64748b);
+    --ok: var(--rupok-color-success, #15803d);
+    --bad: var(--rupok-color-danger, #dc2626);
+    --radius: var(--rupok-radius, 12px);
+    --font: var(--rupok-font-body, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif);
+    --font-h: var(--rupok-font-heading, var(--font));
+  }
+  /* Designed at 1280 x 720: 1rem = 16px there, and everything scales with the frame. */
+  html { font-size: min(calc(100vw * 16 / 1280), calc(100vh * 16 / 720)); }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  * { box-sizing: border-box; }
+  body {
+    display: flex; flex-direction: column;
+    padding: 2.5rem 3.5rem 2.25rem;
+    background: var(--bg); color: var(--fg); font-family: var(--font);
+    -webkit-user-select: none; user-select: none;
+  }
+  [hidden] { display: none !important; }
+  #question-view { flex: 1; display: flex; flex-direction: column; }
+
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+  .kicker { font: 800 1.5rem/1 var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .dots { display: flex; gap: .75rem; }
+  .dots span {
+    width: 1.75rem; height: 1.75rem; border-radius: 50%;
+    border: .1875rem solid var(--muted); opacity: .5;
+  }
+  .dots span.now { border-color: var(--accent); opacity: 1; }
+  .dots span.ok { background: var(--ok); border-color: var(--ok); opacity: 1; }
+  .dots span.bad { background: var(--bad); border-color: var(--bad); opacity: 1; }
+
+  .q { margin: 1.5rem 0 1.75rem; font: 800 2.625rem/1.2 var(--font-h); letter-spacing: -0.01em; min-height: 2.4em; }
+  .options { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  .opt {
+    display: flex; align-items: center; gap: 1.25rem; min-height: 6.25rem; padding: 1rem 1.5rem;
+    font: 600 1.75rem/1.25 var(--font); text-align: left; color: var(--fg); background: var(--bg);
+    border: .1875rem solid var(--muted); border-radius: var(--radius);
+    cursor: pointer; touch-action: manipulation;
+    transition: border-color .2s, background-color .2s, transform .12s, opacity .2s;
+  }
+  .opt:active { transform: scale(.98); }
+  .opt:focus-visible { outline: .25rem solid var(--accent2); outline-offset: .25rem; }
+  .opt .letter {
+    flex: none; width: 3.25rem; height: 3.25rem; border-radius: 50%; display: grid; place-items: center;
+    font: 800 1.625rem/1 var(--font); color: var(--bg); background: var(--accent);
+  }
+  .opt .mark { margin-left: auto; flex: none; width: 2.5rem; height: 2.5rem; }
+  .opt .mark svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  .answered .opt { cursor: default; }
+  .answered .opt:not(.correct):not(.chosen) { opacity: .45; }
+  .opt.correct { border-color: var(--ok); color: var(--ok); background: var(--bg); background: color-mix(in srgb, var(--ok) 10%, var(--bg)); }
+  .opt.correct .letter { background: var(--ok); }
+  .opt.chosen.wrong { border-color: var(--bad); color: var(--bad); background: var(--bg); background: color-mix(in srgb, var(--bad) 10%, var(--bg)); }
+  .opt.chosen.wrong .letter { background: var(--bad); }
+
+  .feedback {
+    margin-top: auto; display: flex; align-items: center; gap: 2rem;
+    padding: 1.25rem 1.5rem; border-radius: var(--radius);
+    background: var(--bg); background: color-mix(in srgb, var(--accent) 7%, var(--bg));
+    animation: rise .35s ease-out;
+  }
+  .feedback p { margin: 0; flex: 1; font-size: 1.5rem; line-height: 1.35; }
+  .feedback b.ok { color: var(--ok); }
+  .feedback b.bad { color: var(--bad); }
+  @keyframes rise { from { opacity: 0; transform: translateY(1rem); } to { opacity: 1; transform: none; } }
+
+  .btn {
+    flex: none; display: inline-flex; align-items: center; gap: .75rem; min-height: 4.5rem; padding: 0 2rem;
+    font: 800 1.75rem/1 var(--font); color: var(--bg); background: var(--accent);
+    border: 0; border-radius: 999px; cursor: pointer; touch-action: manipulation;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn:focus-visible { outline: .25rem solid var(--accent2); outline-offset: .25rem; }
+  .btn.ghost { color: var(--accent); background: var(--bg); border: .1875rem solid var(--accent); }
+
+  /* -------------------------------------------------------- results */
+  .results { flex: 1; display: grid; grid-template-columns: 22rem 1fr; gap: 3rem; align-items: center; animation: rise .4s ease-out; }
+  .score {
+    width: 22rem; height: 22rem; border-radius: 50%; display: grid; place-content: center; text-align: center;
+    border: .75rem solid var(--accent);
+  }
+  .score .big { font: 800 7rem/1 var(--font-h); }
+  .score .of { font-size: 1.75rem; color: var(--muted); margin-top: .5rem; }
+  .results h2 { margin: 0 0 1.25rem; font: 800 3rem/1.1 var(--font-h); }
+  .summary { list-style: none; margin: 0 0 2rem; padding: 0; display: grid; gap: .75rem; }
+  .summary li { display: flex; align-items: center; gap: 1rem; font-size: 1.625rem; }
+  .summary svg { flex: none; width: 2.25rem; height: 2.25rem; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  .summary .ok svg { stroke: var(--ok); }
+  .summary .bad svg { stroke: var(--bad); }
+  .summary .skip { color: var(--muted); }
+  .summary .skip svg { stroke: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+  <header class="top">
+    <span class="kicker" id="kicker">Networking basics</span>
+    <div class="dots" id="dots" aria-hidden="true"></div>
+  </header>
+
+  <section id="question-view">
+    <h1 class="q" id="q" aria-live="polite"></h1>
+    <div class="options" id="options" role="group" aria-labelledby="q"></div>
+    <div class="feedback" id="feedback" hidden>
+      <p id="explain"></p>
+      <button class="btn" id="next" type="button"></button>
+    </div>
+  </section>
+
+  <section class="results" id="results-view" hidden>
+    <div class="score"><div class="big" id="score"></div><div class="of">correct</div></div>
+    <div>
+      <h2 id="verdict"></h2>
+      <ul class="summary" id="summary"></ul>
+      <button class="btn ghost" id="again" type="button">Try again</button>
+    </div>
+  </section>
+
+<script>
+  /* rupok injects window.rupok before this script runs. This small stand-in
+     is only used when the file is opened directly in a browser without the SDK,
+     so the object still previews (arrow keys step through it). */
+  const rupok = window.rupok || (function () {
+    let cur = 0, count = 0, saved;
+    const subs = [];
+    const set = (n) => {
+      n = Math.max(0, Math.min(count, n));
+      if (n !== cur) { cur = n; subs.forEach((f) => f(cur)); }
+    };
+    document.addEventListener("keydown", (e) => {
+      const k = e.key;
+      if (k === "ArrowRight" || k === "PageDown" || (k === " " && e.target.tagName !== "BUTTON")) { e.preventDefault(); set(cur + 1); }
+      if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); set(cur - 1); }
+    });
+    return {
+      mode: "present",
+      ready: Promise.resolve({ standalone: true }),
+      steps: {
+        get current() { return cur; },
+        get count() { return count; },
+        setCount(n) { count = n; set(cur); },
+        onChange(f) { subs.push(f); setTimeout(() => f(cur)); return () => {}; },
+        next() { set(cur + 1); },
+        prev() { set(cur - 1); },
+        goto: set,
+      },
+      state: { load: () => saved, save: (v) => { saved = v; } },
+      theme: { get: (k, d) => d, all: () => ({}), onChange: () => () => {} },
+      quiz: { submit() {} },
+      resize() {},
+      log() {},
+    };
+  })();
+
+  const QUESTIONS = [
+    {
+      id: "q1",
+      text: "What does IP stand for in “IP address”?",
+      options: { a: "Internet Protocol", b: "Internal Program", c: "Internet Provider", d: "Instant Packet" },
+      answer: "a",
+      explain: "<b>Internet Protocol</b>: the rules for addressing and routing data. Every device on a network has an IP address, like a postal address.",
+    },
+    {
+      id: "q2",
+      text: "Which device forwards data between networks, such as your home network and the internet?",
+      options: { a: "Switch", b: "Router", c: "Hub", d: "Printer" },
+      answer: "b",
+      explain: "A <b>router</b> joins networks and picks the path for each packet. Switches and hubs connect devices inside one network.",
+    },
+    {
+      id: "q3",
+      text: "What does DNS do?",
+      options: {
+        a: "Turns names like example.com into IP addresses",
+        b: "Encrypts your passwords",
+        c: "Makes your Wi-Fi faster",
+        d: "Stores every web page forever",
+      },
+      answer: "a",
+      explain: "The <b>Domain Name System</b> is the internet’s phone book: it looks up the IP address for a name you type.",
+    },
+    {
+      id: "q4",
+      text: "Data sent across the internet is split into small pieces called…",
+      options: { a: "Pixels", b: "Cookies", c: "Packets", d: "Folders" },
+      answer: "c",
+      explain: "<b>Packets</b> travel separately, maybe by different routes, and are put back in order when they arrive.",
+    },
+  ];
+  const RESULTS_STEP = QUESTIONS.length;
+
+  const ICON = {
+    ok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    bad: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>',
+    skip: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>',
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const ui = {
+    kicker: $("kicker"), dots: $("dots"), questionView: $("question-view"), q: $("q"), options: $("options"),
+    feedback: $("feedback"), explain: $("explain"), next: $("next"),
+    resultsView: $("results-view"), score: $("score"), verdict: $("verdict"), summary: $("summary"), again: $("again"),
+  };
+
+  let step = 0;
+  let answers = {}; /* questionId -> chosen option key */
+
+  const isCorrect = (q) => answers[q.id] === q.answer;
+  const score = () => QUESTIONS.filter(isCorrect).length;
+
+  const dots = QUESTIONS.map(() => ui.dots.appendChild(document.createElement("span")));
+
+  function renderDots() {
+    QUESTIONS.forEach((q, i) => {
+      const d = dots[i];
+      d.className = q.id in answers ? (isCorrect(q) ? "ok" : "bad") : i === step ? "now" : "";
+    });
+  }
+
+  function renderQuestion(q, i) {
+    ui.kicker.textContent = "Networking basics · Question " + (i + 1) + " of " + QUESTIONS.length;
+    ui.q.textContent = q.text;
+    const chosen = answers[q.id];
+    const answered = chosen !== undefined;
+    ui.options.classList.toggle("answered", answered);
+    ui.options.innerHTML = "";
+    for (const key of Object.keys(q.options)) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt";
+      const correct = key === q.answer;
+      if (answered && correct) b.classList.add("correct");
+      if (answered && key === chosen) b.classList.add("chosen", correct ? "right" : "wrong");
+      const mark = answered && (correct || key === chosen) ? (correct ? ICON.ok : ICON.bad) : "";
+      b.innerHTML =
+        '<span class="letter">' + key.toUpperCase() + "</span>" +
+        "<span>" + q.options[key] + "</span>" +
+        '<span class="mark">' + mark + "</span>";
+      b.disabled = answered;
+      b.addEventListener("click", () => choose(q, key));
+      ui.options.appendChild(b);
+    }
+    ui.feedback.hidden = !answered;
+    if (answered) {
+      ui.explain.innerHTML = (isCorrect(q) ? '<b class="ok">Correct!</b> ' : '<b class="bad">Not quite.</b> ') + q.explain;
+      ui.next.textContent = i + 1 < QUESTIONS.length ? "Next question" : "See my score";
+    }
+  }
+
+  function renderResults() {
+    const s = score();
+    ui.kicker.textContent = "Networking basics · Results";
+    ui.score.textContent = s + " / " + QUESTIONS.length;
+    ui.verdict.textContent =
+      s === QUESTIONS.length ? "Perfect score!" : s >= QUESTIONS.length / 2 ? "Well done!" : "Keep practising!";
+    ui.summary.innerHTML = QUESTIONS.map((q, i) => {
+      const done = q.id in answers;
+      const cls = !done ? "skip" : isCorrect(q) ? "ok" : "bad";
+      const icon = !done ? ICON.skip : isCorrect(q) ? ICON.ok : ICON.bad;
+      const label = !done
+        ? "not answered"
+        : isCorrect(q)
+          ? q.options[q.answer]
+          : q.options[q.answer] + " (you chose " + q.options[answers[q.id]] + ")";
+      return '<li class="' + cls + '">' + icon + "<span>Q" + (i + 1) + ": " + label + "</span></li>";
+    }).join("");
+  }
+
+  function render() {
+    renderDots();
+    const results = step >= RESULTS_STEP;
+    ui.questionView.hidden = results;
+    ui.resultsView.hidden = !results;
+    if (results) renderResults();
+    else renderQuestion(QUESTIONS[step], step);
+  }
+
+  function choose(q, key) {
+    if (q.id in answers) return;
+    answers[q.id] = key;
+    rupok.quiz.submit({ questionId: q.id, answer: key, correct: key === q.answer, score: score() });
+    rupok.state.save({ answers });
+    render();
+  }
+
+  ui.next.addEventListener("click", () => rupok.steps.next());
+  ui.again.addEventListener("click", () => {
+    answers = {};
+    rupok.state.save({ answers });
+    rupok.steps.goto(0);
+    render();
+  });
+
+  rupok.steps.setCount(RESULTS_STEP);
+  rupok.ready.then(() => {
+    const saved = rupok.state.load();
+    if (saved && saved.answers && typeof saved.answers === "object") answers = saved.answers;
+    rupok.steps.onChange((s) => {
+      step = s;
+      render();
+    });
+  });
+  render();
+</script>
+</body>
+</html>

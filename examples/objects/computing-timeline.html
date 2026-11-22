@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A short history of computing</title>
+<!--
+  rupok Smart Object: ICT, history of computing.
+  Size 1920 x 1080 (full slide), 8 steps: each step reveals the next era.
+  Tap any revealed era to show its card again.
+-->
+<style>
+  :root {
+    --bg: var(--rupok-color-bg, #ffffff);
+    --fg: var(--rupok-color-fg, #1d2433);
+    --accent: var(--rupok-color-accent, #2563eb);
+    --accent2: var(--rupok-color-accent2, #7c3aed);
+    --muted: var(--rupok-color-muted, #64748b);
+    --radius: var(--rupok-radius, 12px);
+    --font: var(--rupok-font-body, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif);
+    --font-h: var(--rupok-font-heading, var(--font));
+  }
+  /* Designed at 1920 x 1080: 1rem = 16px there, and everything scales with the frame. */
+  html { font-size: min(calc(100vw * 16 / 1920), calc(100vh * 16 / 1080)); }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  * { box-sizing: border-box; }
+  body {
+    display: flex; flex-direction: column;
+    padding: 5rem 7.5rem 4.5rem;
+    background: var(--bg); color: var(--fg); font-family: var(--font);
+    -webkit-user-select: none; user-select: none;
+  }
+  h1 { margin: 0; font: 800 4rem/1.05 var(--font-h); letter-spacing: -0.015em; }
+  .sub { margin: .75rem 0 0; font-size: 2rem; color: var(--muted); }
+
+  /* ---------------------------------------------------------- axis */
+  .axis { position: relative; margin-top: 5.5rem; height: 17rem; }
+  .rail, .fill {
+    position: absolute; left: 6.25%; right: 6.25%; top: 7.25rem; height: .5rem; border-radius: 1rem;
+  }
+  .rail { background: var(--muted); opacity: .25; }
+  .fill { right: auto; width: 0; background: var(--accent); transition: width .6s ease; }
+  .eras { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(8, 1fr); list-style: none; margin: 0; padding: 0; }
+  .era {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    padding: 0; border: 0; background: none; font: inherit; color: inherit;
+    cursor: default; touch-action: manipulation;
+  }
+  .era .year {
+    height: 3rem; font: 800 1.75rem/3rem var(--font); color: var(--accent);
+    opacity: 0; transform: translateY(.5rem); transition: opacity .4s, transform .4s;
+  }
+  .era .dot {
+    width: 6.5rem; height: 6.5rem; margin-top: .5rem; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--bg); color: var(--muted);
+    border: .25rem dashed var(--muted); opacity: .45;
+    transition: background-color .35s, color .35s, border-color .35s, opacity .35s, transform .35s;
+  }
+  .era .dot svg { width: 3.5rem; height: 3.5rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .35s; }
+  .era .name {
+    margin-top: 1.25rem; max-width: 13rem; font: 700 1.625rem/1.2 var(--font);
+    opacity: 0; transform: translateY(-.5rem); transition: opacity .4s, transform .4s;
+  }
+  .era.shown { cursor: pointer; }
+  .era.shown .year, .era.shown .name { opacity: 1; transform: none; }
+  .era.shown .dot { border-style: solid; border-color: var(--accent); color: var(--accent); opacity: 1; }
+  .era.shown .dot svg { opacity: 1; }
+  .era.focus .dot { background: var(--accent); color: var(--bg); transform: scale(1.12); }
+  .era:focus-visible { outline: none; }
+  .era:focus-visible .dot { outline: .3rem solid var(--accent2); outline-offset: .4rem; }
+
+  /* ---------------------------------------------------------- card */
+  .card {
+    margin-top: auto; align-self: center; width: min(100%, 100rem); min-height: 22rem;
+    display: grid; grid-template-columns: 11rem 1fr; gap: 3rem; align-items: center;
+    padding: 3rem 3.5rem; border-radius: calc(var(--radius) * 2);
+    border: .1875rem solid var(--accent);
+    background: var(--bg);
+    background: color-mix(in srgb, var(--accent) 6%, var(--bg));
+  }
+  .card .badge {
+    width: 11rem; height: 11rem; border-radius: 50%; display: grid; place-items: center;
+    background: var(--accent); color: var(--bg);
+  }
+  .card .badge svg { width: 6rem; height: 6rem; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .card .head { display: flex; align-items: baseline; gap: 1.5rem; flex-wrap: wrap; }
+  .card h2 { margin: 0; font: 800 3.5rem/1.1 var(--font-h); }
+  .card .chip {
+    padding: .35rem 1.1rem; border-radius: 999px; font: 800 1.75rem/1.3 var(--font);
+    color: var(--bg); background: var(--accent2);
+  }
+  .card p { margin: 1.25rem 0 0; font-size: 2rem; line-height: 1.4; max-width: 70rem; }
+  .card .fact { font-size: 1.75rem; color: var(--muted); }
+  .card .fact b { color: var(--accent2); }
+  .card.enter { animation: enter .45s ease-out; }
+  @keyframes enter { from { opacity: 0; transform: translateY(1.5rem); } to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>A short history of computing</h1>
+    <p class="sub">From counting beads to learning machines. Not to scale.</p>
+  </header>
+
+  <section class="axis" aria-label="Timeline">
+    <div class="rail"></div>
+    <div class="fill" id="fill"></div>
+    <ol class="eras" id="eras"></ol>
+  </section>
+
+  <article class="card" id="card" aria-live="polite">
+    <div class="badge" id="badge"></div>
+    <div>
+      <div class="head"><h2 id="card-title"></h2><span class="chip" id="card-year"></span></div>
+      <p id="card-text"></p>
+      <p class="fact" id="card-fact"></p>
+    </div>
+  </article>
+
+<script>
+  /* rupok injects window.rupok before this script runs. This small stand-in
+     is only used when the file is opened directly in a browser without the SDK,
+     so the object still previews (arrow keys step through it). */
+  const rupok = window.rupok || (function () {
+    let cur = 0, count = 0, saved;
+    const subs = [];
+    const set = (n) => {
+      n = Math.max(0, Math.min(count, n));
+      if (n !== cur) { cur = n; subs.forEach((f) => f(cur)); }
+    };
+    document.addEventListener("keydown", (e) => {
+      const k = e.key;
+      if (k === "ArrowRight" || k === "PageDown" || (k === " " && e.target.tagName !== "BUTTON")) { e.preventDefault(); set(cur + 1); }
+      if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); set(cur - 1); }
+    });
+    return {
+      mode: "present",
+      ready: Promise.resolve({ standalone: true }),
+      steps: {
+        get current() { return cur; },
+        get count() { return count; },
+        setCount(n) { count = n; set(cur); },
+        onChange(f) { subs.push(f); setTimeout(() => f(cur)); return () => {}; },
+        next() { set(cur + 1); },
+        prev() { set(cur - 1); },
+        goto: set,
+      },
+      state: { load: () => saved, save: (v) => { saved = v; } },
+      theme: { get: (k, d) => d, all: () => ({}), onChange: () => () => {} },
+      quiz: { submit() {} },
+      resize() {},
+      log() {},
+    };
+  })();
+
+  /* Simple line icons on a 24 x 24 grid (stroke = currentColor). */
+  const ICONS = {
+    abacus: '<rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 8h18M3 13h18M3 18h18"/><circle cx="7" cy="8" r="1.6"/><circle cx="10.5" cy="8" r="1.6"/><circle cx="15" cy="13" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16.5" cy="18" r="1.6"/>',
+    engine: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/><circle cx="12" cy="12" r="1.2"/>',
+    tube: '<path d="M8 15V8a4 4 0 0 1 8 0v7"/><rect x="6.5" y="15" width="11" height="3.5" rx="1"/><path d="M9 21v-2.5M12 21v-2.5M15 21v-2.5M10 12.5l2-3 2 3"/>',
+    transistor: '<circle cx="12" cy="10" r="6.5"/><path d="M8.5 21v-6M12 21v-4.5M15.5 21v-6"/>',
+    chip: '<rect x="6" y="6" width="12" height="12" rx="1.5"/><rect x="9.5" y="9.5" width="5" height="5"/><path d="M9 2.5V6M12 2.5V6M15 2.5V6M9 18v3.5M12 18v3.5M15 18v3.5M2.5 9H6M2.5 12H6M2.5 15H6M18 9h3.5M18 12h3.5M18 15h3.5"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9M12 3c-2.6 2.6-3.8 5.6-3.8 9s1.2 6.4 3.8 9"/>',
+    phone: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 5h3"/><circle cx="12" cy="18.3" r="1"/>',
+    network: '<circle cx="4.5" cy="7" r="2"/><circle cx="4.5" cy="17" r="2"/><circle cx="12" cy="4.5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19.5" r="2"/><circle cx="19.5" cy="12" r="2"/><path d="M6.4 7.6l3.7-2.5M6.4 7.6l3.7 3.8M6.4 16.4l3.7-3.8M6.4 16.4l3.7 2.5M14 5.3l3.8 5.4M14 12h3.5M14 18.7l3.8-5.4"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  };
+
+  const ERAS = [
+    {
+      year: "c. 2500 BCE", name: "Abacus", icon: "abacus",
+      text: "Beads on rods let traders in Mesopotamia, and later China and Rome, add and subtract quickly. Each rod is a place value, just like the digits in a number.",
+      fact: "The abacus is still used to teach arithmetic today.",
+    },
+    {
+      year: "1837", name: "Analytical Engine", icon: "engine",
+      text: "Charles Babbage designed a mechanical, general-purpose computer with a “mill” (processor) and a “store” (memory). Ada Lovelace published the first program written for it.",
+      fact: "It was never finished in Babbage’s lifetime.",
+    },
+    {
+      year: "1945", name: "ENIAC", icon: "tube",
+      text: "The first programmable, general-purpose electronic computer. It used about 18,000 vacuum tubes, filled a large room and weighed about 27 tonnes.",
+      fact: "Six women programmed it by hand, with cables and switches.",
+    },
+    {
+      year: "1947", name: "Transistor", icon: "transistor",
+      text: "Bardeen, Brattain and Shockley at Bell Labs built a tiny electronic switch with no moving parts. Transistors replaced vacuum tubes and made computers smaller, cheaper and more reliable.",
+      fact: "A modern processor chip holds billions of transistors.",
+    },
+    {
+      year: "1971", name: "Microprocessor", icon: "chip",
+      text: "The Intel 4004 put a whole processor on a single chip, with 2,300 transistors. Personal computers soon followed.",
+      fact: "For decades, transistor counts doubled about every two years (Moore’s law).",
+    },
+    {
+      year: "1989", name: "World Wide Web", icon: "globe",
+      text: "Tim Berners-Lee at CERN proposed pages linked together that anyone could publish and read over the internet. The web opened to the public in 1991.",
+      fact: "The internet is the network; the web is one service that runs on it.",
+    },
+    {
+      year: "2007", name: "Smartphones", icon: "phone",
+      text: "Touch-screen phones put a powerful computer, a camera and the internet into billions of pockets.",
+      fact: "Apps turned the phone into a map, a bank and a classroom.",
+    },
+    {
+      year: "2010s–now", name: "Artificial intelligence", icon: "network",
+      text: "Machine learning lets computers learn patterns from huge amounts of data: recognising speech and images, translating languages and writing text.",
+      fact: "AI tools still make mistakes, so people must check their work.",
+    },
+  ];
+
+  const INTRO = {
+    year: "4,500 years", name: "Travel through time", icon: "clock",
+    text: "Each step reveals the next big idea in computing, from the abacus to artificial intelligence.",
+    fact: "Tap any era on the timeline to see it again.",
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const ui = {
+    eras: $("eras"), fill: $("fill"), card: $("card"), badge: $("badge"),
+    title: $("card-title"), year: $("card-year"), text: $("card-text"), fact: $("card-fact"),
+  };
+
+  let step = 0;
+  let focus = 0; /* era shown in the card: 1..8, or 0 for the intro */
+  let shownCard = -1;
+
+  const svg = (name) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[name] + "</svg>";
+
+  const nodes = ERAS.map((era, i) => {
+    const li = document.createElement("li");
+    li.style.display = "contents";
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "era";
+    b.innerHTML =
+      '<span class="year">' + era.year + "</span>" +
+      '<span class="dot">' + svg(era.icon) + "</span>" +
+      '<span class="name">' + era.name + "</span>";
+    b.addEventListener("click", () => {
+      if (i + 1 > step) return;
+      focus = i + 1;
+      render();
+    });
+    li.appendChild(b);
+    ui.eras.appendChild(li);
+    return b;
+  });
+
+  function render() {
+    nodes.forEach((b, i) => {
+      const shown = i < step;
+      b.classList.toggle("shown", shown);
+      b.classList.toggle("focus", shown && focus === i + 1);
+      b.disabled = !shown;
+      b.setAttribute("aria-label", shown ? ERAS[i].year + ", " + ERAS[i].name : "Hidden era");
+    });
+    /* The rail spans 87.5% of the width; node k sits at (k - 0.5) / 8 of the grid. */
+    const pct = step === 0 ? 0 : ((step - 1) / 7) * 87.5;
+    ui.fill.style.width = pct + "%";
+
+    if (shownCard !== focus) {
+      const era = focus === 0 ? INTRO : ERAS[focus - 1];
+      ui.badge.innerHTML = svg(era.icon);
+      ui.title.textContent = era.name;
+      ui.year.textContent = era.year;
+      ui.text.textContent = era.text;
+      ui.fact.innerHTML = "<b>Did you know?</b> " + era.fact;
+      ui.card.classList.remove("enter");
+      void ui.card.offsetWidth;
+      ui.card.classList.add("enter");
+      shownCard = focus;
+    }
+  }
+
+  rupok.steps.setCount(ERAS.length);
+  rupok.steps.onChange((s) => {
+    step = s;
+    focus = s; /* every step change shows the newest era */
+    render();
+  });
+  render();
+</script>
+</body>
+</html>

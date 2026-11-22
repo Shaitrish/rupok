@@ -1,0 +1,10 @@
+/target
+node_modules/
+dist/
+apps/board/src/wasm/
+*.rpk.tmp
+.DS_Store
+.vscode/
+.idea/
+*.log
+.gstack/

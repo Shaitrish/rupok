@@ -1,0 +1,95 @@
+name: Bug report
+description: Something is broken, wrong or slow.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Teachers: you don't need technical details. Tell us what happened in your class.
+        **Security problems** (sandbox escapes, malicious `.rpk` files): please don't file them here; see SECURITY.md.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, and what went wrong?
+      placeholder: When I wrote on a slide with a Smart Object, the ink lagged behind the pen…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the attached lesson
+        2. Go to page 3
+        3. Press Next twice
+    validations:
+      required: false
+  - type: dropdown
+    id: component
+    attributes:
+      label: Area
+      options:
+        - Pen / ink
+        - Pages, slides, board
+        - Smart Objects
+        - Replay
+        - Save / open / .rpk files
+        - PDF import
+        - CLI or MCP server (AI agents)
+        - Performance
+        - Something else
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Browser (Chrome / Edge)
+        - Browser (Firefox)
+        - Browser (Safari)
+        - Windows
+        - Linux
+        - macOS
+        - Android
+    validations:
+      required: true
+  - type: dropdown
+    id: input
+    attributes:
+      label: Input device
+      multiple: true
+      options:
+        - Pen / stylus
+        - Touch screen or interactive panel
+        - Mouse or trackpad
+        - Graphics tablet
+        - Not relevant
+  - type: input
+    id: version
+    attributes:
+      label: rupok version or commit
+      placeholder: e.g. 0.1.0, or the output of `rupok --version`, or a git commit
+  - type: textarea
+    id: files
+    attributes:
+      label: Files, screenshots, logs
+      description: Attach a small `.rpk` file or the Smart Object HTML if you can (remove anything private). For performance problems, paste the output of `cargo run -p rupok-bench --release`.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: I agree to follow the Code of Conduct.
+          required: true

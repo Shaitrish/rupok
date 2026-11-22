@@ -1,0 +1,14 @@
+rupok
+Copyright (c) Shaitrish and rupok contributors.
+
+This product includes third-party assets:
+
+- Solar icon set by 480 Design — CC BY 4.0
+  https://www.figma.com/community/file/1166831539721848736
+  (subset extracted to apps/board/src/icons.generated.ts)
+- Figtree typeface by Erik Kennedy — SIL Open Font License 1.1
+- Noto Sans Bengali by Google — SIL Open Font License 1.1
+- pdf.js by Mozilla — Apache License 2.0
+
+Rust and JavaScript dependencies are listed in Cargo.lock and apps/board/bun.lock
+with their respective licenses.

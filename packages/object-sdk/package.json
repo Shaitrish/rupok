@@ -1,0 +1,34 @@
+{
+  "name": "@rupok/object-sdk",
+  "version": "0.1.0",
+  "description": "In-object SDK for rupok Smart Objects: steps, state, theme and quiz over the rupok bridge protocol v1",
+  "license": "Apache-2.0",
+  "author": "Shaitrish and rupok contributors",
+  "homepage": "https://github.com/shaitrish/rupok/tree/main/packages/object-sdk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shaitrish/rupok.git",
+    "directory": "packages/object-sdk"
+  },
+  "bugs": "https://github.com/shaitrish/rupok/issues",
+  "keywords": [
+    "rupok",
+    "smart-object",
+    "whiteboard",
+    "education",
+    "iframe",
+    "postmessage"
+  ],
+  "main": "sdk.js",
+  "types": "index.d.ts",
+  "files": [
+    "sdk.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}

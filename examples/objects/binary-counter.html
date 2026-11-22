@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binary counter</title>
+<!--
+  rupok Smart Object: ICT, binary numbers.
+  Size 1280 x 720, 10 steps:
+    0      eight bits, all off
+    1-8    reveal place values, right to left (1, 2, 4 ... 128)
+    9      show the decimal total; tap bits to build any number 0-255
+    10     count up automatically (pause, +1, reset)
+  Tap any bit to flip it at any step. The value is saved with the lesson.
+-->
+<style>
+  :root {
+    --bg: var(--rupok-color-bg, #ffffff);
+    --fg: var(--rupok-color-fg, #1d2433);
+    --accent: var(--rupok-color-accent, #2563eb);
+    --accent2: var(--rupok-color-accent2, #7c3aed);
+    --muted: var(--rupok-color-muted, #64748b);
+    --radius: var(--rupok-radius, 12px);
+    --font: var(--rupok-font-body, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif);
+    --font-h: var(--rupok-font-heading, var(--font));
+    --mono: var(--rupok-font-mono, ui-monospace, Menlo, Consolas, "Liberation Mono", monospace);
+  }
+  /* Designed at 1280 x 720: 1rem = 16px there, and everything scales with the frame. */
+  html { font-size: min(calc(100vw * 16 / 1280), calc(100vh * 16 / 720)); }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  * { box-sizing: border-box; }
+  body {
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 2.75rem 4rem 2.25rem;
+    background: var(--bg); color: var(--fg); font-family: var(--font);
+    -webkit-user-select: none; user-select: none;
+  }
+  h1 { margin: 0; font: 800 3rem/1.1 var(--font-h); letter-spacing: -0.01em; }
+  .caption { margin: .75rem 0 0; min-height: 2.5em; font-size: 1.75rem; line-height: 1.3; color: var(--muted); }
+  .caption b { color: var(--fg); }
+
+  .byte { display: grid; grid-template-columns: repeat(8, 1fr); gap: 1.25rem; }
+  .tile {
+    position: relative; height: 13.5rem; padding: 1rem .5rem 1.25rem;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    font: inherit; color: var(--fg); background: var(--bg);
+    border: .1875rem solid var(--muted); border-radius: var(--radius);
+    cursor: pointer; touch-action: manipulation;
+    transition: background-color .25s, color .25s, border-color .25s, transform .12s;
+  }
+  .tile:active { transform: scale(.96); }
+  .tile:focus-visible { outline: .25rem solid var(--accent2); outline-offset: .25rem; }
+  .tile .pow { font-size: 1.5rem; color: var(--muted); opacity: 0; transition: opacity .3s; }
+  .tile .digit { font: 700 5.5rem/1 var(--mono); color: var(--muted); }
+  .tile .place {
+    font: 800 2.25rem/1 var(--font); opacity: 0; transform: translateY(.5rem);
+    transition: opacity .35s, transform .35s;
+  }
+  .tile.revealed .pow, .tile.revealed .place { opacity: 1; transform: none; }
+  .tile.on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .tile.on .digit, .tile.on .pow { color: var(--bg); }
+  .tile.pulse { animation: pulse .7s ease-out; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 var(--accent2); }
+    100% { box-shadow: 0 0 0 1.25rem transparent; }
+  }
+
+  .sum {
+    display: flex; align-items: baseline; justify-content: center; gap: 1.25rem;
+    min-height: 5.5rem; opacity: 0; transform: translateY(.75rem);
+    transition: opacity .35s, transform .35s;
+  }
+  .sum.shown { opacity: 1; transform: none; }
+  .sum .expr { font: 600 2rem/1.2 var(--mono); color: var(--muted); max-width: 46rem; text-align: right; }
+  .sum .eq { font-size: 2.5rem; color: var(--muted); }
+  .sum .dec { font: 800 5rem/1 var(--font-h); color: var(--accent); min-width: 3ch; }
+
+  .bottom { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4.5rem; }
+  .hint { font-size: 1.5rem; color: var(--muted); }
+  .controls { display: flex; gap: 1rem; }
+  .controls[hidden] { display: none; }
+  .btn {
+    display: inline-flex; align-items: center; gap: .75rem;
+    min-height: 4.5rem; padding: 0 1.75rem;
+    font: 700 1.75rem/1 var(--font); color: var(--accent); background: var(--bg);
+    border: .1875rem solid var(--accent); border-radius: 999px;
+    cursor: pointer; touch-action: manipulation;
+  }
+  .btn.primary { background: var(--accent); color: var(--bg); }
+  .btn:active { transform: scale(.97); }
+  .btn:focus-visible { outline: .25rem solid var(--accent2); outline-offset: .25rem; }
+  .btn svg { width: 1.75rem; height: 1.75rem; fill: currentColor; }
+  .btn[hidden] { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Binary: counting with 8 bits</h1>
+    <p class="caption" id="caption" aria-live="polite"></p>
+  </header>
+
+  <main class="byte" id="byte" aria-label="Eight bits, tap to flip"></main>
+
+  <section class="sum" id="sum" aria-live="polite">
+    <span class="expr" id="expr"></span>
+    <span class="eq">=</span>
+    <span class="dec" id="dec">0</span>
+  </section>
+
+  <footer class="bottom">
+    <span class="hint">Tap a bit to flip it.</span>
+    <div class="controls" id="controls" hidden>
+      <button class="btn primary" id="play" type="button" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true" id="play-icon"><path d="M8 5v14l11-7z"/></svg>
+        <span id="play-label">Pause</span>
+      </button>
+      <button class="btn" id="plus" type="button">+1</button>
+      <button class="btn" id="reset" type="button">Reset</button>
+    </div>
+  </footer>
+
+<script>
+  /* rupok injects window.rupok before this script runs. This small stand-in
+     is only used when the file is opened directly in a browser without the SDK,
+     so the object still previews (arrow keys step through it). */
+  const rupok = window.rupok || (function () {
+    let cur = 0, count = 0, saved;
+    const subs = [];
+    const set = (n) => {
+      n = Math.max(0, Math.min(count, n));
+      if (n !== cur) { cur = n; subs.forEach((f) => f(cur)); }
+    };
+    document.addEventListener("keydown", (e) => {
+      const k = e.key;
+      if (k === "ArrowRight" || k === "PageDown" || (k === " " && e.target.tagName !== "BUTTON")) { e.preventDefault(); set(cur + 1); }
+      if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); set(cur - 1); }
+    });
+    return {
+      mode: "present",
+      ready: Promise.resolve({ standalone: true }),
+      steps: {
+        get current() { return cur; },
+        get count() { return count; },
+        setCount(n) { count = n; set(cur); },
+        onChange(f) { subs.push(f); setTimeout(() => f(cur)); return () => {}; },
+        next() { set(cur + 1); },
+        prev() { set(cur - 1); },
+        goto: set,
+      },
+      state: { load: () => saved, save: (v) => { saved = v; } },
+      theme: { get: (k, d) => d, all: () => ({}), onChange: () => () => {} },
+      quiz: { submit() {} },
+      resize() {},
+      log() {},
+    };
+  })();
+
+  const BITS = 8;
+  const SUM_STEP = 9;
+  const COUNT_STEP = 10;
+  const TICK_MS = 900;
+  const PLAY_ICON = '<path d="M8 5v14l11-7z"/>';
+  const PAUSE_ICON = '<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>';
+
+  const $ = (id) => document.getElementById(id);
+  const ui = {
+    byte: $("byte"), caption: $("caption"), sum: $("sum"), expr: $("expr"), dec: $("dec"),
+    controls: $("controls"), play: $("play"), playIcon: $("play-icon"), playLabel: $("play-label"),
+    plus: $("plus"), reset: $("reset"),
+  };
+
+  let value = 0;
+  let step = 0;
+  let playing = true;
+  let timer = null;
+
+  /* Tiles, left to right: bit 7 (128) down to bit 0 (1). */
+  const tiles = [];
+  for (let i = 0; i < BITS; i++) {
+    const bit = BITS - 1 - i;
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "tile";
+    el.innerHTML =
+      '<span class="pow">2<sup>' + bit + "</sup></span>" +
+      '<span class="digit">0</span>' +
+      '<span class="place">' + (1 << bit) + "</span>";
+    el.addEventListener("click", () => {
+      value ^= 1 << bit;
+      if (step === COUNT_STEP) setPlaying(false);
+      render();
+      persist();
+    });
+    ui.byte.appendChild(el);
+    tiles.push({ el, bit, digit: el.querySelector(".digit") });
+  }
+
+  function captionFor(s) {
+    if (s === 0) return "A byte has <b>8 bits</b>. Each bit is off (0) or on (1).";
+    if (s === 1) return "The rightmost bit is worth <b>1</b>.";
+    if (s < 8) {
+      const v = 1 << (s - 1);
+      return "The next place is worth <b>" + v + "</b>: double " + v / 2 + ".";
+    }
+    if (s === 8) return "The leftmost bit is worth <b>128</b>. Eight places: 1 up to 128.";
+    if (s === SUM_STEP) return "Add the places that are on. Tap bits to make any number from <b>0 to 255</b>.";
+    return "Counting up: watch the rightmost bit flip <b>every time</b>.";
+  }
+
+  function render() {
+    for (const t of tiles) {
+      const on = (value >> t.bit) & 1;
+      t.el.classList.toggle("on", on === 1);
+      t.el.classList.toggle("revealed", step >= t.bit + 1);
+      t.el.setAttribute("aria-pressed", on ? "true" : "false");
+      t.el.setAttribute("aria-label", "Bit worth " + (1 << t.bit) + ", " + (on ? "on" : "off"));
+      t.digit.textContent = on ? "1" : "0";
+    }
+    const parts = tiles.filter((t) => (value >> t.bit) & 1).map((t) => String(1 << t.bit));
+    ui.expr.textContent = parts.length ? parts.join(" + ") : "0";
+    ui.dec.textContent = String(value);
+    ui.sum.classList.toggle("shown", step >= SUM_STEP);
+    ui.caption.innerHTML = captionFor(step);
+    ui.controls.hidden = step < SUM_STEP;
+    ui.play.hidden = step < COUNT_STEP;
+    ui.playIcon.innerHTML = playing ? PAUSE_ICON : PLAY_ICON;
+    ui.playLabel.textContent = playing ? "Pause" : "Count";
+  }
+
+  function persist() {
+    rupok.state.save({ value });
+  }
+
+  function tick() {
+    value = (value + 1) & 0xff;
+    render();
+  }
+
+  function syncTimer() {
+    const run = step === COUNT_STEP && playing;
+    if (run && !timer) timer = setInterval(tick, TICK_MS);
+    if (!run && timer) { clearInterval(timer); timer = null; }
+  }
+
+  function setPlaying(on) {
+    const wasRunning = !!timer;
+    playing = on;
+    syncTimer();
+    if (wasRunning && !on) persist();
+    render();
+  }
+
+  function onStep(s) {
+    const revealed = s >= 1 && s <= BITS && s === step + 1;
+    if (s === COUNT_STEP && step !== COUNT_STEP) playing = true;
+    step = s;
+    syncTimer();
+    render();
+    if (revealed) {
+      const t = tiles.find((x) => x.bit === s - 1);
+      t.el.classList.remove("pulse");
+      void t.el.offsetWidth;
+      t.el.classList.add("pulse");
+    }
+  }
+
+  ui.play.addEventListener("click", () => setPlaying(!playing));
+  ui.plus.addEventListener("click", () => {
+    if (step === COUNT_STEP) setPlaying(false);
+    tick();
+    persist();
+  });
+  ui.reset.addEventListener("click", () => {
+    if (step === COUNT_STEP) setPlaying(false);
+    value = 0;
+    render();
+    persist();
+  });
+
+  render();
+  rupok.steps.setCount(COUNT_STEP);
+  rupok.ready.then(() => {
+    const saved = rupok.state.load();
+    if (saved && Number.isInteger(saved.value)) value = saved.value & 0xff;
+    render();
+    rupok.steps.onChange(onStep);
+  });
+</script>
+</body>
+</html>

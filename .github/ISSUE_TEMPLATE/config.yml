@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/shaitrish/rupok/security/policy
+    about: Please report vulnerabilities privately (see SECURITY.md), not as public issues.
+  - name: Questions and ideas
+    url: https://github.com/shaitrish/rupok/discussions
+    about: Ask how to do something, share a lesson, or discuss an idea before filing an issue.
+  - name: Roadmap and plans
+    url: https://github.com/shaitrish/rupok/blob/main/ROADMAP.md
+    about: See what is planned and pick up a task.

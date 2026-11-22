@@ -1,0 +1,12 @@
+[package]
+name = "rupok-ink"
+description = "Ink input pipeline for rupok: filtering, pressure, simplification and compact point encoding"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+thiserror.workspace = true

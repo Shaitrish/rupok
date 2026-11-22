@@ -1,0 +1,18 @@
+[package]
+name = "rupok-bench"
+description = "Performance harness for rupok: synthetic long classes, document + GPU render budgets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+rupok-ink.workspace = true
+rupok-core.workspace = true
+rupok-format.workspace = true
+rupok-render.workspace = true
+wgpu = { workspace = true, features = ["wgsl", "std", "parking_lot", "vulkan", "metal", "dx12", "gles"] }
+pollster.workspace = true

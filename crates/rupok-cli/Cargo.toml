@@ -1,0 +1,32 @@
+[package]
+name = "rupok-cli"
+description = "The `rupok` command-line tool and MCP server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+name = "rupok_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rupok"
+path = "src/main.rs"
+
+[dependencies]
+rupok-core.workspace = true
+rupok-format.workspace = true
+clap.workspace = true
+tokio.workspace = true
+rmcp = { workspace = true, features = ["server", "macros", "transport-io"] }
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

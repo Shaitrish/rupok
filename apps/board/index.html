@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Rupok — Mind Over Matter</title>
+    <meta name="description" content="The free, open-source smart whiteboard for teachers. Write on your slides, drop in live lessons your AI made, and replay every class." />
+    <meta name="theme-color" content="#5b5bd6" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="canonical" href="https://rupok.app/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Rupok — Mind Over Matter" />
+    <meta property="og:description" content="The free, open-source smart whiteboard for teachers. Live AI content, pen on top, every class replayable." />
+    <meta property="og:url" content="https://rupok.app/" />
+    <meta property="og:image" content="https://rupok.app/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <header class="nav">
+      <div class="wrap nav-in">
+        <a class="logo" href="/" aria-label="Rupok home">
+          <img src="/favicon.svg" alt="" width="32" height="32" />
+          <span>rupok</span>
+        </a>
+        <nav class="links" aria-label="Main">
+          <a href="#features">Features</a>
+          <a href="#ai">Your AI</a>
+          <a href="#students">Students</a>
+          <a href="#plans">Plans</a>
+          <a href="https://github.com/Shaitrish/rupok" rel="noopener">GitHub</a>
+        </nav>
+        <a class="btn solid" href="/board/">Open the board</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="wrap">
+          <p class="eyebrow"><span class="dot"></span>Free · Open source · Works offline</p>
+          <h1>The smart whiteboard<br />for teachers.</h1>
+          <p class="lede">
+            Write on your slides with a pen. Drop in live, interactive lessons your AI made.
+            Replay every class, stroke by stroke. <b>Mind over matter.</b>
+          </p>
+          <div class="ctas">
+            <a class="btn solid lg" href="/board/"><i data-icon="pen"></i>Open the board — it's free</a>
+            <a class="btn ghost lg" href="https://github.com/Shaitrish/rupok" rel="noopener"><i data-icon="layers"></i>View the source</a>
+          </div>
+          <p class="fine">No account, no install. Runs in Chrome or Edge on any smartboard, laptop or tablet.</p>
+          <figure class="shot">
+            <img src="/hero.webp" width="2880" height="1620" alt="The Rupok board: a live binary-numbers Smart Object on a slide, with a teacher's pen annotations on top." />
+          </figure>
+        </div>
+      </section>
+
+      <section id="features" class="band">
+        <div class="wrap">
+          <h2>Everything a class needs. Nothing in the way.</h2>
+          <p class="sub">Built for 86-inch panels and chalk-dusted fingers, and just as good on a laptop.</p>
+          <div class="grid">
+            <article class="card"><i data-icon="pen"></i><h3>A pen that keeps up</h3><p>A GPU ink engine draws in under a millisecond, even after a two-hour class with thousands of strokes. Pressure, palm rejection, highlighter, shapes.</p></article>
+            <article class="card"><i data-icon="object"></i><h3>Live Smart Objects</h3><p>Diagrams, simulations, quizzes and games run right on the slide. Write on top of them, and step through them with your clicker.</p></article>
+            <article class="card"><i data-icon="pdf"></i><h3>Your slides in one drop</h3><p>Drop a PDF and every page becomes a slide you can write on. Images, HTML and lessons drop in the same way.</p></article>
+            <article class="card"><i data-icon="replay"></i><h3>Every class, replayable</h3><p>Every stroke is timestamped. Replay any page, stroke by stroke, for students who missed it.</p></article>
+            <article class="card"><i data-icon="monitor"></i><h3>Works offline</h3><p>Lessons are single <code>.rpk</code> files. Fonts and libraries are built in, so a classroom without Wi-Fi still works. Install it as an app.</p></article>
+            <article class="card"><i data-icon="palette"></i><h3>Yours to shape</h3><p>Light or dark, seven accents, four icon styles, toolbar on any side, sizes for big boards. Chalkboard and paper backgrounds too.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section id="ai" class="split">
+        <div class="wrap split-in">
+          <div>
+            <p class="eyebrow">Your AI, your subscription</p>
+            <h2>Ask for a lesson.<br />Teach it a minute later.</h2>
+            <p class="sub">
+              Rupok speaks MCP, the open standard for AI tools. Connect the agent you already use — Claude, Codex,
+              OpenCode — and ask for “a binary counter for Grade 7” or “a quiz on networking”. It builds the slides and
+              Smart Objects straight into your lesson.
+            </p>
+            <ul class="ticks">
+              <li>Uses your own AI subscription. Rupok never sees your login.</li>
+              <li>Every object is validated and sandboxed before it reaches the board.</li>
+              <li>Coming with Rupok Cloud: a one-click connector inside Claude.</li>
+            </ul>
+          </div>
+          <pre class="term" aria-label="Example"><span class="c"># connect your agent once</span>
+<span class="p">$</span> claude mcp add rupok -- rupok mcp
+
+<span class="c"># then just ask</span>
+<span class="q">›</span> Make tomorrow’s ICT class on binary numbers:
+  5 slides, a live counter, and a 4-question quiz.
+
+<span class="ok">✓</span> create_lesson  “Binary numbers”
+<span class="ok">✓</span> add_smart_object  “8-bit counter” · 8 steps
+<span class="ok">✓</span> add_smart_object  “Quick quiz” · 4 steps</pre>
+        </div>
+      </section>
+
+      <section id="students" class="band">
+        <div class="wrap split-in">
+          <div>
+            <p class="eyebrow">For students</p>
+            <h2>Open the lesson. Replay the class.</h2>
+            <p class="sub">
+              Got a <code>.rpk</code> file from your teacher? Open it in your browser — no account, no download — and
+              replay the class exactly as it was taught, including the live objects.
+            </p>
+            <a class="btn solid" href="/board/"><i data-icon="open"></i>Open a lesson file</a>
+          </div>
+          <div class="stack">
+            <div class="mini"><i data-icon="replay"></i><div><b>Replay at 1–8×</b><span>Watch every stroke appear in order.</span></div></div>
+            <div class="mini"><i data-icon="object"></i><div><b>Try the objects</b><span>Quizzes and simulations still work.</span></div></div>
+            <div class="mini"><i data-icon="pen"></i><div><b>Add your own notes</b><span>Write on top and save your copy.</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="plans" class="split">
+        <div class="wrap">
+          <h2>The app is free. Forever.</h2>
+          <p class="sub">Rupok is open source. Rupok Cloud adds sync, sharing and live classes, starting with a free plan for every teacher.</p>
+          <div class="plans">
+            <article class="plan"><h3>Free</h3><p class="price">৳0</p><ul><li>The full app, every feature</li><li>500 MB cloud storage and sync <em>soon</em></li><li>Claude connector <em>soon</em></li><li>Student share links <em>soon</em></li></ul><a class="btn solid" href="/board/">Start now</a></article>
+            <article class="plan feat"><h3>Pro</h3><p class="price">Coming soon</p><ul><li>Everything in Free</li><li>Large cloud storage</li><li>Live class for your students</li><li>Rupok AI credits</li><li>Quiz and attendance insights</li></ul><a class="btn ghost" href="https://github.com/Shaitrish/rupok" rel="noopener">Watch for launch</a></article>
+            <article class="plan"><h3>School</h3><p class="price">Coming soon</p><ul><li>Everything in Pro</li><li>Admin for all your teachers</li><li>Student lists and classes</li><li>Shared course library</li></ul><a class="btn ghost" href="https://shaitrish.com" rel="noopener">Talk to us</a></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="band cta-band">
+        <div class="wrap">
+          <img src="/favicon.svg" width="56" height="56" alt="" />
+          <h2>Mind over matter.</h2>
+          <p class="sub">Open the board and write your first line in five seconds.</p>
+          <a class="btn solid lg" href="/board/">Open the board</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot-in">
+        <span>© Shaitrish · Rupok is open source under AGPL-3.0</span>
+        <span class="foot-links"><a href="https://github.com/Shaitrish/rupok">GitHub</a><a href="https://github.com/Shaitrish/rupok/blob/main/ROADMAP.md">Roadmap</a><a href="https://github.com/Shaitrish/rupok/blob/main/CONTRIBUTING.md">Contribute</a></span>
+      </div>
+    </footer>
+    <script type="module" src="/src/site.ts"></script>
+  </body>
+</html>

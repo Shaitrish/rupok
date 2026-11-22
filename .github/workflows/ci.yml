@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  rust:
+    name: Rust (fmt, clippy, test, wasm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installs the toolchain, components (rustfmt, clippy) and the
+      # wasm32-unknown-unknown target pinned in rust-toolchain.toml.
+      - name: Install Rust from rust-toolchain.toml
+        run: |
+          rustup toolchain install
+          rustup show
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      # .cargo/config.toml sets the getrandom wasm backend rustflags.
+      - name: Build wasm
+        run: cargo build -p rupok-wasm --target wasm32-unknown-unknown --release
+
+  sdk:
+    name: Object SDK (node --test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Node 22+ treats test arguments as globs; a bare directory is not expanded.
+      - name: Test
+        run: node --test "packages/object-sdk/test/*.test.mjs"

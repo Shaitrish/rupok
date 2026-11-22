@@ -1,0 +1,13 @@
+// Cloudflare Workers static-assets deploy of the board app.
+//   cd apps/board && bunx vite build && bunx wrangler deploy
+// CI does the same on every push to main (.github/workflows/deploy.yml).
+{
+  "name": "rupok",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  // www.rupok.app and the old rupok.shaitrish.com redirect here (see redirect/).
+  "routes": [{ "pattern": "rupok.app", "custom_domain": true }]
+}

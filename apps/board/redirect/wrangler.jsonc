@@ -1,0 +1,11 @@
+// Tiny Worker that permanently redirects alternate hostnames to https://rupok.app.
+//   cd apps/board/redirect && bunx wrangler deploy
+{
+  "name": "rupok-redirect",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-01",
+  "routes": [
+    { "pattern": "www.rupok.app", "custom_domain": true },
+    { "pattern": "rupok.shaitrish.com", "custom_domain": true }
+  ]
+}

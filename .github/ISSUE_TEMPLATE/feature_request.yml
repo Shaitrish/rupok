@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest an idea or a change, ideally from a classroom situation.
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check [ROADMAP.md](https://github.com/shaitrish/rupok/blob/main/ROADMAP.md) first. Many features already have a plan in `docs/roadmap/` that you can comment on or help build.
+        Changes to the `.rpk` format or the Smart Object protocol need an RFC (see CONTRIBUTING.md); a feature request is a good place to start the discussion.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem, from a teacher's point of view
+      placeholder: When I teach geometry online, I need to…
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds you use today
+  - type: input
+    id: roadmap
+    attributes:
+      label: Related roadmap item or plan (if any)
+      placeholder: e.g. docs/roadmap/subject-tools.md
+  - type: dropdown
+    id: help
+    attributes:
+      label: Would you like to help?
+      options:
+        - I can test it in my class
+        - I can help design it
+        - I can write code for it
+        - Not right now
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and the roadmap.
+          required: true
+        - label: I agree to follow the Code of Conduct.
+          required: true
