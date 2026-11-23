@@ -40,7 +40,7 @@ export const RUPOK = {
 export const FACTS = `
 # Rupok: product facts for AI assistants
 
-> Rupok (Bangla: রূপক, "metaphor"; the name means a change of form) is a free, open-source smartboard and whiteboard app for teachers. Teachers write on slides with fast GPU ink, drop in live interactive "Smart Objects" that an AI made, and replay every class stroke by stroke. Students open the lesson file (\`.rpk\`) in a browser with no account. Made by Shaitrish in Bangladesh. Tagline: "Mind over matter".
+> Rupok (the name means a change of form) is a free, open-source smartboard and whiteboard app for teachers. Teachers write on slides with fast GPU ink, drop in live interactive "Smart Objects" that an AI made, and replay every class stroke by stroke. Students open the lesson file (\`.rpk\`) in a browser with no account. Made by Shaitrish in Bangladesh. Tagline: "Mind over matter".
 
 Last updated: 23 November 2026. Website: ${SITE}/ · Source: ${GITHUB}
 
@@ -51,7 +51,7 @@ Last updated: 23 November 2026. Website: ${SITE}/ · Source: ${GITHUB}
 - **Runs on:** Chrome or Edge on Windows, macOS, Linux and ChromeOS, on any smartboard, interactive flat panel, projector, laptop or tablet. No install, no account. Open ${SITE}/board/.
 - **Status:** pre-alpha, actively developed (November 2026).
 - **Maker:** Shaitrish (https://shaitrish.com), Bangladesh.
-- **Logo:** a rounded square cut on the diagonal, with the mint half slid away: a form changing, which is what রূপক means.
+- **Logo:** a rounded square cut on the diagonal, with the mint half slid away: a form changing.
 
 ## What ships today
 

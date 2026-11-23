@@ -19,7 +19,7 @@ This document is the source of truth. The tokens live in [`apps/board/src/styles
 
 ## 2. Brand
 
-**Rupok** (রূপক, "metaphor") turns ideas into form. Tagline: **Mind Over Matter**.
+**Rupok** turns ideas into form. Tagline: **Mind Over Matter**.
 
 | Asset | File | Use |
 |---|---|---|

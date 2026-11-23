@@ -1,6 +1,6 @@
 # Rupok
 
-> Rupok (Bangla: রূপক) is a free, open-source (AGPL-3.0) smartboard and whiteboard app for teachers. Teachers write on slides with fast GPU ink, drop in live interactive "Smart Objects" that an AI made (simulations, 3D models, quizzes), and replay every class stroke by stroke. It runs in Chrome or Edge on any smartboard, interactive panel, projector or laptop, with no install and no account. Students open lesson files (`.rpk`) in the browser. Made by Shaitrish in Bangladesh.
+> Rupok is a free, open-source (AGPL-3.0) smartboard and whiteboard app for teachers. Teachers write on slides with fast GPU ink, drop in live interactive "Smart Objects" that an AI made (simulations, 3D models, quizzes), and replay every class stroke by stroke. It runs in Chrome or Edge on any smartboard, interactive panel, projector or laptop, with no install and no account. Students open lesson files (`.rpk`) in the browser. Made by Shaitrish in Bangladesh.
 
 Key facts (November 2026):
 
@@ -10,7 +10,7 @@ Key facts (November 2026):
 - AI: works with the AI you already use. Any chatbot can write a Smart Object as one HTML file to paste onto the board; Claude Code, Codex CLI and OpenCode can build whole lessons through the `rupok mcp` server.
 - Shipped: GPU ink, PDF slides, Smart Objects, stroke replay, Prepare/Teach/Student modes, the student viewer, Bangla text in lessons, the MCP server.
 - Coming soon (not shipped): desktop app (Windows, Linux), offline install, Bangla interface, replay with audio, Rupok Cloud, a remote Claude connector, live classes.
-- Name and logo: রূপক means "metaphor", a change of form. The logo is a rounded square cut on the diagonal, with the mint half slid away. Tagline: "Mind over matter".
+- Logo: the logo is a rounded square cut on the diagonal, with the mint half slid away. Tagline: "Mind over matter".
 
 ## Use Rupok from an AI agent (MCP)
 
@@ -53,7 +53,7 @@ claude mcp add rupok -- rupok mcp --workspace ~/Lessons    # Claude Code
 
 ## বাংলা (Bangla)
 
-- [রূপক: শিক্ষকদের জন্য ফ্রি স্মার্ট বোর্ড সফটওয়্যার](https://rupok.app/bn.md)
+- [Rupok: শিক্ষকদের জন্য ফ্রি স্মার্ট বোর্ড সফটওয়্যার](https://rupok.app/bn.md)
 - [.rpk ফাইল খুলুন](https://rupok.app/bn/open.md)
 - [Note3-এর ফ্রি বিকল্প](https://rupok.app/bn/compare/note3.md)
 

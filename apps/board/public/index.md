@@ -36,7 +36,7 @@ Rupok is open source. Rupok Cloud adds sync, sharing and live classes, starting 
 - [Online class whiteboard](https://rupok.app/online-class-whiteboard/): Teach on Zoom, Meet or Teams; send a replay.
 - [For teachers](https://rupok.app/for-teachers/): Plan, teach, replay, share.
 - [Compare](https://rupok.app/compare/): Rupok vs Note3, SMART Notebook, OpenBoard, Jamboard and more.
-- [বাংলা](https://rupok.app/bn/): রূপক: শিক্ষকদের জন্য ফ্রি স্মার্ট বোর্ড সফটওয়্যার।
+- [বাংলা](https://rupok.app/bn/): Rupok: শিক্ষকদের জন্য ফ্রি স্মার্ট বোর্ড সফটওয়্যার।
 
 ## Questions teachers ask
 

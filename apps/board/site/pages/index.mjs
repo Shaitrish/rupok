@@ -52,7 +52,7 @@ export const HOME = {
         { href: "/online-class-whiteboard/", b: "Online class whiteboard", t: "Teach on Zoom, Meet or Teams; send a replay." },
         { href: "/for-teachers/", b: "For teachers", t: "Plan, teach, replay, share." },
         { href: "/compare/", b: "Compare", t: "Rupok vs Note3, SMART Notebook, OpenBoard, Jamboard and more." },
-        { href: "/bn/", b: "বাংলা", t: "রূপক: শিক্ষকদের জন্য ফ্রি স্মার্ট বোর্ড সফটওয়্যার।" },
+        { href: "/bn/", b: "বাংলা", t: "Rupok: শিক্ষকদের জন্য ফ্রি স্মার্ট বোর্ড সফটওয়্যার।" },
       ] }],
     },
   ],

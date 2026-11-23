@@ -128,12 +128,12 @@ const NAV = {
   },
   bn: {
     home: "/bn/",
-    homeLabel: "রূপক হোম",
+    homeLabel: "Rupok হোম",
     label: "প্রধান",
     links: [
       ["/bn/", "স্মার্ট বোর্ড সফটওয়্যার"],
       ["/bn/open/", ".rpk ফাইল খুলুন"],
-      ["/bn/compare/note3/", "Note3 বনাম রূপক"],
+      ["/bn/compare/note3/", "Note3 বনাম Rupok"],
     ],
     board: "বোর্ড খুলুন",
   },
@@ -177,20 +177,20 @@ export function footer(page) {
   const bn = page.lang === "bn";
   const a = (href, label, extra = "") => `<a href="${href}"${extra}>${label}</a>`;
   const product = bn
-    ? [a("/board/", "বোর্ড খুলুন"), a("/bn/", "স্মার্ট বোর্ড সফটওয়্যার"), a("/bn/open/", ".rpk ফাইল খুলুন"), a("/bn/compare/note3/", "Note3 বনাম রূপক"), a("/#plans", "মূল্য", ' hreflang="en"')]
+    ? [a("/board/", "বোর্ড খুলুন"), a("/bn/", "স্মার্ট বোর্ড সফটওয়্যার"), a("/bn/open/", ".rpk ফাইল খুলুন"), a("/bn/compare/note3/", "Note3 বনাম Rupok"), a("/#plans", "মূল্য", ' hreflang="en"')]
     : [a("/board/", "Open the board"), a("/smartboard-software/", "Smartboard software"), a("/ai-whiteboard/", "AI whiteboard"), a("/online-class-whiteboard/", "Online class whiteboard"), a("/for-teachers/", "For teachers"), a("/open/", "Open a .rpk file"), a("/#plans", "Pricing")];
   const compare = [a("/compare/", bn ? "সব তুলনা" : "All comparisons", bn ? ' hreflang="en"' : ""), ...COMPARE_LINKS.map(([h, l]) => a(h, l, bn ? ' hreflang="en"' : ""))];
   const oss = [a(GITHUB, "GitHub", ' rel="noopener"'), a(`${GITHUB}/blob/main/ROADMAP.md`, bn ? "রোডম্যাপ" : "Roadmap", ' rel="noopener"'), a(`${GITHUB}/blob/main/CONTRIBUTING.md`, bn ? "অবদান রাখুন" : "Contribute", ' rel="noopener"'), a("/llms.txt", "llms.txt"), `<span class="lic">AGPL-3.0</span>`];
   const lang = bn
     ? [a("/", "Rupok in English", ' hreflang="en" lang="en"'), a("/open/", "Open a .rpk file", ' hreflang="en" lang="en"'), a("/compare/", "Compare", ' hreflang="en" lang="en"')]
-    : [a("/bn/", "রূপক বাংলায়", ' hreflang="bn"'), a("/bn/open/", ".rpk ফাইল খুলুন", ' hreflang="bn"'), a("/bn/compare/note3/", "Note3 বনাম রূপক", ' hreflang="bn"')];
+    : [a("/bn/", "Rupok বাংলায়", ' hreflang="bn"'), a("/bn/open/", ".rpk ফাইল খুলুন", ' hreflang="bn"'), a("/bn/compare/note3/", "Note3 বনাম Rupok", ' hreflang="bn"')];
   const blurb = bn
     ? `শিক্ষকদের জন্য ফ্রি, ওপেন সোর্স হোয়াইটবোর্ড। বাংলাদেশে বানিয়েছে <a href="https://shaitrish.com" rel="noopener">Shaitrish</a>, সব ক্লাসরুমের জন্য।`
     : `The free, open-source whiteboard for teachers. Made by <a href="https://shaitrish.com" rel="noopener">Shaitrish</a> in Bangladesh, for classrooms everywhere.`;
   return `<footer class="foot">
       <div class="wrap foot-in">
         <div class="foot-brand"><span class="word">${MARK_SVG("#3EE6B0")}rupok</span><p>${blurb}</p></div>
-        <nav aria-label="${bn ? "রূপক" : "Product"}"><b>${bn ? "রূপক" : "Product"}</b>${product.join("")}</nav>
+        <nav aria-label="${bn ? "Rupok" : "Product"}"><b>${bn ? "Rupok" : "Product"}</b>${product.join("")}</nav>
         <nav aria-label="${bn ? "তুলনা" : "Compare"}"><b>${bn ? "তুলনা" : "Compare"}</b>${compare.join("")}</nav>
         <nav aria-label="Open source"><b>${bn ? "ওপেন সোর্স" : "Open source"}</b>${oss.join("")}</nav>
         <nav aria-label="${bn ? "English" : "বাংলা"}"${bn ? ' lang="en"' : ' lang="bn"'}><b>${bn ? "English" : "বাংলা"}</b>${lang.join("")}</nav>
@@ -213,7 +213,6 @@ export const APP = {
   "@type": "SoftwareApplication",
   "@id": `${SITE}/#app`,
   name: "Rupok",
-  alternateName: "রূপক",
   description:
     "Free, open-source smartboard and whiteboard software for teachers: GPU ink on slides, live AI-made Smart Objects, stroke-by-stroke class replay and a no-account student viewer for .rpk lesson files.",
   url: `${SITE}/`,
@@ -249,7 +248,6 @@ export function jsonLd(page, { home = false } = {}) {
       "@id": `${SITE}/#website`,
       url: `${SITE}/`,
       name: "Rupok",
-      alternateName: "রূপক",
       inLanguage: ["en", "bn"],
       publisher: { "@id": `${SITE}/#org` },
     });
@@ -268,7 +266,7 @@ export function jsonLd(page, { home = false } = {}) {
     ...(crumbs.length ? { breadcrumb: { "@id": `${url}#crumbs` } } : {}),
   });
   if (crumbs.length) {
-    const home = page.lang === "bn" ? ["রূপক", "/bn/"] : ["Rupok", "/"];
+    const home = page.lang === "bn" ? ["Rupok", "/bn/"] : ["Rupok", "/"];
     const items = [home, ...crumbs];
     graph.push({
       "@type": "BreadcrumbList",
@@ -343,7 +341,7 @@ export function mdPath(page) {
 
 function crumbsHtml(page) {
   if (!page.crumbs?.length) return "";
-  const home = page.lang === "bn" ? ["রূপক", "/bn/"] : ["Rupok", "/"];
+  const home = page.lang === "bn" ? ["Rupok", "/bn/"] : ["Rupok", "/"];
   const items = [home, ...page.crumbs];
   return `<nav class="crumbs" aria-label="${page.lang === "bn" ? "ব্রেডক্রাম্ব" : "Breadcrumb"}"><ol>${items
     .map(([name, href], i) =>

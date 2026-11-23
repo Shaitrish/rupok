@@ -93,7 +93,7 @@ The toolchain (1.100, edition 2024) is pinned in `rust-toolchain.toml`.
 5. **Don't weaken the sandbox.** Never add `allow-same-origin` or other
    sandbox flags, relax the object CSP, or let objects reach the network
    without `permissions.network`.
-6. **Commits:** sign off (`git commit -s`, DCO). Commit only when the human
+6. **Commits:** contributors sign the CLA (CLA.md) once; no sign-off needed. Commit only when the human
    asks.
 7. **Stay in scope.** Other contributors (human or agent) may be editing
    other parts of the tree; change only what your task needs.

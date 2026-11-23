@@ -22,7 +22,7 @@ export function Icon(props: { name: IconName; size?: number; active?: boolean; v
 }
 
 /** The Rupok mark, "Split": a rounded square cut on the diagonal with the
- * mint half slid away (form changing — রূপক). The ink half follows the text
+ * mint half slid away (form changing). The ink half follows the text
  * colour so it works on light and dark. Source of truth: /brand/rupok-mark.svg. */
 export function Mark(props: { size?: number }) {
   return (
