@@ -41,7 +41,7 @@ in one line; the panel already shows a card per board change.
 Mentions arrive as resources: `rupok://board/page/N`, `…/selection`,
 `…/object/<id>` (board JSON, often with a picture), `rupok://library/<name>`
 (a lesson's outline) and `file:///<name>` (the teacher's files). `/quiz`,
-`/explain`, `/translate` and `/solve` reach you as plain requests about the
+`/explain`, `/translate`, `/design` and `/solve` reach you as plain requests about the
 attached page.
 
 ## Look before you act
@@ -131,6 +131,44 @@ offline recogniser read (n-best LaTeX). Then:
 - **Harder practice problems**: read the example, make 3 graded problems on a
   new page, answers revealed on Next.
 
+## Page design
+
+Teachers ask for a look: "a chalkboard background with our school logo and a
+physics theme for Class 9". Use `set_page_design` and `set_branding` (both
+take `path: "live"` or a lesson file; each call is one undo step).
+
+1. **Read first.** Call each tool with only `path` to get the current design
+   (colour, pattern, background, branding).
+2. **Background** (`set_page_design`): a colour (`white`, `paper`,
+   `chalkboard`, `blackboard`, `#rrggbb`), a pattern, and an image drawn as
+   SVG for the 1920×1080 page (`viewBox="0 0 1920 1080"`, default fit
+   `stretch`) or a PNG/JPEG as base64. `all_pages: true` gives every page the
+   look; ask first unless the teacher said "all".
+3. **Branding** (`set_branding`): a logo (`logo_svg` or `logo_image`) in a
+   `logo_corner`, and a header or footer line (`school`, `teacher`, `class`,
+   `date`, `text_position`). Text can fill itself in: `{lesson}`, `{page}`,
+   `{pages}`, `{date}`, `{teacher}`, `{school}`, `{subject}`, `{course}`,
+   `{chapter}`, so one design fits every lesson ("Class 9 · {subject} ·
+   {lesson}", "{page} / {pages}"). `scope: "page"` styles one page; `page`
+   with `hidden: true` keeps a title slide clean.
+
+House rules (projectors in bright rooms, chalk-dusted fingers):
+
+- **Ink must stay readable.** On a dark page the teacher writes in white or
+  yellow; on a light page in dark colours. Keep the background's contrast
+  low: big soft shapes, at most ~8 % luminance difference in the middle.
+- **Keep the content area calm.** Decoration (a theme motif, a border, a
+  formula watermark) goes to the edges and corners, never behind the middle
+  of the slide. No text in the background image; text goes in the branding
+  line.
+- **Logo small, in a corner**: `logo_width` 0.08–0.12, away from the text
+  line. Opacity 0.8–1.
+- **Photos need dimming**: `background_dim: true` or `background_opacity`
+  0.3–0.5 so ink shows over them.
+- SVG is checked: no scripts, event handlers, external references
+  (`href` only to `#id` or embedded PNG/JPEG data) or animation. A refused
+  SVG changes nothing; fix it and call again.
+
 ## Tools
 
 | Tool | Use |
@@ -144,5 +182,7 @@ offline recogniser read (n-best LaTeX). Then:
 | `point_at(x, y, w?, h?, label?, seconds?)` | Show the class where to look. |
 | `write_handwriting(lines, anchor?, style?, speed?, color?, size?, step_mode?)` | Write a solution in handwriting next to the problem (see Solve this). |
 | `set_board_theme(page_color?, pattern?, ui?)` | Chalkboard, grid, dark mode. |
+| `set_page_design(path, page?, all_pages?, color?, pattern?, background_svg?, background_image?, background_fit?, background_opacity?, background_dim?, remove_background?)` | Page colour, pattern and background image (see Page design). |
+| `set_branding(path, scope?, page?, logo_svg?, logo_image?, logo_corner?, logo_width?, …, school?, teacher?, class?, date?, text_position?, text_align?, hidden?, remove?)` | Logo and header/footer on every page or one. |
 
 Setup for each agent: `docs/ai-agents.md` in the Rupok repository.

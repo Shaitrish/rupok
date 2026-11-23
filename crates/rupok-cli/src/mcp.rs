@@ -40,7 +40,8 @@ Live board (during class): the teacher can pair their open Rupok board with you.
 \"Connect AI\" on the board and give you a 6-digit code: call `connect_board` with it \
 (`get_board_status` says whether a board is paired and what to do next). Once paired:\n\
 - Pass `path: \"live\"` to the lesson tools (get_lesson_outline, add_page, add_text, add_smart_object, \
-update_smart_object, delete_item, set_page_background) to change the lesson open on the board; the class \
+update_smart_object, delete_item, set_page_background, set_page_design, set_branding) to change the lesson \
+open on the board; the class \
 sees each change at once and the teacher can undo it with Ctrl+Z.\n\
 - Look before you act: `get_current_page` (items and ids), `get_page_snapshot` (an image, to read \
 handwriting), `get_selection` (what the teacher selected).\n\
@@ -49,6 +50,9 @@ current one; show it with `go_to_page` when it is ready. Never delete or replace
 without asking first. Match the page `scheme` (light/dark) so objects stay themed.\n\
 - `point_at`, `step_object`, `replace_items_with_text` (ink to text) and `set_board_theme` help \
 you teach on the board.\n\
+- Page design (`set_page_design`, `set_branding`): when asked for a background, a theme or a school logo. \
+Draw it as SVG; keep the content area calm, ink readable (light ink on dark pages) and the logo small in a \
+corner; read the current design first by calling the tool with only `path`.\n\
 - To solve a problem written on the board, read it (`get_page_snapshot` with its item_ids), check every \
 step, then `write_handwriting` the solution as short lines; the board writes it in handwriting next to \
 the problem. If the result says `preview`, the teacher is checking it first: do not write it again.",
@@ -289,6 +293,51 @@ as #rrggbb.",
                 .await;
         }
         self.run(move |t| t.set_page_background(p)).await
+    }
+
+    #[tool(
+        description = "Page design: a page's colour, pattern and background image, or every page's with \
+`all_pages`. Draw backgrounds as SVG for the 1920×1080 page (viewBox=\"0 0 1920 1080\"); no scripts, event \
+handlers, external references or animation (refused). Keep the middle calm and low-contrast so ink and text \
+stay readable: on a dark page use light ink, on a light page dark ink; use `background_dim` over photos. \
+Call with only `path` to read the current design. One undo step on the board.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn set_page_design(
+        &self,
+        Parameters(p): Parameters<SetPageDesignParams>,
+    ) -> CallToolResult {
+        let op = crate::mcp_live::op_set_page_design(&p);
+        if is_live(&p.path) {
+            return self.live_call(op).await;
+        }
+        self.run(move |t| t.design_op(&p.path, op)).await
+    }
+
+    #[tool(
+        description = "Branding on every page (or one page): a logo (SVG markup or base64 PNG/JPEG) placed in a \
+corner or at fractions of the page, and a header or footer line of school, teacher and class text. Text may \
+use placeholders that fill themselves in per lesson and page: {lesson}, {page}, {pages}, {date}, {teacher}, \
+{school}, {subject}, {course}, {chapter}. Keep the logo small (logo_width 0.08–0.12) in a corner, away from \
+the content. Only the given fields change; call with only `path` to read the branding. One undo step.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn set_branding(&self, Parameters(p): Parameters<SetBrandingParams>) -> CallToolResult {
+        let op = crate::mcp_live::op_set_branding(&p);
+        if is_live(&p.path) {
+            return self.live_call(op).await;
+        }
+        self.run(move |t| t.design_op(&p.path, op)).await
     }
 
     #[tool(

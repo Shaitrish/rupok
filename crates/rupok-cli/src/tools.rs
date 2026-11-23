@@ -223,6 +223,103 @@ pub struct SetPageBackgroundParams {
     pub color: Option<String>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetPageDesignParams {
+    /// Lesson file path relative to the workspace, or `"live"` for the lesson
+    /// open on the paired board.
+    pub path: String,
+    /// 1-based page number. Default: the page the board shows (live) or page 1 (file).
+    #[serde(default)]
+    #[schemars(range(min = 1))]
+    pub page: Option<u32>,
+    /// Give every page this page's resulting look (colour, pattern, background).
+    #[serde(default)]
+    pub all_pages: bool,
+    /// Page colour: white, paper, chalkboard, blackboard or #rrggbb.
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub pattern: Option<PatternArg>,
+    /// Background as SVG markup, drawn for the 1920×1080 page (use viewBox="0 0 1920 1080").
+    /// No scripts, event handlers, external references or animation.
+    #[serde(default)]
+    pub background_svg: Option<String>,
+    /// Background as PNG or JPEG bytes, base64.
+    #[serde(default)]
+    pub background_image: Option<String>,
+    /// fit, fill, stretch, tile or center. Default: stretch for SVG, fill for photos.
+    #[serde(default)]
+    pub background_fit: Option<String>,
+    /// 0 to 1.
+    #[serde(default)]
+    pub background_opacity: Option<f64>,
+    /// Wash the image with the page colour (50 %) so ink stays readable.
+    #[serde(default)]
+    pub background_dim: Option<bool>,
+    #[serde(default)]
+    pub remove_background: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetBrandingParams {
+    /// Lesson file path relative to the workspace, or `"live"`.
+    pub path: String,
+    /// 1-based page for `scope: "page"` and `hidden`. Default: the shown page (live) or page 1.
+    #[serde(default)]
+    #[schemars(range(min = 1))]
+    pub page: Option<u32>,
+    /// `lesson` (every page, default) or `page` (this page's own branding).
+    #[serde(default)]
+    pub scope: Option<String>,
+    /// Logo as SVG markup (no scripts, external references or animation).
+    #[serde(default)]
+    pub logo_svg: Option<String>,
+    /// Logo as PNG or JPEG bytes, base64.
+    #[serde(default)]
+    pub logo_image: Option<String>,
+    /// top-left, top-right, bottom-left or bottom-right.
+    #[serde(default)]
+    pub logo_corner: Option<String>,
+    /// Logo top-left as fractions (0..1) of the page width and height.
+    #[serde(default)]
+    pub logo_x: Option<f64>,
+    #[serde(default)]
+    pub logo_y: Option<f64>,
+    /// Logo width as a fraction of the page width, 0.02 to 0.6 (0.08–0.12 is a small corner logo).
+    #[serde(default)]
+    pub logo_width: Option<f64>,
+    #[serde(default)]
+    pub logo_opacity: Option<f64>,
+    #[serde(default)]
+    pub remove_logo: bool,
+    /// Header/footer text parts (each up to 120 characters). They may use placeholders that
+    /// fill themselves in: {lesson}, {page}, {pages}, {date}, {teacher}, {school}, {subject},
+    /// {course}, {chapter}.
+    #[serde(default)]
+    pub school: Option<String>,
+    #[serde(default)]
+    pub teacher: Option<String>,
+    #[serde(default)]
+    pub class: Option<String>,
+    /// Show the day's date.
+    #[serde(default)]
+    pub date: Option<bool>,
+    /// top (header) or bottom (footer).
+    #[serde(default)]
+    pub text_position: Option<String>,
+    /// left, center or right.
+    #[serde(default)]
+    pub text_align: Option<String>,
+    /// Hide (true) or show again (false) the branding on `page` (a title slide).
+    #[serde(default)]
+    pub hidden: Option<bool>,
+    /// Remove the branding (the lesson's, or with scope page the page's own).
+    #[serde(default)]
+    pub remove: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ValidateSmartObjectParams {
@@ -403,6 +500,33 @@ impl Tools {
         let abs = self.lesson(&p.path)?;
         let color = p.color.as_deref().map(ops::parse_color).transpose()?;
         ops::set_page_background(&abs, p.page as usize, p.pattern.into(), color)
+    }
+
+    /// Run a page design op (`set_page_design`, `set_branding`) on a lesson
+    /// file: the same code the live board runs, saved when it changed.
+    pub fn design_op(&self, path: &str, op: rupok_live::Op) -> Result<serde_json::Value> {
+        let _g = self.guard();
+        let abs = self.lesson(path)?;
+        let (mut pkg, mut lesson) = ops::load(&abs)?;
+        let page_id = lesson.page_id_at(0)?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0.0, |d| d.as_secs_f64() * 1000.0);
+        let ctx = rupok_live::BoardCtx {
+            pkg: &mut pkg,
+            lesson: &mut lesson,
+            page_id: &page_id,
+            selection: &[],
+            read_only: false,
+        };
+        let out = rupok_live::apply(ctx, &op, "agent", now).map_err(|e| match e {
+            rupok_live::LiveError::NotFound(m) => ops::OpError::NotFound(m),
+            e => ops::OpError::Invalid(e.to_string()),
+        })?;
+        if out.changed {
+            ops::save(&abs, &mut pkg, &lesson)?;
+        }
+        Ok(out.result)
     }
 
     pub fn validate_smart_object(
@@ -881,5 +1005,56 @@ rupok.steps.onChange(step => { document.getElementById("bars").textContent = "St
         let bg = serde_json::to_value(schemars::schema_for!(SetPageBackgroundParams)).unwrap();
         let pat = bg["properties"]["pattern"].to_string();
         assert!(pat.contains("grid") && pat.contains("dots"), "{pat}");
+    }
+
+    #[test]
+    fn page_design_and_branding_on_a_file() {
+        let (dir, t) = tools();
+        t.create_lesson(CreateLessonParams {
+            path: "d.rpk".into(),
+            title: "Forces".into(),
+            pages: Some(3),
+        })
+        .unwrap();
+        let svg = r##"<svg viewBox="0 0 1920 1080"><rect width="1920" height="1080" fill="#17191c"/></svg>"##;
+        let op = crate::mcp_live::op_set_page_design(&SetPageDesignParams {
+            path: "d.rpk".into(),
+            all_pages: true,
+            color: Some("blackboard".into()),
+            background_svg: Some(svg.into()),
+            ..Default::default()
+        });
+        let out = t.design_op("d.rpk", op).unwrap();
+        assert_eq!(out["pages_changed"], 3);
+        let op = crate::mcp_live::op_set_branding(&SetBrandingParams {
+            path: "d.rpk".into(),
+            logo_svg: Some(
+                r#"<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="5"/></svg>"#.into(),
+            ),
+            logo_corner: Some("bottom-right".into()),
+            class: Some("Physics · {lesson} · {page}/{pages}".into()),
+            ..Default::default()
+        });
+        t.design_op("d.rpk", op).unwrap();
+        let bytes = std::fs::read(dir.path().join("d.rpk")).unwrap();
+        let pkg = rupok_format::Package::read(&bytes).unwrap();
+        let lesson = pkg.lesson().unwrap();
+        assert!(
+            lesson
+                .pages()
+                .iter()
+                .all(|p| p.bg_color == 0x17191cff && p.background.is_some())
+        );
+        let b = lesson.branding().unwrap();
+        assert_eq!(b.class, "Physics · {lesson} · {page}/{pages}");
+        assert_eq!(pkg.assets.len(), 2);
+        // Unsafe SVG: refused, the file unchanged.
+        let op = crate::mcp_live::op_set_page_design(&SetPageDesignParams {
+            path: "d.rpk".into(),
+            background_svg: Some("<svg><script>x</script></svg>".into()),
+            ..Default::default()
+        });
+        assert!(t.design_op("d.rpk", op).is_err());
+        assert_eq!(std::fs::read(dir.path().join("d.rpk")).unwrap(), bytes);
     }
 }

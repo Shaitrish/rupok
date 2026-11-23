@@ -10,7 +10,7 @@ import { isView, mode, pageIndex } from "../state";
 import { livePairError, livePhase, liveHasChat, liveWaiting, live, liveAgent } from "../live";
 import {
   SUGGESTIONS, agentCommands, agentSessions, answerPermission, attachPage, autoApprove, chat, chatAgent, chatAgents,
-  chatBusy, chatHistory, chatOpen, chatPrefs, chatStatus, chatUsage, chatWidth, closeAiPanel, composerDraft, currentMode,
+  chatBusy, chatHistory, chatOpen, chatPrefs, chatStatus, chatUsage, chatWidth, closeAiPanel, composerDraft, setComposerDraft, currentMode,
   currentModel, denyAllAndStop, editMessage, editsAutoApproved, forgetChat, formatUsage, goToPage, initChat,
   listAgentSessions, modeAutoApproves, models, modes, newChat, pendingPermissions, pickAgent, recallSent, refreshAgents,
   replaying, resumeAgentSession, resumeChat, retryAgent, retryLast, sendPrompt, setAttachPage, setAutoApprove,
@@ -490,7 +490,8 @@ function Composer() {
   const grow = () => { ta.style.height = "auto"; ta.style.height = `${Math.min(180, ta.scrollHeight)}px`; };
   const setValue = (v: string, caret = v.length) => { setText(v); ta.value = v; ta.setSelectionRange(caret, caret); grow(); };
 
-  createEffect(on(composerDraft, (d) => { if (d) { setValue(d.text); ta.focus(); } }, { defer: true }));
+  // A draft waits for the composer (e.g. "Design with AI…" before the AI is connected), then is used once.
+  createEffect(on(composerDraft, (d) => { if (d) { setValue(d.text); ta.focus(); setComposerDraft(null); } }));
 
   let menuSeq = 0;
   const updateMenu = async () => {

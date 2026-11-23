@@ -540,7 +540,7 @@ class Exporter {
       }
     }
     // Branding sits above the items and under the ink, as on the board.
-    if (hasBranding(p.branding)) await this.drawBranding(ops, res, p.branding, frameOf(p), bg);
+    if (hasBranding(p.branding)) await this.drawBranding(ops, res, p.branding, frameOf(p), bg, index);
     this.drawStrokes(ops, res, p.items, paper);
     const ctx = this.pdf.context;
     const resources = ctx.obj({
@@ -568,7 +568,9 @@ class Exporter {
   }
 
   /** The branding logo and text line (the text drawn as an image, so any script works). */
-  private async drawBranding(ops: string[], res: Resources, b: Branding, f: { w: number; h: number }, bg: number) {
+  private pageCount = 0;
+
+  private async drawBranding(ops: string[], res: Resources, b: Branding, f: { w: number; h: number }, bg: number, index: number) {
     if (b.logo) {
       const img = await this.asset(b.logo);
       const url = this.c.assetUrl(b.logo);
@@ -580,7 +582,9 @@ class Exporter {
         ops.push("Q");
       }
     }
-    const line = brandLine(b);
+    // `{page}` is the page's number in the lesson, as on the board.
+    this.pageCount ||= (JSON.parse(this.c.board.pages_json()) as unknown[]).length;
+    const line = brandLine(b, { page: index + 1, pages: this.pageCount });
     if (!line) return;
     const { rect, size } = brandTextBox(b, f.w, f.h);
     const canvas = document.createElement("canvas");

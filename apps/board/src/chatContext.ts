@@ -8,6 +8,8 @@
 import type { Controller } from "./controller";
 import { renderSnapshot } from "./snapshot";
 import { store } from "./library/session";
+import { pageIndex, pages, title } from "./state";
+import { brandingFor, lessonBranding } from "./design";
 
 export type CtxEntry = Record<string, unknown> & { kind: string };
 
@@ -204,6 +206,7 @@ export const RUPOK_COMMANDS: SlashCommand[] = [
   { name: "quiz", description: "Make a quiz from this page on a new page", hint: "number of questions", source: "rupok" },
   { name: "explain", description: "Explain this page simply, for the class", hint: "optional: for which class", source: "rupok" },
   { name: "translate", description: "Translate this page onto a new page", hint: "language, e.g. bn", source: "rupok" },
+  { name: "design", description: "Design the page background, theme and branding", hint: "what you want, e.g. chalkboard, physics, our logo", source: "rupok" },
   { name: "clear", description: "Clear the chat view (the agent keeps its memory)", source: "rupok" },
   { name: "new", description: "Start a new chat", source: "rupok" },
 ];
@@ -221,10 +224,29 @@ export function runRupokCommand(name: string, args: string): CommandAction {
       const lang = LANGS[a.toLowerCase()] ?? (a || "Bangla (বাংলা)");
       return { prompt: `Translate this page into ${lang} on a new page right after it, keeping the same layout (same positions and sizes). Keep numbers and formulas as they are.`, attachPage: true };
     }
+    case "design": return { prompt: designPrompt(a), attachPage: true };
     case "clear": return { local: "clear" };
     case "new": return { local: "new" };
     default: return { error: `Unknown command /${name}` };
   }
+}
+
+/** `/design`: the teacher's wish, the current design as context, and the house rules. */
+export function designPrompt(wish: string): string {
+  const p = pages()[pageIndex()];
+  const hex = (c: number) => "#" + (c >>> 8).toString(16).padStart(6, "0");
+  const current = {
+    lesson: title(), page: pageIndex() + 1, pages: pages().length,
+    color: hex(p?.bg_color ?? 0xffffffff), pattern: p?.pattern ?? "plain",
+    background_image: p?.background ? { fit: p.background.fit, opacity: p.background.opacity, dim: p.background.dim } : null,
+    branding: brandingFor(p, lessonBranding()),
+  };
+  return [
+    `Design the pages of this lesson: ${wish || "a calm, readable look that suits the topic"}.`,
+    "Use the set_page_design tool (colour, pattern, a background drawn as SVG for the 1920×1080 page) and set_branding (a small logo in a corner, a header or footer line). Ask before changing every page if I did not say so.",
+    "Rules: keep the middle of the page calm and low-contrast so handwriting stays readable; on a dark page the ink is light, on a light page dark; decoration goes to the edges; no text in the background image; keep any logo small (logo_width about 0.1) in a corner. Header and footer text may use {lesson}, {page}, {pages}, {date}, {teacher}, {school}, {subject}, {course} and {chapter}.",
+    `The current design: ${JSON.stringify(current)}.`,
+  ].join("\n");
 }
 
 // ------------------------------------------- optional modules of other features

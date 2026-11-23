@@ -239,6 +239,9 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
             Ok(Outcome::changed(out))
         }
 
+        Op::SetPageDesign(_) => crate::design::run_page_design(ctx, op, msg),
+        Op::SetBranding(_) => crate::design::run_branding(ctx, op, msg),
+
         Op::AddPage {
             title,
             index,
@@ -1337,6 +1340,106 @@ mod tests {
             None,
             "teacher stroke stays untagged"
         );
+    }
+
+    fn op(v: Value) -> Op {
+        serde_json::from_value(v).unwrap()
+    }
+
+    #[test]
+    fn page_design_and_branding_by_an_agent_are_one_attributed_step_each() {
+        let mut b = Board::new();
+        b.run(Op::AddPage {
+            title: None,
+            index: None,
+            pattern: None,
+            color: None,
+        })
+        .unwrap();
+        let svg = r##"<svg viewBox="0 0 1920 1080"><rect width="1920" height="1080" fill="#1f3b30"/><circle cx="1700" cy="900" r="120" fill="#ffffff" opacity=".06"/></svg>"##;
+        let out = b
+            .run(op(json!({"op": "set_page_design", "color": "chalkboard", "pattern": "grid", "background_svg": svg, "all_pages": true})))
+            .unwrap();
+        assert_eq!(out.result["pages_changed"], 2);
+        assert_eq!(out.result["scheme"], "dark");
+        assert_eq!(out.result["background_image"]["fit"], "stretch");
+        let pages = b.lesson.pages();
+        assert!(
+            pages
+                .iter()
+                .all(|p| p.bg_color == 0x1f3b30ff && p.background.is_some())
+        );
+        let image = pages[0].background.as_ref().unwrap().image.clone();
+        assert!(image.ends_with(".svg") && b.pkg.assets.contains_key(&image));
+        assert_eq!(
+            crate::parse_commit_message(&last_message(&b.lesson).unwrap()),
+            Some(("Claude Code".into(), "set_page_design".into()))
+        );
+        // Only the fit: the image stays.
+        b.run(op(
+            json!({"op": "set_page_design", "background_fit": "tile"}),
+        ))
+        .unwrap();
+        assert_eq!(
+            b.lesson
+                .page(&b.page.clone())
+                .unwrap()
+                .background
+                .unwrap()
+                .fit,
+            rupok_core::BgFit::Tile
+        );
+        assert!(b.lesson.undo().unwrap());
+        assert!(b.lesson.undo().unwrap());
+        assert!(
+            b.lesson.pages().iter().all(|p| p.background.is_none()),
+            "one undo, every page"
+        );
+
+        // Unsafe SVG changes nothing.
+        let err = b
+            .run(op(
+                json!({"op": "set_page_design", "background_svg": "<svg onload=\"x()\"/>"}),
+            ))
+            .unwrap_err();
+        assert!(err.to_string().contains("event attribute"), "{err}");
+        assert!(b.lesson.pages().iter().all(|p| p.background.is_none()));
+
+        // Branding: a logo in the top-right corner and a footer with placeholders.
+        let logo =
+            r##"<svg viewBox="0 0 200 100"><rect width="200" height="100" fill="#e5484d"/></svg>"##;
+        let out = b
+            .run(op(json!({"op": "set_branding", "logo_svg": logo, "logo_corner": "top-right", "logo_width": 0.1,
+                "school": "Dhaka Model School", "class": "Class 9 · {lesson}", "text_position": "bottom"})))
+            .unwrap();
+        let br = b.lesson.branding().unwrap();
+        assert!(
+            (br.logo_x - 0.875).abs() < 1e-9 && (br.logo_y - 0.035).abs() < 1e-9,
+            "{out:?}"
+        );
+        assert_eq!(br.class, "Class 9 · {lesson}");
+        assert_eq!(out.result["lesson"]["school"], "Dhaka Model School");
+        // A wider logo stays in its corner.
+        b.run(op(json!({"op": "set_branding", "logo_width": 0.2})))
+            .unwrap();
+        let br = b.lesson.branding().unwrap();
+        assert!((br.logo_x - 0.775).abs() < 1e-9);
+        // Hidden on page 2 only.
+        b.run(op(json!({"op": "set_branding", "page": 2, "hidden": true})))
+            .unwrap();
+        let p2 = b.lesson.pages()[1].clone();
+        assert_eq!(b.lesson.branding_for(&p2), None);
+        let read = b.run(op(json!({"op": "set_branding"}))).unwrap();
+        assert!(!read.changed && read.result["lesson"]["logo"].is_string());
+        for bad in [
+            json!({"op": "set_branding", "logo_corner": "middle"}),
+            json!({"op": "set_branding", "logo_width": 3}),
+            json!({"op": "set_branding", "scope": "class"}),
+            json!({"op": "set_page_design", "background_fit": "tile"}),
+            json!({"op": "set_branding", "logo_image": "aGVsbG8="}),
+        ] {
+            assert!(b.run(op(bad.clone())).is_err(), "{bad}");
+        }
     }
 
     #[test]

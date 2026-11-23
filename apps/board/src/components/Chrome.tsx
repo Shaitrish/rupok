@@ -3,7 +3,7 @@ import { controller } from "../controller";
 import {
   BOARD_COLORS, camera, pageIndex, pages, prefs, replay, setPrefs, showToast, isView, modeConfig,
 } from "../state";
-import { brandingFor, lessonBranding, styleOf } from "../design";
+import { brandVars, brandingFor, lessonBranding, styleOf, usesPlaceholders } from "../design";
 import { openPageDesign } from "./PageDesign";
 import { hasTopBar } from "../modes";
 import LatencyOverlay from "./LatencyOverlay";
@@ -349,7 +349,11 @@ export function PagesPanel() {
           {(id, i) => {
             const p = () => pages()[i()];
             const lifted = () => drag()?.from === i();
-            const design = () => JSON.stringify([p()?.background, brandingFor(p(), lessonBranding())]);
+            const design = () => {
+              const b = brandingFor(p(), lessonBranding());
+              // A line with placeholders changes with the title, page count and names.
+              return JSON.stringify([p()?.background, b, usesPlaceholders(b) ? [pages().length, brandVars()] : 0]);
+            };
             return (
               <div
                 class="page-thumb"

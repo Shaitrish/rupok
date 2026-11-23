@@ -9,13 +9,14 @@
 
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { controller } from "../controller";
-import { BOARD_COLORS, canUndo, pageIndex, pages, showToast } from "../state";
+import { BOARD_COLORS, canUndo, pageIndex, pages, showToast, title } from "../state";
 import {
   type BgFit, type Branding, type Corner, type PageBackground, type PageStyle, type Preset, CORNERS, DEFAULT_BRANDING, MAX_BRAND_TEXT, MAX_LOGO_W,
-  MIN_LOGO_W, PRESETS, brandingFor, clamp, cornerOf, cornerPos, cssColor, designDefault, designPreview, examPaperSvg, frameOf, imageSize,
+  MIN_LOGO_W, PLACEHOLDERS, PRESETS, brandLine, brandingFor, expand, clamp, cornerOf, cornerPos, cssColor, designDefault, designPreview, examPaperSvg, frameOf, imageSize,
   lessonBranding, logoRect, prepareImage, presetStyle, resizeLogo, setDesignDefault, setDesignPreview, styleOf,
 } from "../design";
 import { designDefaultStore } from "../storage";
+import { openAiPanel, setComposerDraft } from "../chat";
 import { cssPx, isPhone } from "../viewport";
 import { Icon } from "./Icon";
 import { PageBackdrop } from "./PageBackdrop";
@@ -231,6 +232,33 @@ function PageDesign(props: { onClose: () => void }) {
   };
 
   const corner = () => cornerOf(editing(), frame().w, frame().h, logoAspect());
+
+  /** Open the AI chat with `/design …` ready to finish and send (the connect hint when no AI is paired). */
+  const designWithAi = () => {
+    props.onClose();
+    openAiPanel();
+    setComposerDraft({ text: `/design a calm background that suits "${title()}"`, n: Date.now() });
+  };
+
+  // Placeholders: a chip goes into the text field used last, at its cursor.
+  const [lastField, setLastField] = createSignal<"school" | "teacher" | "class">("class");
+  const place = () => ({ page: pageIndex() + 1, pages: count() });
+  const insertPlaceholder = (name: string) => {
+    const key = lastField();
+    const el = document.getElementById(`ds-${key}`) as HTMLInputElement | null;
+    const cur = el?.value ?? editing()[key];
+    const at = el && document.activeElement === el ? el.selectionStart ?? cur.length : cur.length;
+    const token = `{${name}}`;
+    const sep = at > 0 && !/\s$/.test(cur.slice(0, at)) ? " " : "";
+    const next = (cur.slice(0, at) + sep + token + cur.slice(at)).slice(0, MAX_BRAND_TEXT);
+    setBrand({ [key]: next } as Partial<Branding>);
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const pos = at + sep.length + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
   const lessonFollowed = () => brandScope() === "lesson" && !!ownBranding();
 
   return (
@@ -249,7 +277,8 @@ function PageDesign(props: { onClose: () => void }) {
         </button>
       </header>
 
-      <div class="ds-body">
+      {/* Controls scrolled into view (keyboard focus, find) stay below the sticky preview. */}
+      <div class="ds-body" style={{ "scroll-padding-top": isPhone() ? undefined : `${Math.round(frame().h * k()) + 16}px` }}>
         <div class="ds-preview" ref={previewBox} style={{ height: `${frame().h * k()}px` }}>
           <div
             class={`ds-page ${shownBg() ? "" : style().pattern}`}
@@ -268,6 +297,7 @@ function PageDesign(props: { onClose: () => void }) {
               pattern={style().pattern}
               background={shownBg()}
               branding={shownBrand()}
+              place={{ page: pageIndex() + 1, pages: count() }}
               assetUrl={(n) => controller.assetUrl(n)}
               onLogoPointerDown={dragLogo}
             />
@@ -276,6 +306,10 @@ function PageDesign(props: { onClose: () => void }) {
             <span class="ds-hint">Drag the logo to move it</span>
           </Show>
         </div>
+
+        <button class="btn ds-ai" onClick={designWithAi} title="Ask your AI assistant to design the background and branding">
+          <Icon name="smartink" size={20} /><span>Design with AI…</span>
+        </button>
 
         {/* ------------------------------------------------ looks */}
         <section class="ds-sec" aria-labelledby="ds-looks">
@@ -447,9 +481,24 @@ function PageDesign(props: { onClose: () => void }) {
               />
               <Slider label="Logo opacity" value={editing().logo_opacity} min={0.1} max={1} onInput={(v) => previewBrand({ logo_opacity: v })} onChange={(v) => setBrand({ logo_opacity: v })} />
             </Show>
-            <TextField label="School" value={editing().school} placeholder="e.g. Dhaka Residential Model College" onChange={(v) => setBrand({ school: v })} />
-            <TextField label="Teacher" value={editing().teacher} placeholder="e.g. Ms. Rahman" onChange={(v) => setBrand({ teacher: v })} />
-            <TextField label="Class / subject" value={editing().class} placeholder="e.g. Class 8 · Science" onChange={(v) => setBrand({ class: v })} />
+            <TextField id="school" label="School" value={editing().school} placeholder="e.g. Dhaka Residential Model College" onFocus={setLastField} onChange={(v) => setBrand({ school: v })} />
+            <TextField id="teacher" label="Teacher" value={editing().teacher} placeholder="e.g. Ms. Rahman, or {teacher}" onFocus={setLastField} onChange={(v) => setBrand({ teacher: v })} />
+            <TextField id="class" label="Class / subject" value={editing().class} placeholder="e.g. Class 9 · {subject} · {lesson}" onFocus={setLastField} onChange={(v) => setBrand({ class: v })} />
+            <div class="ds-placeholders" role="group" aria-label="Text that fills itself in">
+              <span class="ds-ph-help">Fills itself in on every page: tap to add to <b>{FIELD_LABEL[lastField()]}</b></span>
+              <div class="ds-ph-chips">
+                <For each={PLACEHOLDERS}>
+                  {(ph) => (
+                    <button class="ds-ph" title={`${ph.label}: ${expand(`{${ph.name}}`, editing(), place()) || "(not set)"}`} onMouseDown={(e) => e.preventDefault()} onClick={() => insertPlaceholder(ph.name)}>
+                      {`{${ph.name}}`}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+            <Show when={brandLine(editing(), place())}>
+              <p class="ds-line" aria-live="polite"><span>On this page:</span> {brandLine(editing(), place())}</p>
+            </Show>
             <Toggle label="Today's date" hint="The day the lesson is shown or exported" on={editing().date} onChange={(v) => setBrand({ date: v })} />
             <div class="ds-row">
               <span class="ds-label">Text</span>
@@ -553,9 +602,14 @@ function Toggle(props: { label: string; hint?: string; on: boolean; onChange: (v
   );
 }
 
+const FIELD_LABEL = { school: "School", teacher: "Teacher", class: "Class / subject" } as const;
+
 /** A text field written on change (Enter or leaving it): one undo step per edit. */
-function TextField(props: { label: string; value: string; placeholder: string; onChange: (v: string) => void }) {
-  const id = `ds-${props.label.replace(/\W+/g, "-").toLowerCase()}`;
+function TextField(props: {
+  id: "school" | "teacher" | "class"; label: string; value: string; placeholder: string;
+  onFocus: (id: "school" | "teacher" | "class") => void; onChange: (v: string) => void;
+}) {
+  const id = `ds-${props.id}`;
   return (
     <div class="ds-field">
       <label for={id}>{props.label}</label>
@@ -565,6 +619,7 @@ function TextField(props: { label: string; value: string; placeholder: string; o
         value={props.value}
         maxLength={MAX_BRAND_TEXT}
         placeholder={props.placeholder}
+        onFocus={() => props.onFocus(props.id)}
         onChange={(e) => {
           const v = e.currentTarget.value.trim();
           if (v !== props.value) props.onChange(v);

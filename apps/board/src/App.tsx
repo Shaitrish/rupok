@@ -7,7 +7,7 @@ import { PagesPanel, StatusChips, TopBar } from "./components/Chrome";
 import { ObjectDialog } from "./components/Dialogs";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
 import { closeSettings, openSettings, settingsRequest } from "./settings/open";
-import { prefs, sizes, toast, tool } from "./state";
+import { prefs, sizes, title, toast, tool } from "./state";
 import { Icon, Mark } from "./components/Icon";
 import { APP_NAME, FILE_EXT, TAGLINE, WORDMARK } from "./brand";
 import { Suspense, lazy } from "solid-js";
@@ -19,7 +19,10 @@ import LivePanel from "./components/LivePanel";
 import ChatPanel from "./components/ChatPanel";
 import VoiceLayer from "./voice/VoiceLayer";
 import { LibraryRoot } from "./components/Library";
-import { startLibrary } from "./library/session";
+import { current, startLibrary } from "./library/session";
+import { courseFromPath } from "./library/paths";
+import { libPrefs } from "./library/prefs";
+import { setBrandVars } from "./design";
 import { isPhone, pagesDrawer, pagesShown } from "./viewport";
 import { PageDesignHost } from "./components/PageDesign";
 import { drawCursor } from "./wetInk";
@@ -52,6 +55,11 @@ export default function App() {
     root.dataset.accent = p.accent;
     root.dataset.density = p.density;
     if (ready()) queueMicrotask(() => controller.objects.broadcastTheme());
+  });
+  // What branding placeholders stand for ({lesson}, {teacher}, {subject}…; design.ts).
+  createEffect(() => {
+    const c = courseFromPath(current()?.path ?? "");
+    setBrandVars({ lesson: title(), teacher: libPrefs().author, subject: c?.subject, course: c?.course, chapter: c?.chapter });
   });
   // The eraser circle goes with the eraser tool.
   createEffect(() => {

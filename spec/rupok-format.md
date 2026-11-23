@@ -235,6 +235,22 @@ container. Unknown keys inside them MUST be ignored.
 
 - A page shows its own `branding` when present (none when `off` is true),
   else `meta.branding`.
+- **Placeholders.** `school`, `teacher` and `class` may contain
+  `{name}` tokens that renderers fill in where the line is drawn, so one
+  design fits every lesson and page. Names are lowercase ASCII letters:
+
+  | Token | Becomes |
+  |---|---|
+  | `{lesson}` | `meta.title` |
+  | `{page}`, `{pages}` | the page's 1-based number and the lesson's page count |
+  | `{date}` | the date of showing, printing or exporting |
+  | `{teacher}` | the teacher's name as the app knows it (empty if unknown) |
+  | `{school}` | the `school` value (empty inside `school` itself) |
+  | `{subject}`, `{course}`, `{chapter}` | the lesson's course: `manifest.json` `course`, or where the app keeps the lesson (empty if unknown) |
+
+  Unknown tokens stay as written. A part that is empty after filling in is
+  left out of the line, and runs of spaces collapse to one. Readable
+  entries show the text as stored, tokens included.
 - **Layers**, bottom to top: page colour; background image (clipped to the
   frame) and its dim wash; the `bg_pattern`; DOM items (images, text, Smart
   Objects); the branding (logo, then text); ink. Branding above the items

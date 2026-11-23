@@ -14,7 +14,7 @@
 
 import { Show, createMemo, createResource } from "solid-js";
 import {
-  type Branding, type PageBackground, DIM_ALPHA, bgCss, brandInk, brandLine, brandTextBox, cssColor, hasBranding, imageSize,
+  type BrandPlace, type Branding, type PageBackground, DIM_ALPHA, bgCss, brandInk, brandLine, brandTextBox, cssColor, hasBranding, imageSize,
 } from "../design";
 
 export interface BackdropProps {
@@ -26,6 +26,8 @@ export interface BackdropProps {
   background: PageBackground | null | undefined;
   branding: Branding | null | undefined;
   assetUrl: (name: string) => string;
+  /** The page (1-based) and page count, for `{page}` and `{pages}` in the text. */
+  place: BrandPlace;
   /** Which layers to draw (default both: the Page design preview). */
   layer?: "background" | "branding";
   /** Page design preview: pointer down on the logo starts a drag. */
@@ -37,7 +39,7 @@ export function PageBackdrop(props: BackdropProps) {
   const [bgSize] = createResource(bgUrl, (u) => (u ? imageSize(u) : Promise.resolve({ w: 0, h: 0 })));
   const brand = () => (hasBranding(props.branding) ? props.branding : null);
   const logoUrl = createMemo(() => (brand()?.logo ? props.assetUrl(brand()!.logo!) : ""));
-  const line = () => (brand() ? brandLine(brand()!) : "");
+  const line = () => (brand() ? brandLine(brand()!, props.place) : "");
   const box = () => brandTextBox(brand()!, props.w, props.h);
   const bgOn = () => props.layer !== "branding";
   const brandOn = () => props.layer !== "background";

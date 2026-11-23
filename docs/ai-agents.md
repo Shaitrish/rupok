@@ -103,7 +103,7 @@ In the panel:
   **Attach page** (on by default) sends the page you are on, or your lasso
   selection, when you mention nothing on the board.
 - **/commands**: the assistant's own (Claude Code's `/review`, `/compact`…)
-  and Rupok's: `/solve` (Solve this), `/quiz 5`, `/explain`, `/translate bn`,
+  and Rupok's: `/solve` (Solve this), `/quiz 5`, `/explain`, `/translate bn`, `/design` (page design),
   `/clear` (clears the view) and `/new`.
 - **History**: the clock button lists the chats on this lesson (kept in this
   browser) and the assistant's own saved chats. Reopening one resumes it when
@@ -288,12 +288,22 @@ shows it when ready.
 - "Where should they look?" (`point_at`)
 - "Dark mode, please." / "Chalkboard." (`set_board_theme`)
 
+### Page design
+
+- "Make a chalkboard background with our school logo and a physics theme for
+  Class 9." (`set_page_design`, `set_branding`)
+- "Put the lesson title and page number in the footer of every slide."
+  (`set_branding` with `class: "{lesson}", teacher: "{page} / {pages}"`)
+- In Rupok's chat: **/design** followed by the wish, or **Design with AI…** in
+  Page design (the current design goes with it).
+
 ## Tools
 
 When a board is paired, these tools act on the lesson open on it. The lesson
 tools (`get_lesson_outline`, `add_page`, `add_text`, `add_smart_object`,
-`update_smart_object`, `delete_item`, `set_page_background`) do the same when
-called with **`path: "live"`**; with a real `.rpk` path they still edit files.
+`update_smart_object`, `delete_item`, `set_page_background`,
+`set_page_design`, `set_branding`) do the same when called with
+**`path: "live"`**; with a real `.rpk` path they still edit files.
 
 | Tool | What it does |
 |---|---|
@@ -309,12 +319,52 @@ called with **`path: "live"`**; with a real `.rpk` path they still edit files.
 | `point_at(x, y, w?, h?, label?, seconds?)` | A temporary laser ring or highlight box (not saved). |
 | `write_handwriting(lines, anchor?, style?, speed?, color?, size?, step_mode?)` | Write lines (text with inline LaTeX) in handwriting, animated stroke by stroke, below the anchor; one undo step. See [Solve this](#solve-this). |
 | `set_board_theme(page_color?, pattern?, ui?)` | Page colour (white, paper, chalkboard, blackboard, #hex) and pattern; app light/dark. |
+| `set_page_design(path, page?, all_pages?, color?, pattern?, background_svg?, background_image?, background_fit?, background_opacity?, background_dim?, remove_background?)` | Page design: colour, pattern and a background image (SVG, or base64 PNG/JPEG), for a page or every page. Only `path`: read the design. Live or on a file. |
+| `set_branding(path, scope?, page?, logo_svg?, logo_image?, logo_corner?, logo_x?, logo_y?, logo_width?, logo_opacity?, remove_logo?, school?, teacher?, class?, date?, text_position?, text_align?, hidden?, remove?)` | Logo and header/footer line on every page (`scope: "lesson"`) or one page; text placeholders `{lesson}`, `{page}`, `{pages}`, `{date}`, `{teacher}`, `{school}`, `{subject}`, `{course}`, `{chapter}`. Only `path`: read it. |
 
 Every change is one undo step on the board, tagged with the agent's name in
 the lesson history (the Loro commit message
 `rupok-agent/1 {"agent":"Claude Code","op":"add_text"}`).
 `update_smart_object` stores the new HTML as a new bundle and re-points the
 placement, so it can be undone too.
+
+## Designing pages
+
+Teachers ask for a look: "a chalkboard background with our school logo and a
+physics theme for Class 9". Use `set_page_design` and `set_branding` (both
+take `path: "live"` or a lesson file; each call is one undo step).
+
+1. **Read first.** Call each tool with only `path` to get the current design
+   (colour, pattern, background, branding).
+2. **Background** (`set_page_design`): a colour (`white`, `paper`,
+   `chalkboard`, `blackboard`, `#rrggbb`), a pattern, and an image drawn as
+   SVG for the 1920×1080 page (`viewBox="0 0 1920 1080"`, default fit
+   `stretch`) or a PNG/JPEG as base64. `all_pages: true` gives every page the
+   look; ask first unless the teacher said "all".
+3. **Branding** (`set_branding`): a logo (`logo_svg` or `logo_image`) in a
+   `logo_corner`, and a header or footer line (`school`, `teacher`, `class`,
+   `date`, `text_position`). Text can fill itself in: `{lesson}`, `{page}`,
+   `{pages}`, `{date}`, `{teacher}`, `{school}`, `{subject}`, `{course}`,
+   `{chapter}`, so one design fits every lesson ("Class 9 · {subject} ·
+   {lesson}", "{page} / {pages}"). `scope: "page"` styles one page; `page`
+   with `hidden: true` keeps a title slide clean.
+
+House rules (projectors in bright rooms, chalk-dusted fingers):
+
+- **Ink must stay readable.** On a dark page the teacher writes in white or
+  yellow; on a light page in dark colours. Keep the background's contrast
+  low: big soft shapes, at most ~8 % luminance difference in the middle.
+- **Keep the content area calm.** Decoration (a theme motif, a border, a
+  formula watermark) goes to the edges and corners, never behind the middle
+  of the slide. No text in the background image; text goes in the branding
+  line.
+- **Logo small, in a corner**: `logo_width` 0.08–0.12, away from the text
+  line. Opacity 0.8–1.
+- **Photos need dimming**: `background_dim: true` or `background_opacity`
+  0.3–0.5 so ink shows over them.
+- SVG is checked: no scripts, event handlers, external references
+  (`href` only to `#id` or embedded PNG/JPEG data) or animation. A refused
+  SVG changes nothing; fix it and call again.
 
 ## Solve this
 
@@ -488,7 +538,8 @@ An operation is `{"op": "<name>", …fields}`; the names and fields are the
 `get_selection`, `snapshot`, `go_to_page`, `point_at`, `set_board_theme`,
 `add_page`, `add_page_after_current`, `add_text`, `add_smart_object`,
 `update_smart_object`, `delete_item`, `set_page_background`,
-`replace_items_with_text`, `step_object`, `write_handwriting`). Pages are 1-based and `page`
+`set_page_design`, `set_branding`, `replace_items_with_text`, `step_object`,
+`write_handwriting`). Pages are 1-based and `page`
 omitted means the page on screen; coordinates are slide pixels in the
 1920 × 1080 frame.
 

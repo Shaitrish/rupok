@@ -9,7 +9,7 @@
 
 import { createEffect, on, onCleanup, onMount } from "solid-js";
 import { controller } from "../controller";
-import { revision } from "../state";
+import { pages, revision } from "../state";
 import {
   type Branding, type PageBackground, DIM_ALPHA, bgPlacements, brandInk, brandLine, brandTextBox, cssColor, frameOf, hasBranding, logoRect,
 } from "../design";
@@ -94,7 +94,7 @@ function imageFor(asset: string, onLoad: () => void): HTMLImageElement | null {
 
 // ---------------------------------------------------------------- drawing
 
-function draw(canvas: HTMLCanvasElement, p: Preview, redraw: () => void) {
+function draw(canvas: HTMLCanvasElement, p: Preview, redraw: () => void, index: number) {
   const cssW = canvas.clientWidth, cssH = canvas.clientHeight;
   if (!cssW || !cssH) return;
   const dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -192,7 +192,7 @@ function draw(canvas: HTMLCanvasElement, p: Preview, redraw: () => void) {
     }
   }
   ctx.globalAlpha = 1;
-  drawBranding(ctx, p, redraw, css.fontFamily);
+  drawBranding(ctx, p, redraw, css.fontFamily, index);
 }
 
 /** Under the items: the background image and the dim wash (design.ts). */
@@ -220,7 +220,7 @@ function drawBackground(ctx: CanvasRenderingContext2D, p: Preview, redraw: () =>
 }
 
 /** Above the items (as on the board): the branding logo and text line. */
-function drawBranding(ctx: CanvasRenderingContext2D, p: Preview, redraw: () => void, font: string) {
+function drawBranding(ctx: CanvasRenderingContext2D, p: Preview, redraw: () => void, font: string, index: number) {
   const { w: fw, h: fh } = frameOf(p);
   const b = p.branding;
   if (!hasBranding(b)) return;
@@ -232,7 +232,7 @@ function drawBranding(ctx: CanvasRenderingContext2D, p: Preview, redraw: () => v
       ctx.globalAlpha = 1;
     }
   }
-  const line = brandLine(b);
+  const line = brandLine(b, { page: index + 1, pages: pages().length });
   if (line) {
     const { rect, size } = brandTextBox(b, fw, fh);
     ctx.font = `600 ${size}px ${font}`;
@@ -251,7 +251,7 @@ function render(canvas: HTMLCanvasElement, index: number) {
   const json = controller.board.page_preview_json(index, MAX_POINTS);
   const p = JSON.parse(json) as Preview | null;
   if (!p) return;
-  draw(canvas, p, () => enqueue(canvas, () => render(canvas, index)));
+  draw(canvas, p, () => enqueue(canvas, () => render(canvas, index)), index);
 }
 
 /** A thumbnail canvas for one page. */

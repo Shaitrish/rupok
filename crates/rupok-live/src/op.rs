@@ -60,6 +60,87 @@ pub struct Anchor {
     pub side: Option<String>,
 }
 
+/// Arguments of [`Op::SetPageDesign`].
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PageDesignArgs {
+    #[serde(default)]
+    pub page: Option<u32>,
+    /// Give every page this page's resulting look.
+    #[serde(default)]
+    pub all_pages: bool,
+    /// `white`, `paper`, `chalkboard`, `blackboard` or `#rrggbb`.
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub pattern: Option<PatternName>,
+    /// SVG markup (no scripts, external references or animation).
+    #[serde(default)]
+    pub background_svg: Option<String>,
+    /// PNG or JPEG bytes, base64 (a `data:` URL is fine too).
+    #[serde(default)]
+    pub background_image: Option<String>,
+    /// `fit`, `fill`, `stretch`, `tile` or `center`.
+    #[serde(default)]
+    pub background_fit: Option<String>,
+    #[serde(default)]
+    pub background_opacity: Option<f64>,
+    /// A wash of the page colour over the image, for readable ink.
+    #[serde(default)]
+    pub background_dim: Option<bool>,
+    #[serde(default)]
+    pub remove_background: bool,
+}
+
+/// Arguments of [`Op::SetBranding`].
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct BrandingArgs {
+    #[serde(default)]
+    pub page: Option<u32>,
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub logo_svg: Option<String>,
+    /// PNG or JPEG bytes, base64.
+    #[serde(default)]
+    pub logo_image: Option<String>,
+    /// `top-left`, `top-right`, `bottom-left` or `bottom-right`.
+    #[serde(default)]
+    pub logo_corner: Option<String>,
+    /// Top-left of the logo as fractions (0..1) of the page.
+    #[serde(default)]
+    pub logo_x: Option<f64>,
+    #[serde(default)]
+    pub logo_y: Option<f64>,
+    /// Width as a fraction of the page width (0.02..0.6).
+    #[serde(default)]
+    pub logo_width: Option<f64>,
+    #[serde(default)]
+    pub logo_opacity: Option<f64>,
+    #[serde(default)]
+    pub remove_logo: bool,
+    /// Text; may use placeholders such as `{lesson}`, `{page}`, `{pages}`.
+    #[serde(default)]
+    pub school: Option<String>,
+    #[serde(default)]
+    pub teacher: Option<String>,
+    #[serde(default)]
+    pub class: Option<String>,
+    #[serde(default)]
+    pub date: Option<bool>,
+    /// `top` (header) or `bottom` (footer).
+    #[serde(default)]
+    pub text_position: Option<String>,
+    /// `left`, `center` or `right`.
+    #[serde(default)]
+    pub text_align: Option<String>,
+    /// Hide (true) or show again (false) branding on this page.
+    #[serde(default)]
+    pub hidden: Option<bool>,
+    /// Remove the branding (of the lesson, or the page's own).
+    #[serde(default)]
+    pub remove: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Op {
@@ -192,6 +273,15 @@ pub enum Op {
         #[serde(default)]
         color: Option<String>,
     },
+    /// Page design (spec: Page design): the colour, pattern and background
+    /// image of a page, or of every page with `all_pages`, as one undo step.
+    /// With nothing to change it returns the page's design.
+    SetPageDesign(Box<PageDesignArgs>),
+    /// Branding: a logo and a header or footer line on every page
+    /// (`scope: "lesson"`, default) or on one page (`scope: "page"`), as one
+    /// undo step. Only the given fields change. With nothing to change it
+    /// returns the branding.
+    SetBranding(Box<BrandingArgs>),
     /// Remove items (typically handwriting) and put a text box in their place.
     ReplaceItemsWithText {
         #[serde(default)]
@@ -277,6 +367,8 @@ impl Op {
             Op::UpdateSmartObject { .. } => "update_smart_object",
             Op::DeleteItem { .. } => "delete_item",
             Op::SetPageBackground { .. } => "set_page_background",
+            Op::SetPageDesign(_) => "set_page_design",
+            Op::SetBranding(_) => "set_branding",
             Op::ReplaceItemsWithText { .. } => "replace_items_with_text",
             Op::StepObject { .. } => "step_object",
             Op::WriteHandwriting { .. } => "write_handwriting",
@@ -318,6 +410,8 @@ impl Op {
             Op::UpdateSmartObject { .. } => "updated a Smart Object",
             Op::DeleteItem { .. } => "deleted an item",
             Op::SetPageBackground { .. } => "changed the background",
+            Op::SetPageDesign(_) => "changed the page design",
+            Op::SetBranding(_) => "changed the branding",
             Op::ReplaceItemsWithText { .. } => "turned ink into text",
             Op::StepObject { .. } => "stepped a Smart Object",
             Op::WriteHandwriting { .. } => "wrote on the board",

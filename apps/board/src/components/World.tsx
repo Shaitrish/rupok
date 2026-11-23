@@ -152,6 +152,7 @@ export default function World(props: { ref: (el: HTMLDivElement) => void }) {
                 pattern={p().pattern}
                 background={background()}
                 branding={null}
+                place={{ page: pageIndex() + 1, pages: pages().length }}
                 assetUrl={(n) => controller.assetUrl(n)}
               />
             </div>
@@ -210,6 +211,7 @@ export default function World(props: { ref: (el: HTMLDivElement) => void }) {
                   pattern={p().pattern}
                   background={null}
                   branding={branding()}
+                  place={{ page: pageIndex() + 1, pages: pages().length }}
                   assetUrl={(n) => controller.assetUrl(n)}
                 />
               </div>

@@ -188,10 +188,51 @@ export function resizeLogo(b: Branding, w: number, fw: number, fh: number, aspec
 
 export const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-/** The branding text line: school · teacher · class · date. */
-export function brandLine(b: Branding, when = new Date()): string {
-  const parts = [b.school, b.teacher, b.class].map((s) => s.trim()).filter(Boolean);
-  if (b.date) parts.push(new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(when));
+// ---------------------------------------------------------- placeholders
+
+/** Text that fills itself in: `{lesson}`, `{page}`… in any branding field
+ * (spec: Page design → Placeholders). Unknown names stay as typed. */
+export const PLACEHOLDERS: { name: string; label: string }[] = [
+  { name: "lesson", label: "Lesson title" },
+  { name: "page", label: "Page number" },
+  { name: "pages", label: "Page count" },
+  { name: "date", label: "Today's date" },
+  { name: "teacher", label: "Your name (Settings)" },
+  { name: "school", label: "School (above)" },
+  { name: "subject", label: "Subject (Library)" },
+  { name: "course", label: "Course (Library)" },
+  { name: "chapter", label: "Chapter (Library)" },
+];
+
+/** What the placeholders stand for, apart from the page: set by the app
+ * (lesson title, the teacher's name, the Library folder). */
+export interface BrandVars { lesson?: string; teacher?: string; subject?: string; course?: string; chapter?: string }
+export const [brandVars, setBrandVars] = createSignal<BrandVars>({}, { equals: sameJson });
+
+/** Where a line is drawn: the page (1-based) and the lesson's page count. */
+export interface BrandPlace { page: number; pages: number; when?: Date; vars?: BrandVars }
+
+const formatDate = (d: Date) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(d);
+
+/** True when the branding's text uses placeholders (its line changes per page or lesson). */
+export const usesPlaceholders = (b: Branding | null | undefined) => !!b && /\{[a-z]+\}/.test(b.school + b.teacher + b.class);
+
+/** Fill in the placeholders of one text. */
+export function expand(text: string, b: Branding, at: BrandPlace): string {
+  const v = at.vars ?? brandVars();
+  const school = b.school.replace(/\{school\}/g, "");
+  const values: Record<string, string> = {
+    lesson: v.lesson ?? "", page: String(at.page), pages: String(at.pages), date: formatDate(at.when ?? new Date()),
+    teacher: v.teacher ?? "", subject: v.subject ?? "", course: v.course ?? "", chapter: v.chapter ?? "",
+  };
+  values.school = text === b.school ? "" : expand(school, b, at);
+  return text.replace(/\{([a-z]+)\}/g, (m, name: string) => (name in values ? values[name] : m)).replace(/\s{2,}/g, " ").trim();
+}
+
+/** The branding text line: school · teacher · class · date, placeholders filled in. */
+export function brandLine(b: Branding, at: BrandPlace = { page: 1, pages: 1 }): string {
+  const parts = [b.school, b.teacher, b.class].map((s) => expand(s, b, at)).filter(Boolean);
+  if (b.date) parts.push(formatDate(at.when ?? new Date()));
   return parts.join("  ·  ");
 }
 

@@ -27,11 +27,13 @@
 //
 // Options: --dist DIR, --chrome PATH, --swiftshader, --headed, --present,
 // --rate HZ (240), --speed PX_PER_S (400), --strokes N (12), --smoothing S,
-// --smart (Smart shapes "auto"), --json FILE, --check, --label TEXT.
+// --smart (Smart shapes "auto"), --json FILE, --check, --label TEXT,
+// --lesson FILE.rpk (write over its first page, e.g. one with a page design).
 
 import { chromium } from "playwright-core";
 import { createServer } from "node:http";
 import { readFile, stat, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -232,6 +234,20 @@ await page.waitForFunction(() => !document.querySelector(".loading"), null, { ti
 await sleep(Number(opt("settle", 3000)));
 // The Library home may open over a fresh board: close it.
 await page.keyboard.press("Escape");
+// --lesson: write over that lesson's first page (e.g. one with a page design:
+// a background image and a logo must not slow the pen).
+const LESSON = opt("lesson", null);
+if (LESSON) {
+  const b64 = readFileSync(resolve(LESSON)).toString("base64");
+  await page.evaluate((b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const dt = new DataTransfer();
+    dt.items.add(new File([bytes], "lesson.rpk"));
+    window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+  }, b64);
+  await sleep(2000);
+  await page.keyboard.press("Escape");
+}
 await page.keyboard.press("p");
 await sleep(300);
 
