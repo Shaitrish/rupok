@@ -407,6 +407,82 @@ mod web {
             self.engine.set_background(Pattern::parse(pattern), rgba);
         }
 
+        /// Add a page that looks like the current one (colour, pattern,
+        /// background image, page branding), right after it or, with
+        /// `at_end`, after the last page. Shows it; returns its index.
+        pub fn add_page_like(&mut self, at_end: bool) -> usize {
+            self.engine.add_page_like(at_end)
+        }
+
+        /// Insert a page that looks like page `src` right before (`before`)
+        /// or after it, and show it. Returns its index.
+        pub fn insert_page_like(&mut self, src: usize, before: bool) -> usize {
+            self.engine.insert_page_like(src, before)
+        }
+
+        /// Delete several pages as one undo step (at least one page stays).
+        /// Returns how many were deleted.
+        pub fn delete_pages(&mut self, indices: Vec<u32>) -> usize {
+            let idx: Vec<usize> = indices.into_iter().map(|i| i as usize).collect();
+            self.engine.delete_pages(&idx)
+        }
+
+        /// Copy several pages, each right after its original, as one undo
+        /// step. Returns the copies' indexes.
+        pub fn duplicate_pages(&mut self, indices: Vec<u32>) -> Vec<u32> {
+            let idx: Vec<usize> = indices.into_iter().map(|i| i as usize).collect();
+            self.engine
+                .duplicate_pages(&idx)
+                .into_iter()
+                .map(|i| i as u32)
+                .collect()
+        }
+
+        /// Move several pages together to the gap before page `gap`
+        /// (indexes before the move), keeping their order: one undo step.
+        pub fn move_pages(&mut self, indices: Vec<u32>, gap: usize) {
+            let idx: Vec<usize> = indices.into_iter().map(|i| i as usize).collect();
+            self.engine.move_pages(&idx, gap);
+        }
+
+        /// Set the look of the current page, or with `all` of every page,
+        /// as one undo step. `style_json`: `{pattern, bg_color, background:
+        /// {image, fit, opacity, dim} | null}` (spec: Page design).
+        pub fn set_page_style_json(&mut self, style_json: &str, all: bool) -> Result<(), JsValue> {
+            let style: rupok_core::PageStyle =
+                serde_json::from_str(style_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+            self.engine
+                .set_page_style(&style, all)
+                .map_err(|e| JsValue::from_str(&e))
+        }
+
+        /// Set the lesson's branding (`page_only` false) or the current
+        /// page's own (`page_only` true), as one undo step. `"null"`
+        /// removes it; `{"off": true}` hides branding on the page.
+        pub fn set_branding_json(&mut self, json: &str, page_only: bool) -> Result<(), JsValue> {
+            let b: Option<rupok_core::Branding> =
+                serde_json::from_str(json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+            self.engine
+                .set_branding(b.as_ref(), page_only)
+                .map_err(|e| JsValue::from_str(&e))
+        }
+
+        /// The lesson's branding as JSON, or `null`.
+        pub fn branding_json(&self) -> String {
+            serde_json::to_string(&self.engine.lesson.branding()).unwrap_or_else(|_| "null".into())
+        }
+
+        /// Store an image as a package asset (deduplicated by content) and
+        /// return its name, for a page background or a logo.
+        pub fn add_asset(&mut self, bytes: Vec<u8>, ext: &str) -> Option<String> {
+            self.engine.add_asset(bytes, ext)
+        }
+
+        /// Clear the undo stack (after giving a new lesson its default design).
+        pub fn forget_history(&mut self) {
+            self.engine.forget_history();
+        }
+
         pub fn clear_page(&mut self) {
             self.engine.clear_page();
         }

@@ -370,3 +370,93 @@ fn scaling_handwriting_and_text_is_one_undo_step_and_previews_without_editing() 
     assert!(e.scale_selection_by(0.8));
     assert!(!e.scale_selection_by(f64::NAN));
 }
+
+// ------------------------------------------------------------ page design
+
+const PNG: &[u8] = &[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3];
+
+#[test]
+fn plus_copies_the_look_and_inserts_after_the_current_page() {
+    let mut e = engine();
+    let img = e.add_asset(PNG.to_vec(), "png").unwrap();
+    let style = PageStyle {
+        pattern: Pattern::Lines,
+        bg_color: 0x1f3b30ff,
+        background: Some(PageBackground {
+            image: img,
+            fit: rupok_core::BgFit::Fill,
+            opacity: 1.0,
+            dim: false,
+        }),
+    };
+    e.set_page_style(&style, false).unwrap();
+    e.add_page_like(true); // page 2, at the end
+    e.add_page_like(true); // page 3
+    e.goto_page(0);
+    let first_ids: Vec<String> = e.lesson.pages().into_iter().map(|p| p.id).collect();
+    // On page 1, "+" makes the new page 2; the old page 2 moves down.
+    assert_eq!(e.add_page_like(false), 1);
+    let pages = e.lesson.pages();
+    assert_eq!(pages.len(), 4);
+    assert_eq!(pages[2].id, first_ids[1]);
+    assert!(
+        pages
+            .iter()
+            .all(|p| e.lesson.page_style(&p.id).unwrap() == style)
+    );
+    // Insert before page 1.
+    assert_eq!(e.insert_page_like(0, true), 0);
+    assert_eq!(e.lesson.pages()[1].id, first_ids[0]);
+}
+
+#[test]
+fn save_writes_design_images_once_and_undo_can_bring_one_back() {
+    let mut e = engine();
+    let logo = e.add_asset(PNG.to_vec(), "png").unwrap();
+    let mut b = Branding {
+        logo: Some(logo.clone()),
+        school: "School".into(),
+        ..Branding::default()
+    };
+    e.set_branding(Some(&b), false).unwrap();
+    for _ in 0..3 {
+        e.add_page_like(true);
+    }
+    let pkg = Package::read(&e.save(1.0).unwrap()).unwrap();
+    assert_eq!(pkg.assets.keys().collect::<Vec<_>>(), vec![&logo]);
+
+    // Replace the logo, save (it leaves the file), then undo: it is back.
+    let other = e.add_asset(vec![9, 9, 9], "png").unwrap();
+    b.logo = Some(other.clone());
+    e.set_branding(Some(&b), false).unwrap();
+    let pkg = Package::read(&e.save(2.0).unwrap()).unwrap();
+    assert_eq!(pkg.assets.keys().collect::<Vec<_>>(), vec![&other]);
+    assert!(e.undo());
+    assert_eq!(e.lesson.branding().unwrap().logo, Some(logo.clone()));
+    let pkg = Package::read(&e.save(3.0).unwrap()).unwrap();
+    assert_eq!(pkg.assets.keys().collect::<Vec<_>>(), vec![&logo]);
+    assert!(e.asset(&logo).is_some());
+}
+
+#[test]
+fn several_pages_at_once_keep_the_current_page_sensible() {
+    let mut e = engine();
+    for _ in 0..5 {
+        e.add_page_like(true);
+    }
+    e.goto_page(4);
+    let current = e.page.clone();
+    assert_eq!(e.delete_pages(&[0, 2]), 2);
+    assert_eq!(e.lesson.page_count(), 4);
+    assert_eq!(e.page, current, "the page shown was not deleted");
+    assert_eq!(e.duplicate_pages(&[0, 1]), vec![1, 3]);
+    assert_eq!(e.lesson.page_count(), 6);
+    assert!(e.undo());
+    assert_eq!(e.lesson.page_count(), 4);
+    // Deleting the page shown shows the one after the first deleted.
+    e.goto_page(1);
+    assert_eq!(e.delete_pages(&[1]), 1);
+    assert_eq!(e.page_index(), 1);
+    // Every page at once is refused.
+    assert_eq!(e.delete_pages(&[0, 1, 2]), 0);
+}

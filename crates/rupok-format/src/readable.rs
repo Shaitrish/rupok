@@ -81,6 +81,9 @@ pub struct Content {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub course: Option<CourseRef>,
     pub page_count: usize,
+    /// The lesson's branding (logo and text shown on every page).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branding: Option<BrandingContent>,
     pub pages: Vec<PageContent>,
     /// True when pages, items or text were cut to keep the file small.
     #[serde(default)]
@@ -100,6 +103,15 @@ pub struct PageContent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub height: Option<f64>,
     pub background: String,
+    /// The page's background image, `assets/<blake3>.<ext>`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub background_image: String,
+    /// This page's own branding, when it differs from the lesson's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branding: Option<BrandingContent>,
+    /// The page shows no branding.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub branding_hidden: bool,
     /// Typed text in reading order (top to bottom, left to right).
     pub text: Vec<TextEntry>,
     pub ink: InkSummary,
@@ -107,6 +119,58 @@ pub struct PageContent {
     pub shapes: Vec<ShapeEntry>,
     pub images: Vec<ImageEntry>,
     pub objects: Vec<ObjectEntry>,
+}
+
+/// Branding text and logo (spec: Page design). The date, when shown, is
+/// the day of showing, so it is a flag here.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct BrandingContent {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub school: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub teacher: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub class: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub date: bool,
+    /// The logo, `assets/<blake3>.<ext>`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub logo: String,
+}
+
+impl BrandingContent {
+    fn from(b: &rupok_core::Branding) -> Option<Self> {
+        if b.is_empty() {
+            return None;
+        }
+        Some(Self {
+            school: cap(&b.school, MAX_TITLE),
+            teacher: cap(&b.teacher, MAX_TITLE),
+            class: cap(&b.class, MAX_TITLE),
+            date: b.date,
+            logo: b
+                .logo
+                .as_deref()
+                .map(|l| format!("assets/{}", cap(l, MAX_TITLE)))
+                .unwrap_or_default(),
+        })
+    }
+
+    /// "School · Teacher · Class", plus the date and logo notes.
+    fn line(&self) -> String {
+        let mut parts: Vec<String> = [&self.school, &self.teacher, &self.class]
+            .into_iter()
+            .filter(|t| !t.is_empty())
+            .map(|t| md_line(t))
+            .collect();
+        if self.date {
+            parts.push("today's date".into());
+        }
+        if !self.logo.is_empty() {
+            parts.push(format!("logo `{}`", self.logo));
+        }
+        parts.join(" · ")
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -177,6 +241,7 @@ fn is_zero(n: &usize) -> bool {
 /// joined in at write time by [`Outline::content`].
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Outline {
+    branding: Option<BrandingContent>,
     pages: Vec<PageContent>,
     page_count: usize,
     truncated: bool,
@@ -200,6 +265,7 @@ impl Outline {
     pub fn from_lesson(lesson: &Lesson, mut cache: Option<&mut ReadableCache>) -> Self {
         let infos = lesson.pages();
         let mut out = Outline {
+            branding: lesson.branding().as_ref().and_then(BrandingContent::from),
             page_count: infos.len(),
             truncated: infos.len() > MAX_PAGES,
             ..Default::default()
@@ -221,6 +287,17 @@ impl Outline {
                 width: info.frame.map(|f| f.w),
                 height: info.frame.map(|f| f.h),
                 background: info.pattern.as_str().into(),
+                background_image: info
+                    .background
+                    .as_ref()
+                    .map(|b| format!("assets/{}", cap(&b.image, MAX_TITLE)))
+                    .unwrap_or_default(),
+                branding: info
+                    .branding
+                    .as_ref()
+                    .filter(|b| !b.off)
+                    .and_then(BrandingContent::from),
+                branding_hidden: info.branding.as_ref().is_some_and(|b| b.off),
                 ..Default::default()
             };
             // Reading order: top to bottom, then left to right.
@@ -328,6 +405,7 @@ impl Outline {
             generator: cap(&m.generator, MAX_TITLE),
             course: m.course.clone(),
             page_count: self.page_count,
+            branding: self.branding.clone(),
             pages,
             truncated: self.truncated,
         }
@@ -669,6 +747,9 @@ pub fn content_md(c: &Content) -> String {
         let _ = writeln!(s, "- Modified: {}", c.modified);
     }
     let _ = writeln!(s, "- Made with: {}", md_line(&c.generator));
+    if let Some(b) = &c.branding {
+        let _ = writeln!(s, "- Branding on every page: {}", b.line());
+    }
     for p in &c.pages {
         if s.len() > MAX_CONTENT_MD {
             let _ = writeln!(
@@ -700,6 +781,14 @@ fn page_md(s: &mut String, p: &PageContent) {
         let _ = write!(s, ": {}", md_line(&p.title));
     }
     s.push_str("\n\n");
+    if !p.background_image.is_empty() {
+        let _ = writeln!(s, "- Background image: `{}`", p.background_image);
+    }
+    if let Some(b) = &p.branding {
+        let _ = writeln!(s, "- Branding on this page: {}", b.line());
+    } else if p.branding_hidden {
+        s.push_str("- No branding on this page\n");
+    }
     let empty = p.text.is_empty()
         && p.ink.strokes == 0
         && p.ink.highlighter == 0

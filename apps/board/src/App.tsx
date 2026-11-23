@@ -20,7 +20,8 @@ import ChatPanel from "./components/ChatPanel";
 import VoiceLayer from "./voice/VoiceLayer";
 import { LibraryRoot } from "./components/Library";
 import { startLibrary } from "./library/session";
-import { isPhone, pagesShown } from "./viewport";
+import { isPhone, pagesDrawer, pagesShown } from "./viewport";
+import { PageDesignHost } from "./components/PageDesign";
 import { drawCursor } from "./wetInk";
 
 const OverlayApp = lazy(() => import("./overlay/OverlayApp"));
@@ -131,9 +132,10 @@ export default function App() {
       </div>
       <Show when={ready()}>
         <TopBar onObject={() => setObjectDialog(true)} onSettings={() => openSettings()} />
-        <Show when={pagesShown()}>
+        <Show when={pagesShown() || pagesDrawer()}>
           <PagesPanel />
         </Show>
+        <PageDesignHost />
         {/* The Smart Dock; it also holds the replay controls while a replay runs. */}
         <Dock onSettings={openSettings} />
         <StatusChips />

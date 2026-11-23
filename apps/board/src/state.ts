@@ -25,6 +25,9 @@ export interface PageInfo {
   pattern: "plain" | "grid" | "dots" | "lines";
   bg_color: number;
   item_count: number;
+  /** Page design (design.ts): the background image and this page's own branding. */
+  background?: import("./design").PageBackground;
+  branding?: import("./design").Branding;
 }
 
 export const [tool, setTool] = createSignal<Tool>("pen");
@@ -121,12 +124,14 @@ export interface Prefs {
   eraserMode: "partial" | "stroke";
   /** Slide pages are the board: ink, shapes and placed items stay on them. */
   keepInkOnPage: boolean;
+  /** The pages drawer stays open after a jump (Teach, phones, "Show pages"). */
+  pagesPinned: boolean;
 }
 // WebGL2 is the default until WebGPU presentation is verified on real boards (see ROADMAP).
 const defaults: Prefs = {
   theme: "system", accent: "mint", iconStyle: "linear", toolbar: "bottom", density: "comfortable",
   touchMode: "auto", smoothing: 0.25, pressure: 0.8, showStats: false, forceWebgl: true, showPages: true,
-  smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right", eraserMode: "partial", keepInkOnPage: true,
+  smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right", eraserMode: "partial", keepInkOnPage: true, pagesPinned: false,
   smartGraphs: true, smartFlowchart: true, smartGates: true, smartNumberLine: true,
   smartGeometry: true, smartTables: true, smartScience: false, smartMath: true,
 };

@@ -68,6 +68,8 @@ const MAP = {
   grow: ["maximize-square-minimalistic", "maximize-square"],
   shrink: ["minimize-square-minimalistic", "minimize-square"],
   broom: ["broom"],
+  pin: ["pin"],
+  pages: ["widget-4"],
 };
 
 function body(name) {

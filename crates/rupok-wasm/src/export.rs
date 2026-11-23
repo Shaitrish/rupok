@@ -12,7 +12,7 @@
 //! the inner side folds over itself, and a translucent highlighter is painted
 //! once, as on the board.
 
-use rupok_core::{BoxGeom, Frame, ItemData, Lesson};
+use rupok_core::{BoxGeom, Branding, Frame, ItemData, Lesson, PageBackground};
 use rupok_format::Package;
 use rupok_ink::{StrokePoint, point_radius};
 use serde::Serialize;
@@ -301,6 +301,12 @@ struct ExportPage<'a> {
     /// 0xRRGGBBAA
     bg: u32,
     pattern: &'static str,
+    /// The page's background image.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    background: Option<PageBackground>,
+    /// The branding the page shows (its own, else the lesson's).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    branding: Option<Branding>,
     /// World bounds of all items, `[minX, minY, maxX, maxY]`.
     bounds: Option<[f32; 4]>,
     items: Vec<ExportItem<'a>>,
@@ -347,7 +353,8 @@ fn rect(g: &BoxGeom) -> [f64; 4] {
 }
 
 /// Everything needed to draw page `index` as vectors, as JSON:
-/// `{title, frame, bg, pattern, bounds, items}` with items in stacking order
+/// `{title, frame, bg, pattern, background?, branding?, bounds, items}` with
+/// items in stacking order
 /// (`stroke` items carry an `outline`); `null` for a bad index. With
 /// `strokes` false, strokes are left out (a quick look for Smart Objects).
 /// Reads the document only, so exporting never changes the lesson or its
@@ -404,11 +411,14 @@ pub fn page_export_json(lesson: &Lesson, pkg: &Package, index: usize, strokes: b
             },
         });
     }
+    let branding = lesson.branding_for(&info);
     serde_json::to_string(&ExportPage {
         title: &info.title,
         frame: info.frame,
         bg: info.bg_color,
         pattern: info.pattern.as_str(),
+        background: info.background.clone(),
+        branding,
         bounds,
         items: out,
     })

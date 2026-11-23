@@ -31,6 +31,9 @@ import type { Controller } from "./controller";
 import { theme as objectTheme } from "./objects";
 import { BOARD_COLORS } from "./state";
 import { APP_NAME, FILE_EXT, SITE_URL } from "./brand";
+import {
+  type Branding, type PageBackground, DIM_ALPHA, bgPlacements, brandInkRgba, brandLine, brandTextBox, frameOf, hasBranding, imageSize, logoRect,
+} from "./design";
 
 export type Layout = "slides" | "handout3" | "handout2";
 
@@ -70,6 +73,9 @@ interface PageData {
   frame: { w: number; h: number } | null;
   bg: number;
   pattern: "plain" | "grid" | "dots" | "lines";
+  /** Page design (design.ts): drawn like the board. */
+  background?: PageBackground;
+  branding?: Branding;
   bounds: Rect | null;
   items: Item[];
 }
@@ -520,6 +526,8 @@ class Exporter {
     // World coordinates (y down) inside the form (y up).
     ops.push(`1 0 0 -1 ${num(-ax)} ${num(ah + ay)} cm`);
     ops.push(`${rgbOps(bg)} rg ${num(ax)} ${num(ay)} ${num(aw)} ${num(ah)} re f`);
+    // A dark page printed as paper leaves out its background image (a chalkboard texture).
+    if (p.background && !paper) await this.drawBackground(ops, res, p.background, frameOf(p), bg);
     this.drawPattern(ops, res, p.pattern, area, paper ? BOARD_COLORS[0].pattern : BOARD_COLORS.find((b) => b.rgba === p.bg)?.pattern);
     for (const it of p.items) {
       if (it.kind === "image") {
@@ -531,6 +539,8 @@ class Exporter {
         await this.drawObject(ops, res, index, it, bg, paper);
       }
     }
+    // Branding sits above the items and under the ink, as on the board.
+    if (hasBranding(p.branding)) await this.drawBranding(ops, res, p.branding, frameOf(p), bg);
     this.drawStrokes(ops, res, p.items, paper);
     const ctx = this.pdf.context;
     const resources = ctx.obj({
@@ -541,6 +551,53 @@ class Exporter {
     await yieldToUi();
     const ref = await this.flate(content, { Type: "XObject", Subtype: "Form", BBox: [0, 0, aw, ah], Resources: resources });
     return { ref, w: aw, h: ah };
+  }
+
+  /** The background image (each asset embedded once per PDF), clipped to the page, and the dim wash. */
+  private async drawBackground(ops: string[], res: Resources, b: PageBackground, f: { w: number; h: number }, bg: number) {
+    const img = await this.asset(b.image);
+    const url = this.c.assetUrl(b.image);
+    if (!img || !url) return;
+    const size = await imageSize(url);
+    const name = this.xobject(img.ref, res);
+    ops.push(`q 0 0 ${num(f.w)} ${num(f.h)} re W n`);
+    if (b.opacity < 0.995) ops.push(this.alpha(Math.max(0, b.opacity), res));
+    for (const [x, y, w, h] of bgPlacements(b.fit, f.w, f.h, size.w, size.h)) this.placeImage(ops, name, x, y, w, h);
+    ops.push("Q");
+    if (b.dim) ops.push(`q ${this.alpha(DIM_ALPHA, res)} ${rgbOps(bg)} rg 0 0 ${num(f.w)} ${num(f.h)} re f Q`);
+  }
+
+  /** The branding logo and text line (the text drawn as an image, so any script works). */
+  private async drawBranding(ops: string[], res: Resources, b: Branding, f: { w: number; h: number }, bg: number) {
+    if (b.logo) {
+      const img = await this.asset(b.logo);
+      const url = this.c.assetUrl(b.logo);
+      if (img && url) {
+        const size = await imageSize(url);
+        ops.push("q");
+        if (b.logo_opacity < 0.995) ops.push(this.alpha(Math.max(0, b.logo_opacity), res));
+        this.placeImage(ops, this.xobject(img.ref, res), ...logoRect(b, f.w, f.h, size.h ? size.w / size.h : 1));
+        ops.push("Q");
+      }
+    }
+    const line = brandLine(b);
+    if (!line) return;
+    const { rect, size } = brandTextBox(b, f.w, f.h);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.ceil(rect[2] * TEXT_SCALE));
+    canvas.height = Math.max(1, Math.ceil(rect[3] * TEXT_SCALE));
+    const g = canvas.getContext("2d")!;
+    g.scale(TEXT_SCALE, TEXT_SCALE);
+    g.font = `600 ${size}px ${getComputedStyle(document.body).fontFamily}`;
+    g.textBaseline = "middle";
+    g.textAlign = b.text_align;
+    const x = b.text_align === "left" ? 0 : b.text_align === "right" ? rect[2] : rect[2] / 2;
+    g.fillText(line, x, rect[3] / 2, rect[2]);
+    const [color, a] = brandInkRgba(bg);
+    const ref = await this.embedMask(canvas, color);
+    ops.push(`q ${this.alpha(a, res)}`);
+    this.placeImage(ops, this.xobject(ref, res), ...rect);
+    ops.push("Q");
   }
 
   private drawPattern(ops: string[], res: Resources, pattern: string, area: Rect, color: string | undefined) {

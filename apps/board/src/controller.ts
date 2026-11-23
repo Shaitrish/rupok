@@ -13,10 +13,11 @@ import {
 } from "./state";
 import { type Mode, type ToolbarItem, hasTopBar } from "./modes";
 import { dockSide } from "./dock";
-import { cssPx, isPhone, safeArea } from "./viewport";
+import { cssPx, isPhone, pagesDrawer, safeArea, setPagesDrawer, togglePagesDrawer } from "./viewport";
+import { type DesignDefault, setDesignDefault, setLessonBranding } from "./design";
 import { ObjectHost } from "./objects";
 import { attachTrackpadPinch } from "./pinch";
-import { autosaveLoad, autosaveStore } from "./storage";
+import { autosaveLoad, autosaveStore, designDefaultLoad } from "./storage";
 import { noteFrame, noteSamples } from "./inkLatency";
 import { attachTrail, drawsInk, notePointerDown, notePointerUp, penBusy, predictedFor, setPointerKind, trailAfterMove } from "./wetInk";
 import { APP_NAME, FILE_EXT, LESSON_MIME } from "./brand";
@@ -33,6 +34,12 @@ function editableTarget(t: EventTarget | null): boolean {
   const el = t as HTMLElement | null;
   return !!el && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT");
 }
+
+/** Inputs that take no typing (a slider, a checkbox): Ctrl/⌘ shortcuts such
+ * as Undo still reach the board from them; plain keys stay with the input. */
+const NON_TEXT_INPUTS = new Set(["range", "checkbox", "radio", "button", "color", "file", "submit", "reset"]);
+const nonTextInput = (t: EventTarget | null) =>
+  (t as HTMLElement | null)?.tagName === "INPUT" && NON_TEXT_INPUTS.has((t as HTMLInputElement).type);
 
 export class Controller {
   board!: Board;
@@ -69,6 +76,7 @@ export class Controller {
     new ResizeObserver(() => this.resize()).observe(root);
     // The student viewer never reads or writes the teacher's autosave.
     const saved = studentEntry ? null : await autosaveLoad();
+    if (!studentEntry) void designDefaultLoad().then((d) => setDesignDefault((d as DesignDefault | null)?.version === 1 ? (d as DesignDefault) : null));
     if (saved) {
       try {
         this.board.load(saved);
@@ -252,6 +260,7 @@ export class Controller {
       setItems(reconcile(list, { key: "id" }));
       const pageList = JSON.parse(this.board.pages_json()) as PageInfo[];
       setPages(pageList);
+      setLessonBranding(JSON.parse(this.board.branding_json()));
       setPageIndex(this.board.page_index());
       // Teach paints the letterbox around the slide in the page colour.
       const bg = pageList[this.board.page_index()]?.bg_color ?? 0xffffffff;
@@ -558,7 +567,7 @@ export class Controller {
   attachKeys() {
     this.attachClipboard();
     window.addEventListener("keydown", (e) => {
-      if (editableTarget(e.target)) return;
+      if (editableTarget(e.target) && !((e.ctrlKey || e.metaKey) && nonTextInput(e.target))) return;
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
       // Modes: F5 presents (Teach), Alt+1/2/3 picks a mode. By key position:
@@ -570,6 +579,9 @@ export class Controller {
         this.setMode((["prepare", "teach", "view"] as const)[Number(digit) - 1]);
         return;
       }
+      // The pages drawer: G shows or hides it; Esc closes it first.
+      if (!mod && !e.altKey && k === "g") { e.preventDefault(); togglePagesDrawer(); return; }
+      if (e.key === "Escape" && pagesDrawer()) { setPagesDrawer(false); return; }
       if (isView()) {
         this.viewKeys(e, mod, k);
         return;
@@ -645,6 +657,11 @@ export class Controller {
   setBoardColor(rgba: number) {
     const page = JSON.parse(this.board.pages_json())[this.board.page_index()];
     this.board.set_background(page?.pattern ?? "plain", rgba);
+    this.penForBoard(rgba);
+  }
+
+  /** Flip a dark default pen to white on a dark board (and back). */
+  penForBoard(rgba: number) {
     const dark = (rgba >>> 8) < 0x808080;
     const c = color();
     if (dark && c === 0x1c2024ff) { setColor(0xffffffff); this.board.set_color(0xffffffff); }
@@ -666,6 +683,8 @@ export class Controller {
   /** Width taken by the docked AI chat panel (ChatPanel.tsx), and its side. */
   chatInset = 0;
   chatSide: "left" | "right" = "right";
+  /** Width taken by the Page design sheet while it is open (0 when closed). */
+  sheetInset = 0;
 
   /** Screen margins covered by chrome, so fit/placement use the visible area. */
   updateInsets(fit = false) {
@@ -691,6 +710,8 @@ export class Controller {
     // The docked chat panel (Prepare only; it is an overlay in Teach).
     if (this.chatInset > 0 && this.chatSide === "right") right = Math.max(right, inset + this.chatInset);
     if (this.chatInset > 0 && this.chatSide === "left") left += this.chatInset;
+    // The Page design sheet (PageDesign.tsx) keeps the slide beside it in view.
+    if (this.sheetInset > 0 && !phone) right = Math.max(right, this.sheetInset);
     // Teach: chrome floats over the slide, which fills the screen.
     if (mode() === "teach") top = right = bottom = left = 0;
     this.insets = [top, right, bottom, left];

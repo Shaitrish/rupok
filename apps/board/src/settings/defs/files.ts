@@ -4,6 +4,7 @@
 import { APP_SLUG } from "../../brand";
 import { controller } from "../../controller";
 import { autosaveClear } from "../../storage";
+import { applyDesignDefault } from "../../design";
 import { downloadQuiz } from "../../components/Chrome";
 import { openExport } from "../../components/ExportDialog";
 import { closeSettings } from "../open";
@@ -59,6 +60,7 @@ registerSettings([
     run: async () => {
       await autosaveClear();
       controller.board.new_lesson("Untitled lesson");
+      applyDesignDefault(controller.board, { style: true });
       closeSettings();
     },
   },

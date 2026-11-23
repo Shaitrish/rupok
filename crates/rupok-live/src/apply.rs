@@ -694,7 +694,8 @@ pub(crate) fn page_ref(
 }
 
 /// A new page: the given look, else the look of the current page (a lesson
-/// on a chalkboard stays on chalkboard).
+/// on a chalkboard stays on chalkboard, with its background image and page
+/// branding when no pattern or colour is asked for).
 pub(crate) fn new_page_spec(
     lesson: &Lesson,
     current: &str,
@@ -703,7 +704,14 @@ pub(crate) fn new_page_spec(
     color: &Option<String>,
 ) -> Result<PageSpec> {
     let cur = lesson.page(current).ok();
+    let same_look = pattern.is_none() && color.is_none();
+    let (background, branding) = match (&cur, same_look) {
+        (Some(p), true) => (p.background.clone(), p.branding.clone()),
+        _ => (None, None),
+    };
     Ok(PageSpec {
+        background,
+        branding,
         title: title.clone().unwrap_or_default(),
         frame: Some(
             cur.as_ref()

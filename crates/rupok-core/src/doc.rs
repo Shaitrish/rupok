@@ -55,14 +55,19 @@ impl std::fmt::Debug for Lesson {
 }
 
 impl Lesson {
+    fn fresh_undo(doc: &LoroDoc) -> UndoManager {
+        let mut undo = UndoManager::new(doc);
+        undo.set_merge_interval(0);
+        undo.set_max_undo_steps(500);
+        undo
+    }
+
     fn wrap(doc: LoroDoc) -> Self {
         doc.set_record_timestamp(true);
         // Never merge separate user actions into one change: each stroke must
         // stay individually undoable and replayable.
         doc.set_change_merge_interval(0);
-        let mut undo = UndoManager::new(&doc);
-        undo.set_merge_interval(0);
-        undo.set_max_undo_steps(500);
+        let undo = Self::fresh_undo(&doc);
         Self {
             doc,
             undo,
@@ -81,13 +86,15 @@ impl Lesson {
         l.doc.commit();
         l.add_page(None, PageSpec::default()).expect("fresh doc");
         // Creating the lesson is not an undoable user action.
-        l.undo = {
-            let mut u = UndoManager::new(&l.doc);
-            u.set_merge_interval(0);
-            u.set_max_undo_steps(500);
-            u
-        };
+        l.forget_history();
         l
+    }
+
+    /// Start a fresh undo stack: what was done so far can no longer be
+    /// undone (the document history, and so replay, is kept). For setting
+    /// up a new lesson, e.g. with the teacher's default page design.
+    pub fn forget_history(&mut self) {
+        self.undo = Self::fresh_undo(&self.doc);
     }
 
     /// Load from a snapshot or update blob produced by [`Lesson::save`].
@@ -247,9 +254,33 @@ impl Lesson {
         }
         page.insert("bg_pattern", spec.pattern.as_str())?;
         page.insert("bg_color", i64::from(spec.bg_color))?;
+        if let Some(bg) = spec.background.and_then(PageBackground::sanitized) {
+            page.insert("background", background_value(&bg))?;
+        }
+        if let Some(b) = spec.branding {
+            page.insert("branding", branding_value(&b.sanitized()))?;
+        }
         page.insert_container("items", LoroMap::new())?;
         self.doc.commit();
         Ok(id)
+    }
+
+    /// Insert a page at `index` (default: end) that looks like page `src`:
+    /// the same frame, colour, pattern, background image and page branding,
+    /// with no title and no items. One change. Returns its id.
+    pub fn add_page_like(&mut self, index: Option<usize>, src: &str) -> Result<PageId> {
+        let info = self.page(src)?;
+        self.add_page(
+            index,
+            PageSpec {
+                title: String::new(),
+                frame: info.frame,
+                pattern: info.pattern,
+                bg_color: info.bg_color,
+                background: info.background,
+                branding: info.branding,
+            },
+        )
     }
 
     pub fn remove_page(&mut self, page_id: &str) -> Result<()> {
@@ -297,6 +328,86 @@ impl Lesson {
     /// `created` and their references (`bundle`, `asset`), so a copied
     /// page replays like the original.
     pub fn duplicate_page(&mut self, page_id: &str) -> Result<PageId> {
+        let id = self.copy_page(page_id)?;
+        self.doc.commit();
+        Ok(id)
+    }
+
+    /// Copy several pages, each right after its original, as one change
+    /// (one undo step). Returns the copies' ids in the order given.
+    pub fn duplicate_pages(&mut self, page_ids: &[PageId]) -> Result<Vec<PageId>> {
+        for id in page_ids {
+            self.page_index(id)?;
+        }
+        let mut out = Vec::with_capacity(page_ids.len());
+        for id in page_ids {
+            out.push(self.copy_page(id)?);
+        }
+        self.doc.commit();
+        Ok(out)
+    }
+
+    /// Remove several pages as one change (one undo step). A lesson keeps
+    /// at least one page: removing them all is refused. Unknown ids change
+    /// nothing. Returns how many were removed.
+    pub fn remove_pages(&mut self, page_ids: &[PageId]) -> Result<usize> {
+        let mut idx = page_ids
+            .iter()
+            .map(|id| self.page_index(id))
+            .collect::<Result<Vec<_>>>()?;
+        idx.sort_unstable();
+        idx.dedup();
+        if idx.len() >= self.page_count() {
+            return Err(CoreError::PageIndex(self.page_count()));
+        }
+        let list = self.pages_list();
+        for &i in idx.iter().rev() {
+            list.delete(i, 1)?;
+        }
+        self.doc.commit();
+        Ok(idx.len())
+    }
+
+    /// Move several pages together to the gap before page `gap` (0..=n,
+    /// indexes before the move), keeping their order, as one change. They
+    /// end up next to each other.
+    pub fn move_pages(&mut self, page_ids: &[PageId], gap: usize) -> Result<()> {
+        let n = self.page_count();
+        if gap > n {
+            return Err(CoreError::PageIndex(gap));
+        }
+        let mut idx = page_ids
+            .iter()
+            .map(|id| self.page_index(id))
+            .collect::<Result<Vec<_>>>()?;
+        idx.sort_unstable();
+        idx.dedup();
+        // The order wanted: the other pages, with the block at `gap`.
+        let all: Vec<PageId> = (0..n).map(|i| self.page_id_at(i)).collect::<Result<_>>()?;
+        let start = gap - idx.iter().filter(|&&i| i < gap).count();
+        let moved: Vec<PageId> = idx.iter().map(|&i| all[i].clone()).collect();
+        let mut target: Vec<PageId> = (0..n)
+            .filter(|i| idx.binary_search(i).is_err())
+            .map(|i| all[i].clone())
+            .collect();
+        target.splice(start..start, moved);
+        // Fill position by position: everything before `t` is already final.
+        let list = self.pages_list();
+        let mut cur = all;
+        for (t, id) in target.iter().enumerate() {
+            let from = cur.iter().position(|x| x == id).unwrap_or(t);
+            if from != t {
+                list.mov(from, t)?;
+                let v = cur.remove(from);
+                cur.insert(t, v);
+            }
+        }
+        self.doc.commit();
+        Ok(())
+    }
+
+    /// The copy of [`Lesson::duplicate_page`], without committing.
+    fn copy_page(&mut self, page_id: &str) -> Result<PageId> {
         let idx = self.page_index(page_id)?;
         let src = self.page_map(page_id)?;
         let src_items = self.items_map(page_id)?;
@@ -335,8 +446,93 @@ impl Lesson {
                 items.insert(&item_id, v)?;
             }
         }
-        self.doc.commit();
         Ok(id)
+    }
+
+    // --------------------------------------------------------- page design
+
+    /// The look of page `page_id`: colour, pattern and background image.
+    pub fn page_style(&self, page_id: &str) -> Result<PageStyle> {
+        let info = self.page(page_id)?;
+        Ok(PageStyle {
+            pattern: info.pattern,
+            bg_color: info.bg_color,
+            background: info.background,
+        })
+    }
+
+    /// Give every page in `page_ids` the look `style` (colour, pattern and
+    /// background image; `background: None` removes the image), as one
+    /// change: one undo step however many pages. An unknown id changes
+    /// nothing.
+    pub fn set_page_style(&mut self, page_ids: &[PageId], style: &PageStyle) -> Result<()> {
+        let list = self.pages_list();
+        let mut at = std::collections::HashMap::new();
+        for i in 0..list.len() {
+            if let Some(id) = self.page_map_at(i).and_then(|m| str_of(&m, "id")) {
+                at.entry(id).or_insert(i);
+            }
+        }
+        let maps = page_ids
+            .iter()
+            .map(|id| {
+                at.get(id)
+                    .and_then(|&i| self.page_map_at(i))
+                    .ok_or_else(|| CoreError::PageNotFound(id.clone()))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let bg = style.background.clone().and_then(PageBackground::sanitized);
+        for page in maps {
+            page.insert("bg_pattern", style.pattern.as_str())?;
+            page.insert("bg_color", i64::from(style.bg_color))?;
+            match &bg {
+                Some(b) => page.insert("background", background_value(b))?,
+                None if page.get("background").is_some() => page.delete("background")?,
+                None => {}
+            }
+        }
+        self.doc.commit();
+        Ok(())
+    }
+
+    /// The lesson's branding (`meta.branding`): shown on every page that
+    /// has no `branding` of its own.
+    pub fn branding(&self) -> Option<Branding> {
+        map_of(&self.doc.get_map("meta"), "branding")
+            .map(|v| read_branding(&v))
+            .filter(|b| !b.off)
+    }
+
+    /// Set (`Some`) or remove (`None`) the lesson's branding. One change.
+    pub fn set_branding(&mut self, branding: Option<&Branding>) -> Result<()> {
+        let meta = self.doc.get_map("meta");
+        let b = branding.map(|b| Branding {
+            off: false,
+            ..b.clone()
+        });
+        write_branding(&meta, b.as_ref())?;
+        self.doc.commit();
+        Ok(())
+    }
+
+    /// Set page `page_id`'s own branding, which replaces the lesson's on
+    /// that page ([`Branding::hidden`] shows none there), or remove it
+    /// (`None`: the page shows the lesson's again). One change.
+    pub fn set_page_branding(&mut self, page_id: &str, branding: Option<&Branding>) -> Result<()> {
+        let page = self.page_map(page_id)?;
+        write_branding(&page, branding)?;
+        self.doc.commit();
+        Ok(())
+    }
+
+    /// The branding a page shows: its own, else the lesson's; `None` when
+    /// it has none or hides it.
+    pub fn branding_for(&self, info: &PageInfo) -> Option<Branding> {
+        match &info.branding {
+            Some(b) if b.off => None,
+            Some(b) => Some(b.clone()),
+            None => self.branding(),
+        }
     }
 
     // --------------------------------------------------------------- items
@@ -894,6 +1090,125 @@ fn page_info(m: &LoroMap) -> PageInfo {
         pattern: Pattern::parse(&str_of(m, "bg_pattern").unwrap_or_default()),
         bg_color: u32_of(m, "bg_color").unwrap_or(0xffffffff),
         item_count,
+        background: map_of(m, "background").and_then(|v| read_background(&v)),
+        branding: map_of(m, "branding").map(|v| read_branding(&v)),
+    }
+}
+
+// ----------------------------------------------------------- page design
+//
+// `background` (page) and `branding` (page and `meta`) are stored as plain
+// map values: one edit replaces the whole map in one op, so an undo step
+// restores the previous design exactly. Readers accept a map container too.
+
+/// The map at `key`, stored as a plain map value or a map container.
+fn map_of(m: &LoroMap, key: &str) -> Option<loro::LoroMapValue> {
+    match m.get(key)? {
+        ValueOrContainer::Value(LoroValue::Map(v)) => Some(v),
+        ValueOrContainer::Container(Container::Map(c)) => match c.get_deep_value() {
+            LoroValue::Map(v) => Some(v),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn bool_of(m: &impl Fields, key: &str) -> Option<bool> {
+    match value_of(m, key)? {
+        LoroValue::Bool(b) => Some(b),
+        _ => None,
+    }
+}
+
+fn read_background(v: &loro::LoroMapValue) -> Option<PageBackground> {
+    PageBackground {
+        image: str_of(v, "image")?,
+        fit: BgFit::parse(&str_of(v, "fit").unwrap_or_default()),
+        opacity: f64_of(v, "opacity").unwrap_or(1.0),
+        dim: bool_of(v, "dim").unwrap_or(false),
+    }
+    .sanitized()
+}
+
+fn background_value(b: &PageBackground) -> LoroValue {
+    let mut f = ValueFields::default();
+    f.set("image", b.image.as_str());
+    f.set("fit", b.fit.as_str());
+    f.set("opacity", b.opacity);
+    f.set("dim", b.dim);
+    f.into_value()
+}
+
+fn read_branding(v: &loro::LoroMapValue) -> Branding {
+    if bool_of(v, "off") == Some(true) {
+        return Branding::hidden();
+    }
+    let d = Branding::default();
+    Branding {
+        logo: str_of(v, "logo").filter(|s| !s.is_empty()),
+        logo_x: f64_of(v, "logo_x").unwrap_or(d.logo_x),
+        logo_y: f64_of(v, "logo_y").unwrap_or(d.logo_y),
+        logo_w: f64_of(v, "logo_w").unwrap_or(d.logo_w),
+        logo_opacity: f64_of(v, "logo_opacity").unwrap_or(1.0),
+        school: str_of(v, "school").unwrap_or_default(),
+        teacher: str_of(v, "teacher").unwrap_or_default(),
+        class: str_of(v, "class").unwrap_or_default(),
+        date: bool_of(v, "date").unwrap_or(false),
+        text_pos: match str_of(v, "text_pos").as_deref() {
+            Some("top") => BrandPos::Top,
+            _ => BrandPos::Bottom,
+        },
+        text_align: match str_of(v, "text_align").as_deref() {
+            Some("left") => BrandAlign::Left,
+            Some("right") => BrandAlign::Right,
+            _ => BrandAlign::Center,
+        },
+        off: false,
+    }
+    .sanitized()
+}
+
+fn branding_value(b: &Branding) -> LoroValue {
+    let mut f = ValueFields::default();
+    if b.off {
+        f.set("off", true);
+        return f.into_value();
+    }
+    if let Some(logo) = &b.logo {
+        f.set("logo", logo.as_str());
+    }
+    f.set("logo_x", b.logo_x);
+    f.set("logo_y", b.logo_y);
+    f.set("logo_w", b.logo_w);
+    f.set("logo_opacity", b.logo_opacity);
+    f.set("school", b.school.as_str());
+    f.set("teacher", b.teacher.as_str());
+    f.set("class", b.class.as_str());
+    f.set("date", b.date);
+    f.set(
+        "text_pos",
+        match b.text_pos {
+            BrandPos::Top => "top",
+            BrandPos::Bottom => "bottom",
+        },
+    );
+    f.set(
+        "text_align",
+        match b.text_align {
+            BrandAlign::Left => "left",
+            BrandAlign::Center => "center",
+            BrandAlign::Right => "right",
+        },
+    );
+    f.into_value()
+}
+
+/// Write (`Some`) or remove (`None`) the `branding` key of `m`.
+fn write_branding(m: &LoroMap, b: Option<&Branding>) -> loro::LoroResult<()> {
+    match b {
+        Some(b) => m.insert("branding", branding_value(&b.clone().sanitized())),
+        None if m.get("branding").is_some() => m.delete("branding"),
+        None => Ok(()),
     }
 }
 
@@ -1793,5 +2108,254 @@ mod tests {
         doc.get_map("meta").insert("format", 999).unwrap();
         doc.commit();
         assert!(Lesson::load(&doc.export(ExportMode::Snapshot).unwrap()).is_err());
+    }
+
+    // ------------------------------------------------------ page design
+
+    fn bg(image: &str) -> PageBackground {
+        PageBackground {
+            image: image.into(),
+            fit: BgFit::Tile,
+            opacity: 0.6,
+            dim: true,
+        }
+    }
+
+    fn brand() -> Branding {
+        Branding {
+            logo: Some("ab12.png".into()),
+            logo_x: 0.8,
+            logo_y: 0.05,
+            logo_w: 0.12,
+            logo_opacity: 0.9,
+            school: "Dhaka Model School".into(),
+            teacher: "Ms. Rahman".into(),
+            class: "Class 8 · Science".into(),
+            date: true,
+            text_pos: BrandPos::Top,
+            text_align: BrandAlign::Right,
+            off: false,
+        }
+    }
+
+    #[test]
+    fn page_design_round_trips_and_each_change_is_one_undo_step() {
+        let mut l = Lesson::new("t", 0.0);
+        let p0 = l.page_id_at(0).unwrap();
+        let style = PageStyle {
+            pattern: Pattern::Lines,
+            bg_color: 0x1f3b30ff,
+            background: Some(bg("cafe.jpg")),
+        };
+        l.set_page_style(std::slice::from_ref(&p0), &style).unwrap();
+        l.set_branding(Some(&brand())).unwrap();
+        let back = Lesson::load(&l.save()).unwrap();
+        assert_eq!(back.page_style(&p0).unwrap(), style);
+        assert_eq!(back.branding(), Some(brand()));
+        assert_eq!(back.branding_for(&back.page(&p0).unwrap()), Some(brand()));
+
+        // A page of its own, then hidden: each is one step back.
+        let own = Branding {
+            school: "Only here".into(),
+            logo: None,
+            ..brand()
+        };
+        l.set_page_branding(&p0, Some(&own)).unwrap();
+        assert_eq!(l.branding_for(&l.page(&p0).unwrap()), Some(own.clone()));
+        l.set_page_branding(&p0, Some(&Branding::hidden())).unwrap();
+        assert_eq!(l.branding_for(&l.page(&p0).unwrap()), None);
+        assert!(l.undo().unwrap());
+        assert_eq!(l.branding_for(&l.page(&p0).unwrap()), Some(own));
+        assert!(l.undo().unwrap());
+        assert_eq!(l.branding_for(&l.page(&p0).unwrap()), Some(brand()));
+        assert!(l.undo().unwrap());
+        assert_eq!(l.branding(), None);
+        assert!(l.undo().unwrap());
+        assert_eq!(l.page_style(&p0).unwrap(), PageStyle::default());
+    }
+
+    #[test]
+    fn new_pages_look_like_the_page_they_follow() {
+        let mut l = Lesson::new("t", 0.0);
+        let p0 = l.page_id_at(0).unwrap();
+        l.set_page_style(
+            std::slice::from_ref(&p0),
+            &PageStyle {
+                pattern: Pattern::Grid,
+                bg_color: 0x17191cff,
+                background: Some(bg("cafe.png")),
+            },
+        )
+        .unwrap();
+        l.set_page_branding(&p0, Some(&Branding::hidden())).unwrap();
+        l.set_page_title(&p0, "Title").unwrap();
+        l.add_item(&p0, &stroke(1.0), 1.0).unwrap();
+        let p1 = l.add_page_like(Some(1), &p0).unwrap();
+        let a = l.page(&p0).unwrap();
+        let b = l.page(&p1).unwrap();
+        assert_eq!(l.page_id_at(1).unwrap(), p1);
+        assert_eq!(
+            (b.pattern, b.bg_color, b.frame, &b.background, &b.branding),
+            (a.pattern, a.bg_color, a.frame, &a.background, &a.branding)
+        );
+        assert_eq!((b.title.as_str(), b.item_count), ("", 0));
+        // One undo step removes it.
+        assert!(l.undo().unwrap());
+        assert_eq!(l.page_count(), 1);
+    }
+
+    #[test]
+    fn a_look_for_all_pages_is_one_step_and_bad_ids_change_nothing() {
+        let mut l = Lesson::new("t", 0.0);
+        for _ in 0..39 {
+            l.add_page(None, PageSpec::default()).unwrap();
+        }
+        let ids: Vec<PageId> = l.pages().into_iter().map(|p| p.id).collect();
+        let style = PageStyle {
+            pattern: Pattern::Dots,
+            bg_color: 0xfbf7edff,
+            background: Some(bg("x.svg")),
+        };
+        l.set_page_style(&ids, &style).unwrap();
+        assert!(ids.iter().all(|id| l.page_style(id).unwrap() == style));
+        assert!(l.undo().unwrap());
+        assert!(
+            ids.iter()
+                .all(|id| l.page_style(id).unwrap() == PageStyle::default())
+        );
+        let mut bad = ids.clone();
+        bad.push("nope".into());
+        assert!(l.set_page_style(&bad, &style).is_err());
+        assert_eq!(l.page_style(&ids[0]).unwrap(), PageStyle::default());
+        // No image removes it.
+        l.set_page_style(&ids[..1], &style).unwrap();
+        l.set_page_style(
+            &ids[..1],
+            &PageStyle {
+                background: None,
+                ..style
+            },
+        )
+        .unwrap();
+        assert_eq!(l.page(&ids[0]).unwrap().background, None);
+    }
+
+    #[test]
+    fn old_documents_have_no_design_and_bad_design_reads_safely() {
+        // A document written before page design (no keys): nothing changes.
+        let l = Lesson::new("t", 0.0);
+        let info = &l.pages()[0];
+        assert_eq!((&info.background, &info.branding), (&None, &None));
+        assert_eq!(l.branding(), None);
+
+        // Garbage from a stranger: wrong types, unknown values, NaN, huge text.
+        let doc = LoroDoc::new();
+        doc.get_map("meta").insert("format", 1).unwrap();
+        doc.get_map("meta").insert("branding", "not a map").unwrap();
+        let page = doc
+            .get_movable_list("pages")
+            .insert_container(0, LoroMap::new())
+            .unwrap();
+        page.insert("id", "p").unwrap();
+        page.insert_container("items", LoroMap::new()).unwrap();
+        let mut bgv = ValueFields::default();
+        bgv.set("image", "a/../b.png");
+        bgv.set("fit", "sideways");
+        page.insert("background", bgv.into_value()).unwrap();
+        let mut b = ValueFields::default();
+        b.set("logo", 42);
+        b.set("logo_w", f64::NAN);
+        b.set("logo_x", -5.0);
+        b.set("logo_opacity", 7.0);
+        b.set("school", "x".repeat(10_000));
+        b.set("text_pos", "sideways");
+        b.set("future_key", true);
+        page.insert("branding", b.into_value()).unwrap();
+        doc.commit();
+        let l = Lesson::load(&doc.export(ExportMode::Snapshot).unwrap()).unwrap();
+        let info = l.page("p").unwrap();
+        assert_eq!(info.background, None, "a path is not an asset name");
+        let b = info.branding.unwrap();
+        assert_eq!(b.logo, None);
+        assert_eq!((b.logo_w, b.logo_x, b.logo_opacity), (0.1, 0.0, 1.0));
+        assert_eq!(b.school.chars().count(), MAX_BRAND_TEXT);
+        assert_eq!(b.text_pos, BrandPos::Bottom);
+        assert_eq!(l.branding(), None);
+
+        // An unknown fit reads as "fit"; a map container is accepted too.
+        let doc = LoroDoc::new();
+        doc.get_map("meta").insert("format", 1).unwrap();
+        let page = doc
+            .get_movable_list("pages")
+            .insert_container(0, LoroMap::new())
+            .unwrap();
+        page.insert("id", "p").unwrap();
+        page.insert_container("items", LoroMap::new()).unwrap();
+        let m = page.insert_container("background", LoroMap::new()).unwrap();
+        m.insert("image", "ok.png").unwrap();
+        m.insert("fit", "sideways").unwrap();
+        doc.commit();
+        let l = Lesson::load(&doc.export(ExportMode::Snapshot).unwrap()).unwrap();
+        let bg = l.page("p").unwrap().background.unwrap();
+        assert_eq!(
+            (bg.image.as_str(), bg.fit, bg.opacity, bg.dim),
+            ("ok.png", BgFit::Fit, 1.0, false)
+        );
+    }
+
+    #[test]
+    fn several_pages_delete_copy_and_move_in_one_step() {
+        let mut l = Lesson::new("t", 0.0);
+        for t in ["B", "C", "D", "E"] {
+            l.add_page(
+                None,
+                PageSpec {
+                    title: t.into(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        }
+        let p0 = l.page_id_at(0).unwrap();
+        l.set_page_title(&p0, "A").unwrap();
+        let titles = |l: &Lesson| {
+            l.pages()
+                .iter()
+                .map(|p| p.title.clone())
+                .collect::<String>()
+        };
+        let id = |l: &Lesson, t: &str| l.pages().into_iter().find(|p| p.title == t).unwrap().id;
+        assert_eq!(titles(&l), "ABCDE");
+
+        // Move A and C to the end, keeping their order.
+        l.move_pages(&[id(&l, "C"), id(&l, "A")], 5).unwrap();
+        assert_eq!(titles(&l), "BDEAC");
+        assert!(l.undo().unwrap());
+        assert_eq!(titles(&l), "ABCDE");
+        // ... and to the front, and into the middle.
+        l.move_pages(&[id(&l, "D"), id(&l, "E")], 0).unwrap();
+        assert_eq!(titles(&l), "DEABC");
+        l.move_pages(&[id(&l, "D"), id(&l, "B")], 3).unwrap();
+        assert_eq!(titles(&l), "EADBC");
+        assert!(l.undo().unwrap() && l.undo().unwrap());
+
+        let copies = l.duplicate_pages(&[id(&l, "B"), id(&l, "D")]).unwrap();
+        assert_eq!(copies.len(), 2);
+        assert_eq!(titles(&l), "ABBCDDE");
+        assert!(l.undo().unwrap());
+        assert_eq!(titles(&l), "ABCDE");
+
+        assert_eq!(
+            l.remove_pages(&[id(&l, "B"), id(&l, "D"), id(&l, "B")])
+                .unwrap(),
+            2
+        );
+        assert_eq!(titles(&l), "ACE");
+        assert!(l.undo().unwrap());
+        assert_eq!(titles(&l), "ABCDE");
+        // A lesson keeps a page.
+        let all: Vec<PageId> = l.pages().into_iter().map(|p| p.id).collect();
+        assert!(l.remove_pages(&all).is_err());
+        assert_eq!(l.page_count(), 5);
     }
 }

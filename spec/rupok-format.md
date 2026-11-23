@@ -164,6 +164,7 @@ containers and unknown keys at every level.
 | `format` | `i64` | yes | Document schema version. This spec defines `1`. |
 | `title` | `String` | yes | Lesson title. |
 | `created` | `f64` | yes | Wall-clock creation time. |
+| `branding` | `Map` | no | The lesson's branding, shown on every page (proposed; see [Page design](#page-design)). |
 
 Readers MUST reject a document whose `meta.format` is missing or greater than
 the highest version they support.
@@ -181,6 +182,8 @@ Each element of `pages` is a `Map`:
 | `bg_pattern` | `String` | yes | `"plain"` | One of `plain`, `grid`, `dots`, `lines`. Readers MUST treat unknown values as `plain`. |
 | `bg_color` | `i64` (colour) | yes | `0xffffffff` | Page background colour. |
 | `items` | `Map<String, Map>` | yes | none | Items keyed by item id. |
+| `background` | `Map` | no | absent | Background image (proposed; see [Page design](#page-design)). |
+| `branding` | `Map` | no | absent | This page's own branding (proposed; see [Page design](#page-design)). |
 
 - `frame_w` and `frame_h` are present together or absent together. When both
   are present the page is a **slide**: the frame spans `[0, frame_w] ×
@@ -190,6 +193,63 @@ Each element of `pages` is a `Map`:
 - New pages default to a 1920 × 1080 slide, `plain`, white (`0xffffffff`).
 - Page order is the order of the movable list. Moving a page is a list move,
   so concurrent edits keep the page identity.
+
+### Page design
+
+> **Status: proposed, pending RFC.** These keys are additive and optional;
+> the reference reader and writer use them today. Readers that do not know
+> them ignore them (rule 2 of [Versioning](#versioning-and-forward-compatibility))
+> and show the page with its colour and pattern only.
+
+A page can carry a background image, and a lesson (or a page) a **branding**:
+a logo and a line of text drawn on the page behind the ink. Neither is an
+item: they are not selected, moved, erased or replayed, and only a page
+design editor changes them.
+
+The three keys hold a `Map` **value** (one op replaces the whole map, so an
+undo restores the previous design exactly). Readers MUST also accept a `Map`
+container. Unknown keys inside them MUST be ignored.
+
+**Page key `background`:**
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `image` | `String` | none | Asset name `<blake3>.<ext>` (see [Assets](#assets)). Required: a map without a valid name (1–128 bytes, one path segment, no control characters) is no background. |
+| `fit` | `String` | `"fit"` | `fit` (whole image, as large as fits, centred), `fill` (covers the page, centred, cropped), `stretch` (exactly the page), `tile` (repeated from the top-left at the image's size, one pixel = one world unit), `center` (the image's size, centred). Unknown values read as `fit`. |
+| `opacity` | `f64` | `1` | 0–1, clamped. |
+| `dim` | `bool` | `false` | "Dim for readability": the page colour at 50 % opacity over the image. |
+
+**Branding** (`meta.branding`, and the page key `branding`):
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `logo` | `String` | absent | Logo asset name. |
+| `logo_x`, `logo_y` | `f64` | `0.025`, `0.035` | The logo's top-left corner as fractions (0–1) of the page frame's width and height. |
+| `logo_w` | `f64` | `0.1` | The logo's width as a fraction of the frame width, clamped to 0.02–0.6. Its height follows the image's aspect ratio. |
+| `logo_opacity` | `f64` | `1` | 0–1, clamped. |
+| `school`, `teacher`, `class` | `String` | `""` | Text, at most 120 characters each (readers cut longer text on a character boundary). |
+| `date` | `bool` | `false` | Show the date of the day the page is shown, printed or exported. |
+| `text_pos` | `String` | `"bottom"` | `top` (header) or `bottom` (footer). |
+| `text_align` | `String` | `"center"` | `left`, `center` or `right`. |
+| `off` | `bool` | `false` | Page key only: no branding on this page. |
+
+- A page shows its own `branding` when present (none when `off` is true),
+  else `meta.branding`.
+- **Layers**, bottom to top: page colour; background image (clipped to the
+  frame) and its dim wash; the `bg_pattern`; DOM items (images, text, Smart
+  Objects); the branding (logo, then text); ink. Branding above the items
+  keeps a logo visible on imported PDF slides.
+- The text line is the set parts of `school`, `teacher`, `class` and the
+  date, joined by ` · `, in a box inset 2.5 % of the frame width from the
+  sides and 1.8 % of its height from the top or bottom edge, `0.026 ×
+  frame height` high type (28 units on a 1080-high slide) in a box 1.6 times
+  that, dark on light page colours and light on dark ones.
+- A page without a frame uses a 1920 × 1080 frame at the origin for these
+  layouts.
+- Every asset named here is referenced: writers MUST keep it in `assets/`
+  like an image item's, and store it once however many pages use it.
+- A new page added after another SHOULD copy its `bg_pattern`, `bg_color`,
+  frame, `background` and `branding` (the reference does).
 
 ### Items
 
@@ -535,10 +595,12 @@ assets/<hash>.<ext>
 - The reference writer derives `ext` from the given extension by keeping
   ASCII letters and digits, taking the first 8 and lowercasing (`"PNG"` →
   `png`).
-- Image items reference assets by name without the `assets/` prefix.
+- Image items, page backgrounds and branding logos reference assets by
+  name without the `assets/` prefix.
 - Readers SHOULD NOT trust that the name matches the content. A reader MAY
   verify the hash and MUST then treat a mismatch as a missing asset.
-- An asset that no item references is garbage. Writers MAY drop it.
+- An asset that nothing references (no item, page `background` or
+  branding `logo`) is garbage. Writers MAY drop it.
 - Readers MUST NOT pick a decoder from the extension alone. They MUST sniff
   the content and refuse types they do not support.
 
@@ -604,7 +666,11 @@ manager, code host and model already treats a README as "read this first".
   entries of each kind per page, 300 pages) and mark the outline as
   truncated when they do.
 
-**Outline.** In reading order per page (top to bottom, then left to right):
+**Outline.** The lesson's branding text, if any (school, teacher, class,
+whether the date shows, and the logo's entry path: the branding is visible
+on every page, so it is lesson content, not personal data beyond it). Then
+per page its background image and own branding, and in reading order (top
+to bottom, then left to right):
 
 - typed `text` (LaTeX text as display maths);
 - handwriting as a count of freehand pen strokes and highlighter strokes,
@@ -619,8 +685,11 @@ manager, code host and model already treats a README as "read this first".
 **`content.json`** is an object with `format` (`"rupok-lesson-content"`),
 `version` (`1`), `about`, `spec`, `title`, `created` and `modified` (ISO
 8601 UTC, from the manifest), `generator`, optional `course`, `page_count`,
-`truncated` and `pages`. Each page has `number` (1-based), optional `title`,
-`layout` (`slide` with `width`/`height`, or `board`), `background`, `text`
+`truncated`, optional `branding` (`{school?, teacher?, class?, date?,
+logo?}`, the lesson's) and `pages`. Each page has `number` (1-based),
+optional `title`, `layout` (`slide` with `width`/`height`, or `board`),
+`background` (the pattern), optional `background_image`, `branding` (the
+page's own) and `branding_hidden`, `text`
 (`[{text, latex?}]`), `ink` (`{strokes, highlighter?, recognized?:
 [{latex, confidence, strokes}]}`), `shapes` (`[{kind, name, count}]`),
 `images` (`[{file, width, height}]`) and `objects` (`[{title, bundle,
