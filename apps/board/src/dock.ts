@@ -195,9 +195,9 @@ export function dockFrame(c: ModeConfig, edge: DockEdge, vertical: boolean, w: n
   if (pagesOn && !phone && (vertical || edge === "top")) f.left = INSET + 176 + GAP;
   // The zoom chip sits in the bottom-right corner; on a phone it floats above
   // the dock (styles.css), so a bottom dock keeps the thumb's edge.
-  // Narrow tablets do the same under 900px, so a centred dock has the full width.
+  // Tablets do the same under 1100px, so a centred dock has the full width.
   if (c.chrome.zoom && !phone) {
-    if (edge === "bottom" && !vertical && w < 900) { /* the zoom chip sits above the dock */ }
+    if (edge === "bottom" && !vertical && w < 1100) { /* the zoom chip sits above the dock */ }
     else if (edge === "bottom" && !vertical && x > 0.75) f.right = INSET + 136 + GAP;
     else if (vertical && x > 0.75) f.bottom = INSET + 40 + GAP;
   }

@@ -235,8 +235,8 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
     const teach = mode() === "teach";
     const tb = teach ? (large ? 48 : 40) : prefs().density === "compact" ? 40 : large ? 56 : 48;
     const pad = teach ? (large ? 6 : 4) : prefs().density === "compact" ? 4 : large ? 8 : 6;
-    // Under 900px the zoom chip floats above a bottom dock (styles.css), as on phones.
-    const side = cfg().chrome.zoom && p.edge === "bottom" && w >= 900 ? 12 + 136 + 8 : Math.max(f.left, f.right);
+    // Under 1100px the zoom chip floats above a bottom dock (styles.css), as on phones.
+    const side = cfg().chrome.zoom && p.edge === "bottom" && w >= 1100 ? 12 + 136 + 8 : Math.max(f.left, f.right);
     const extras = 2 * (Math.max(40, tb - 8) + 2); // grip and minimise
     return { room: w - 2 * side - 2 * pad - extras, cell: tb + 2, sep: 15 };
   };

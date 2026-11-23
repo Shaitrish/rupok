@@ -190,6 +190,10 @@ svg.icon { display: block; flex: none; }
 .btn .label { padding-right: 2px; }
 .vsep { width: 1px; height: 20px; background: var(--hairline); margin: 0 6px; flex: none; }
 @media (max-width: 1180px) { .btn .label { display: none; } .btn.solid { padding: 0; width: var(--ctl); } }
+/* Dialogs keep their button labels at every width (the rule above is for bars). */
+.dialog .btn.solid { width: auto; padding: 0 var(--s3) 0 10px; }
+.dialog .btn .label { display: inline; }
+.dialog .actions .btn { flex: none; }
 
 /* ---------------------------------------------------------------- toolbar */
 .toolbar {
@@ -620,9 +624,9 @@ button, a, [role="button"] { touch-action: manipulation; }
   /* The selection toolbar wraps onto two rows rather than running off screen. */
   .sel-bar { height: auto; max-width: calc(100vw - 2 * var(--inset)); flex-wrap: wrap; justify-content: center; row-gap: 2px; }
 }
-/* Narrow tablets: the zoom chip floats above a bottom dock too, so the
- * centred dock gets the full width (dock.ts → dockFrame). */
-@media (min-width: 601px) and (max-width: 899px) and (min-height: 501px) {
+/* Tablets: the zoom chip floats above a bottom dock too, so the centred
+ * dock gets the full width (dock.ts → dockFrame). */
+@media (min-width: 601px) and (max-width: 1099px) and (min-height: 501px) {
   :root[data-dock-side="bottom"] .statusbar {
     bottom: calc(var(--inset) + env(safe-area-inset-bottom, 0px) + var(--tb) + 2 * var(--tb-pad) + var(--s2));
   }

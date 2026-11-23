@@ -50,3 +50,4 @@
   .export-checks .check { min-height: 44px; }
   .export-checks .check input { width: 20px; height: 20px; }
 }
+@media (max-width: 600px) { .export-actions > .export-hint, .export-actions > .export-progress { flex: 1 1 100%; max-width: none; } }
