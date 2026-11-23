@@ -41,6 +41,7 @@ cargo fmt --all --check
 cargo clippy --workspace -- -D warnings
 cargo build -p rupok-wasm --target wasm32-unknown-unknown --release   # wasm must keep building
 cargo run -p rupok-bench --release                         # performance budgets
+node bench/latency/pen-latency.mjs --swiftshader --check   # pen-to-pixel budgets (board built; docs/performance.md)
 node --test "packages/object-sdk/test/*.test.mjs"        # SDK (Node 22+)
 cargo run -p rupok-cli -- validate examples/objects/binary-counter.html --steps 10
 ```
@@ -85,7 +86,11 @@ The toolchain (1.100, edition 2024) is pinned in `rust-toolchain.toml`.
    `rupok-ink`, `rupok-core`, `rupok-render`, the pointer path in `rupok-wasm`, or
    package I/O: run `cargo run -p rupok-bench --release` before and after, and
    report both budget tables. Budgets: stroke commit p99 ≤ 5 ms, open lesson
-   ≤ 1000 ms, pan frame p99 ≤ 8.3 ms, wet frame p99 ≤ 4 ms.
+   ≤ 1000 ms, pan frame p99 ≤ 8.3 ms, wet frame p99 ≤ 4 ms, pen move → wet
+   update p99 ≤ 0.5 ms, wet vs dry pixels ≤ 0.5 %. Changes to the pen path
+   (`controller.ts` pointer handlers, `wetInk.ts`, the stroke builder, the
+   ink shader) also run `bench/latency` before and after. Wet and dry ink
+   must look identical: see "The wet/dry contract" in docs/performance.md.
 3. **Keep wasm building.** Run the wasm build after touching any crate that
    `rupok-wasm` depends on.
 4. **Respect the license split.** `spec/`, `crates/rupok-format`,
