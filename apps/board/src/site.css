@@ -402,3 +402,9 @@ h2 { margin: 18px 0 0; font: 800 clamp(36px, 4.4vw, 60px)/1.02 var(--font); lett
 @media (max-width: 440px) {
   .pad-top > span:first-child { flex-basis: 100%; padding-top: 6px; }
 }
+
+/* English nav at 360-400px: "Open the board" is long, so with the language
+ * switch the wordmark gives way to the logo mark (the link keeps its label). */
+@media (max-width: 400px) {
+  html:lang(en) .nav-in:has(.lang-swap) .brand .word { display: none; }
+}
