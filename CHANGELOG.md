@@ -5,6 +5,22 @@ notes come after each list. Downloads are on
 [rupok.app/download](https://rupok.app/download/) and on
 [GitHub Releases](https://github.com/Shaitrish/rupok/releases).
 
+## v0.2.1 (23 November 2026)
+
+### For teachers
+
+- **Smart Ink:** a small handwritten "+" stays as your ink instead of
+  turning into an arrow.
+- **Maths:** chemistry formulas such as H₂O and CO₂ come out upright
+  (`\mathrm{H}_2\mathrm{O}`), as in a textbook, not in italics.
+- **Website:** a better Bangla home page and corrected copy across the
+  site.
+
+### For developers
+
+- Dependency updates in one batch (#12); Dependabot now groups updates
+  weekly per ecosystem.
+
 ## v0.2.0 (23 November 2026)
 
 The second early-alpha release. It brings a home for your lessons, a new

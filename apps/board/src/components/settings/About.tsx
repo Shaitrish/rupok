@@ -4,7 +4,7 @@ import { APP_NAME, SITE_URL } from "../../brand";
 import type { SettingProps } from "../../settings/registry";
 import { Mark } from "../Icon";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.2.1";
 const REPO = "https://github.com/shaitrish/rupok";
 
 export function AboutSection(props: SettingProps) {
