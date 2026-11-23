@@ -6,6 +6,10 @@
 //!
 //! The windows are created on first use and afterwards only hidden, so the
 //! ink survives toggling the overlay off and on.
+//!
+//! macOS (beta): both windows also join every Space, float over full-screen
+//! apps and sit above the menu bar and the Dock (see [`macos`]); capture
+//! needs the Screen Recording permission ([`overlay_open_screen_settings`]).
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -94,24 +98,29 @@ fn target_monitor(app: &AppHandle) -> Option<Monitor> {
 fn ensure_windows(app: &AppHandle) -> tauri::Result<(WebviewWindow, WebviewWindow)> {
     let ink = match app.get_webview_window(INK) {
         Some(w) => w,
-        None => WebviewWindowBuilder::new(app, INK, url("overlay"))
-            .title("Rupok overlay")
-            .transparent(true)
-            .decorations(false)
-            .shadow(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .resizable(false)
-            .maximizable(false)
-            .minimizable(false)
-            .visible(false)
-            .build()?,
+        None => {
+            let win = WebviewWindowBuilder::new(app, INK, url("overlay"))
+                .title("Rupok overlay")
+                .transparent(true)
+                .decorations(false)
+                .shadow(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .resizable(false)
+                .maximizable(false)
+                .minimizable(false)
+                .visible(false)
+                .build()?;
+            #[cfg(target_os = "macos")]
+            macos::float_everywhere(&win, macos::INK_LEVEL);
+            win
+        }
     };
     let toolbar = match app.get_webview_window(TOOLBAR) {
         Some(w) => w,
         None => {
             let (w, h) = TOOLBAR_DEFAULT;
-            WebviewWindowBuilder::new(app, TOOLBAR, url("overlay=toolbar"))
+            let win = WebviewWindowBuilder::new(app, TOOLBAR, url("overlay=toolbar"))
                 .title("Rupok overlay tools")
                 .transparent(true)
                 .decorations(false)
@@ -124,10 +133,14 @@ fn ensure_windows(app: &AppHandle) -> tauri::Result<(WebviewWindow, WebviewWindo
                 .focused(false)
                 .inner_size(w, h)
                 .visible(false)
-                // Owned by (Windows) / transient for (Linux) the ink window, so
-                // it always stays above it, even after the ink takes focus.
+                // Owned by (Windows) / transient for (Linux) / a child window
+                // of (macOS) the ink window, so it always stays above it, even
+                // after the ink takes focus.
                 .parent(&ink)?
-                .build()?
+                .build()?;
+            #[cfg(target_os = "macos")]
+            macos::float_everywhere(&win, macos::TOOLBAR_LEVEL);
+            win
         }
     };
     Ok((ink, toolbar))
@@ -348,6 +361,7 @@ pub async fn overlay_capture(
         ink.outer_position().map_err(err)?,
         ink.outer_size().map_err(err)?,
     );
+    let scale = ink.scale_factor().unwrap_or(1.0);
     let rect = Rect {
         x: pos.x,
         y: pos.y,
@@ -361,7 +375,7 @@ pub async fn overlay_capture(
     let _ = ink.hide();
     let shot = tauri::async_runtime::spawn_blocking(move || {
         std::thread::sleep(HIDE_SETTLE);
-        capture::capture(rect)
+        capture::capture(rect, scale)
     })
     .await;
     let _ = ink.show();
@@ -377,6 +391,41 @@ pub async fn overlay_capture(
 
     let frame = shot.map_err(err)?.map_err(err)?;
     Ok(Response::new(frame))
+}
+
+/// System Settings → Privacy & Security → Screen Recording.
+#[cfg(target_os = "macos")]
+const SCREEN_RECORDING_SETTINGS: &str =
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
+
+/// macOS, after [`overlay_capture`] failed for lack of the Screen Recording
+/// permission: hide the overlay (it floats above System Settings), ask for
+/// the permission (which adds Rupok to the list there) and open that pane.
+/// macOS applies the switch after Rupok restarts.
+#[tauri::command]
+pub async fn overlay_open_screen_settings(app: AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        hide(&app).map_err(err)?;
+        app.run_on_main_thread(|| {
+            capture::request_permission();
+        })
+        .map_err(err)?;
+        tauri::async_runtime::spawn_blocking(|| {
+            std::process::Command::new("/usr/bin/open")
+                .arg(SCREEN_RECORDING_SETTINGS)
+                .status()
+        })
+        .await
+        .map_err(err)?
+        .map_err(err)?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Err("Screen Recording settings exist only on macOS".into())
+    }
 }
 
 fn is_png_or_webp(b: &[u8]) -> bool {
@@ -413,4 +462,49 @@ pub async fn take_overlay_page(state: State<'_, OverlayState>) -> Result<Respons
         .pop_front();
     page.map(Response::new)
         .ok_or_else(|| "no overlay snapshot is waiting".into())
+}
+
+// -------------------------------------------------------------------- macOS
+
+/// What the overlay needs on macOS beyond Tauri's `always_on_top`, which uses
+/// the floating level (under the menu bar and the Dock) on the current Space
+/// only.
+#[cfg(target_os = "macos")]
+mod macos {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    use tauri::WebviewWindow;
+
+    /// `NSStatusWindowLevel`: above the menu bar and the Dock.
+    pub const INK_LEVEL: isize = 25;
+    /// One higher, so the toolbar always stays above the ink.
+    pub const TOOLBAR_LEVEL: isize = INK_LEVEL + 1;
+
+    // `NSWindowCollectionBehavior` bits.
+    const CAN_JOIN_ALL_SPACES: usize = 1 << 0;
+    const STATIONARY: usize = 1 << 4;
+    const IGNORES_CYCLE: usize = 1 << 6;
+    const FULL_SCREEN_AUXILIARY: usize = 1 << 8;
+
+    /// Show `window` on every Space and over full-screen apps (a slideshow in
+    /// Keynote or PowerPoint), keep it out of Mission Control and the ⌘`
+    /// window cycle, and lift it to `level`.
+    pub fn float_everywhere(window: &WebviewWindow, level: isize) {
+        let w = window.clone();
+        let _ = window.run_on_main_thread(move || {
+            let Ok(ptr) = w.ns_window() else { return };
+            let ns = ptr.cast::<AnyObject>();
+            if ns.is_null() {
+                return;
+            }
+            let behavior = CAN_JOIN_ALL_SPACES | STATIONARY | IGNORES_CYCLE | FULL_SCREEN_AUXILIARY;
+            // SAFETY: `ns` is this window's live NSWindow, used on the main
+            // thread; both setters exist on every supported macOS. The
+            // behaviour bits are one valid choice from each exclusive group.
+            unsafe {
+                let _: () = msg_send![ns, setCollectionBehavior: behavior];
+                let _: () = msg_send![ns, setLevel: level];
+            }
+        });
+    }
 }

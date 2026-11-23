@@ -1,12 +1,36 @@
 // PDF import: every PDF page becomes a board page with the slide as an image
 // you can write on. This is the "Claude made slides → PDF → class" workflow.
 
-import * as pdfjs from "pdfjs-dist";
-import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { Controller } from "./controller";
 import { showToast } from "./state";
 
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+type PdfJs = typeof import("pdfjs-dist");
+
+/**
+ * pdf.js's modern build calls recent built-ins without polyfills
+ * (`Math.sumPrecise`, `Map.prototype.getOrInsertComputed`: Safari 26.2,
+ * Chrome 147, Firefox 144). Older browsers, including Safari and the macOS
+ * app's WKWebView before macOS 26, get the legacy build, which polyfills them.
+ */
+export function needsLegacyPdfjs(): boolean {
+  const has = (o: object, k: string) => typeof (o as Record<string, unknown>)[k] === "function";
+  return !(has(Math, "sumPrecise") && has(Map.prototype, "getOrInsertComputed") && has(Promise, "try"));
+}
+
+let pdfjsLoad: Promise<PdfJs> | null = null;
+function loadPdfjs(): Promise<PdfJs> {
+  pdfjsLoad ??= (async () => {
+    const [lib, worker] = needsLegacyPdfjs()
+      ? await Promise.all([import("pdfjs-dist/legacy/build/pdf.mjs"), import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")])
+      : await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")]);
+    lib.GlobalWorkerOptions.workerSrc = worker.default;
+    return lib as PdfJs;
+  })().catch((e) => {
+    pdfjsLoad = null; // let the next import try again
+    throw e;
+  });
+  return pdfjsLoad;
+}
 
 const FRAME_W = 1920;
 const FRAME_H = 1080;
@@ -14,6 +38,7 @@ const FRAME_H = 1080;
 const QUALITY = 1.5;
 
 export async function importPdf(c: Controller, file: File) {
+  const pdfjs = await loadPdfjs();
   const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
   const n = doc.numPages;
   const pages = JSON.parse(c.board.pages_json());

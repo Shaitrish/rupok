@@ -1,4 +1,4 @@
-# Desktop app (Tauri 2) for Windows and Linux
+# Desktop app (Tauri 2) for Windows, macOS and Linux
 
 `Status: 🚧 in progress · Phase 1 · Difficulty: intermediate`
 
@@ -12,6 +12,15 @@
 > workspace builds without WebKitGTK; the release workflow is `desktop.yml`;
 > bytes cross the IPC as raw bodies, and the board opens `/board/`
 > (`url: "/board/"`), because `/` is the website. See `apps/desktop/README.md`.
+>
+> **macOS (2026-11):** added after this plan (it was a non-goal). CI builds a
+> universal `.dmg` on `macos-15` and attaches it to the draft release; signing
+> and notarisation are wired but run only when the six `APPLE_*` secrets exist
+> (ad-hoc signed until then). Native menu, ⌘ shortcuts, `.rpk` document type
+> (UTI `app.rupok.lesson`) with `RunEvent::Opened`, and the overlay (beta:
+> Spaces, full-screen apps, Screen Recording permission). The board's key
+> flows run in Playwright WebKit on macOS in the same workflow. See
+> [macOS](#macos) below and `apps/desktop/README.md#macos`.
 
 Wrap the browser board in a Tauri 2 shell so teachers get an installable, offline app that opens `.rpk` files, saves to disk safely and hosts Smart Objects securely.
 
@@ -19,8 +28,8 @@ Wrap the browser board in a Tauri 2 shell so teachers get an installable, offlin
 
 Ship `apps/desktop`: a Tauri 2 application that loads the `apps/board` UI
 (SolidJS + `rupok-wasm`), adds native file handling, autosave, the Smart Object
-host (sandbox, `rupoklib://`, SDK injection) and installers for Windows and Linux,
-built by CI on every tag.
+host (sandbox, `rupoklib://`, SDK injection) and installers for Windows, macOS
+and Linux, built by CI on every tag.
 
 ## User story
 
@@ -28,8 +37,8 @@ built by CI on every tag.
   Rupok opens it full-screen, even without internet.
 - *As a teacher*, the power goes out mid-class; when I restart, my lesson is
   there up to the last few seconds.
-- *As a teacher*, I install one `.exe` on Windows or an AppImage on Ubuntu; no
-  admin rights, no account.
+- *As a teacher*, I install one `.exe` on Windows, an AppImage on Ubuntu or a
+  `.dmg` on my Mac; no admin rights, no account.
 - *As a teacher*, my AI agent can find the `rupok` command to run its MCP
   server because the installer put it on my PATH (opt-in).
 
@@ -40,13 +49,13 @@ built by CI on every tag.
   single instance (a second launch focuses the window and opens the file).
 - Crash-safe saving and autosave.
 - Smart Object host duties from `spec/smart-object.md#host-duties`.
-- Installers: Windows (NSIS `.exe`, MSI) and Linux (AppImage, `.deb`).
+- Installers: Windows (NSIS `.exe`, MSI), macOS (universal `.dmg`) and Linux
+  (AppImage, `.deb`).
 - Bundled `rupok` CLI as a sidecar for the MCP server.
 - Release workflow with code signing hooks and the Tauri updater (opt-in).
 
 ## Non-goals
 
-- macOS builds (welcome later; nothing here should block them).
 - Desktop overlay annotation: see [desktop-overlay](./desktop-overlay.md).
 - Sync: see [google-drive-sync](./google-drive-sync.md).
 - Moving the engine out of wasm into the Rust side. The engine stays in the
@@ -153,6 +162,41 @@ and OpenCode (`rupok mcp --workspace <library dir>`), with a copy button.
 `windows-latest` and `ubuntu-22.04`; upload installers to a draft GitHub
 release. Signing secrets are optional so forks can build unsigned.
 
+## macOS
+
+- **Build:** the `macOS (universal dmg)` job in `.github/workflows/desktop.yml`
+  runs on `macos-15` (Apple silicon; `macos-14` runners are retired), adds the
+  `aarch64-apple-darwin` and `x86_64-apple-darwin` targets and runs `tauri build --target
+  universal-apple-darwin` through tauri-action. Outputs:
+  `target/universal-apple-darwin/release/bundle/dmg/Rupok_<version>_universal.dmg`
+  and `bundle/macos/Rupok.app.tar.gz` (artifact `rupok-macos`; on `v*` tags
+  both are attached to the draft release). Locally on a Mac:
+  `bun run build`, or `bun run bundle -- --target universal-apple-darwin`.
+- **Config:** `bundle.macOS` in `tauri.conf.json` sets macOS 11 as the
+  minimum, the hardened runtime, `macos/Entitlements.plist` (no exceptions)
+  and `signingIdentity: "-"` (ad hoc) unless `APPLE_SIGNING_IDENTITY` is set;
+  the category is Education. `macOSPrivateApi` is not needed: Tauri 2.12.1+
+  always allows transparent windows (via the private `drawsBackground` key,
+  which rules out the Mac App Store; Rupok ships signed outside it).
+- **Install and first launch:** open the `.dmg`, drag Rupok to Applications.
+  While unsigned: right-click → **Open** (macOS 14 and earlier), or
+  **System Settings → Privacy & Security → Open Anyway** (macOS 15+). Once.
+- **Signing and notarisation:** the founder enrols in the Apple Developer
+  Program (US$99/year), creates a Developer ID Application certificate,
+  exports the `.p12`, creates an app-specific password and adds six GitHub
+  secrets (`APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`,
+  `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`).
+  Step by step in `apps/desktop/README.md` ("Signing and notarising for
+  macOS"). With all six, CI signs with the hardened runtime and notarises.
+- **WebKit:** the macOS app runs the board in WKWebView (the Linux app in
+  WebKitGTK). The `WebKit e2e (macOS)` job runs `apps/board/e2e` in
+  Playwright WebKit. Fixes it led to: pdf.js falls back to its legacy build
+  where `Math.sumPrecise`/`Map.prototype.getOrInsertComputed` are missing
+  (Safari < 26.2, every WKWebView before macOS 26), trackpad pinch through
+  WebKit's gesture events, and Option+1/2/3 by key position.
+- **Untested on real hardware:** the overlay on macOS (beta), pen tablets on
+  macOS, trackpad pinch.
+
 ## Implementation tasks
 
 1. **Scaffold `apps/desktop`** with Tauri 2 pointing at `apps/board/dist`;
@@ -175,6 +219,9 @@ release. Signing secrets are optional so forks can build unsigned.
 10. **MCP sidecar** + Settings page with config snippets. *(intermediate)*
 11. **Release workflow** for Windows and Linux installers. *(intermediate)*
 12. **Updater** (opt-in setting, signed update manifests). *(intermediate)*
+13. **macOS**: universal `.dmg` in CI, optional signing and notarisation,
+    menu bar, ⌘ shortcuts, `.rpk` document type, overlay (beta), WebKit e2e.
+    *(intermediate; done except a first test on a real Mac)*
 
 ## Acceptance criteria and tests
 
@@ -188,7 +235,11 @@ release. Signing secrets are optional so forks can build unsigned.
   steps, state and theme working; a test object that calls
   `fetch("https://example.com")` is blocked by CSP.
 - An object importing `rupoklib://three/three.module.js` renders offline.
-- CI produces installers for both platforms from a tag on a fork with no secrets.
+- CI produces installers for all three platforms from a tag on a fork with no
+  secrets (the macOS one ad-hoc signed); with the `APPLE_*` secrets the macOS
+  app passes `spctl --assess` as notarised.
+- Double-clicking a `.rpk` in Finder opens it in Rupok; ⌘C/⌘V work in text
+  fields; ⌘Q quits.
 
 ## Performance budget
 
@@ -206,6 +257,8 @@ release. Signing secrets are optional so forks can build unsigned.
 - Linux: AppImage vs Flatpak as the main channel; WebKitGTK version floor for
   `color-mix()` and import maps used by objects.
 - Code-signing certificate for Windows (SmartScreen warnings) — who holds it?
+- macOS overlay without switching Spaces over full-screen apps may need a
+  non-activating `NSPanel` (e.g. the `tauri-nspanel` plugin).
 - Per-document `doc_key` for `rupokobj`: random per open, or a hash of the path?
 
 ## References

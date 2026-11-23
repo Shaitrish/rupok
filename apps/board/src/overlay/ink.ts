@@ -34,6 +34,10 @@ export const CMD_EVENT = "rupok://overlay-cmd";
 export const STATUS_EVENT = "rupok://overlay-status";
 export const CLICK_THROUGH_EVENT = "rupok://overlay-click-through";
 
+/** Start of the `overlay_capture` error on a Mac without the Screen
+ * Recording permission (`CaptureError::Permission` in apps/desktop/src/capture.rs). */
+export const SCREEN_PERMISSION_ERROR = "Screen Recording permission";
+
 /** Screenshot from `overlay_capture`: `[w: u32 LE][h: u32 LE][RGBA…]`. */
 function decodeFrame(buf: ArrayBuffer): ImageData {
   const v = new DataView(buf);
@@ -48,6 +52,9 @@ function toBlob(c: HTMLCanvasElement, type: string, quality?: number): Promise<B
 
 export class OverlayInk {
   board: Board | null = null;
+  /** True after a "Save to lesson" that could not capture the screen because
+   * macOS has not given Rupok the Screen Recording permission. */
+  needsScreenPermission = false;
   private root!: HTMLElement;
   private canvas!: HTMLCanvasElement;
   private tool: Extract<OverlayCommand, { type: "tool" }> = { type: "tool", tool: "pen", color: 0xe5484dff, width: 4 };
@@ -155,7 +162,8 @@ export class OverlayInk {
    * "Save to lesson": screenshot of the screen under the overlay (taken by
    * the desktop app with the overlay hidden) with the ink on top, sent to the
    * board window as a new page. Where the screen cannot be captured
-   * (Wayland), the ink alone is saved. Returns a message for the teacher.
+   * (Wayland, or a Mac without the Screen Recording permission), the ink
+   * alone is saved. Returns a message for the teacher.
    */
   async saveToLesson(): Promise<string> {
     let shot: ImageData | null = null;
@@ -165,6 +173,7 @@ export class OverlayInk {
     } catch (e: any) {
       why = String(e?.message ?? e);
     }
+    this.needsScreenPermission = why.startsWith(SCREEN_PERMISSION_ERROR);
     const w = shot?.width ?? this.canvas.width;
     const h = shot?.height ?? this.canvas.height;
     const out = document.createElement("canvas");
@@ -177,8 +186,8 @@ export class OverlayInk {
     if (!blob || blob.type !== "image/webp") blob = await toBlob(out, "image/png");
     if (!blob) throw new Error("could not encode the snapshot");
     await desktopInvoke("overlay_deliver_page", new Uint8Array(await blob.arrayBuffer()));
-    return shot
-      ? "Saved the screen and your ink as a new page"
-      : `Saved your ink as a new page (no screenshot: ${why})`;
+    if (shot) return "Saved the screen and your ink as a new page";
+    if (this.needsScreenPermission) return "Saved your ink as a new page, without the screen";
+    return `Saved your ink as a new page (no screenshot: ${why})`;
   }
 }

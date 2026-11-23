@@ -14,6 +14,14 @@
 > vectors); Linux capture uses a pure-Rust X11 `GetImage` (no PipeWire), and
 > on Wayland the app runs under XWayland and saves the ink only. Open: 5, 6
 > (editor, more shortcuts), 7 (freeze), 8, 10. See `apps/desktop/README.md`.
+>
+> **macOS (beta, 2026-11):** builds and is linted in CI, untested on a real
+> Mac. Both windows join every Space, may float over full-screen apps and sit
+> at the status-bar level (`overlay::macos`); capture uses `xcap` after a
+> Screen Recording permission check, and without the permission the overlay
+> saves the ink and offers to open System Settings
+> (`overlay_open_screen_settings`). The shortcut is ⌃⇧D. See
+> `apps/desktop/README.md#the-overlay-on-macos-beta`.
 
 Draw with the Rupok pen on top of anything on screen (PowerPoint, a browser, a video, a simulator), then click through to the app underneath or save the annotated screen as a slide.
 

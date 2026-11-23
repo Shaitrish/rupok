@@ -471,6 +471,10 @@ html[data-overlay="toolbar"] .ov-dock { position: fixed; left: 0; top: 0; paddin
 .ov-exit:hover { color: var(--danger); }
 .overlay-board .toast { top: var(--inset); }
 .ov-error { color: var(--danger); height: auto; min-height: var(--ctl); padding-block: var(--s2); }
+/* macOS: Screen Recording permission help after "Save to lesson". */
+.ov-permission { position: fixed; inset: 0; margin: auto; height: fit-content; width: min(460px, calc(100vw - 32px)); z-index: 70; }
+.ov-permission ol { margin: var(--s4) 0; padding-left: 1.4em; font: 450 14px/22px var(--font); }
+.ov-permission-actions { display: flex; justify-content: flex-end; gap: var(--s2); }
 
 /* --- brand mark --- */
 :root { --brand-mint: #20c997; }

@@ -119,13 +119,23 @@ fn sync_parent(path: &Path) {
 /// existing files with an extension the board imports, resolved against
 /// `cwd`. Flags (`-…`) and anything else are ignored.
 pub fn paths_from_args<S: AsRef<str>>(args: &[S], cwd: &Path) -> Vec<PathBuf> {
-    args.iter()
-        .map(AsRef::as_ref)
-        .filter(|a| !a.is_empty() && !a.starts_with('-'))
-        .map(|a| {
-            let p = PathBuf::from(a);
-            if p.is_absolute() { p } else { cwd.join(p) }
-        })
+    openable_paths(
+        args.iter()
+            .map(AsRef::as_ref)
+            .filter(|a| !a.is_empty() && !a.starts_with('-'))
+            .map(|a| {
+                let p = PathBuf::from(a);
+                if p.is_absolute() { p } else { cwd.join(p) }
+            }),
+    )
+}
+
+/// The paths the board can open: existing files with an extension it
+/// imports. Used for the command line and for the files macOS hands over
+/// (Finder double-click, "Open With", drag onto the Dock icon).
+pub fn openable_paths(paths: impl IntoIterator<Item = PathBuf>) -> Vec<PathBuf> {
+    paths
+        .into_iter()
         .filter(|p| has_extension(p, OPENABLE_EXTENSIONS) && p.is_file())
         .collect()
 }
@@ -230,5 +240,20 @@ mod tests {
         ];
         let got = paths_from_args(&args, dir.path());
         assert_eq!(got, vec![abs.clone(), dir.path().join("slides.PDF"), abs]);
+    }
+
+    #[test]
+    fn opened_files_keep_existing_importable_files() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("lesson.RPK"), b"x").unwrap();
+        fs::write(dir.path().join("notes.txt"), b"x").unwrap();
+        fs::create_dir(dir.path().join("folder.rpk")).unwrap();
+        let got = openable_paths([
+            dir.path().join("lesson.RPK"),
+            dir.path().join("notes.txt"),
+            dir.path().join("folder.rpk"),
+            dir.path().join("missing.rpk"),
+        ]);
+        assert_eq!(got, vec![dir.path().join("lesson.RPK")]);
     }
 }

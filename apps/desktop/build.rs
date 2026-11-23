@@ -16,6 +16,7 @@ fn main() {
             "overlay_set_click_through",
             "overlay_toolbar_fit",
             "overlay_capture",
+            "overlay_open_screen_settings",
             "overlay_deliver_page",
             "library_info",
             "library_list",

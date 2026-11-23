@@ -1,6 +1,10 @@
 //! Screen capture for the overlay's "Save to lesson".
 //!
 //! - **Windows**: `xcap` (GDI / DXGI, physical pixels).
+//! - **macOS**: `xcap` (CoreGraphics). Needs the Screen Recording permission
+//!   (System Settings → Privacy & Security → Screen Recording); without it
+//!   macOS silently returns only the wallpaper, so [`available`] checks first
+//!   and returns [`CaptureError::Permission`].
 //! - **Linux X11**: one core-protocol `GetImage` of the root window through
 //!   `x11rb`, which speaks the protocol in pure Rust (no libxcb, no
 //!   PipeWire), so the desktop app needs no extra system packages.
@@ -16,6 +20,10 @@ use crate::geometry::Rect;
 pub enum CaptureError {
     #[error("screen capture is not available on Wayland")]
     Wayland,
+    /// Matched by the overlay page (`SCREEN_PERMISSION_ERROR` in
+    /// `apps/board/src/overlay/ink.ts`) to show how to turn it on.
+    #[error("Screen Recording permission is off for Rupok")]
+    Permission,
     #[error("screen capture is not supported on this platform")]
     Unsupported,
     #[error("screen capture failed: {0}")]
@@ -26,15 +34,26 @@ fn failed(e: impl std::fmt::Display) -> CaptureError {
     CaptureError::Failed(e.to_string())
 }
 
-/// Capture the screen area `rect` (physical pixels, desktop coordinates).
-pub fn capture(rect: Rect) -> Result<Vec<u8>, CaptureError> {
-    imp::capture(rect)
+/// Capture the monitor under the screen area `rect` (physical pixels,
+/// desktop coordinates). `scale` is that monitor's scale factor: macOS finds
+/// displays in points, not pixels.
+pub fn capture(rect: Rect, scale: f64) -> Result<Vec<u8>, CaptureError> {
+    imp::capture(rect, scale)
 }
 
 /// Whether [`capture`] can work in this session, checked before the overlay
-/// hides itself so a Wayland session does not flicker for nothing.
+/// hides itself so a Wayland session (or a Mac without the Screen Recording
+/// permission) does not flicker for nothing.
 pub fn available() -> Result<(), CaptureError> {
     imp::available()
+}
+
+/// macOS: ask for the Screen Recording permission. The first call shows the
+/// system prompt and adds Rupok to the list in System Settings; later calls
+/// only return the current state. macOS applies a new grant after the app
+/// restarts. Always `true` elsewhere.
+pub fn request_permission() -> bool {
+    imp::request_permission()
 }
 
 #[cfg(windows)]
@@ -46,9 +65,51 @@ mod imp {
         Ok(())
     }
 
-    pub fn capture(rect: Rect) -> Result<Vec<u8>, CaptureError> {
+    pub fn request_permission() -> bool {
+        true
+    }
+
+    pub fn capture(rect: Rect, _scale: f64) -> Result<Vec<u8>, CaptureError> {
         let (cx, cy) = rect.center();
         let monitor = xcap::Monitor::from_point(cx, cy).map_err(failed)?;
+        let img = monitor.capture_image().map_err(failed)?;
+        let (w, h) = img.dimensions();
+        pack_frame(w, h, img.into_raw()).ok_or_else(|| failed("unexpected image size"))
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod imp {
+    use super::{CaptureError, Rect, failed};
+    use crate::geometry::{logical_point, pack_frame};
+
+    // CoreGraphics, macOS 10.15+ (the app's minimum is 11). xcap links the
+    // framework already; declared here to avoid another dependency.
+    #[link(name = "CoreGraphics", kind = "framework")]
+    unsafe extern "C" {
+        fn CGPreflightScreenCaptureAccess() -> bool;
+        fn CGRequestScreenCaptureAccess() -> bool;
+    }
+
+    pub fn available() -> Result<(), CaptureError> {
+        // SAFETY: no arguments, no preconditions; never shows UI.
+        if unsafe { CGPreflightScreenCaptureAccess() } {
+            Ok(())
+        } else {
+            Err(CaptureError::Permission)
+        }
+    }
+
+    pub fn request_permission() -> bool {
+        // SAFETY: no arguments, no preconditions.
+        unsafe { CGRequestScreenCaptureAccess() }
+    }
+
+    pub fn capture(rect: Rect, scale: f64) -> Result<Vec<u8>, CaptureError> {
+        available()?;
+        let (cx, cy) = logical_point(rect.center(), scale);
+        let monitor = xcap::Monitor::from_point(cx, cy).map_err(failed)?;
+        // Pixels at the display's backing scale (2× on Retina screens).
         let img = monitor.capture_image().map_err(failed)?;
         let (w, h) = img.dimensions();
         pack_frame(w, h, img.into_raw()).ok_or_else(|| failed("unexpected image size"))
@@ -81,7 +142,11 @@ mod imp {
         }
     }
 
-    pub fn capture(rect: Rect) -> Result<Vec<u8>, CaptureError> {
+    pub fn request_permission() -> bool {
+        true
+    }
+
+    pub fn capture(rect: Rect, _scale: f64) -> Result<Vec<u8>, CaptureError> {
         available()?;
         let (conn, screen) = x11rb::connect(None).map_err(failed)?;
         let setup = conn.setup();
@@ -136,12 +201,15 @@ mod imp {
         #[test]
         #[ignore = "needs an X11 display"]
         fn captures_the_top_left_corner() {
-            let frame = capture(Rect {
-                x: 0,
-                y: 0,
-                w: 64,
-                h: 32,
-            })
+            let frame = capture(
+                Rect {
+                    x: 0,
+                    y: 0,
+                    w: 64,
+                    h: 32,
+                },
+                1.0,
+            )
             .unwrap();
             assert_eq!(&frame[..8], &[64, 0, 0, 0, 32, 0, 0, 0]);
             assert_eq!(frame.len(), 8 + 64 * 32 * 4);
@@ -150,7 +218,7 @@ mod imp {
     }
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 mod imp {
     use super::{CaptureError, Rect};
 
@@ -158,7 +226,11 @@ mod imp {
         Err(CaptureError::Unsupported)
     }
 
-    pub fn capture(_rect: Rect) -> Result<Vec<u8>, CaptureError> {
+    pub fn request_permission() -> bool {
+        true
+    }
+
+    pub fn capture(_rect: Rect, _scale: f64) -> Result<Vec<u8>, CaptureError> {
         Err(CaptureError::Unsupported)
     }
 }

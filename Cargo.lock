@@ -4954,6 +4954,7 @@ name = "rupok-desktop"
 version = "0.1.0"
 dependencies = [
  "notify",
+ "objc2",
  "percent-encoding",
  "rupok-cli",
  "rupok-core",

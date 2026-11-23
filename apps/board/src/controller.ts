@@ -15,6 +15,7 @@ import { type Mode, type ToolbarItem, hasTopBar } from "./modes";
 import { dockSide } from "./dock";
 import { cssPx, isPhone, safeArea } from "./viewport";
 import { ObjectHost } from "./objects";
+import { attachTrackpadPinch } from "./pinch";
 import { autosaveLoad, autosaveStore } from "./storage";
 import { APP_NAME, FILE_EXT, LESSON_MIME } from "./brand";
 import { forgetLessonPath, openLessonFiles, openLessonInto, saveLessonBytes } from "./platform";
@@ -485,6 +486,11 @@ export class Controller {
       },
       { passive: false },
     );
+    // Safari and the macOS app send a trackpad pinch as gesture events.
+    attachTrackpadPinch(this.root, (f, x, y) => {
+      this.lastNav = performance.now();
+      this.board.zoom_at(f, x, y);
+    });
   }
 
   eraserCursor: ((x: number, y: number, show: boolean) => void) | null = null;
@@ -511,11 +517,13 @@ export class Controller {
       if (editableTarget(e.target)) return;
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
-      // Modes: F5 presents (Teach), Alt+1/2/3 picks a mode.
+      // Modes: F5 presents (Teach), Alt+1/2/3 picks a mode. By key position:
+      // on a Mac, Option+1 types "¡", not "1".
       if (e.key === "F5") { e.preventDefault(); this.setMode("teach"); return; }
-      if (e.altKey && !mod && ["1", "2", "3"].includes(e.key)) {
+      const digit = /^Digit[1-3]$/.test(e.code) ? e.code.slice(5) : e.key;
+      if (e.altKey && !mod && ["1", "2", "3"].includes(digit)) {
         e.preventDefault();
-        this.setMode((["prepare", "teach", "view"] as const)[Number(e.key) - 1]);
+        this.setMode((["prepare", "teach", "view"] as const)[Number(digit) - 1]);
         return;
       }
       if (isView()) {

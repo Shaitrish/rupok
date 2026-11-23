@@ -1,10 +1,14 @@
 name: Desktop
 
-# Builds the Rupok desktop app (apps/desktop, Tauri 2) for Windows and Linux:
-# the wasm engine, the board (apps/board), then the installers.
+# Builds the Rupok desktop app (apps/desktop, Tauri 2) for Windows, macOS and
+# Linux: the wasm engine, the board (apps/board), then the installers. Also runs
+# the board's end-to-end flows in WebKit (Safari, and the macOS app's WKWebView).
 # - every push to main and every PR touching the app: installers as workflow artifacts
 # - tags v*: a draft GitHub Release with the installers attached
-# Signing is not configured yet, so forks build unsigned installers with no secrets.
+# macOS: a universal (Apple silicon + Intel) .dmg. It is signed and notarised
+# only when all six APPLE_* secrets exist (see apps/desktop/README.md, "Signing
+# and notarising for macOS"); otherwise it is ad-hoc signed, so forks and PRs
+# build with no secrets. Windows and Linux installers are unsigned for now.
 
 on:
   push:
@@ -53,6 +57,14 @@ jobs:
             paths: |
               target/release/bundle/deb/*.deb
               target/release/bundle/appimage/*.AppImage
+          # Apple silicon runner; one binary for both architectures (lipo).
+          - name: macOS (universal dmg)
+            os: macos-15
+            artifact: rupok-macos
+            args: --target universal-apple-darwin
+            paths: |
+              target/universal-apple-darwin/release/bundle/dmg/*.dmg
+              target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -72,6 +84,10 @@ jobs:
         run: |
           rustup toolchain install
           rustup show
+
+      - name: Add both macOS targets (universal binary)
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -104,6 +120,7 @@ jobs:
         working-directory: apps/board
         run: |
           bun install --frozen-lockfile
+          bun run vendor   # offline Smart Object libraries -> public/rupoklib/
           bun run build
 
       - name: Install desktop tooling (Tauri CLI)
@@ -111,24 +128,96 @@ jobs:
         run: bun install --frozen-lockfile
 
       # The Tauri code is behind the `app` feature (the root CI stays free of
-      # WebKitGTK), so lint it here where the system libraries exist.
+      # WebKitGTK), so lint it here where the system libraries exist. On macOS
+      # this also checks the macOS-only code (menu, overlay, capture).
       - name: Clippy (desktop app)
-        if: runner.os == 'Linux'
+        if: runner.os != 'Windows'
         run: cargo clippy -p rupok-desktop --features app -- -D warnings
 
+      # Sign and notarise only with all six secrets; a partial set builds the
+      # ad-hoc signed app as before (and says so) instead of failing.
+      - name: Check for Apple signing secrets
+        id: apple
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=()
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!v}" ] || missing+=("$v")
+          done
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "Signing with a Developer ID and notarising."
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            if [ ${#missing[@]} -lt 6 ]; then
+              echo "::warning::Apple secrets incomplete (missing: ${missing[*]}). Building an ad-hoc signed app."
+            else
+              echo "No Apple signing secrets: building an ad-hoc signed app (Gatekeeper asks once; see apps/desktop/README.md)."
+            fi
+          fi
+
+      # Windows, Linux, and macOS without the secrets. tauri.conf.json signs the
+      # macOS app ad hoc (signingIdentity "-").
       - name: Build installers
+        if: steps.apple.outputs.signed != 'true'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: apps/desktop
           tauriScript: bunx tauri
+          args: ${{ matrix.args }}
           # Only on v* tags: create (or reuse) a draft release and attach the installers.
           tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
           releaseName: ${{ startsWith(github.ref, 'refs/tags/v') && format('Rupok {0}', github.ref_name) || '' }}
-          releaseBody: Desktop installers for Windows (NSIS .exe, MSI) and Linux (.deb, AppImage). See the assets below.
+          releaseBody: Desktop installers for Windows (NSIS .exe, MSI), macOS (universal .dmg) and Linux (.deb, AppImage). See the assets below.
           releaseDraft: true
           prerelease: false
+
+      # macOS with the secrets: tauri-action imports the certificate into a
+      # temporary keychain, signs with the hardened runtime and notarises.
+      - name: Build, sign and notarise (macOS)
+        if: steps.apple.outputs.signed == 'true'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: bunx tauri
+          args: ${{ matrix.args }}
+          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/v') && format('Rupok {0}', github.ref_name) || '' }}
+          releaseBody: Desktop installers for Windows (NSIS .exe, MSI), macOS (universal .dmg) and Linux (.deb, AppImage). See the assets below.
+          releaseDraft: true
+          prerelease: false
+
+      # Evidence in the log: both architectures, the signature, the file
+      # association and the macOS settings that ended up in Info.plist.
+      - name: Inspect the macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          app=target/universal-apple-darwin/release/bundle/macos/Rupok.app
+          lipo -archs "$app"/Contents/MacOS/*
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign --display --verbose=2 "$app" 2>&1 | grep -E "^(Identifier|Format|Authority|Signature|TeamIdentifier|Runtime)" || true
+          plutil -p "$app/Contents/Info.plist"
+          spctl --assess --type execute --verbose=2 "$app" || echo "Gatekeeper: not notarised (expected without the Apple secrets)"
+          ls -l target/universal-apple-darwin/release/bundle/dmg/
 
       - name: Upload installers
         uses: actions/upload-artifact@v4
@@ -137,3 +226,79 @@ jobs:
           path: ${{ matrix.paths }}
           if-no-files-found: error
           retention-days: 14
+
+  # The board's key flows in Playwright WebKit on macOS: the engine of Safari
+  # and of the macOS app's WKWebView (apps/board/e2e).
+  webkit:
+    name: WebKit e2e (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust from rust-toolchain.toml
+        run: |
+          rustup toolchain install
+          rustup show
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: webkit-e2e
+          cache-on-failure: true
+
+      - name: Cache wasm-bindgen CLI
+        id: wasm-bindgen-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: wasm-bindgen-${{ runner.os }}-${{ env.WASM_BINDGEN_VERSION }}
+
+      - name: Install wasm-bindgen CLI
+        if: steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
+        run: cargo install wasm-bindgen-cli --version ${{ env.WASM_BINDGEN_VERSION }} --locked
+
+      - name: Build the board engine (wasm)
+        run: |
+          cargo build -p rupok-wasm --target wasm32-unknown-unknown --profile release-wasm
+          wasm-bindgen --target web --out-dir apps/board/src/wasm --out-name rupok \
+            target/wasm32-unknown-unknown/release-wasm/rupok_wasm.wasm
+
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build the board
+        working-directory: apps/board
+        run: |
+          bun install --frozen-lockfile
+          bun run vendor
+          bun run build
+
+      - name: Install Playwright
+        id: playwright
+        working-directory: apps/board/e2e
+        run: |
+          bun install --frozen-lockfile
+          echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the WebKit build
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/ms-playwright
+          key: playwright-webkit-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+
+      - name: Run the flows in WebKit
+        working-directory: apps/board/e2e
+        run: |
+          npx playwright install webkit
+          npx playwright test
+
+      - name: Upload the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webkit-e2e-report
+          path: |
+            apps/board/e2e/playwright-report
+            apps/board/e2e/test-results
+          retention-days: 7
