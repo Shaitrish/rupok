@@ -67,7 +67,7 @@ jobs:
               target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install WebKitGTK and bundling dependencies
         if: runner.os == 'Linux'
@@ -233,7 +233,7 @@ jobs:
     name: WebKit e2e (macOS)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust from rust-toolchain.toml
         run: |
