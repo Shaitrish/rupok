@@ -113,7 +113,11 @@ impl StrokeBuilder {
     /// Feed one raw sample. Returns true if a point was appended.
     pub fn push(&mut self, s: InputPoint) -> bool {
         self.last_raw = Some(s);
-        let (x, y) = self.filter.filter(s.x, s.y, s.t_ms);
+        let (x, y) = if self.cfg.filter.is_raw() {
+            (s.x, s.y)
+        } else {
+            self.filter.filter(s.x, s.y, s.t_ms)
+        };
         let p = self.pressure(s.pressure);
         let dt = (s.t_ms - self.t0).max(0.0).min(f64::from(u32::MAX)) as u32;
         if let Some(last) = self.points.last_mut() {
@@ -130,27 +134,42 @@ impl StrokeBuilder {
         true
     }
 
-    /// Current wet points (filtered, not yet simplified).
+    /// Current wet points (filtered, not yet simplified), without the [tip].
+    ///
+    /// [tip]: StrokeBuilder::tip
     pub fn points(&self) -> &[StrokePoint] {
         &self.points
     }
 
-    /// Finish the stroke: snap the tail to the real pen-up position (the filter
-    /// trails slightly) and simplify. Tolerances are ~0.2 screen px.
+    /// The pen's newest raw position, when the smoothed points trail it.
+    ///
+    /// Wet ink is `points()` + `tip()`: the smoothed body catches up behind
+    /// the tip, but the ink always reaches the pen, at any smoothing.
+    /// [`StrokeBuilder::finish`] ends the dry stroke at this same point, so
+    /// pen-up changes nothing on screen (docs/performance.md).
+    pub fn tip(&self) -> Option<StrokePoint> {
+        let raw = self.last_raw?;
+        let last = *self.points.last()?;
+        if (raw.x - last.x).abs() <= 0.01 && (raw.y - last.y).abs() <= 0.01 {
+            return None;
+        }
+        let dt = (raw.t_ms - self.t0).max(0.0).min(f64::from(u32::MAX)) as u32;
+        Some(StrokePoint {
+            x: raw.x,
+            y: raw.y,
+            p: last.p,
+            dt: dt.max(last.dt),
+        })
+    }
+
+    /// Finish the stroke: end it at the [tip] (the real pen-up position, which
+    /// the last wet frame already showed) and simplify. Tolerances are ~0.2
+    /// screen px, below what the eye can tell from the wet stroke.
+    ///
+    /// [tip]: StrokeBuilder::tip
     pub fn finish(mut self) -> Vec<StrokePoint> {
-        if let (Some(raw), Some(last)) = (self.last_raw, self.points.last().copied())
-            && self.points.len() > 1
-        {
-            let dt = (raw.t_ms - self.t0).max(0.0) as u32;
-            let p = last.p;
-            if (raw.x - last.x).abs() > 0.01 || (raw.y - last.y).abs() > 0.01 {
-                self.points.push(StrokePoint {
-                    x: raw.x,
-                    y: raw.y,
-                    p,
-                    dt: dt.max(last.dt),
-                });
-            }
+        if let Some(t) = self.tip() {
+            self.points.push(t);
         }
         let eps = 0.2 / self.cfg.zoom.max(1e-3);
         simplify(&self.points, eps, 0.06)
@@ -194,6 +213,54 @@ mod tests {
         let last = pts.last().unwrap();
         assert_eq!(last.x, 200.0, "tail must snap to pen-up position");
         assert_eq!(last.dt, 800);
+    }
+
+    #[test]
+    fn wet_tip_reaches_the_pen_and_dry_ends_there() {
+        let cfg = BuilderConfig {
+            filter: OneEuroParams::from_smoothing(1.0),
+            ..Default::default()
+        };
+        let at = |i: i32| InputPoint {
+            x: i as f32 * 3.0,
+            y: 0.0,
+            pressure: 0.5,
+            t_ms: i as f64 * 4.0,
+        };
+        let mut b = StrokeBuilder::begin(StrokeStyle::default(), cfg, at(0), true);
+        for i in 1..=60 {
+            b.push(at(i));
+        }
+        // Heavy smoothing trails the pen; the tip does not.
+        assert!(b.points().last().unwrap().x < 175.0);
+        let tip = b.tip().expect("tip");
+        assert_eq!(tip.x, 180.0);
+        let dry = b.clone().finish();
+        assert_eq!(dry.last().unwrap().x, tip.x);
+        assert_eq!(dry.last().unwrap().p, tip.p);
+    }
+
+    #[test]
+    fn smoothing_zero_keeps_every_sample() {
+        let cfg = BuilderConfig {
+            filter: OneEuroParams::from_smoothing(0.0),
+            ..Default::default()
+        };
+        let at = |i: i32| InputPoint {
+            x: (i * 5) as f32,
+            y: ((i * 37) % 11) as f32,
+            pressure: 0.5,
+            t_ms: i as f64 * 4.0,
+        };
+        let mut b = StrokeBuilder::begin(StrokeStyle::default(), cfg, at(0), true);
+        for i in 1..20 {
+            b.push(at(i));
+        }
+        for (i, p) in b.points().iter().enumerate() {
+            let s = at(i as i32);
+            assert_eq!((p.x, p.y), (s.x, s.y));
+        }
+        assert!(b.tip().is_none(), "raw points already reach the pen");
     }
 
     #[test]

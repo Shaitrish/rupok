@@ -22,8 +22,24 @@ impl Default for OneEuroParams {
 }
 
 impl OneEuroParams {
+    /// No filtering: every sample passes through unchanged (smoothing 0).
+    pub const RAW: Self = Self {
+        min_cutoff: f32::INFINITY,
+        beta: 0.0,
+        d_cutoff: 1.0,
+    };
+
+    /// True for [`OneEuroParams::RAW`]: the builder skips the filter.
+    pub fn is_raw(&self) -> bool {
+        self.min_cutoff.is_infinite()
+    }
+
     /// Map a user-facing "smoothing" setting (0 = raw, 1 = very smooth).
+    /// Smoothing 0 is truly raw: the pen's samples, unfiltered.
     pub fn from_smoothing(s: f32) -> Self {
+        if s.is_nan() || s <= 0.0 {
+            return Self::RAW;
+        }
         let s = s.clamp(0.0, 1.0);
         Self {
             min_cutoff: 6.0 - 5.5 * s,
@@ -138,6 +154,18 @@ mod tests {
             }
         }
         assert!(max_dev < 0.5, "jitter not reduced: {max_dev}");
+    }
+
+    #[test]
+    fn smoothing_zero_is_raw() {
+        let p = OneEuroParams::from_smoothing(0.0);
+        assert!(p.is_raw());
+        assert!(!OneEuroParams::from_smoothing(0.01).is_raw());
+        let mut f = OneEuro::new(p);
+        for i in 0..50 {
+            let v = (i * 7 % 13) as f32;
+            assert_eq!(f.filter(v, i as f64 * 4.0), v);
+        }
     }
 
     #[test]

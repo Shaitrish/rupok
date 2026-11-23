@@ -2445,7 +2445,11 @@ impl<S: InkSink> Engine<S> {
                 Gesture::Ink {
                     builder, predicted, ..
                 } => {
-                    let mut pts = builder.points().to_vec();
+                    // Smoothed body + raw tip + the browser's prediction:
+                    // the ink reaches the pen (rupok_ink::StrokeBuilder::tip).
+                    let mut pts = Vec::with_capacity(builder.points().len() + 1 + predicted.len());
+                    pts.extend_from_slice(builder.points());
+                    pts.extend(builder.tip());
                     pts.extend_from_slice(predicted);
                     let st = builder.style;
                     clip::push_wet(
@@ -2670,6 +2674,25 @@ pub(crate) mod tests {
         }
         e.pointer_move(id, &s, &[], 1.0);
         e.pointer_up(id, 2.0);
+    }
+
+    /// Wet ink reaches the pen at any smoothing, and the dry stroke ends
+    /// where the last wet frame did: pen-up moves nothing (docs/performance.md).
+    #[test]
+    fn wet_ink_reaches_the_pen_and_dry_matches_it() {
+        let mut e = engine();
+        e.set_smoothing(1.0);
+        e.pointer_down(1, 100.0, 100.0, 0.5, 0.0, PointerKind::Pen, 0, 0.0);
+        let s: Vec<f64> = (1..=40)
+            .flat_map(|i| [100.0 + f64::from(i) * 6.0, 100.0, 0.5, f64::from(i) * 4.0])
+            .collect();
+        e.pointer_move(1, &s, &[], 1.0);
+        let wet_tip = *e.sink.wet[0].points.last().unwrap();
+        assert_eq!((wet_tip.x, wet_tip.y), (340.0, 100.0), "wet tip at the pen");
+        e.pointer_up(1, 2.0);
+        let dry = e.sink.strokes.values().next().unwrap();
+        let end = dry.points.last().unwrap();
+        assert_eq!((end.x, end.y, end.p), (wet_tip.x, wet_tip.y, wet_tip.p));
     }
 
     #[test]
