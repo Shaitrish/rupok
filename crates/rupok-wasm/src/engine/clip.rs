@@ -103,15 +103,18 @@ impl<S: InkSink> Engine<S> {
         ]
     }
 
-    /// Where an item placed at world point `w` goes: inside the page, with
-    /// room for text of font size `size` below it.
-    pub(super) fn place_on_page(&self, w: [f32; 2], size: f64) -> [f32; 2] {
+    /// Where text placed at world point `w` goes: inside the page, with
+    /// room for `text` at font size `size` (a rough width) below and right.
+    pub(super) fn place_on_page(&self, w: [f32; 2], text: &str, size: f64) -> [f32; 2] {
         let Some(r) = self.ink_bounds() else {
             return w;
         };
-        let line = (size as f32 * 1.5).clamp(0.0, (r[3] - r[1]) * 0.5);
+        let size = size as f32;
+        let line = (size * 1.5).clamp(0.0, (r[3] - r[1]) * 0.5);
+        let wide =
+            (text.chars().count().max(2) as f32 * size * 0.6).clamp(48.0, (r[2] - r[0]) * 0.5);
         [
-            w[0].clamp(r[0], (r[2] - 48.0).max(r[0])),
+            w[0].clamp(r[0], (r[2] - wide).max(r[0])),
             w[1].clamp(r[1], (r[3] - line).max(r[1])),
         ]
     }

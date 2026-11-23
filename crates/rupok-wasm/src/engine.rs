@@ -2089,7 +2089,7 @@ impl<S: InkSink> Engine<S> {
         size: f64,
         now_ms: f64,
     ) -> Option<ItemId> {
-        let w = self.place_on_page(self.world(x, y), size);
+        let w = self.place_on_page(self.world(x, y), text, size);
         let data = ItemData::Text(TextData {
             latex: false,
             geom: BoxGeom {
