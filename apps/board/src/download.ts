@@ -59,7 +59,6 @@ const T = {
   en: {
     windows: "Download for Windows", linux: "Download for Linux", mac: "Download for Mac",
     msi: "or .msi", appimage: "or AppImage", other: "Other platforms",
-    macSoon: "Mac app coming soon — use Rupok in Chrome, Safari or Edge today.",
     mobile: "On a phone, tablet or Chromebook, Rupok runs in the browser.",
     open: "Open the board", install: "Install as an app", app: "Download the desktop app",
     page: "/download/", board: "/board/",
@@ -67,7 +66,6 @@ const T = {
   bn: {
     windows: "Windows-এর জন্য ডাউনলোড", linux: "Linux-এর জন্য ডাউনলোড", mac: "Mac-এর জন্য ডাউনলোড",
     msi: "অথবা .msi", appimage: "অথবা AppImage", other: "অন্য প্ল্যাটফর্ম",
-    macSoon: "Mac অ্যাপ শিগগিরই আসছে। আজই Chrome, Safari বা Edge-এ Rupok ব্যবহার করুন।",
     mobile: "ফোন, ট্যাবলেট বা Chromebook-এ Rupok ব্রাউজারেই চলে।",
     open: "বোর্ড খুলুন", install: "অ্যাপ হিসেবে ইনস্টল করুন", app: "ডেস্কটপ অ্যাপ ডাউনলোড করুন",
     page: "/bn/download/", board: "/board/",
@@ -107,16 +105,16 @@ function widget(slot: string, os: Platform, rel: Release | null, t: Strings): st
     // One quiet line in the footer.
     if (os === "windows") return `<a href="${url("exe")}"${dl("exe")}>${t.windows}</a> · ${other}`;
     if (os === "linux") return `<a href="${url("deb")}"${dl("deb")}>${t.linux} (.deb)</a> · ${other}`;
-    if (os === "mac" && rel?.assets.dmg) return `<a href="${url("dmg")}" download>${t.mac}</a> · ${other}`;
+    if (os === "mac") return `<a href="${url("dmg")}"${dl("dmg")}>${t.mac}</a> · ${other}`;
     return `<a href="${t.page}">${t.app}</a>`;
   }
   if (os === "windows")
     return main(t.windows, "exe", DL_ICONS.windows) + metaLine([meta(rel, "exe"), `<a class="dl-link" href="${url("msi")}"${dl("msi")}>${t.msi}</a>`, other]);
   if (os === "linux")
     return main(t.linux, "deb", DL_ICONS.linux) + metaLine([meta(rel, "deb") && `.deb · ${meta(rel, "deb")}`, `<a class="dl-link" href="${url("appimage")}"${dl("appimage")}>${t.appimage}</a>`, other]);
-  if (os === "mac" && rel?.assets.dmg) return main(t.mac, "dmg", DL_ICONS.mac) + metaLine([meta(rel, "dmg"), other]);
-  // Mac without a .dmg yet, phones, tablets, Chromebooks: the web app.
-  const note = os === "mac" ? t.macSoon : t.mobile;
+  if (os === "mac") return main(t.mac, "dmg", DL_ICONS.mac) + metaLine([meta(rel, "dmg"), other]);
+  // Phones, tablets, Chromebooks: the web app.
+  const note = t.mobile;
   // The hero and the final call to action already have "Open the board".
   const open = slot === "hero" || slot === "final" ? "" : `<a class="pill dark${big}" href="${t.board}">${t.open}</a>`;
   const install = os === "mobile" ? `<a class="pill ghost${big}" href="${t.page}#install" data-install>${t.install}</a>` : "";
@@ -141,9 +139,6 @@ function render(rel: Release | null) {
   document.querySelectorAll<HTMLElement>("[data-meta]").forEach((m) => (m.textContent = meta(rel, m.dataset.meta as Kind)));
   document.querySelectorAll<HTMLAnchorElement>("a[data-notes]").forEach((a) => (a.href = rel?.notes ?? RELEASES_URL));
   document.querySelectorAll<HTMLElement>("[data-os-card]").forEach((c) => c.classList.toggle("you", c.dataset.osCard === os));
-  // A Mac release appears on its card once it exists.
-  if (rel?.assets.dmg) document.querySelectorAll<HTMLElement>("[data-mac-ready]").forEach((e) => (e.hidden = false));
-  if (rel?.assets.dmg) document.querySelectorAll<HTMLElement>("[data-mac-soon]").forEach((e) => (e.hidden = true));
 }
 
 if (document.querySelector("[data-download], [data-asset], [data-os-card]")) {

@@ -54,7 +54,7 @@ export function CloudSignIn(props: { compact?: boolean }) {
         <span class="label">Sign in with Google</span>
       </button>
       <Show when={!props.compact}>
-        <span class="hint">{cloudOffline() ? "Rupok Cloud is not reachable right now." : "Optional: sync between devices and share links. 500 MB free."}</span>
+        <span class="hint">{cloudOffline() ? "Rupok Cloud is coming soon (or not reachable right now)." : "Optional: sync between devices and share links. 500 MB free."}</span>
       </Show>
       <Show when={devLogin()}>
         <form class="cloud-dev" onSubmit={(e) => { e.preventDefault(); void dev(); }}>

@@ -588,7 +588,7 @@ const hub = {
       lede: "Swipe sideways on a phone. ✓ yes · ◐ partly or paid · ✗ no · ◷ coming soon.",
       blocks: [
         { table: { wide: true, hl: "row", caption: "Whiteboard and smartboard software for teachers, as of November 2026", head: ["Software", "Price", "Open source", "Runs on", "AI", "Replay / recording", "Bangla interface"], rows: HUB_ROWS } },
-        { note: "Sources for every row are on each product’s comparison page. Rupok’s Bangla interface, desktop app, offline install and live class are coming soon; everything else in Rupok’s row ships today." },
+        { note: "Sources for every row are on each product’s comparison page. Rupok’s Bangla interface, offline install and live class are coming soon; everything else in Rupok’s row ships today." },
       ],
     },
     {

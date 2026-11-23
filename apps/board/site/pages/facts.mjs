@@ -23,7 +23,7 @@ export const ROWS = [
 export const RUPOK = {
   price: "yes: Free, every feature, on every device. No licence keys",
   oss: "yes: Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0",
-  runs: "Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon",
+  runs: "Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux",
   account: "yes: None, for teachers or students",
   ai: "yes: Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot",
   replay: "yes: Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon",
@@ -60,14 +60,17 @@ Last updated: 23 November 2026. Website: ${SITE}/ · Source: ${GITHUB}
 - **Smart Objects:** self-contained HTML (simulations, 3D models, quizzes) that runs live on a slide in a sandboxed iframe. The teacher writes on top with the pen and steps through it with a clicker. Made by an AI agent through the MCP server, or pasted/dropped as an .html file from any chatbot.
 - **Replay:** every stroke is stored with its timing; replay any page at 1–8× speed.
 - **Modes:** Prepare (build the lesson), Teach (fitted slide, minimal chrome), Student (read-only viewer).
+- **Desktop app (v0.2.0):** for Windows, macOS (universal) and Linux, with \`.rpk\` file association and drawing over any app (overlay, beta). Download: ${SITE}/download/
+- **Smart Ink and maths:** hand-drawn shapes snap clean and turn into graphs, flowcharts, logic gates and circuits; handwritten maths shows a live LaTeX preview.
+- **AI on the board:** chat with your own Claude, Codex or OpenCode inside Rupok, and let an agent edit the open lesson live; voice input for typing.
 - **Student viewer:** ${SITE}/open/ opens a \`.rpk\` file in the browser, read-only, with replay and working Smart Objects. No account, nothing uploaded.
 - **Bangla:** Bangla text and fonts work in lessons (Hind Siliguri, Noto Sans Bengali).
-- **MCP server:** the \`rupok\` CLI includes an MCP server (stdio) with 11 tools for creating lessons and adding validated Smart Objects. Works with Claude Code, Codex CLI, OpenCode and any MCP client.
+- **MCP server:** the \`rupok\` CLI includes an MCP server (stdio) with 12 tools for creating lessons and adding validated Smart Objects. Works with Claude Code, Codex CLI, OpenCode and any MCP client.
 - **Open file format:** \`.rpk\` (RPK, Rich Presentation Kit) is a ZIP package (media type \`application/vnd.rupok.lesson+zip\`) holding a Loro CRDT document with full history, assets and Smart Object bundles, plus a readable outline (\`README.md\`, \`content.md\`, \`content.json\`) that AI models and scripts read without Loro. Format page: ${SITE}/rpk/ · Agent skill: ${SITE}/skills/read-rpk.md · Spec: ${GITHUB}/blob/main/spec/rupok-format.md
 
 ## Coming soon (not shipped yet)
 
-Desktop app for Windows and Linux (Tauri), draw over any app (desktop overlay), offline install (PWA), Bangla interface, replay with audio, Rupok Cloud (500 MB free cloud storage per teacher, share links \`rupok.app/s/<id>\`, a remote Claude connector, Google Drive "Open with"), live classes, live quizzes, handwriting recognition, subject tools (ruler, protractor, compass), Android app.
+Offline install (PWA), Bangla interface, replay with audio, Rupok Cloud (500 MB free cloud storage per teacher, share links \`rupok.app/s/<id>\`, a remote Claude connector, Google Drive "Open with"), live classes, live quizzes, full handwriting-to-text recognition, subject tools (ruler, protractor, compass), Android app.
 
 ## Use the MCP server (for AI agents)
 

@@ -148,7 +148,7 @@ const smartboard = {
   faq: [
     { q: "What is the best smartboard software for teachers?", a: "If your school is invested in one brand, its own software (SMART Notebook, ActivInspire) fits that hardware best. If you have mixed boards, want every feature free, or want AI-made interactive lessons and class replay, Rupok is built for that. See the [comparison](/compare/)." },
     { q: "Is Rupok really free?", a: "Yes. The whole app is free and open source, with no paid edition of the software. A hosted add-on, Rupok Cloud (sync, share links and live classes), is coming with a free plan for every teacher." },
-    { q: "Do I need to download smartboard software for my PC?", a: "No download is needed: Rupok runs in Chrome or Edge. You can install it from the browser menu so it opens in its own window. A desktop app for Windows and Linux is coming soon." },
+    { q: "Do I need to download smartboard software for my PC?", a: "No download is needed: Rupok runs in Chrome or Edge. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](/download/)." },
     { q: "Does it work with SMART, Promethean, BenQ, ViewSonic or Prestigio boards?", a: "Yes. Rupok runs on the computer connected to the board and uses its touch and pen like any browser app, so the brand doesn’t matter." },
     { q: "Does Rupok work offline?", a: "Once the board is open, it runs on your device: drawing, slides and replay don’t need the internet. An offline install (PWA) is coming soon." },
     { q: "Can I use my PowerPoint slides?", a: "Save the presentation as a PDF (File → Save As → PDF in PowerPoint), then drop the PDF onto the board. Every slide becomes a page you can write on." },
