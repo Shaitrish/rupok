@@ -1,15 +1,21 @@
 # Rupok desktop (Tauri 2)
 
-The installable Rupok app for **Windows and Linux**. It wraps the board from
+The installable Rupok app for **Windows, macOS and Linux**. It wraps the board from
 [`apps/board`](../board) (SolidJS + the `rupok-wasm` engine, unchanged) in a
 Tauri 2 shell and adds what a browser cannot do:
 
 - native Open/Save dialogs and **crash-safe saving** (validate → temp file → fsync → rename);
 - **`.rpk` file association**, open from the command line, and a **single instance**
-  (double-clicking a second lesson opens it in the running window);
+  (double-clicking a second lesson opens it in the running window); on macOS,
+  Finder's double-click, "Open With" and drops on the Dock icon;
 - remembered window size and position;
 - **draw over any app**: a transparent, always-on-top ink layer over the whole
-  screen with a floating toolbar, click-through, and "Save to lesson".
+  screen with a floating toolbar, click-through, and "Save to lesson" (beta on
+  macOS);
+- on macOS, a native menu bar (About, Hide, Quit ⌘Q, Edit, Window), and the
+  board's Ctrl shortcuts also work with ⌘.
+
+**Mac users:** see [macOS](#macos) for install and first launch.
 
 Plans: [tauri-desktop](../../docs/roadmap/tauri-desktop.md) ·
 [desktop-overlay](../../docs/roadmap/desktop-overlay.md).
@@ -18,14 +24,15 @@ Plans: [tauri-desktop](../../docs/roadmap/tauri-desktop.md) ·
 
 | Path | What |
 |---|---|
-| `tauri.conf.json` | Windows, CSP, bundle targets, file association. `frontendDist` is `../board/dist`; `devUrl` is `http://127.0.0.1:3737/board/` |
+| `tauri.conf.json` | Windows, CSP, bundle targets, file association (`.rpk`, UTI `app.rupok.lesson` on macOS), macOS bundle settings. `frontendDist` is `../board/dist`; `devUrl` is `http://127.0.0.1:3737/board/` |
 | `capabilities/` | Least-privilege permissions: `main.json` (board window), `overlay.json` (overlay windows) |
-| `src/app.rs` | Builder, plugins, `save_lesson`, files opened by the OS |
-| `src/overlay.rs` | Overlay windows, click-through, global shortcut, capture, snapshot hand-off |
+| `src/app.rs` | Builder, plugins, `save_lesson`, files opened by the OS (argv, and `RunEvent::Opened` on macOS), the macOS menu bar |
+| `src/overlay.rs` | Overlay windows, click-through, global shortcut, capture, snapshot hand-off; macOS window level and Spaces |
 | `src/files.rs` | Atomic save and argv parsing (plain Rust, unit-tested) |
-| `src/capture.rs` | Screen capture: `xcap` on Windows, pure-Rust X11 on Linux |
-| `src/geometry.rs` | Toolbar placement and the screenshot wire format (unit-tested) |
+| `src/capture.rs` | Screen capture: `xcap` on Windows and macOS (with the Screen Recording permission check), pure-Rust X11 on Linux |
+| `src/geometry.rs` | Toolbar placement, points/pixels, and the screenshot wire format (unit-tested) |
 | `linux/` | `.desktop` template (`Exec=… %F`) and the shared-mime-info entry for `.rpk` |
+| `macos/` | `Entitlements.plist` for the hardened runtime (no exceptions; see the comment in it) |
 | `icons/` | Generated app icons (see below) |
 
 On the board side: [`src/platform.ts`](../board/src/platform.ts) is the file
@@ -46,6 +53,9 @@ is the overlay UI.
   ```
 
 - **Windows**: WebView2 (preinstalled on Windows 10/11) and the MSVC build tools.
+- **macOS**: the Xcode Command Line Tools (`xcode-select --install`). For a
+  universal (Apple silicon + Intel) build, both Rust targets:
+  `rustup target add aarch64-apple-darwin x86_64-apple-darwin`.
 
 ## Develop
 
@@ -75,12 +85,26 @@ bun run build      # builds the wasm engine and the board, then `tauri build`
 ```
 
 Output in `target/release/bundle/` at the repo root: `nsis/*.exe` and
-`msi/*.msi` on Windows, `deb/*.deb` and `appimage/*.AppImage` on Linux. If the
-board is already built, `bun run bundle` runs only `tauri build`.
+`msi/*.msi` on Windows, `deb/*.deb` and `appimage/*.AppImage` on Linux,
+`macos/Rupok.app` and `dmg/*.dmg` on macOS. If the board is already built,
+`bun run bundle` runs only `tauri build`. On a Mac, the universal build is
+
+```sh
+bun run bundle -- --target universal-apple-darwin
+# -> target/universal-apple-darwin/release/bundle/dmg/Rupok_<version>_universal.dmg
+```
 
 CI ([`.github/workflows/desktop.yml`](../../.github/workflows/desktop.yml))
-builds both platforms on every push to `main` (installers as workflow
-artifacts) and attaches them to a **draft GitHub Release** for `v*` tags.
+builds all three platforms on every push to `main` and on pull requests
+(installers as workflow artifacts: `rupok-windows`, `rupok-linux`,
+`rupok-macos`) and attaches them to a **draft GitHub Release** for `v*` tags.
+The macOS job runs on an Apple silicon runner (`macos-14`), builds one
+universal binary and prints the app's architectures, signature and
+`Info.plist` in the log ("Inspect the macOS app"). The same workflow runs the
+board's key flows in **Playwright WebKit** on macOS
+([`apps/board/e2e`](../board/e2e/playwright.config.ts)): load, drawing with
+pointer events, ⌘Z, a Smart Object preset, Teach mode, save/open, PDF import
+and the website pages.
 
 ## Icons
 
@@ -97,8 +121,8 @@ or `brand/rupok-mark.svg` for rounded corners on the taskbar).
 
 ## The overlay: draw over any app
 
-- **Ctrl+Shift+D** (global) shows or hides the overlay on the monitor under the
-  mouse. `platform.openOverlay()` / `closeOverlay()` do the same from the board.
+- **Ctrl+Shift+D** (global; **⌃⇧D**, Control-Shift-D, on a Mac) shows or hides
+  the overlay on the monitor under the mouse. `platform.openOverlay()` / `closeOverlay()` do the same from the board.
 - The **ink window** (`/board/?overlay`) is transparent, undecorated, always on
   top, skipped from the taskbar and covers the monitor. It shows only ink: no
   page frame, no canvas colour. It is a separate small lesson and never touches
@@ -117,6 +141,174 @@ or `brand/rupok-mark.svg` for rounded corners on the taskbar).
 - In a browser, `/board/?overlay` is a plain page with the toolbar inline (handy
   for development; Save to lesson needs the desktop app).
 
+## macOS
+
+One **universal** app for Apple silicon (M1 and later) and Intel Macs,
+**macOS 11 Big Sur or later**. Rupok uses the system WebKit (WKWebView), so
+keep macOS and Safari updated. The overlay is **beta on macOS**; everything
+else is the same board as on Windows and Linux.
+
+### Install
+
+1. Download `Rupok_<version>_universal.dmg` from the
+   [GitHub Releases](https://github.com/shaitrish/rupok/releases) page (or,
+   for a test build, the `rupok-macos` artifact of a
+   [Desktop workflow run](https://github.com/shaitrish/rupok/actions/workflows/desktop.yml)).
+2. Open the `.dmg` and drag **Rupok** onto **Applications**.
+
+### First launch while the app is unsigned
+
+Until the founder's Apple Developer account exists (see
+[Signing and notarising](#signing-and-notarising-for-macos)), the app is
+ad-hoc signed, not notarised, so macOS asks once before the first launch:
+
+- **macOS 14 Sonoma and earlier:** in Applications, **right-click** (or
+  Control-click) Rupok → **Open**, then **Open** again in the dialog.
+- **macOS 15 Sequoia and later** (right-click → Open no longer skips the
+  check): double-click Rupok and click **Done** in the warning. Open
+  **System Settings → Privacy & Security**, scroll down to *Security*, click
+  **Open Anyway** next to "Rupok was blocked…", enter your password, then
+  **Open Anyway** once more.
+
+After that Rupok opens normally, until an update replaces the app. (For IT
+staff: `xattr -dr com.apple.quarantine /Applications/Rupok.app` does the same
+from Terminal.)
+
+### What is different on a Mac
+
+- **Menu bar:** Rupok (About, Hide ⌘H, Hide Others, Quit ⌘Q), Edit (Undo,
+  Redo, Cut, Copy, Paste, Select All: these also make ⌘C/⌘V work in text
+  fields, which WKWebView only gets through the menu), View (Enter Full
+  Screen ⌃⌘F) and Window (Minimize ⌘M, Zoom, Close ⌘W). The board handles its
+  own keys first, so ⌘Z on the canvas undoes ink and in a text field undoes
+  typing.
+- **⌘ shortcuts:** every Ctrl shortcut of the board works with ⌘ (⌘Z, ⇧⌘Z,
+  ⌘C, ⌘X, ⌘V, ⌘D, ⌘G, ⇧⌘G, ⌘E, ⌘A, ⌘S, ⌘O, ⇧⌘E). Option+1/2/3 picks the
+  mode. Teach is F5 (fn+F5 on most Mac keyboards). Trackpad pinch zooms the
+  board, two-finger scroll pans.
+- **Lessons:** `.rpk` files get their own type (UTI `app.rupok.lesson`,
+  conforming to `public.zip-archive`) with Rupok as the owner, so a
+  double-click in Finder, "Open With" or a drop on the Dock icon opens the
+  lesson (`RunEvent::Opened` in `src/app.rs`), also while Rupok is running.
+- **No usage strings needed:** Rupok uses no camera, microphone, location or
+  contacts, so its `Info.plist` has no `NS…UsageDescription` keys. Screen
+  Recording (overlay "Save to lesson") has no `Info.plist` key; macOS asks
+  through its own prompt and System Settings.
+
+### The overlay on macOS (beta)
+
+It compiles and is linted on macOS in CI, but it has **not been tried on a
+real Mac yet**, nor with real pen tablets there. What it does:
+
+- The ink window is transparent (Tauri draws a transparent WKWebView with
+  WebKit's private `drawsBackground` key, always on since Tauri 2.12.1, so
+  `macOSPrivateApi` is not needed in `tauri.conf.json`). It sits at the
+  status-bar window level, above the menu bar and the Dock, joins **every
+  Space**, and is allowed over **full-screen apps** (Keynote or PowerPoint
+  slideshows): collection behaviour `canJoinAllSpaces | stationary |
+  ignoresCycle | fullScreenAuxiliary` (`overlay::macos` in `src/overlay.rs`).
+- Click-through uses `setIgnoresMouseEvents`; the toolbar is a child window
+  one level above the ink, so it stays clickable.
+- **Save to lesson needs the Screen Recording permission.** Without it macOS
+  would hand Rupok only the wallpaper, so Rupok checks first
+  (`CGPreflightScreenCaptureAccess`). If it is off, the ink is saved alone and
+  the overlay explains why, with an **Open System Settings** button: it hides
+  the overlay, asks macOS for the permission (which adds Rupok to the list)
+  and opens *Privacy & Security → Screen & System Audio Recording*. Turn on
+  Rupok, then quit and reopen it (macOS applies the change after a restart).
+  While the app is ad-hoc signed, each update counts as a new app, so the
+  switch has to be turned on again after updating. macOS 15 and later may
+  also ask again from time to time whether Rupok may keep recording.
+- Untested and possibly rough: activating the overlay over a full-screen app
+  may switch Spaces (macOS's "switch to a Space with open windows" setting),
+  and displays with different scale factors.
+
+**App Store trade-off.** The private `drawsBackground` key that makes the
+overlay transparent is not allowed in the Mac App Store, and the App Store
+also requires the App Sandbox, which the overlay and "open lessons
+anywhere" do not fit. Rupok is distributed outside the App Store, signed with
+a Developer ID and notarised, where both are fine. An App Store build would
+need the overlay off and the sandbox entitlements added to
+`macos/Entitlements.plist`.
+
+### Signing and notarising for macOS
+
+CI signs and notarises the macOS app **only when all six secrets below
+exist**; with none of them it builds the ad-hoc signed app described above (a
+partial set prints a warning and builds ad hoc too). The bundle already uses
+the **hardened runtime** (required for notarisation) with
+[`macos/Entitlements.plist`](macos/Entitlements.plist): a non-sandboxed
+WKWebView app needs no exceptions, because JavaScript and WebAssembly run in
+WebKit's own process.
+
+What the founder has to do once (only the Apple account holder can):
+
+1. **Enrol in the Apple Developer Program** at
+   <https://developer.apple.com/programs/enroll/> (US$99 a year), with an
+   Apple Account that has two-factor authentication on. Enrol as an
+   individual (your name is shown as the developer) or as an organisation
+   (needs a D-U-N-S number; shows "Shaitrish"). Approval takes from hours to
+   a few days.
+2. **Create a "Developer ID Application" certificate.**
+   - *On a Mac:* Keychain Access → Certificate Assistant → *Request a
+     Certificate From a Certificate Authority* → your email and name, *Saved
+     to disk*. Then on <https://developer.apple.com/account/resources/certificates/list>
+     click **+**, choose **Developer ID Application** (G2 Sub-CA), upload
+     the `.certSigningRequest`, download the `.cer` and double-click it.
+   - *Without a Mac* (any Linux or Windows machine with OpenSSL):
+
+     ```sh
+     openssl req -new -newkey rsa:2048 -nodes -keyout devid.key -out devid.csr \
+       -subj "/emailAddress=you@example.com/CN=Your Name/C=BD"
+     # upload devid.csr as above, download developerID_application.cer, then:
+     openssl x509 -inform der -in developerID_application.cer -out devid.pem
+     ```
+
+3. **Export it as a `.p12`** with a strong password.
+   - *Mac:* Keychain Access → *login* → *My Certificates* → right-click
+     "Developer ID Application: …" → **Export** → `rupok-devid.p12`.
+   - *OpenSSL 3:* `openssl pkcs12 -export -legacy -inkey devid.key -in devid.pem -out rupok-devid.p12`
+     (`-legacy` keeps it readable by macOS's `security import`; leave it out
+     on OpenSSL 1.1).
+
+   Keep the `.p12`, its password and `devid.key` somewhere safe and offline;
+   anyone with them can sign apps as you. Revoke the certificate on the
+   developer site if they leak.
+4. **Note the identity and team ID.** The identity is the certificate's full
+   name, e.g. `Developer ID Application: Your Name (AB12CD34EF)`
+   (`security find-identity -v -p codesigning` on a Mac, or
+   `openssl x509 -in devid.pem -noout -subject` and take the `CN`). The team
+   ID is the 10 characters in brackets, also under *Membership details* on
+   <https://developer.apple.com/account>.
+5. **Create an app-specific password** for notarisation: <https://account.apple.com>
+   → *Sign-In and Security* → **App-Specific Passwords** → **+**, name it
+   "Rupok notarisation", copy the `xxxx-xxxx-xxxx-xxxx` password.
+6. **Add six repository secrets** on GitHub: *Settings → Secrets and
+   variables → Actions → New repository secret* (or with `gh secret set`):
+
+   | Secret | Value |
+   |---|---|
+   | `APPLE_CERTIFICATE` | the `.p12` as one line of base64: `base64 -i rupok-devid.p12` (Mac) or `base64 -w0 rupok-devid.p12` (Linux) |
+   | `APPLE_CERTIFICATE_PASSWORD` | the `.p12` export password |
+   | `APPLE_SIGNING_IDENTITY` | `Developer ID Application: Your Name (AB12CD34EF)` |
+   | `APPLE_ID` | the Apple Account email |
+   | `APPLE_PASSWORD` | the app-specific password (not the account password) |
+   | `APPLE_TEAM_ID` | `AB12CD34EF` |
+
+   ```sh
+   base64 -w0 rupok-devid.p12 | gh secret set APPLE_CERTIFICATE --repo shaitrish/rupok
+   gh secret set APPLE_CERTIFICATE_PASSWORD --repo shaitrish/rupok   # prompts for the value
+   # …and the same for the other four
+   ```
+
+7. **Check it:** run the Desktop workflow (*Actions → Desktop → Run
+   workflow*, or push to `main`). The macOS job logs "Signing with a Developer
+   ID and notarising"; in "Inspect the macOS app", `Authority=Developer ID
+   Application: …` and `spctl` reports `accepted, source=Notarized Developer
+   ID`. Notarisation usually takes a few minutes. From then on the `.dmg`
+   opens with a normal double-click, and the first-launch steps above are no
+   longer needed.
+
 ## Known platform limits
 
 | Platform | Limit |
@@ -125,6 +317,7 @@ or `brand/rupok-mark.svg` for rounded corners on the taskbar).
 | Linux, X11 | Transparency needs a compositor (all mainstream desktops have one); without it the overlay is black. Some window managers keep undecorated windows out of panel areas. |
 | Linux, AppImage | The file association is not registered system-wide (that needs AppImageLauncher or the `.deb`). |
 | Windows | Full-screen *exclusive* apps (some games and video players) can cover the overlay; PowerPoint slideshows and full-screen browsers work. Installers are unsigned for now, so SmartScreen warns on first run. |
+| macOS | The overlay is **beta**: it builds in CI but has not been tried on a real Mac yet (see [The overlay on macOS](#the-overlay-on-macos-beta)). Until the app is signed, Gatekeeper asks once on first launch (see [First launch](#first-launch-while-the-app-is-unsigned)). |
 | Global shortcut | Ctrl+Shift+D is skipped (with a log line) if another app already owns it. A settings editor for shortcuts is still to do. |
 | Multi-monitor | One overlay at a time, on the monitor under the mouse when it opens. |
 | Smart Objects | Objects run as in the browser (`srcdoc` iframes). Objects that `import` ES modules from `/rupoklib/` are untested in the app: the opaque-origin iframe may need CORS headers that only the planned `rupokobj://` protocol will add. |
@@ -148,6 +341,7 @@ or `brand/rupok-mark.svg` for rounded corners on the taskbar).
 
 From the plan: autosave to the app data folder with restore, recent files, the
 `rupokobj://` Smart Object protocol with vendored `rupoklib://` libraries, the
-MCP sidecar, the updater and code signing; for the overlay: freeze-frame,
-per-monitor overlays and a shortcut editor. The board's mode switcher opens the
+MCP sidecar, the updater and Windows code signing (macOS signing is wired but
+waits for the Apple secrets); for the overlay: freeze-frame, per-monitor
+overlays, a shortcut editor, and a first test on a real Mac. The board's mode switcher opens the
 overlay through `platform.openOverlay()`.

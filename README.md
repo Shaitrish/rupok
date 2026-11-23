@@ -8,14 +8,15 @@
 <p align="center"><b>The open-source whiteboard for teachers, with your own AI built in.</b><br>
 Write on slides with a pen. Drop in live, interactive lessons your AI made. Replay any class, stroke by stroke.</p>
 
-<p align="center"><a href="https://rupok.app"><b>rupok.app</b></a> · works in Chrome and Edge, installable as an app</p>
+<p align="center"><a href="https://rupok.app"><b>rupok.app</b></a> · works in Chrome, Edge and Safari, installable as an app · desktop app for Windows, macOS and Linux</p>
 
 > **Status: early alpha (v0.1).** The board works in the browser today at
 > [rupok.app](https://rupok.app): pen and highlighter, slides and PDFs,
 > Smart Objects with presets, Teach mode, replay and `.rpk` lesson files.
 > **Desktop app for Windows and Linux** is out: download it from
-> [Releases](https://github.com/Shaitrish/rupok/releases/latest) (macOS is
-> coming next). Much more is in active
+> [Releases](https://github.com/Shaitrish/rupok/releases/latest). The macOS
+> app (universal `.dmg`, unsigned for now) is built by CI and comes with the
+> next release. Much more is in active
 > development. See [ROADMAP.md](ROADMAP.md) for what is done, what is in
 > progress, and what you can help build.
 
@@ -58,7 +59,7 @@ online and classroom teaching.
 | ✅ | Smart Object SDK, examples and an AI skill pack |
 | 🚧 | Board in the browser: toolbar, PDF import, Smart Objects, save/open, replay |
 | ✅ | Desktop app for Windows and Linux ([download](https://github.com/Shaitrish/rupok/releases/latest)) |
-| 🚧 | Desktop app for macOS; draw over any app (overlay, beta) |
+| 🚧 | Desktop app for macOS (universal `.dmg`, Apple silicon and Intel); draw over any app (overlay, beta) |
 | 📋 | Rupok Cloud sync and student share links, course library, agent panel inside the app |
 | 📋 | Live broadcast to students, live quizzes, subject tools, Bangla |
 

@@ -48,8 +48,9 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 | 🚧 | Save and open `.rpk`, autosave | `apps/board`, `crates/rupok-wasm` | |
 | 🚧 | Replay a page stroke by stroke (play, seek, speed) | `crates/rupok-wasm/src/replay.rs` | |
 | ✅ | Desktop app (Tauri 2) for Windows and Linux: shell, `.rpk` association, single instance, atomic save, installers in CI (v0.1.0, unsigned) |
-| 🚧 | Desktop app for macOS: universal `.dmg`, ⌘ shortcuts, WebKit fixes; signing/notarisation once an Apple Developer account exists | [tauri-desktop](docs/roadmap/tauri-desktop.md), `apps/desktop` | intermediate |
-| 🚧 | Desktop overlay (beta): draw over any app on the screen (ink, toolbar, click-through, save to lesson) | [desktop-overlay](docs/roadmap/desktop-overlay.md), `apps/desktop/src/overlay.rs` | advanced |
+| 🚧 | Desktop app for macOS: universal `.dmg` built in CI, native menu, ⌘ shortcuts, `.rpk` document type, WebKit fixes; signing/notarisation wired, waiting for an Apple Developer account; first test on a real Mac to do | [tauri-desktop](docs/roadmap/tauri-desktop.md#macos), `apps/desktop` | intermediate |
+| 🚧 | Desktop overlay (beta): draw over any app on the screen (ink, toolbar, click-through, save to lesson); on macOS untested on real hardware | [desktop-overlay](docs/roadmap/desktop-overlay.md), `apps/desktop/src/overlay.rs` | advanced |
+| ✅ | WebKit (Safari, the macOS app) checked in CI: the board's key flows in Playwright WebKit on macOS | `apps/board/e2e`, `.github/workflows/desktop.yml` | |
 | 🚧 | Touch and pen settings: palm rejection modes, smoothing, pressure curve | engine done; UI in `apps/board` | |
 | 🚧 | Themes: light/dark, accent colour, board colours | [DESIGN.md](DESIGN.md) | |
 | ✅ | Website: landing page, RPK viewer page (`/open/`, `/bn/open/`), smartboard / AI / online-class / teacher pages, honest comparison pages, Bangla pages, `llms.txt`, sitemap and JSON-LD | `apps/board/site/` (`node site/build.mjs`), [docs/seo](docs/seo/keywords.md) | |
