@@ -59,7 +59,7 @@ jobs:
               target/release/bundle/appimage/*.AppImage
           # Apple silicon runner; one binary for both architectures (lipo).
           - name: macOS (universal dmg)
-            os: macos-14
+            os: macos-15
             artifact: rupok-macos
             args: --target universal-apple-darwin
             paths: |
@@ -231,7 +231,7 @@ jobs:
   # and of the macOS app's WKWebView (apps/board/e2e).
   webkit:
     name: WebKit e2e (macOS)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 

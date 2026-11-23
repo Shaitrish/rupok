@@ -100,6 +100,21 @@ test.describe("board in WebKit", () => {
     expect(errors).toEqual([]);
   });
 
+  test("selects, copies and pastes with the platform shortcuts", async ({ page }) => {
+    const errors = trackErrors(page);
+    await openBoard(page);
+    await page.keyboard.press("p");
+    await scribble(page);
+    await page.keyboard.press("ControlOrMeta+a");
+    await expect(page.locator(".sel-frame")).toBeVisible();
+    await page.keyboard.press("ControlOrMeta+c");
+    await expect(page.getByRole("status")).toContainText("Copied 1 item");
+    const before = await inkShot(page);
+    await page.keyboard.press("ControlOrMeta+v");
+    await expect.poll(async () => (await inkShot(page)).equals(before), { message: "the copy shows up" }).toBe(false);
+    expect(errors).toEqual([]);
+  });
+
   test("inserts a Smart Object preset that runs", async ({ page }) => {
     const errors = trackErrors(page);
     await openBoard(page);

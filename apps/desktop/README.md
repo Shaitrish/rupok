@@ -98,9 +98,9 @@ CI ([`.github/workflows/desktop.yml`](../../.github/workflows/desktop.yml))
 builds all three platforms on every push to `main` and on pull requests
 (installers as workflow artifacts: `rupok-windows`, `rupok-linux`,
 `rupok-macos`) and attaches them to a **draft GitHub Release** for `v*` tags.
-The macOS job runs on an Apple silicon runner (`macos-14`), builds one
-universal binary and prints the app's architectures, signature and
-`Info.plist` in the log ("Inspect the macOS app"). The same workflow runs the
+The macOS job runs on an Apple silicon runner (`macos-15`; GitHub has retired
+`macos-14`), builds one universal binary and prints the app's architectures,
+signature and `Info.plist` in the log ("Inspect the macOS app"). The same workflow runs the
 board's key flows in **Playwright WebKit** on macOS
 ([`apps/board/e2e`](../board/e2e/playwright.config.ts)): load, drawing with
 pointer events, ⌘Z, a Smart Object preset, Teach mode, save/open, PDF import

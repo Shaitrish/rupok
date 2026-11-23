@@ -14,7 +14,7 @@
 > (`url: "/board/"`), because `/` is the website. See `apps/desktop/README.md`.
 >
 > **macOS (2026-11):** added after this plan (it was a non-goal). CI builds a
-> universal `.dmg` on `macos-14` and attaches it to the draft release; signing
+> universal `.dmg` on `macos-15` and attaches it to the draft release; signing
 > and notarisation are wired but run only when the six `APPLE_*` secrets exist
 > (ad-hoc signed until then). Native menu, ⌘ shortcuts, `.rpk` document type
 > (UTI `app.rupok.lesson`) with `RunEvent::Opened`, and the overlay (beta:
@@ -165,8 +165,8 @@ release. Signing secrets are optional so forks can build unsigned.
 ## macOS
 
 - **Build:** the `macOS (universal dmg)` job in `.github/workflows/desktop.yml`
-  runs on `macos-14` (Apple silicon), adds the `aarch64-apple-darwin` and
-  `x86_64-apple-darwin` targets and runs `tauri build --target
+  runs on `macos-15` (Apple silicon; `macos-14` runners are retired), adds the
+  `aarch64-apple-darwin` and `x86_64-apple-darwin` targets and runs `tauri build --target
   universal-apple-darwin` through tauri-action. Outputs:
   `target/universal-apple-darwin/release/bundle/dmg/Rupok_<version>_universal.dmg`
   and `bundle/macos/Rupok.app.tar.gz` (artifact `rupok-macos`; on `v*` tags
