@@ -14,7 +14,7 @@ In 2026 Microsoft retired the standalone Whiteboard apps, and personal Microsoft
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Included with Microsoft 365 work or school accounts. Personal accounts can’t create or edit boards since 25 Sep 2026[^2] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Web and Microsoft Teams. The standalone Windows, iOS and Android apps retired on 16 Oct 2026[^1][^6] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Web and Microsoft Teams. The standalone Windows, iOS and Android apps retired on 16 Oct 2026[^1][^6] |
 | Account | ✓ None, for teachers or students | Microsoft 365 work or school account[^1][^2] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ Copilot (suggest, categorize, summarize) with a paid Microsoft Copilot licence[^3] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ✗ No lesson replay found |

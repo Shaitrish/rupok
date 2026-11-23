@@ -12,7 +12,7 @@ Google stopped Jamboard editing on 1 October 2024 and wound the app down on 31 D
 
 |  | Rupok | Jamboard |
 |---|---|---|
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | ✗ Nowhere: no editing since 1 Oct 2024, and the app wound down on 31 Dec 2024[^1] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | ✗ Nowhere: no editing since 1 Oct 2024, and the app wound down on 31 Dec 2024[^1] |
 | Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome or Edge | ✗ The 55-inch Jamboard device reached end of life on 1 Oct 2024[^2] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | Old Jams were converted to PDFs in Google Drive[^3] |
 | Status (Nov 2026) | Actively developed, pre-alpha (first public release) | Discontinued. Google pointed users to FigJam, Lucidspark and Miro[^1] |

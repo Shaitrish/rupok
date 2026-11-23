@@ -14,7 +14,7 @@ Many teachers write on OneNote at the front of the class. OneNote is a superb no
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Free to download and use; Ink Replay, Math Assistant and Copilot need Microsoft 365 or Copilot subscriptions[^1][^5] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Windows, Mac, web, iPhone, iPad and Android[^1] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows, Mac, web, iPhone, iPad and Android[^1] |
 | Account | ✓ None, for teachers or students | A Microsoft account (the Windows app can also keep local notebooks)[^1] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ Copilot summarizes, rewrites and answers questions, with a paid subscription[^5] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Ink Replay redraws strokes in order, on Windows only[^2] |

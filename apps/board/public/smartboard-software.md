@@ -80,7 +80,7 @@ Yes. The whole app is free and open source, with no paid edition of the software
 
 ### Do I need to download smartboard software for my PC?
 
-No download is needed: Rupok runs in Chrome or Edge. You can install it from the browser menu so it opens in its own window. A desktop app for Windows and Linux is coming soon.
+No download is needed: Rupok runs in Chrome or Edge. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](https://rupok.app/download/).
 
 ### Does it work with SMART, Promethean, BenQ, ViewSonic or Prestigio boards?
 

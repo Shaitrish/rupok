@@ -14,7 +14,7 @@ SMART Notebook is the most established smartboard software, with a free basic ve
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Basic Notebook is free; Notebook Plus with Lumio Standard is US$59/year[^1]. New installs get a 180-day Plus trial[^4] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Windows 10/11 and macOS[^3]. No Linux, iPad or Android app (the iPad app ended in 2020)[^5]. Lumio runs in a browser[^6] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows 10/11 and macOS[^3]. No Linux, iPad or Android app (the iPad app ended in 2020)[^5]. Lumio runs in a browser[^6] |
 | Account | ✓ None, for teachers or students | Online activation for the desktop app[^3] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ Lumio AI Assist generates lessons, quizzes and activities, limited on the free plan[^6][^7]. No AI in desktop Notebook release notes through August 2026[^4] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Lesson Recorder (Plus) records on-page actions, without sound[^8] |

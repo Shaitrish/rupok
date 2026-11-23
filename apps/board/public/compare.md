@@ -24,7 +24,7 @@ Swipe sideways on a phone. ✓ yes · ◐ partly or paid · ✗ no · ◷ coming
 | [OneNote](https://rupok.app/compare/onenote/) | ◐ Free; extras need Microsoft 365 | ✗ No | Every major OS, web | ◐ Copilot (paid) | ◐ Ink Replay (Windows) | ◐ Proofing only |
 | [Jamboard](https://rupok.app/compare/jamboard/) | ✗ Discontinued 31 Dec 2024 | ✗ No | — | — | — | — |
 
-*Sources for every row are on each product’s comparison page. Rupok’s Bangla interface, desktop app, offline install and live class are coming soon; everything else in Rupok’s row ships today.*
+*Sources for every row are on each product’s comparison page. Rupok’s Bangla interface, offline install and live class are coming soon; everything else in Rupok’s row ships today.*
 
 ## Detailed comparisons
 

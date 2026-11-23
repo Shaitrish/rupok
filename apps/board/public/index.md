@@ -50,7 +50,7 @@ Yes, with any brand: SMART, Promethean, BenQ, ViewSonic, Prestigio and others. R
 
 ### Do I need to install anything?
 
-No. Open [rupok.app/board](https://rupok.app/board/) in Chrome or Edge. You can install it from the browser menu so it opens in its own window. A desktop app for Windows and Linux is coming soon.
+No. Open [rupok.app/board](https://rupok.app/board/) in Chrome or Edge. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](https://rupok.app/download/).
 
 ### How does the AI part work?
 

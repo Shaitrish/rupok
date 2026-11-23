@@ -14,7 +14,7 @@ OpenBoard is a mature, free desktop whiteboard maintained in Geneva. Rupok is a 
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ✓ Free, no registration[^1] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✓ Yes: GPL-3.0[^3] |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Windows 10+, macOS 12+ and Debian, plus community Linux packages[^3][^4]. No web, ChromeOS or mobile app |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows 10+, macOS 12+ and Debian, plus community Linux packages[^3][^4]. No web, ChromeOS or mobile app |
 | Account | ✓ None, for teachers or students | ✓ None[^1] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ✗ None |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Podcast mode records the board and your voice as a video[^5] |

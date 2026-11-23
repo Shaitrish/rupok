@@ -14,7 +14,7 @@ Note3 is Prestigio’s paid, Windows-only whiteboard software, the updated EasiN
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ✗ Paid, one-time licence per device: €29 on Prestigio’s store (Nov 2026), after a 15-day trial[^1][^3] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Windows only. Prestigio’s Android panels need a connected Windows PC[^1][^2] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows only. Prestigio’s Android panels need a connected Windows PC[^1][^2] |
 | Account | ✓ None, for teachers or students | Online activation with a serial number[^4] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ✗ None documented[^2][^4] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ✗ No stroke replay documented[^4] |

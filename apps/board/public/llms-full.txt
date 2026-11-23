@@ -20,14 +20,17 @@ Last updated: 23 November 2026. Website: https://rupok.app/ · Source: https://g
 - **Smart Objects:** self-contained HTML (simulations, 3D models, quizzes) that runs live on a slide in a sandboxed iframe. The teacher writes on top with the pen and steps through it with a clicker. Made by an AI agent through the MCP server, or pasted/dropped as an .html file from any chatbot.
 - **Replay:** every stroke is stored with its timing; replay any page at 1–8× speed.
 - **Modes:** Prepare (build the lesson), Teach (fitted slide, minimal chrome), Student (read-only viewer).
+- **Desktop app (v0.2.0):** for Windows, macOS (universal) and Linux, with `.rpk` file association and drawing over any app (overlay, beta). Download: https://rupok.app/download/
+- **Smart Ink and maths:** hand-drawn shapes snap clean and turn into graphs, flowcharts, logic gates and circuits; handwritten maths shows a live LaTeX preview.
+- **AI on the board:** chat with your own Claude, Codex or OpenCode inside Rupok, and let an agent edit the open lesson live; voice input for typing.
 - **Student viewer:** https://rupok.app/open/ opens a `.rpk` file in the browser, read-only, with replay and working Smart Objects. No account, nothing uploaded.
 - **Bangla:** Bangla text and fonts work in lessons (Hind Siliguri, Noto Sans Bengali).
-- **MCP server:** the `rupok` CLI includes an MCP server (stdio) with 11 tools for creating lessons and adding validated Smart Objects. Works with Claude Code, Codex CLI, OpenCode and any MCP client.
+- **MCP server:** the `rupok` CLI includes an MCP server (stdio) with 12 tools for creating lessons and adding validated Smart Objects. Works with Claude Code, Codex CLI, OpenCode and any MCP client.
 - **Open file format:** `.rpk` (RPK, Rich Presentation Kit) is a ZIP package (media type `application/vnd.rupok.lesson+zip`) holding a Loro CRDT document with full history, assets and Smart Object bundles, plus a readable outline (`README.md`, `content.md`, `content.json`) that AI models and scripts read without Loro. Format page: https://rupok.app/rpk/ · Agent skill: https://rupok.app/skills/read-rpk.md · Spec: https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md
 
 ## Coming soon (not shipped yet)
 
-Desktop app for Windows and Linux (Tauri), draw over any app (desktop overlay), offline install (PWA), Bangla interface, replay with audio, Rupok Cloud (500 MB free cloud storage per teacher, share links `rupok.app/s/<id>`, a remote Claude connector, Google Drive "Open with"), live classes, live quizzes, handwriting recognition, subject tools (ruler, protractor, compass), Android app.
+Offline install (PWA), Bangla interface, replay with audio, Rupok Cloud (500 MB free cloud storage per teacher, share links `rupok.app/s/<id>`, a remote Claude connector, Google Drive "Open with"), live classes, live quizzes, full handwriting-to-text recognition, subject tools (ruler, protractor, compass), Android app.
 
 ## Use the MCP server (for AI agents)
 
@@ -132,7 +135,7 @@ Yes, with any brand: SMART, Promethean, BenQ, ViewSonic, Prestigio and others. R
 
 ### Do I need to install anything?
 
-No. Open [rupok.app/board](https://rupok.app/board/) in Chrome or Edge. You can install it from the browser menu so it opens in its own window. A desktop app for Windows and Linux is coming soon.
+No. Open [rupok.app/board](https://rupok.app/board/) in Chrome or Edge. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](https://rupok.app/download/).
 
 ### How does the AI part work?
 
@@ -228,7 +231,7 @@ Rupok বানিয়েছে বাংলাদেশের Shaitrish। �
 
 ### কম্পিউটারে কি সফটওয়্যার ডাউনলোড করতে হবে?
 
-না, Rupok ব্রাউজারেই চলে। চাইলে ব্রাউজারের মেনু থেকে ইনস্টল করে আলাদা উইন্ডোতে খুলতে পারেন। Windows ও Linux-এর ডেস্কটপ অ্যাপ আসছে।
+না, Rupok ব্রাউজারেই চলে। চাইলে ব্রাউজারের মেনু থেকে ইনস্টল করে আলাদা উইন্ডোতে খুলতে পারেন। Windows, Mac ও Linux-এর ডেস্কটপ অ্যাপও আছে: [ডাউনলোড পেজ](https://rupok.app/bn/download/)।
 
 ### ইন্টারনেট ছাড়া কি চলে?
 
@@ -774,11 +777,11 @@ Chrome বা Edge-এ [rupok.app/bn/open](https://rupok.app/bn/open/) খুল
 
 # Download Rupok
 
-> Download Rupok, the free, open-source whiteboard for teachers, for Windows (.exe, .msi) and Linux (.deb, AppImage). Mac is coming; phones and tablets use it in the browser.
+> Download Rupok, the free, open-source whiteboard for teachers, for Windows (.exe, .msi), macOS (.dmg) and Linux (.deb, AppImage). Phones and tablets use it in the browser.
 
 Canonical: https://rupok.app/download/ · Language: en · Updated: 2026-11-23
 
-The free whiteboard for teachers, as a desktop app for Windows and Linux. Or open it in Chrome or Edge on any device: same board, no install.
+The free whiteboard for teachers, as a desktop app for Windows, Mac and Linux. Or open it in Chrome or Edge on any device: same board, no install.
 
 ## Every platform
 
@@ -799,11 +802,12 @@ Open [rupok.app/board](https://rupok.app/board/) in Safari, tap **Share**, then 
 The installers aren’t code-signed yet, so your computer may ask once before it opens Rupok. That’s expected; signing is on the roadmap.
 
 - **Windows:** if SmartScreen says “Windows protected your PC”, choose **More info**, then **Run anyway**.
-- **Mac** (when the app ships): right-click the app, choose **Open**, then **Open** again.
+- **Mac:** right-click Rupok in Applications, choose **Open**, then **Open** again. Or open **System Settings → Privacy & Security** and choose **Open Anyway**.
 
 ## System requirements
 
 - **Windows**: Windows 10 or 11, 64-bit
+- **macOS**: macOS 11 Big Sur or later, Apple silicon or Intel
 - **Linux**: 64-bit; .deb for Debian and Ubuntu, AppImage for other distributions
 - **Browser**: A recent Chrome or Edge (any OS), with WebGL2 or WebGPU
 - **Hardware**: Any smartboard, interactive panel, laptop or tablet; a pen is optional
@@ -813,11 +817,11 @@ The installers aren’t code-signed yet, so your computer may ask once before it
 
 # Rupok ডাউনলোড করুন
 
-> শিক্ষকদের ফ্রি, ওপেন সোর্স হোয়াইটবোর্ড Rupok ডাউনলোড করুন: Windows (.exe, .msi) ও Linux (.deb, AppImage)। Mac আসছে; ফোন ও ট্যাবলেটে ব্রাউজারেই চলে।
+> শিক্ষকদের ফ্রি, ওপেন সোর্স হোয়াইটবোর্ড Rupok ডাউনলোড করুন: Windows (.exe, .msi), macOS (.dmg) ও Linux (.deb, AppImage)। ফোন ও ট্যাবলেটে ব্রাউজারেই চলে।
 
 Canonical: https://rupok.app/bn/download/ · Language: bn · Updated: 2026-11-23
 
-শিক্ষকদের ফ্রি হোয়াইটবোর্ড, Windows ও Linux-এর ডেস্কটপ অ্যাপ হিসেবে। অথবা যেকোনো ডিভাইসে Chrome বা Edge-এ খুলুন: একই বোর্ড, ইনস্টল ছাড়াই।
+শিক্ষকদের ফ্রি হোয়াইটবোর্ড, Windows, Mac ও Linux-এর ডেস্কটপ অ্যাপ হিসেবে। অথবা যেকোনো ডিভাইসে Chrome বা Edge-এ খুলুন: একই বোর্ড, ইনস্টল ছাড়াই।
 
 ## সব প্ল্যাটফর্ম
 
@@ -838,11 +842,12 @@ Safari-তে [rupok.app/board](https://rupok.app/board/) খুলুন, **Sha
 ইনস্টলারগুলো এখনো কোড-সাইন করা নয়, তাই প্রথমবার কম্পিউটার একবার জিজ্ঞেস করতে পারে। এটা স্বাভাবিক; সাইনিং রোডম্যাপে আছে।
 
 - **Windows:** SmartScreen “Windows protected your PC” দেখালে **More info**, তারপর **Run anyway** বেছে নিন।
-- **Mac** (অ্যাপ এলে): অ্যাপে রাইট-ক্লিক করে **Open**, তারপর আবার **Open**।
+- **Mac:** Applications-এ Rupok-এ রাইট-ক্লিক করে **Open**, তারপর আবার **Open**। অথবা **System Settings → Privacy & Security** খুলে **Open Anyway** বেছে নিন।
 
 ## সিস্টেম রিকোয়ারমেন্ট
 
 - **Windows**: Windows 10 বা 11, 64-বিট
+- **macOS**: macOS 11 Big Sur বা নতুন, Apple silicon বা Intel
 - **Linux**: 64-বিট; Debian ও Ubuntu-র জন্য .deb, অন্য ডিস্ট্রোর জন্য AppImage
 - **ব্রাউজার**: সাম্প্রতিক Chrome বা Edge (যেকোনো OS), WebGL2 বা WebGPU সহ
 - **হার্ডওয়্যার**: যেকোনো স্মার্ট বোর্ড, ইন্টারঅ্যাক্টিভ প্যানেল, ল্যাপটপ বা ট্যাবলেট; পেন ঐচ্ছিক
@@ -932,7 +937,7 @@ Yes. The whole app is free and open source, with no paid edition of the software
 
 ### Do I need to download smartboard software for my PC?
 
-No download is needed: Rupok runs in Chrome or Edge. You can install it from the browser menu so it opens in its own window. A desktop app for Windows and Linux is coming soon.
+No download is needed: Rupok runs in Chrome or Edge. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](https://rupok.app/download/).
 
 ### Does it work with SMART, Promethean, BenQ, ViewSonic or Prestigio boards?
 
@@ -1187,7 +1192,7 @@ Swipe sideways on a phone. ✓ yes · ◐ partly or paid · ✗ no · ◷ coming
 | [OneNote](https://rupok.app/compare/onenote/) | ◐ Free; extras need Microsoft 365 | ✗ No | Every major OS, web | ◐ Copilot (paid) | ◐ Ink Replay (Windows) | ◐ Proofing only |
 | [Jamboard](https://rupok.app/compare/jamboard/) | ✗ Discontinued 31 Dec 2024 | ✗ No | — | — | — | — |
 
-*Sources for every row are on each product’s comparison page. Rupok’s Bangla interface, desktop app, offline install and live class are coming soon; everything else in Rupok’s row ships today.*
+*Sources for every row are on each product’s comparison page. Rupok’s Bangla interface, offline install and live class are coming soon; everything else in Rupok’s row ships today.*
 
 ## Detailed comparisons
 
@@ -1243,7 +1248,7 @@ Note3 is Prestigio’s paid, Windows-only whiteboard software, the updated EasiN
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ✗ Paid, one-time licence per device: €29 on Prestigio’s store (Nov 2026), after a 15-day trial[^1][^3] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Windows only. Prestigio’s Android panels need a connected Windows PC[^1][^2] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows only. Prestigio’s Android panels need a connected Windows PC[^1][^2] |
 | Account | ✓ None, for teachers or students | Online activation with a serial number[^4] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ✗ None documented[^2][^4] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ✗ No stroke replay documented[^4] |
@@ -1340,7 +1345,7 @@ SMART Notebook is the most established smartboard software, with a free basic ve
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Basic Notebook is free; Notebook Plus with Lumio Standard is US$59/year[^1]. New installs get a 180-day Plus trial[^4] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Windows 10/11 and macOS[^3]. No Linux, iPad or Android app (the iPad app ended in 2020)[^5]. Lumio runs in a browser[^6] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows 10/11 and macOS[^3]. No Linux, iPad or Android app (the iPad app ended in 2020)[^5]. Lumio runs in a browser[^6] |
 | Account | ✓ None, for teachers or students | Online activation for the desktop app[^3] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ Lumio AI Assist generates lessons, quizzes and activities, limited on the free plan[^6][^7]. No AI in desktop Notebook release notes through August 2026[^4] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Lesson Recorder (Plus) records on-page actions, without sound[^8] |
@@ -1436,7 +1441,7 @@ OpenBoard is a mature, free desktop whiteboard maintained in Geneva. Rupok is a 
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ✓ Free, no registration[^1] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✓ Yes: GPL-3.0[^3] |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Windows 10+, macOS 12+ and Debian, plus community Linux packages[^3][^4]. No web, ChromeOS or mobile app |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows 10+, macOS 12+ and Debian, plus community Linux packages[^3][^4]. No web, ChromeOS or mobile app |
 | Account | ✓ None, for teachers or students | ✓ None[^1] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ✗ None |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Podcast mode records the board and your voice as a video[^5] |
@@ -1530,7 +1535,7 @@ Google stopped Jamboard editing on 1 October 2024 and wound the app down on 31 D
 
 |  | Rupok | Jamboard |
 |---|---|---|
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | ✗ Nowhere: no editing since 1 Oct 2024, and the app wound down on 31 Dec 2024[^1] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | ✗ Nowhere: no editing since 1 Oct 2024, and the app wound down on 31 Dec 2024[^1] |
 | Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome or Edge | ✗ The 55-inch Jamboard device reached end of life on 1 Oct 2024[^2] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | Old Jams were converted to PDFs in Google Drive[^3] |
 | Status (Nov 2026) | Actively developed, pre-alpha (first public release) | Discontinued. Google pointed users to FigJam, Lucidspark and Miro[^1] |
@@ -1612,7 +1617,7 @@ In 2026 Microsoft retired the standalone Whiteboard apps, and personal Microsoft
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Included with Microsoft 365 work or school accounts. Personal accounts can’t create or edit boards since 25 Sep 2026[^2] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Web and Microsoft Teams. The standalone Windows, iOS and Android apps retired on 16 Oct 2026[^1][^6] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Web and Microsoft Teams. The standalone Windows, iOS and Android apps retired on 16 Oct 2026[^1][^6] |
 | Account | ✓ None, for teachers or students | Microsoft 365 work or school account[^1][^2] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ Copilot (suggest, categorize, summarize) with a paid Microsoft Copilot licence[^3] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ✗ No lesson replay found |
@@ -1698,7 +1703,7 @@ ActivInspire is Promethean’s long-running flipchart software, with a free Pers
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Personal Edition is a free download; Professional comes with some ActivPanels or costs US$1,249 per device (US list price, Jan 2026)[^1][^2] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Windows, macOS and Ubuntu[^1]. No web, ChromeOS or mobile app |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows, macOS and Ubuntu[^1]. No web, ChromeOS or mobile app |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ✗ None found[^1] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Screen and sound recorder in Professional only[^1] |
 | Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide | ✓ Activities, polls and learner-response devices; question manager and actions in Professional[^1] |
@@ -1790,7 +1795,7 @@ Explain Everything, now part of Promethean, records polished video lessons on ta
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Free plan: 3 projects, 1 slide per project, 3-minute videos. Advanced US$69/year (education); Pro US$7.49/month billed yearly[^1] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | iPad, iPhone, Android, Chromebook and a browser app[^1] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | iPad, iPhone, Android, Chromebook and a browser app[^1] |
 | Account | ✓ None, for teachers or students | An account to create projects[^1] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ AI activities and an AI Companion on paid plans, on Apple devices with Apple Intelligence[^2][^5] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ✓ Records narrated video lessons, with editing and captions; exports MP4[^2] |
@@ -1878,7 +1883,7 @@ Many teachers write on OneNote at the front of the class. OneNote is a superb no
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Free to download and use; Ink Replay, Math Assistant and Copilot need Microsoft 365 or Copilot subscriptions[^1][^5] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Windows, Mac, web, iPhone, iPad and Android[^1] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows, Mac, web, iPhone, iPad and Android[^1] |
 | Account | ✓ None, for teachers or students | A Microsoft account (the Windows app can also keep local notebooks)[^1] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ Copilot summarizes, rewrites and answers questions, with a paid subscription[^5] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Ink Replay redraws strokes in order, on Windows only[^2] |

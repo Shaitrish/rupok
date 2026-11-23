@@ -14,7 +14,7 @@ Explain Everything, now part of Promethean, records polished video lessons on ta
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Free plan: 3 projects, 1 slide per project, 3-minute videos. Advanced US$69/year (education); Pro US$7.49/month billed yearly[^1] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | iPad, iPhone, Android, Chromebook and a browser app[^1] |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | iPad, iPhone, Android, Chromebook and a browser app[^1] |
 | Account | ✓ None, for teachers or students | An account to create projects[^1] |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ AI activities and an AI Companion on paid plans, on Apple devices with Apple Intelligence[^2][^5] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ✓ Records narrated video lessons, with editing and captions; exports MP4[^2] |

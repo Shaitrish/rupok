@@ -14,7 +14,7 @@ ActivInspire is Promethean’s long-running flipchart software, with a free Pers
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Personal Edition is a free download; Professional comes with some ActivPanels or costs US$1,249 per device (US list price, Jan 2026)[^1][^2] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows and Linux: coming soon | Windows, macOS and Ubuntu[^1]. No web, ChromeOS or mobile app |
+| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows, macOS and Ubuntu[^1]. No web, ChromeOS or mobile app |
 | AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ✗ None found[^1] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Screen and sound recorder in Professional only[^1] |
 | Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide | ✓ Activities, polls and learner-response devices; question manager and actions in Professional[^1] |
