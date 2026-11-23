@@ -67,9 +67,18 @@ fn vs_main(v: VIn) -> VOut {
     let pad = max(a.z, b.z) + 1.5 / g.scale;
 
     // Triangle strip: 0=(start,-), 1=(end,-), 2=(start,+), 3=(end,+)
+    //
+    // The quad reaches `pad` behind `a` (the start cap, and the outer wedge of
+    // the joint with the previous segment) but stops at `b` unless this is the
+    // stroke's last segment (the end cap). Segments of one stroke share a
+    // depth and the first fragment wins, so a quad that reached ahead would
+    // claim pixels that belong to segments two or more steps on, which this
+    // instance cannot see: dense wet ink (a point every ~0.5 px) came out
+    // thinner than the same stroke dry, and thickened at pen-up.
     let along_end = (v.vi & 1u) == 1u;
     let side = select(-1.0, 1.0, (v.vi & 2u) == 2u);
-    let base = select(a.xy - dir * pad, b.xy + dir * pad, along_end);
+    let ahead = select(0.0, pad, v.next.z < 0.0);
+    let base = select(a.xy - dir * pad, b.xy + dir * ahead, along_end);
     let world = base + n * pad * side;
     o.world = world;
 
