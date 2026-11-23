@@ -90,7 +90,8 @@ impl Package {
         now_ms: f64,
         max_age_ms: f64,
     ) -> bool {
-        let stale = self.outline.is_none() || !(now_ms - self.outline_at < max_age_ms);
+        // `abs`: a clock that jumped back still refreshes.
+        let stale = self.outline.is_none() || (now_ms - self.outline_at).abs() >= max_age_ms;
         if stale {
             self.update_lesson(lesson, generator, now_ms);
         } else {

@@ -304,36 +304,36 @@ pub async fn overlay_toolbar_fit(app: AppHandle, width: f64, height: f64) -> Res
     };
     // Visible: the teacher may have dragged it. Keep its spot (bottom centre)
     // and only clamp it on screen. Hidden: `show` places it bottom centre.
-    if toolbar.is_visible().unwrap_or(false) {
-        if let (Ok(pos), Ok(cur), Ok(Some(m))) = (
+    if toolbar.is_visible().unwrap_or(false)
+        && let (Ok(pos), Ok(cur), Ok(Some(m))) = (
             toolbar.outer_position(),
             toolbar.outer_size(),
             toolbar.current_monitor(),
-        ) {
-            let scale = m.scale_factor();
-            let (pw, ph) = (
-                (size.0 * scale).round() as u32,
-                (size.1 * scale).round() as u32,
-            );
-            let area = m.work_area();
-            let area = Rect {
-                x: area.position.x,
-                y: area.position.y,
-                w: area.size.width,
-                h: area.size.height,
-            };
-            let was = Rect {
-                x: pos.x,
-                y: pos.y,
-                w: cur.width,
-                h: cur.height,
-            };
-            let (x, y) = geometry::refit_toolbar(was, pw, ph, area);
-            toolbar.set_size(PhysicalSize::new(pw, ph)).map_err(err)?;
-            return toolbar
-                .set_position(PhysicalPosition::new(x, y))
-                .map_err(err);
-        }
+        )
+    {
+        let scale = m.scale_factor();
+        let (pw, ph) = (
+            (size.0 * scale).round() as u32,
+            (size.1 * scale).round() as u32,
+        );
+        let area = m.work_area();
+        let area = Rect {
+            x: area.position.x,
+            y: area.position.y,
+            w: area.size.width,
+            h: area.size.height,
+        };
+        let was = Rect {
+            x: pos.x,
+            y: pos.y,
+            w: cur.width,
+            h: cur.height,
+        };
+        let (x, y) = geometry::refit_toolbar(was, pw, ph, area);
+        toolbar.set_size(PhysicalSize::new(pw, ph)).map_err(err)?;
+        return toolbar
+            .set_position(PhysicalPosition::new(x, y))
+            .map_err(err);
     }
     match ink.current_monitor().map_err(err)? {
         Some(m) => place_toolbar(&app, &toolbar, &m).map_err(err),
