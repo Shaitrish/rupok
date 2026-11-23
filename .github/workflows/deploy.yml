@@ -39,7 +39,7 @@ jobs:
           bun run vendor   # offline Smart Object libraries -> public/rupoklib/
           bunx vite build
       - name: Deploy to Cloudflare
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
