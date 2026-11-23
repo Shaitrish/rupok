@@ -51,6 +51,7 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 | 🚧 | Desktop overlay: draw over any app on the screen (ink, toolbar, click-through, save to lesson) | [desktop-overlay](docs/roadmap/desktop-overlay.md), `apps/desktop/src/overlay.rs` | advanced |
 | 🚧 | Touch and pen settings: palm rejection modes, smoothing, pressure curve | engine done; UI in `apps/board` | |
 | 🚧 | Themes: light/dark, accent colour, board colours | [DESIGN.md](DESIGN.md) | |
+| ✅ | Website: landing page, RPK viewer page (`/open/`, `/bn/open/`), smartboard / AI / online-class / teacher pages, honest comparison pages, Bangla pages, `llms.txt`, sitemap and JSON-LD | `apps/board/site/` (`node site/build.mjs`), [docs/seo](docs/seo/keywords.md) | |
 
 ## Phase 2: the teacher's workflow
 
@@ -62,9 +63,12 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 | 📋 | Agent panel (ACP): chat with your own AI agent inside Rupok | [acp-agent-panel](docs/roadmap/acp-agent-panel.md) | advanced |
 | 📋 | Live agent edits during class, merged into the open lesson | [acp-agent-panel § Live edits](docs/roadmap/acp-agent-panel.md#live-edits) | advanced |
 | 📋 | Replay with audio | [replay-audio](docs/roadmap/replay-audio.md) | intermediate |
-| 📋 | Google Drive sync (Apache OpenDAL, `drive.file` scope, per-device Loro update logs) | [google-drive-sync](docs/roadmap/google-drive-sync.md) | advanced |
 | 📋 | LAN "send to board" from laptop or phone | [lan-send](docs/roadmap/lan-send.md) | intermediate |
-| 🚧 | Web viewer (PWA): open any `.rpk` in a browser, offline. Read-only student view at `/board/?view` done; PWA and offline install to do | [web-viewer](docs/roadmap/web-viewer.md) | intermediate |
+| 🚧 | Web viewer (PWA): open any `.rpk` in a browser, offline. Read-only student view at `/board/?view` done; the `/open/` page hands a picked file to it; installed-PWA "Open with" (`launchQueue`) done; offline install to do | [web-viewer](docs/roadmap/web-viewer.md) | intermediate |
+| 📋 | Android share target: share a `.rpk` from WhatsApp straight into Rupok (Web Share Target + service worker) | [rupok-cloud § Android](docs/roadmap/rupok-cloud.md#android-web-share-target) | intermediate |
+| 📋 | Rupok Cloud: Google sign-in, 500 MB free per teacher, share links (`rupok.app/s/<id>`) students open with no account, Pro and School plans (Paddle, then bKash) | [rupok-cloud](docs/roadmap/rupok-cloud.md) | advanced |
+| 📋 | Claude connector: remote MCP server on Workers with OAuth, so teachers manage lessons from their own Claude | [rupok-cloud § Claude connector](docs/roadmap/rupok-cloud.md#claude-connector-remote-mcp) | advanced |
+| 📋 | Google Drive "Open with → Rupok" (Workspace Marketplace): a `.rpk` tapped in Drive opens in the Rupok viewer | [rupok-cloud § Google Drive](docs/roadmap/rupok-cloud.md#google-drive) | intermediate |
 | 📋 | Student annotation layers | [student-layers](docs/roadmap/student-layers.md) | advanced |
 | 📋 | Browser panel with clip-to-board | [browser-panel](docs/roadmap/browser-panel.md) | intermediate |
 | 📋 | Standalone HTML export: one file students can open anywhere | [standalone-html-export](docs/roadmap/standalone-html-export.md) | intermediate |
@@ -75,11 +79,11 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 |---|---|---|---|
 | 💡 | Rosters and data export | | |
 | 📋 | Self-hostable live broadcast server (students follow the board live) | [live-broadcast](docs/roadmap/live-broadcast.md) | advanced |
+| 📋 | Hosted live classes (Durable Objects) and class spaces, School admin, in Rupok Cloud | [rupok-cloud § Phases](docs/roadmap/rupok-cloud.md#phases-rough-sizes) | advanced |
 | 📋 | Live quizzes with a results panel | [live-quiz](docs/roadmap/live-quiz.md) | intermediate |
 | 💡 | Submissions (students hand in annotated pages) | | |
 | 📋 | Subject tools: ruler, protractor, compass, graphing, periodic table | [subject-tools](docs/roadmap/subject-tools.md) | intermediate |
 | 📋 | Handwriting to text and math | [handwriting-recognition](docs/roadmap/handwriting-recognition.md) | advanced |
-| 📋 | OneDrive, Dropbox, WebDAV (through OpenDAL) | [google-drive-sync § Other backends](docs/roadmap/google-drive-sync.md#other-backends-phase-3) | intermediate |
 | 💡 | MP4 export of a replay | | |
 | 💡 | Plugin API | | |
 | 📋 | Android app and overlay | [android](docs/roadmap/android.md) | advanced |
@@ -117,8 +121,8 @@ Some overlap and must be reconciled in the RFCs.
 
 | Change | Proposed by |
 |---|---|
-| Stable lesson id in `meta` (`meta.id` / `meta.lesson_id`) | [google-drive-sync](docs/roadmap/google-drive-sync.md), [student-layers](docs/roadmap/student-layers.md) |
-| `spec/sync.md`: per-device update logs, compaction | [google-drive-sync](docs/roadmap/google-drive-sync.md) |
+| Stable lesson id in `meta` (`meta.id` / `meta.lesson_id`) | [rupok-cloud](docs/roadmap/rupok-cloud.md), [student-layers](docs/roadmap/student-layers.md) |
+| `spec/sync.md`: Loro update exchange and compaction for Rupok Cloud sync | [rupok-cloud](docs/roadmap/rupok-cloud.md) |
 | `spec/library.md`: course, chapter and `kb/` layout | [course-library](docs/roadmap/course-library.md), [knowledge-base](docs/roadmap/knowledge-base.md) |
 | `layers/<peer>.loro` layout | [student-layers](docs/roadmap/student-layers.md) |
 | `locked` item key (background slides from PDFs) | [pdf-import-native](docs/roadmap/pdf-import-native.md) |

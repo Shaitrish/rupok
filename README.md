@@ -36,8 +36,12 @@ online and classroom teaching.
   a lesson step by step for students who missed it.
 - **Works offline.** Lessons are single `.rpk` files. Smart Objects run without
   internet, and common libraries ship inside the app.
-- **Your files, your Drive** *(planned)*. Lessons sync through your own Google
-  Drive. No Rupok account, no lock-in.
+- **Your files stay yours.** Lessons are plain `.rpk` files in a folder you
+  choose. Back them up with any cloud drive app (Google Drive, OneDrive,
+  Dropbox), export them any time, no lock-in.
+- **Rupok Cloud** *(coming soon)*. One-click sync between your laptop and the
+  classroom board, and share links your students open with no account (live
+  lessons, replay, make a copy). 500 MB free for every teacher.
 - **Safe by design.** Smart Objects run in a locked-down sandbox: no network,
   no access to your files.
 
@@ -52,7 +56,7 @@ online and classroom teaching.
 | ✅ | Smart Object SDK, examples and an AI skill pack |
 | 🚧 | Board in the browser: toolbar, PDF import, Smart Objects, save/open, replay |
 | 📋 | Desktop app for Windows and Linux; draw over any app (overlay) |
-| 📋 | Google Drive sync, course library, agent panel inside the app |
+| 📋 | Rupok Cloud sync and student share links, course library, agent panel inside the app |
 | 📋 | Live broadcast to students, live quizzes, subject tools, Bangla |
 
 The full list, with a plan for every item, is in **[ROADMAP.md](ROADMAP.md)**.

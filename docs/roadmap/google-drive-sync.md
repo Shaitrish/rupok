@@ -1,6 +1,15 @@
 # Google Drive sync
 
-`Status: 📋 planned · Phase 2 · Difficulty: advanced`
+`Status: ⛔ not planned (superseded by Rupok Cloud) · kept for reference`
+
+> **Decision (Nov 2026):** Rupok will not build its own two-way Google Drive
+> sync engine. Sync and sharing are provided by
+> [Rupok Cloud](./rupok-cloud.md). Lessons remain plain `.rpk` files in a
+> local folder, so any cloud-drive desktop client (Google Drive, OneDrive,
+> Dropbox, Syncthing) can back them up with no Rupok code. A Drive
+> "Open with → Rupok" integration is still planned, in the Rupok Cloud plan.
+> The design below is kept for reference; because Rupok is open source, the
+> community may still build a Drive sync add-on.
 
 Keep lessons in sync between the teacher's laptop, the classroom board and home PC through the teacher's own Google Drive, offline-first and conflict-free, using Apache OpenDAL and per-device Loro update logs.
 
