@@ -34,8 +34,16 @@ pub use duster::EraserMode;
 pub use smart::{SmartInk, SmartMode};
 
 pub const GENERATOR: &str = concat!("rupok/", env!("CARGO_PKG_VERSION"));
+/// Zoom range on an infinite board (a page without a frame).
 const MIN_ZOOM: f32 = 0.05;
 const MAX_ZOOM: f32 = 40.0;
+/// On a slide, zoom runs from fit (the smallest it gets: ink stays on the
+/// page, so there is nothing to see around it) to this many times fit.
+const MAX_ZOOM_OVER_FIT: f32 = 5.0;
+/// A touch pinch may stretch the slide below fit to this fraction of it;
+/// lifting the fingers springs it back over [`SETTLE_MS`].
+const PINCH_UNDER_FIT: f32 = 0.7;
+const SETTLE_MS: f64 = 220.0;
 const LASER_LIFETIME_MS: f64 = 1400.0;
 const DEFAULT_FIT_MARGIN: f32 = 0.03;
 /// Clipboard format marker, the first key of every clipboard JSON.
@@ -244,6 +252,9 @@ pub struct Engine<S: InkSink> {
     insets: [f32; 4],
     /// Margin `fit_page` leaves around the page (fraction of its size).
     fit_margin: f32,
+    /// A pinch released below fit springs back: (zoom at release, start ms).
+    settle: Option<(f32, f64)>,
+    reduced_motion: bool,
     tool: ToolKind,
     pen: StrokeStyle,
     highlighter: StrokeStyle,
@@ -584,6 +595,8 @@ impl<S: InkSink> Engine<S> {
             view: [1280.0, 720.0],
             insets: [0.0; 4],
             fit_margin: DEFAULT_FIT_MARGIN,
+            settle: None,
+            reduced_motion: false,
             tool: ToolKind::Pen,
             pen: StrokeStyle {
                 tool: Tool::Pen,
@@ -673,10 +686,14 @@ impl<S: InkSink> Engine<S> {
             || !self.flashes.is_empty()
             || self.replay.as_ref().is_some_and(|r| r.playing)
             || self.reveal_animating()
+            || self.settle.is_some()
     }
 
+    /// The board refits a fitted slide on resize (controller.ts); here the
+    /// camera only comes back inside the slide's bounds.
     pub fn set_view(&mut self, w: f32, h: f32) {
         self.view = [w.max(1.0), h.max(1.0)];
+        self.clamp_camera();
         self.dirty = true;
     }
 
@@ -684,6 +701,8 @@ impl<S: InkSink> Engine<S> {
     /// "fit page" and new-item placement use the visible area.
     pub fn set_insets(&mut self, top: f32, right: f32, bottom: f32, left: f32) {
         self.insets = [top.max(0.0), right.max(0.0), bottom.max(0.0), left.max(0.0)];
+        self.clamp_camera();
+        self.dirty = true;
     }
 
     /// Centre and size of the visible (unobstructed) area in screen px.
@@ -907,6 +926,12 @@ impl<S: InkSink> Engine<S> {
     /// page size) around it. With 0 the page touches both edges of the
     /// limiting axis and is centred on the other.
     pub fn fit_page_margin(&mut self, margin: f32) {
+        self.settle = None;
+        self.camera = self.fit_camera(margin);
+        self.dirty = true;
+    }
+
+    fn fit_camera(&self, margin: f32) -> Camera {
         let m = 1.0
             + if margin.is_finite() {
                 margin.clamp(0.0, 1.0)
@@ -924,12 +949,84 @@ impl<S: InkSink> Engine<S> {
         let zoom = (size[0] / (fw * m))
             .min(size[1] / (fh * m))
             .clamp(MIN_ZOOM, MAX_ZOOM);
-        self.camera = Camera {
+        Camera {
             x: fw / 2.0 - c[0] / zoom,
             y: fh / 2.0 - c[1] / zoom,
             zoom,
+        }
+    }
+
+    /// The zoom [`Engine::fit_page`] gives: 100 % on the zoom chip.
+    pub fn fit_zoom(&self) -> f32 {
+        self.fit_camera(self.fit_margin).zoom
+    }
+
+    /// The slide frame, or `None` on an infinite board.
+    fn slide_frame(&self) -> Option<Frame> {
+        self.lesson.page(&self.page).ok().and_then(|p| p.frame)
+    }
+
+    /// Zoom range: fit to [`MAX_ZOOM_OVER_FIT`] × fit on a slide.
+    fn zoom_range(&self) -> (f32, f32) {
+        if self.slide_frame().is_some() {
+            let f = self.fit_zoom();
+            (f, f * MAX_ZOOM_OVER_FIT)
+        } else {
+            (MIN_ZOOM, MAX_ZOOM)
+        }
+    }
+
+    /// Keep the slide on screen: a slide smaller than the visible area is
+    /// centred in it; a larger one cannot leave a gap at either edge.
+    fn clamp_pan(&mut self) {
+        let Some(f) = self.slide_frame() else {
+            return;
         };
+        let (c, s) = self.visible_area();
+        let z = self.camera.zoom;
+        let axis = |x: f32, len: f32, c: f32, s: f32| {
+            if len * z <= s {
+                len / 2.0 - c / z
+            } else {
+                x.clamp(-(c - s / 2.0) / z, len - (c + s / 2.0) / z)
+            }
+        };
+        self.camera.x = axis(self.camera.x, f.w as f32, c[0], s[0]);
+        self.camera.y = axis(self.camera.y, f.h as f32, c[1], s[1]);
+    }
+
+    /// Bring the camera into the slide's zoom range and pan bounds.
+    fn clamp_camera(&mut self) {
+        let (lo, hi) = self.zoom_range();
+        let (c, _) = self.visible_area();
+        self.camera.zoom_at(1.0, c[0], c[1], lo, hi);
+        self.clamp_pan();
+    }
+
+    /// Spring back a pinch released below fit (no animation with reduced motion).
+    pub fn set_reduced_motion(&mut self, on: bool) {
+        self.reduced_motion = on;
+    }
+
+    fn settle_tick(&mut self, now_ms: f64) -> bool {
+        let Some((from, t0)) = self.settle else {
+            return false;
+        };
+        let lo = self.zoom_range().0;
+        let t = ((now_ms - t0) / SETTLE_MS).clamp(0.0, 1.0) as f32;
+        let ease = 1.0 - (1.0 - t).powi(3);
+        let (c, _) = self.visible_area();
+        let z = from + (lo - from) * ease;
+        self.camera
+            .zoom_at(z / self.camera.zoom, c[0], c[1], MIN_ZOOM, MAX_ZOOM);
+        if t >= 1.0 {
+            self.settle = None;
+            self.clamp_camera();
+        } else {
+            self.clamp_pan();
+        }
         self.dirty = true;
+        true
     }
 
     // ----------------------------------------------------------- input
@@ -1320,6 +1417,12 @@ impl<S: InkSink> Engine<S> {
         }
         if self.touches.remove(&id).is_some() {
             self.pinch = None;
+            if self.touches.is_empty() && self.camera.zoom < self.zoom_range().0 {
+                self.settle = Some((self.camera.zoom, now_ms));
+                if self.reduced_motion {
+                    self.settle_tick(f64::INFINITY);
+                }
+            }
             return;
         }
         let Some(g) = self.gestures.remove(&id) else {
@@ -1437,8 +1540,14 @@ impl<S: InkSink> Engine<S> {
             .max(1.0);
         if let Some(p) = self.pinch {
             self.pan_by(c[0] - p.centroid[0], c[1] - p.centroid[1]);
-            self.camera
-                .zoom_at(d / p.dist, c[0], c[1], MIN_ZOOM, MAX_ZOOM);
+            let (lo, hi) = self.zoom_range();
+            let lo = if self.slide_frame().is_some() {
+                lo * PINCH_UNDER_FIT
+            } else {
+                lo
+            };
+            self.camera.zoom_at(d / p.dist, c[0], c[1], lo, hi);
+            self.clamp_pan();
         }
         self.pinch = Some(Pinch {
             centroid: c,
@@ -1448,17 +1557,25 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn pan_by(&mut self, dx: f32, dy: f32) {
+        self.settle = None;
         self.camera.x -= dx / self.camera.zoom;
         self.camera.y -= dy / self.camera.zoom;
+        self.clamp_pan();
         self.dirty = true;
     }
 
     pub fn zoom_at(&mut self, factor: f32, x: f32, y: f32) {
-        self.camera.zoom_at(factor, x, y, MIN_ZOOM, MAX_ZOOM);
+        self.settle = None;
+        let (lo, hi) = self.zoom_range();
+        self.camera.zoom_at(factor, x, y, lo, hi);
+        self.clamp_pan();
         self.dirty = true;
     }
 
+    /// Set the camera as given (no slide bounds): restoring a saved view,
+    /// or the desktop overlay pinning its own.
     pub fn set_camera(&mut self, x: f32, y: f32, zoom: f32) {
+        self.settle = None;
         self.camera = Camera {
             x,
             y,
@@ -2532,7 +2649,7 @@ impl<S: InkSink> Engine<S> {
                 r.playing = false;
             }
         }
-        let revealing = self.reveal_tick(now_ms);
+        let revealing = self.reveal_tick(now_ms) | self.settle_tick(now_ms);
         let snapped = self.hold_tick(now_ms) | self.deferred_tick(now_ms);
         if snapped
             || revealing
@@ -2651,6 +2768,8 @@ pub(crate) mod tests {
     pub(crate) fn engine() -> Engine<MockSink> {
         let mut e = Engine::new(MockSink::default(), "Test", 0.0);
         e.set_view(1280.0, 720.0);
+        // Screen = world: most tests draw in world coordinates.
+        e.set_camera(0.0, 0.0, 1.0);
         e
     }
 
@@ -2791,8 +2910,8 @@ pub(crate) mod tests {
             &mut e,
             3,
             PointerKind::Touch,
-            [100.0, 400.0],
             [300.0, 400.0],
+            [100.0, 400.0],
         );
         assert_eq!(
             e.stroke_count(),
@@ -3200,6 +3319,8 @@ pub(crate) mod tests {
         assert!(v.read_only());
         v.load(&bytes).unwrap();
         let rev = v.lesson.version();
+        // A loaded slide sits at fit, where there is nothing to pan to.
+        v.zoom_at(2.0, 640.0, 360.0);
         let cam = v.camera;
         for tool in [
             ToolKind::Pen,
@@ -3547,6 +3668,120 @@ pub(crate) mod tests {
         assert_eq!(e.merge_selection(), "grouped");
         e.select(vec![]);
         assert_eq!(e.merge_selection(), "none");
+    }
+
+    /// Screen rectangle of the 1920 × 1080 slide: [left, top, right, bottom].
+    fn slide_on_screen(e: &Engine<MockSink>) -> [f32; 4] {
+        let (l, t) = e.camera.world_to_screen(0.0, 0.0);
+        let (r, b) = e.camera.world_to_screen(1920.0, 1080.0);
+        [l, t, r, b]
+    }
+
+    #[test]
+    fn a_slide_never_zooms_out_past_fit_nor_in_past_five_times() {
+        let mut e = engine();
+        e.set_insets(60.0, 12.0, 72.0, 200.0);
+        e.fit_page();
+        let fit = e.camera;
+        for _ in 0..200 {
+            e.zoom_at(0.8, 10.0, 10.0);
+        }
+        assert!((e.camera.zoom - fit.zoom).abs() < 1e-4, "stops at fit");
+        assert!((e.camera.x - fit.x).abs() < 0.01 && (e.camera.y - fit.y).abs() < 0.01);
+        for _ in 0..200 {
+            e.zoom_at(1.25, 900.0, 400.0);
+        }
+        assert!((e.camera.zoom / e.fit_zoom() - MAX_ZOOM_OVER_FIT).abs() < 1e-3);
+        // A portrait page fits by its height, and its own fit is the floor.
+        let spec = |frame| PageSpec {
+            frame,
+            ..Default::default()
+        };
+        let tall = Some(Frame {
+            w: 600.0,
+            h: 1000.0,
+        });
+        e.lesson.add_page(None, spec(tall)).unwrap();
+        e.goto_page(1);
+        let fit = e.camera.zoom;
+        e.zoom_at(0.5, 10.0, 10.0);
+        assert!((e.camera.zoom - fit).abs() < 1e-4);
+        let (_, top) = e.camera.world_to_screen(0.0, 0.0);
+        assert!(top > 60.0, "the tall page sits below the header");
+        // An infinite board keeps the wide range.
+        e.lesson.add_page(None, spec(None)).unwrap();
+        e.goto_page(2);
+        for _ in 0..200 {
+            e.zoom_at(0.8, 10.0, 10.0);
+        }
+        assert!((e.camera.zoom - MIN_ZOOM).abs() < 1e-4);
+        e.pan_by(-1e5, 0.0);
+        assert!(e.camera.x > 1e5, "and pans freely");
+    }
+
+    #[test]
+    fn pan_keeps_the_slide_on_screen() {
+        let mut e = engine();
+        let [t, r, b, l] = [60.0, 12.0, 72.0, 200.0];
+        e.set_insets(t, r, b, l);
+        e.fit_page();
+        let fit = e.camera;
+        e.pan_by(400.0, -300.0);
+        assert_eq!(e.camera, fit, "at fit the slide stays centred");
+        e.zoom_at(3.0, 700.0, 400.0);
+        for (dx, dy) in [(5000.0, 0.0), (-5000.0, 0.0), (0.0, 5000.0), (0.0, -5000.0)] {
+            e.pan_by(dx, dy);
+            let [sl, st, sr, sb] = slide_on_screen(&e);
+            assert!(
+                sl <= l + 0.01 && st <= t + 0.01,
+                "no gap left/top: {sl} {st}"
+            );
+            assert!(
+                sr >= 1280.0 - r - 0.01 && sb >= 720.0 - b - 0.01,
+                "no gap right/bottom"
+            );
+        }
+        // Panning still moves the slide inside those bounds.
+        let before = e.camera;
+        e.pan_by(30.0, 0.0);
+        assert_ne!(e.camera, before);
+    }
+
+    #[test]
+    fn a_pinch_below_fit_springs_back_and_resizing_clamps() {
+        let mut e = engine();
+        e.touch_mode = TouchMode::Navigate;
+        e.fit_page();
+        let fit = e.camera.zoom;
+        e.pointer_down(1, 400.0, 360.0, 0.5, 0.0, PointerKind::Touch, 0, 0.0);
+        e.pointer_down(2, 880.0, 360.0, 0.5, 0.0, PointerKind::Touch, 0, 0.0);
+        e.pointer_move(1, &[560.0, 360.0, 0.5, 1.0], &[], 10.0);
+        e.pointer_move(2, &[720.0, 360.0, 0.5, 2.0], &[], 10.0);
+        assert!(e.camera.zoom < fit && e.camera.zoom >= fit * PINCH_UNDER_FIT - 1e-4);
+        e.pointer_up(1, 20.0);
+        e.pointer_up(2, 20.0);
+        e.tick(20.0 + SETTLE_MS / 2.0);
+        assert!(e.camera.zoom < fit, "animates");
+        e.tick(20.0 + SETTLE_MS);
+        assert!((e.camera.zoom - fit).abs() < 1e-4, "back at fit");
+        assert!(!e.has_animation());
+        // Reduced motion: no animation.
+        e.set_reduced_motion(true);
+        e.zoom_at(1.0, 0.0, 0.0);
+        e.pointer_down(1, 400.0, 360.0, 0.5, 0.0, PointerKind::Touch, 0, 30.0);
+        e.pointer_down(2, 880.0, 360.0, 0.5, 0.0, PointerKind::Touch, 0, 30.0);
+        e.pointer_move(1, &[560.0, 360.0, 0.5, 31.0], &[], 40.0);
+        e.pointer_up(1, 50.0);
+        e.pointer_up(2, 50.0);
+        assert!((e.camera.zoom - fit).abs() < 1e-4);
+        // A bigger window never leaves the slide below its new fit.
+        e.set_view(2560.0, 1440.0);
+        assert!((e.camera.zoom - e.fit_zoom()).abs() < 1e-4);
+        let [l, t, r, b] = slide_on_screen(&e);
+        assert!(
+            (l + r - 2560.0).abs() < 0.1 && (t + b - 1440.0).abs() < 0.1,
+            "centred"
+        );
     }
 
     #[test]
