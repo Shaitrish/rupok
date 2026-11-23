@@ -14,15 +14,15 @@ In 2026 Microsoft retired the standalone Whiteboard apps, and personal Microsoft
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Included with Microsoft 365 work or school accounts. Personal accounts can’t create or edit boards since 25 Sep 2026[^2] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Web and Microsoft Teams. The standalone Windows, iOS and Android apps retired on 16 Oct 2026[^1][^6] |
+| Runs on | Chrome, Edge or Safari on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS (beta) and Linux; installers not code-signed yet | Web and Microsoft Teams. The standalone Windows, iOS and Android apps retired on 16 Oct 2026[^1][^6] |
 | Account | ✓ None, for teachers or students | Microsoft 365 work or school account[^1][^2] |
-| AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ Copilot (suggest, categorize, summarize) with a paid Microsoft Copilot licence[^3] |
+| AI | ✓ Your own AI (Claude, Codex or OpenCode): chat with it inside Rupok, let it edit the open board live, or connect it over MCP. It makes live Smart Objects and writes step-by-step solutions in handwriting (Solve this). HTML from any chatbot works too | ◐ Copilot (suggest, categorize, summarize) with a paid Microsoft Copilot licence[^3] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ✗ No lesson replay found |
-| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide | ◐ Templates, Forms polls, links and video[^5] |
-| PDF and slides | ✓ Import a PDF and write on every page; Download PDF | ◐ Exports images; no PDF export documented[^4] |
-| Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome or Edge | ✓ Any device with a supported browser |
+| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ◐ Templates, Forms polls, links and video[^5] |
+| PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ◐ Exports images; no PDF export documented[^4] |
+| Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ✓ Any device with a supported browser |
 | Real-time collaboration | ◷ Live class and share links: coming soon with Rupok Cloud | ✓ Real-time co-editing with cursors, and live in Teams meetings[^5] |
-| Status (Nov 2026) | Actively developed, pre-alpha (first public release) | Standalone apps retired 16 Oct 2026; continues on the web and in Teams for work/school accounts[^1] |
+| Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Standalone apps retired 16 Oct 2026; continues on the web and in Teams for work/school accounts[^1] |
 
 ## Where Microsoft Whiteboard is stronger
 
@@ -50,7 +50,7 @@ Being honest about this saves you time.
 ## Moving your boards to Rupok
 
 1. **Export your board.** Whiteboard exports boards as images[^4]; drop the images into Rupok, or print the board to PDF.
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome or Edge, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).

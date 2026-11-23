@@ -8,7 +8,7 @@ Share Rupok in Zoom, Google Meet or Teams and teach with a pen tablet, a touchsc
 
 ## Set up your online class in three minutes
 
-1. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome or Edge and drop in your PDF slides.
+1. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari and drop in your PDF slides.
 2. **Share the window.** In Zoom, Meet or Teams, share the Rupok tab or window. Teach mode keeps the slide fitted with minimal chrome.
 3. **Teach with a pen.** A pen tablet (Wacom, XP-Pen, Huion), a pen-enabled laptop or an Android tablet with a stylus gives you pressure-sensitive ink. A touchscreen or a mouse works too.
 4. **Send the replay.** Save the lesson as a `.rpk` file and post it in the class WhatsApp group, Google Classroom or email.
@@ -47,7 +47,7 @@ Yes. Share the Rupok tab or window like any other app. Nothing needs to be insta
 
 ### Do I need a pen tablet?
 
-No, but it helps a lot. Rupok supports pen pressure from pen tablets and pen-enabled screens in Chrome or Edge; touch and mouse work too.
+No, but it helps a lot. Rupok supports pen pressure from pen tablets and pen-enabled screens in Chrome, Edge or Safari; touch and mouse work too.
 
 ### How do students watch the class later?
 

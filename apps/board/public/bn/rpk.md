@@ -19,7 +19,7 @@ RPK মানে **Rich Presentation Kit**। শিক্ষকরা [Rupok](h
 - **এক্সটেনশন**: `.rpk`
 - **মিডিয়া টাইপ**: `application/vnd.rupok.lesson+zip`
 - **ভেতরে**: একটি ZIP প্যাকেজ
-- **যা দিয়ে খোলে**: Rupok, Chrome বা Edge-এ ফ্রি ([rupok.app/bn/open](https://rupok.app/bn/open/))
+- **যা দিয়ে খোলে**: Rupok, Chrome, Edge বা Safari-তে ফ্রি ([rupok.app/bn/open](https://rupok.app/bn/open/))
 - **স্পেসিফিকেশন**: খোলা, Apache-2.0 ([GitHub-এ](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))
 
 ## .rpk ফাইলের ভেতরে কী থাকে
@@ -43,7 +43,7 @@ lesson.rpk                 a ZIP archive
 
 ## RPK ফাইল কীভাবে খুলবেন
 
-1. **rupok.app/bn/open খুলুন,** মোবাইল বা কম্পিউটারের Chrome বা Edge ব্রাউজারে।
+1. **rupok.app/bn/open খুলুন,** মোবাইল বা কম্পিউটারের Chrome, Edge বা Safari ব্রাউজারে।
 2. **.rpk ফাইলটি পাতায় ছেড়ে দিন,** অথবা “.rpk ফাইল বেছে নিন”-এ চাপুন। স্টুডেন্ট মোডে খুলবে।
 3. **ক্লাসের রিপ্লে দেখুন,** পাতা উল্টান, লাইভ অ্যাক্টিভিটি চালান।
 
@@ -71,7 +71,7 @@ RPK মানে Rich Presentation Kit। .rpk ফাইল হলো Rupok দ�
 
 ### RPK ফাইল কীভাবে খুলবো?
 
-Chrome বা Edge-এ [rupok.app/bn/open](https://rupok.app/bn/open/) খুলে ফাইলটি ছেড়ে দিন। ফ্রি, অ্যাকাউন্ট লাগে না, কিছু আপলোড হয় না।
+Chrome, Edge বা Safari-তে [rupok.app/bn/open](https://rupok.app/bn/open/) খুলে ফাইলটি ছেড়ে দিন। ফ্রি, অ্যাকাউন্ট লাগে না, কিছু আপলোড হয় না।
 
 ### RPK ফাইলকে PDF বানাবো কীভাবে?
 

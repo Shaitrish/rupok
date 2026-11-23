@@ -14,17 +14,17 @@ OpenBoard is a mature, free desktop whiteboard maintained in Geneva. Rupok is a 
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ✓ Free, no registration[^1] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✓ Yes: GPL-3.0[^3] |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows 10+, macOS 12+ and Debian, plus community Linux packages[^3][^4]. No web, ChromeOS or mobile app |
+| Runs on | Chrome, Edge or Safari on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS (beta) and Linux; installers not code-signed yet | Windows 10+, macOS 12+ and Debian, plus community Linux packages[^3][^4]. No web, ChromeOS or mobile app |
 | Account | ✓ None, for teachers or students | ✓ None[^1] |
-| AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ✗ None |
+| AI | ✓ Your own AI (Claude, Codex or OpenCode): chat with it inside Rupok, let it edit the open board live, or connect it over MCP. It makes live Smart Objects and writes step-by-step solutions in handwriting (Solve this). HTML from any chatbot works too | ✗ None |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Podcast mode records the board and your voice as a video[^5] |
-| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide | ✓ Web widgets and about 25 built-in activities (memory, word games)[^6] |
-| PDF and slides | ✓ Import a PDF and write on every page; Download PDF | ✓ Imports and exports PDF[^5]; IWB (Common File Format) import and export[^3] |
-| Bangla | ◐ Bangla text and fonts in lessons. Bangla interface: coming soon | ✗ 35 interface languages, no Bangla translation[^3] |
-| Offline | ◐ Runs on your device once the board is open. Offline install: coming soon | ✓ Installed desktop app[^1] |
-| Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome or Edge | ✓ Any interactive whiteboard, graphics tablet or mouse[^1] |
+| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ✓ Web widgets and about 25 built-in activities (memory, word games)[^6] |
+| PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports and exports PDF[^5]; IWB (Common File Format) import and export[^3] |
+| Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ 35 interface languages, no Bangla translation[^3] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Installed desktop app[^1] |
+| Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ✓ Any interactive whiteboard, graphics tablet or mouse[^1] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.ubz`[^5] |
-| Status (Nov 2026) | Actively developed, pre-alpha (first public release) | Actively maintained: version 1.7.7 released 30 March 2026; 1.8 in development[^2] |
+| Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Actively maintained: version 1.7.7 released 30 March 2026; 1.8 in development[^2] |
 
 ## Where OpenBoard is stronger
 
@@ -38,7 +38,7 @@ Being honest about this saves you time.
 
 ## Where Rupok is stronger
 
-- **Nothing to install.** It runs in Chrome or Edge, so it also works on Chromebooks and locked-down school PCs.
+- **Nothing to install.** It runs in Chrome, Edge or Safari, so it also works on Chromebooks, Macs and locked-down school PCs. Prefer an app? The free desktop app runs on Windows, Mac and Linux.
 - **AI Smart Objects.** Live simulations, 3D models and quizzes made by Claude, ChatGPT, Codex or OpenCode, with an MCP server for agents.
 - **Stroke-by-stroke replay** in a small lesson file, instead of a large video. Students pause, zoom and still use the live objects.
 - **GPU ink** that stays smooth with 100,000 strokes.
@@ -56,7 +56,7 @@ Both are free, so try both on your board for a week.
 ## Switching from OpenBoard
 
 1. **Export from OpenBoard.** OpenBoard exports documents as PDF[^5].
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome or Edge, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).

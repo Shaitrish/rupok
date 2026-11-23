@@ -18,7 +18,7 @@ export const HOME = {
   description:
     "Rupok is free, open-source smartboard and whiteboard software for teachers. Write on your slides with fast GPU ink, drop in live lessons your AI made, and replay every class. Works on any board.",
   h1: "Rupok: teach with ink that comes alive",
-  lede: "Rupok is free, open-source smartboard and whiteboard software for teachers. Write on your slides, drop in live lessons your AI made, and replay every class, stroke by stroke. It runs in Chrome or Edge on any smartboard, interactive panel, laptop or tablet, with no account. Open it at [rupok.app/board](/board/).",
+  lede: "Rupok is free, open-source smartboard and whiteboard software for teachers. Write on your slides, drop in live lessons your AI made, and replay every class, stroke by stroke. It runs in Chrome, Edge or Safari on any smartboard, interactive panel, laptop or tablet, with no account. Open it at [rupok.app/board](/board/).",
   sections: [
     {
       h2: "Draw: a pen that keeps up with you",
@@ -61,8 +61,8 @@ export const HOME = {
   faqTitle: "Questions teachers ask",
   faq: [
     { q: "Is Rupok really free?", a: "Yes. The whole app is free and open source, with every feature, on every device. Rupok Cloud, a hosted add-on for sync, sharing and live classes, is coming with a free plan for every teacher." },
-    { q: "Does it work with my smartboard or interactive panel?", a: "Yes, with any brand: SMART, Promethean, BenQ, ViewSonic, Prestigio and others. Rupok runs in Chrome or Edge on the computer connected to the board, and uses its touch and pen like any browser app." },
-    { q: "Do I need to install anything?", a: "No. Open [rupok.app/board](/board/) in Chrome or Edge. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](/download/)." },
+    { q: "Does it work with my smartboard or interactive panel?", a: "Yes, with any brand: SMART, Promethean, BenQ, ViewSonic, Prestigio and others. Rupok runs in Chrome, Edge or Safari on the computer connected to the board, and uses its touch and pen like any browser app." },
+    { q: "Do I need to install anything?", a: "No. Open [rupok.app/board](/board/) in Chrome, Edge or Safari. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](/download/)." },
     { q: "How does the AI part work?", a: "Ask the AI you already use for a simulation, 3D model or quiz as a single HTML file, and paste it onto the board. Claude Code, Codex and OpenCode can build whole lessons through Rupok’s MCP server. [More about the AI whiteboard](/ai-whiteboard/)." },
     { q: "How do students open my lessons?", a: "Save the lesson as a `.rpk` file and send it on WhatsApp, Gmail or Google Drive. Students open it at [rupok.app/open](/open/) on a phone or computer, with no account, and replay the class." },
     { q: "What is an RPK file?", a: "An RPK (Rich Presentation Kit) file, `.rpk`, is a Rupok lesson: its slides, the teacher’s ink with timing, live Smart Objects and a readable outline that AI can read, in one open ZIP package. Open one free at [rupok.app/open](/open/); see [the RPK file format](/rpk/)." },

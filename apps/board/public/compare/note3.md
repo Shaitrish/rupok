@@ -4,7 +4,7 @@
 
 Canonical: https://rupok.app/compare/note3/ · Language: en · Updated: 2026-11-23
 
-Note3 is Prestigio’s paid, Windows-only whiteboard software, the updated EasiNote. Rupok is free and open source, runs in Chrome or Edge on any computer, and adds AI-made lessons and class replay. Here’s an honest comparison.
+Note3 is Prestigio’s paid, Windows-only whiteboard software, the updated EasiNote. Rupok is free and open source, runs in Chrome, Edge or Safari on any computer, and adds AI-made lessons and class replay. Here’s an honest comparison.
 
 ## Rupok vs Note3 at a glance
 
@@ -14,15 +14,15 @@ Note3 is Prestigio’s paid, Windows-only whiteboard software, the updated EasiN
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ✗ Paid, one-time licence per device: €29 on Prestigio’s store (Nov 2026), after a 15-day trial[^1][^3] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows only. Prestigio’s Android panels need a connected Windows PC[^1][^2] |
+| Runs on | Chrome, Edge or Safari on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS (beta) and Linux; installers not code-signed yet | Windows only. Prestigio’s Android panels need a connected Windows PC[^1][^2] |
 | Account | ✓ None, for teachers or students | Online activation with a serial number[^4] |
-| AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ✗ None documented[^2][^4] |
+| AI | ✓ Your own AI (Claude, Codex or OpenCode): chat with it inside Rupok, let it edit the open board live, or connect it over MCP. It makes live Smart Objects and writes step-by-step solutions in handwriting (Solve this). HTML from any chatbot works too | ✗ None documented[^2][^4] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ✗ No stroke replay documented[^4] |
-| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide | ✓ Subject tools for maths, physics and chemistry (geometry, circuits, lab apparatus), plus handwriting and formula recognition[^2][^4] |
-| PDF and slides | ✓ Import a PDF and write on every page; Download PDF | ✓ Imports PDF and PowerPoint; exports PDF, PPTX, DOCX and JPG[^4] |
-| Bangla | ◐ Bangla text and fonts in lessons. Bangla interface: coming soon | ✗ About 29 interface languages in the installer, no Bangla[^4] |
-| Offline | ◐ Runs on your device once the board is open. Offline install: coming soon | ✓ Installed Windows app (activation needs internet)[^4] |
-| Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome or Edge | ✓ Panels, PCs, laptops and projectors running Windows[^2] |
+| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ✓ Subject tools for maths, physics and chemistry (geometry, circuits, lab apparatus), plus handwriting and formula recognition[^2][^4] |
+| PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports PDF and PowerPoint; exports PDF, PPTX, DOCX and JPG[^4] |
+| Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ About 29 interface languages in the installer, no Bangla[^4] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Installed Windows app (activation needs internet)[^4] |
+| Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ✓ Panels, PCs, laptops and projectors running Windows[^2] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.enb` (the EasiNote format)[^4] |
 
 ## Where Note3 is stronger
@@ -38,7 +38,7 @@ Being honest about this saves you time.
 ## Where Rupok is stronger
 
 - **Free on every device.** No licence keys and no activation, so you can put it on every panel and laptop in your school.
-- **Not just Windows.** It runs in Chrome or Edge on Windows, macOS, Linux and ChromeOS.
+- **Not just Windows.** It runs in Chrome, Edge or Safari on Windows, macOS, Linux and ChromeOS.
 - **AI Smart Objects.** Ask Claude or ChatGPT for a simulation or a quiz and it lands on your slide, live, ready to write on.
 - **Class replay.** Every stroke is saved with its timing. Send the `.rpk` file to the class WhatsApp group; students replay it in their browser.
 - **Bangla.** Bangla text and fonts work in lessons, and the interface is coming. Rupok is made in Bangladesh.
@@ -55,7 +55,7 @@ You can also use both: export a Note3 lesson to PDF and teach it in Rupok.
 ## Switching from Note3
 
 1. **Export from Note3.** Note3 exports lessons as PDF[^4].
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome or Edge, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).
@@ -64,7 +64,7 @@ You can also use both: export a Note3 lesson to PDF and teach it in Rupok.
 
 ### Is there a free alternative to Note3?
 
-Yes. Rupok is free and open source. It runs in Chrome or Edge on any computer connected to your smartboard or panel, with no licence key, activation or account.
+Yes. Rupok is free and open source. It runs in Chrome, Edge or Safari on any computer connected to your smartboard or panel, with no licence key, activation or account.
 
 ### Is Note3 the same as EasiNote?
 
@@ -76,7 +76,7 @@ No. Export the lesson from Note3 as a PDF and drop the PDF into Rupok; every pag
 
 ### Does Rupok work on a Prestigio MultiBoard?
 
-Rupok needs Chrome or Edge with WebGPU or WebGL2. On a panel with a Windows PC module or a connected computer, open rupok.app/board there. Whether a panel’s built-in Android browser is fast enough varies by model, so a PC is the safe choice.
+Rupok needs Chrome, Edge or Safari with WebGPU or WebGL2. On a panel with a Windows PC module or a connected computer, open rupok.app/board there. Whether a panel’s built-in Android browser is fast enough varies by model, so a PC is the safe choice.
 
 ### Is Rupok legal to use for free in schools?
 

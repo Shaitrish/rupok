@@ -52,7 +52,7 @@ const smartboard = {
   lede: "Rupok turns any interactive flat panel, smart board or projector into a teaching board: fast pen ink on your slides, live interactive lessons, and a replay of every class. Free and open source, with no licence keys and no account.",
   crumbs: [["Smartboard software"]],
   cta: [{ href: "/board/", label: "Open the board, it’s free" }, { href: "/compare/", label: "Compare software", kind: "ghost" }],
-  fine: "Runs in Chrome or Edge on the computer connected to your board.",
+  fine: "Runs in Chrome, Edge or Safari on the computer connected to your board.",
   aside: ART_BOARD,
   sections: [
     {
@@ -63,7 +63,7 @@ const smartboard = {
         { cards: [
           { b: "Any brand", t: "SMART, Promethean, BenQ, ViewSonic, Prestigio or no-name panels, projectors with a pen, laptops and tablets." },
           { b: "Every feature free", t: "No “Plus” or “Professional” edition. Recording, PDF and AI aren’t locked away." },
-          { b: "Nothing to install", t: "Open rupok.app/board in Chrome or Edge. Works on Windows, macOS, Linux and ChromeOS." },
+          { b: "Nothing to install", t: "Open rupok.app/board in Chrome, Edge or Safari. Works on Windows, macOS, Linux and ChromeOS." },
         ] },
       ],
     },
@@ -117,7 +117,7 @@ const smartboard = {
       h2: "Set it up on your board in two minutes",
       blocks: [
         { steps: [
-          { b: "Open Chrome or Edge on the board’s computer.", t: "The built-in PC (OPS module) of an interactive flat panel, or the laptop connected to your projector." },
+          { b: "Open Chrome, Edge or Safari on the board’s computer.", t: "The built-in PC (OPS module) of an interactive flat panel, or the laptop connected to your projector." },
           { b: "Go to rupok.app/board.", t: "Pin it to the taskbar or install it from the browser’s menu so it opens like an app." },
           { b: "Drop in your slides.", t: "Drag a PDF onto the board; every page becomes a slide." },
           { b: "Teach.", t: "Switch to Teach mode, pick up the pen, and press the clicker to move on." },
@@ -148,7 +148,7 @@ const smartboard = {
   faq: [
     { q: "What is the best smartboard software for teachers?", a: "If your school is invested in one brand, its own software (SMART Notebook, ActivInspire) fits that hardware best. If you have mixed boards, want every feature free, or want AI-made interactive lessons and class replay, Rupok is built for that. See the [comparison](/compare/)." },
     { q: "Is Rupok really free?", a: "Yes. The whole app is free and open source, with no paid edition of the software. A hosted add-on, Rupok Cloud (sync, share links and live classes), is coming with a free plan for every teacher." },
-    { q: "Do I need to download smartboard software for my PC?", a: "No download is needed: Rupok runs in Chrome or Edge. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](/download/)." },
+    { q: "Do I need to download smartboard software for my PC?", a: "No download is needed: Rupok runs in Chrome, Edge or Safari. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](/download/)." },
     { q: "Does it work with SMART, Promethean, BenQ, ViewSonic or Prestigio boards?", a: "Yes. Rupok runs on the computer connected to the board and uses its touch and pen like any browser app, so the brand doesn’t matter." },
     { q: "Does Rupok work offline?", a: "Once the board is open, it runs on your device: drawing, slides and replay don’t need the internet. An offline install (PWA) is coming soon." },
     { q: "Can I use my PowerPoint slides?", a: "Save the presentation as a PDF (File → Save As → PDF in PowerPoint), then drop the PDF onto the board. Every slide becomes a page you can write on." },
@@ -237,7 +237,7 @@ const ai = {
   ],
   faq: [
     { q: "What is an AI whiteboard?", a: "A whiteboard where AI helps make the lesson. In Rupok, an AI writes interactive Smart Objects (simulations, 3D models, quizzes) that run live on your slide while you teach with the pen." },
-    { q: "Do I need to buy an AI smartboard?", a: "No. Rupok runs on the board you already have, in Chrome or Edge. The AI is the assistant you already use." },
+    { q: "Do I need to buy an AI smartboard?", a: "No. Rupok runs on the board you already have, in Chrome, Edge or Safari. The AI is the assistant you already use." },
     { q: "Which AI works with Rupok?", a: "Any AI that can write an HTML file: ChatGPT, Claude or Gemini (paste the file onto the board). Claude Code, Codex and OpenCode can build whole lessons through Rupok’s MCP server." },
     { q: "Does it cost anything?", a: "Rupok is free. You use your own AI subscription, or a free AI plan. Optional Rupok AI credits are planned for the paid Pro plan." },
     { q: "Can a Smart Object steal data or go online?", a: "No. Objects run in a sandboxed frame with no access to your files or the rest of the page, and network access is blocked unless the lesson allows a specific site." },
@@ -265,7 +265,7 @@ const online = {
       h2: "Set up your online class in three minutes",
       blocks: [
         { steps: [
-          { b: "Open the board.", t: "Go to [rupok.app/board](/board/) in Chrome or Edge and drop in your PDF slides." },
+          { b: "Open the board.", t: "Go to [rupok.app/board](/board/) in Chrome, Edge or Safari and drop in your PDF slides." },
           { b: "Share the window.", t: "In Zoom, Meet or Teams, share the Rupok tab or window. Teach mode keeps the slide fitted with minimal chrome." },
           { b: "Teach with a pen.", t: "A pen tablet (Wacom, XP-Pen, Huion), a pen-enabled laptop or an Android tablet with a stylus gives you pressure-sensitive ink. A touchscreen or a mouse works too." },
           { b: "Send the replay.", t: "Save the lesson as a `.rpk` file and post it in the class WhatsApp group, Google Classroom or email." },
@@ -314,7 +314,7 @@ const online = {
   faq: [
     { q: "What is the best whiteboard for online teaching?", a: "One you can write on comfortably with a pen, that shares cleanly over video, and that leaves students something to review. Rupok does all three for free, and adds live AI-made activities and a replay file." },
     { q: "Does Rupok work with Zoom, Google Meet and Microsoft Teams?", a: "Yes. Share the Rupok tab or window like any other app. Nothing needs to be installed in the meeting." },
-    { q: "Do I need a pen tablet?", a: "No, but it helps a lot. Rupok supports pen pressure from pen tablets and pen-enabled screens in Chrome or Edge; touch and mouse work too." },
+    { q: "Do I need a pen tablet?", a: "No, but it helps a lot. Rupok supports pen pressure from pen tablets and pen-enabled screens in Chrome, Edge or Safari; touch and mouse work too." },
     { q: "How do students watch the class later?", a: "Send them the `.rpk` lesson file. They open it at rupok.app/open on a phone or computer and press play. No account is needed." },
     { q: "Is Rupok a digital whiteboard or an interactive whiteboard?", a: "Both: a digital whiteboard you can use on a laptop for online classes, and interactive whiteboard software for a smartboard in a classroom." },
   ],

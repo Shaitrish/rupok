@@ -19,7 +19,7 @@ An **RPK (Rich Presentation Kit) file is a Rupok lesson.** Rupok is a free, open
 - **Extension**: `.rpk`
 - **Media type**: `application/vnd.rupok.lesson+zip`
 - **Inside**: A ZIP package: the lesson document with its full history, images and Smart Objects
-- **Opens with**: Rupok, free in Chrome or Edge, on this page or at rupok.app/board
+- **Opens with**: Rupok, free in Chrome, Edge or Safari, on this page or at rupok.app/board
 - **Format**: Open and documented ([RPK file format](https://rupok.app/rpk/), Apache-2.0 [spec](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))
 - **Readable by AI**: Yes: each file carries a Markdown outline ChatGPT or Claude can read
 
@@ -34,7 +34,7 @@ An **RPK (Rich Presentation Kit) file is a Rupok lesson.** Rupok is a free, open
 ### On a computer
 
 1. **Download the file** from WhatsApp Web, Gmail or Google Drive.
-2. **Drag it onto this page,** or click “Choose a .rpk file”. Use Chrome or Edge.
+2. **Drag it onto this page,** or click “Choose a .rpk file”. Use Chrome, Edge or Safari.
 3. **Replay the class.** Press play, flip through the pages and try the live objects.
 
 *Student mode is read-only: you can’t change your teacher’s lesson by accident.*

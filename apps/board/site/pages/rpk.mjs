@@ -114,7 +114,7 @@ const en = {
           ["Extension", "`.rpk`"],
           ["Media type", "`application/vnd.rupok.lesson+zip`"],
           ["Container", "ZIP, with a `mimetype` first entry (like EPUB)"],
-          ["Opens with", "Rupok, free in Chrome or Edge ([rupok.app/open](/open/))"],
+          ["Opens with", "Rupok, free in Chrome, Edge or Safari ([rupok.app/open](/open/))"],
           ["Specification", `Open, Apache-2.0 ([spec on GitHub](${SPEC}))`],
         ] },
       ],
@@ -134,7 +134,7 @@ const en = {
       h2: "How to open an RPK file",
       blocks: [
         { steps: [
-          { b: "Go to rupok.app/open", t: "in Chrome or Edge, on a phone or a computer." },
+          { b: "Go to rupok.app/open", t: "in Chrome, Edge or Safari, on a phone or a computer." },
           { b: "Drop the .rpk file on the page", t: "or tap “Choose a .rpk file”. It opens in Student mode, read-only." },
           { b: "Replay the class,", t: "flip through the pages and try the live activities." },
         ] },
@@ -192,7 +192,7 @@ const en = {
   faq: [
     { q: "What does RPK stand for?", a: "RPK stands for Rich Presentation Kit. A .rpk file is a lesson made with Rupok, the free, open-source whiteboard for teachers." },
     { q: "What is an RPK file?", a: "An RPK file is one whole lesson: its pages, the teacher's handwriting with timing, images, live Smart Objects (simulations, 3D models, quizzes) and a readable outline. It is a ZIP package with an open, documented format." },
-    { q: "How do I open an RPK file?", a: "Go to [rupok.app/open](/open/) in Chrome or Edge and drop the file on the page. It opens free in your browser, with no account and nothing uploaded." },
+    { q: "How do I open an RPK file?", a: "Go to [rupok.app/open](/open/) in Chrome, Edge or Safari and drop the file on the page. It opens free in your browser, with no account and nothing uploaded." },
     { q: "Is there a free RPK file viewer?", a: "Yes. Rupok's student viewer at [rupok.app/open](/open/) is free, runs in the browser on phones and computers, and replays the class stroke by stroke." },
     { q: "How do I convert an RPK file to PDF?", a: "Open the file at [rupok.app/open](/open/), then press Download PDF. Every page is exported with the teacher's ink, on your device." },
     { q: "Can ChatGPT or Claude read an RPK file?", a: "Yes. Every .rpk made by current Rupok versions carries `README.md`, `content.md` and `content.json`: the lesson as plain Markdown and JSON. Upload the file and ask about it; agents can also use the [read-rpk skill](/skills/read-rpk.md)." },
@@ -243,7 +243,7 @@ const bn = {
           ["এক্সটেনশন", "`.rpk`"],
           ["মিডিয়া টাইপ", "`application/vnd.rupok.lesson+zip`"],
           ["ভেতরে", "একটি ZIP প্যাকেজ"],
-          ["যা দিয়ে খোলে", "Rupok, Chrome বা Edge-এ ফ্রি ([rupok.app/bn/open](/bn/open/))"],
+          ["যা দিয়ে খোলে", "Rupok, Chrome, Edge বা Safari-তে ফ্রি ([rupok.app/bn/open](/bn/open/))"],
           ["স্পেসিফিকেশন", `খোলা, Apache-2.0 ([GitHub-এ](${SPEC}))`],
         ] },
       ],
@@ -263,7 +263,7 @@ const bn = {
       h2: "RPK ফাইল কীভাবে খুলবেন",
       blocks: [
         { steps: [
-          { b: "rupok.app/bn/open খুলুন,", t: "মোবাইল বা কম্পিউটারের Chrome বা Edge ব্রাউজারে।" },
+          { b: "rupok.app/bn/open খুলুন,", t: "মোবাইল বা কম্পিউটারের Chrome, Edge বা Safari ব্রাউজারে।" },
           { b: ".rpk ফাইলটি পাতায় ছেড়ে দিন,", t: "অথবা “.rpk ফাইল বেছে নিন”-এ চাপুন। স্টুডেন্ট মোডে খুলবে।" },
           { b: "ক্লাসের রিপ্লে দেখুন,", t: "পাতা উল্টান, লাইভ অ্যাক্টিভিটি চালান।" },
         ] },
@@ -298,7 +298,7 @@ const bn = {
   faqTitle: "আরপিকে ফাইল নিয়ে প্রশ্নোত্তর",
   faq: [
     { q: "RPK-এর পুরো নাম কী?", a: "RPK মানে Rich Presentation Kit। .rpk ফাইল হলো Rupok দিয়ে বানানো লেসন; Rupok শিক্ষকদের জন্য ফ্রি, ওপেন সোর্স হোয়াইটবোর্ড।" },
-    { q: "RPK ফাইল কীভাবে খুলবো?", a: "Chrome বা Edge-এ [rupok.app/bn/open](/bn/open/) খুলে ফাইলটি ছেড়ে দিন। ফ্রি, অ্যাকাউন্ট লাগে না, কিছু আপলোড হয় না।" },
+    { q: "RPK ফাইল কীভাবে খুলবো?", a: "Chrome, Edge বা Safari-তে [rupok.app/bn/open](/bn/open/) খুলে ফাইলটি ছেড়ে দিন। ফ্রি, অ্যাকাউন্ট লাগে না, কিছু আপলোড হয় না।" },
     { q: "RPK ফাইলকে PDF বানাবো কীভাবে?", a: "ফাইলটি [rupok.app/bn/open](/bn/open/)-এ খুলে Download PDF চাপুন।" },
     { q: "ChatGPT বা Claude কি RPK ফাইল পড়তে পারে?", a: "হ্যাঁ। Rupok-এর নতুন সংস্করণে বানানো প্রতিটি .rpk-এ `README.md`, `content.md` আর `content.json` থাকে, অর্থাৎ পুরো লেসনের সহজপাঠ্য সারাংশ। ফাইলটি আপলোড করে প্রশ্ন করুন।" },
     { q: "RPK ফরম্যাট কি খোলা?", a: `হ্যাঁ। স্পেসিফিকেশন আর রেফারেন্স রিডার-রাইটার Apache-2.0 লাইসেন্সে, তাই যে কেউ .rpk পড়ার বা লেখার টুল বানাতে পারে। [GitHub-এ স্পেসিফিকেশন](${SPEC})।` },

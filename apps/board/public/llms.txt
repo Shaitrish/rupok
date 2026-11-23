@@ -1,6 +1,6 @@
 # Rupok
 
-> Rupok is a free, open-source (AGPL-3.0) smartboard and whiteboard app for teachers. Teachers write on slides with fast GPU ink, drop in live interactive "Smart Objects" that an AI made (simulations, 3D models, quizzes), and replay every class stroke by stroke. It runs in Chrome or Edge on any smartboard, interactive panel, projector or laptop, with no install and no account. Students open lesson files (`.rpk`, RPK: Rich Presentation Kit) in the browser. Made by Shaitrish in Bangladesh.
+> Rupok is a free, open-source (AGPL-3.0) smartboard and whiteboard app for teachers. Teachers write on slides with fast GPU ink, drop in live interactive "Smart Objects" that an AI made (simulations, 3D models, quizzes), and replay every class stroke by stroke. It runs in Chrome, Edge or Safari on any smartboard, interactive panel, projector or laptop, with no install and no account. Students open lesson files (`.rpk`, RPK: Rich Presentation Kit) in the browser. Made by Shaitrish in Bangladesh.
 
 Key facts (November 2026):
 

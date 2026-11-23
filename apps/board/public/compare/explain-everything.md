@@ -14,17 +14,17 @@ Explain Everything, now part of Promethean, records polished video lessons on ta
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Free plan: 3 projects, 1 slide per project, 3-minute videos. Advanced US$69/year (education); Pro US$7.49/month billed yearly[^1] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | iPad, iPhone, Android, Chromebook and a browser app[^1] |
+| Runs on | Chrome, Edge or Safari on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS (beta) and Linux; installers not code-signed yet | iPad, iPhone, Android, Chromebook and a browser app[^1] |
 | Account | ✓ None, for teachers or students | An account to create projects[^1] |
-| AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ AI activities and an AI Companion on paid plans, on Apple devices with Apple Intelligence[^2][^5] |
+| AI | ✓ Your own AI (Claude, Codex or OpenCode): chat with it inside Rupok, let it edit the open board live, or connect it over MCP. It makes live Smart Objects and writes step-by-step solutions in handwriting (Solve this). HTML from any chatbot works too | ◐ AI activities and an AI Companion on paid plans, on Apple devices with Apple Intelligence[^2][^5] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ✓ Records narrated video lessons, with editing and captions; exports MP4[^2] |
-| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide | ◐ AI-made crossword, memory and matching activities; polls, timers and spinners in Advanced[^1][^5] |
-| PDF and slides | ✓ Import a PDF and write on every page; Download PDF | ✓ Imports PDF; exports PDF, video, images and `.explain` files[^2] |
-| Bangla | ◐ Bangla text and fonts in lessons. Bangla interface: coming soon | ✗ 15 interface languages, no Bangla[^2] |
-| Offline | ◐ Runs on your device once the board is open. Offline install: coming soon | ◐ Tablet apps work offline with some features missing; the browser app is online-only[^4] |
+| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ◐ AI-made crossword, memory and matching activities; polls, timers and spinners in Advanced[^1][^5] |
+| PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports PDF; exports PDF, video, images and `.explain` files[^2] |
+| Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ 15 interface languages, no Bangla[^2] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ◐ Tablet apps work offline with some features missing; the browser app is online-only[^4] |
 | Real-time collaboration | ◷ Live class and share links: coming soon with Rupok Cloud | ✓ Real-time collaboration; one-to-one sessions of 15 minutes on the free plan[^1] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.explain`[^2] |
-| Status (Nov 2026) | Actively developed, pre-alpha (first public release) | Actively developed; owned by Promethean since November 2022[^3] |
+| Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Actively developed; owned by Promethean since November 2022[^3] |
 
 ## Where Explain Everything is stronger
 
@@ -41,7 +41,7 @@ Being honest about this saves you time.
 - **No limits on the free plan:** unlimited lessons, pages and replay length.
 - **Replay, not video:** students get every stroke in a small file. They can pause, zoom and still use the live Smart Objects, which a video can’t do.
 - **AI from any assistant**, not tied to an Apple device or a paid plan: Claude, ChatGPT, Codex or OpenCode.
-- **Built for the classroom board:** fast GPU ink on smartboards and panels in Chrome or Edge.
+- **Built for the classroom board:** fast GPU ink on smartboards and panels in Chrome, Edge or Safari.
 - **Bangla text in lessons**, and open source.
 
 ## Which one should you pick?
@@ -53,7 +53,7 @@ Being honest about this saves you time.
 ## Switching from Explain Everything
 
 1. **Export your project as PDF.** Explain Everything exports PDF[^2].
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome or Edge, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).

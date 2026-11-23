@@ -62,7 +62,7 @@ A whiteboard where AI helps make the lesson. In Rupok, an AI writes interactive 
 
 ### Do I need to buy an AI smartboard?
 
-No. Rupok runs on the board you already have, in Chrome or Edge. The AI is the assistant you already use.
+No. Rupok runs on the board you already have, in Chrome, Edge or Safari. The AI is the assistant you already use.
 
 ### Which AI works with Rupok?
 

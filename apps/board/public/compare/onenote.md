@@ -14,16 +14,16 @@ Many teachers write on OneNote at the front of the class. OneNote is a superb no
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Free to download and use; Ink Replay, Math Assistant and Copilot need Microsoft 365 or Copilot subscriptions[^1][^5] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows, Mac, web, iPhone, iPad and Android[^1] |
+| Runs on | Chrome, Edge or Safari on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS (beta) and Linux; installers not code-signed yet | Windows, Mac, web, iPhone, iPad and Android[^1] |
 | Account | ✓ None, for teachers or students | A Microsoft account (the Windows app can also keep local notebooks)[^1] |
-| AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ◐ Copilot summarizes, rewrites and answers questions, with a paid subscription[^5] |
+| AI | ✓ Your own AI (Claude, Codex or OpenCode): chat with it inside Rupok, let it edit the open board live, or connect it over MCP. It makes live Smart Objects and writes step-by-step solutions in handwriting (Solve this). HTML from any chatbot works too | ◐ Copilot summarizes, rewrites and answers questions, with a paid subscription[^5] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Ink Replay redraws strokes in order, on Windows only[^2] |
-| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide | Notes, ink and embedded files |
-| PDF and slides | ✓ Import a PDF and write on every page; Download PDF | ✓ Insert PDF printouts and ink on them; export to PDF[^8] |
-| Bangla | ◐ Bangla text and fonts in lessons. Bangla interface: coming soon | ◐ Bangla (Bangladesh) gets proofing tools only; Bangla (India) is partly localized[^6] |
-| Offline | ◐ Runs on your device once the board is open. Offline install: coming soon | ✓ Native apps work offline and sync later[^9] |
+| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | Notes, ink and embedded files |
+| PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Insert PDF printouts and ink on them; export to PDF[^8] |
+| Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ◐ Bangla (Bangladesh) gets proofing tools only; Bangla (India) is partly localized[^6] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Native apps work offline and sync later[^9] |
 | Real-time collaboration | ◷ Live class and share links: coming soon with Rupok Cloud | ✓ Co-editing; Class Notebook gives each student a private section[^3] |
-| Status (Nov 2026) | Actively developed, pre-alpha (first public release) | Actively developed. OneNote for Windows 10 reached end of support on 14 Oct 2025[^4] |
+| Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Actively developed. OneNote for Windows 10 reached end of support on 14 Oct 2025[^4] |
 
 ## Where OneNote is stronger
 
@@ -54,7 +54,7 @@ Plenty of teachers use both: OneNote for the notebook, Rupok for the lesson.
 ## Moving a OneNote lesson to Rupok
 
 1. **Export the pages as PDF.** OneNote exports pages, sections or notebooks to PDF on Windows, and single pages on the web and Mac[^8].
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome or Edge, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).

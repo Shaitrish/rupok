@@ -4,7 +4,7 @@
 
 Canonical: https://rupok.app/ · Language: en · Updated: 2026-11-23
 
-Rupok is free, open-source smartboard and whiteboard software for teachers. Write on your slides, drop in live lessons your AI made, and replay every class, stroke by stroke. It runs in Chrome or Edge on any smartboard, interactive panel, laptop or tablet, with no account. Open it at [rupok.app/board](https://rupok.app/board/).
+Rupok is free, open-source smartboard and whiteboard software for teachers. Write on your slides, drop in live lessons your AI made, and replay every class, stroke by stroke. It runs in Chrome, Edge or Safari on any smartboard, interactive panel, laptop or tablet, with no account. Open it at [rupok.app/board](https://rupok.app/board/).
 
 ## Draw: a pen that keeps up with you
 
@@ -46,11 +46,11 @@ Yes. The whole app is free and open source, with every feature, on every device.
 
 ### Does it work with my smartboard or interactive panel?
 
-Yes, with any brand: SMART, Promethean, BenQ, ViewSonic, Prestigio and others. Rupok runs in Chrome or Edge on the computer connected to the board, and uses its touch and pen like any browser app.
+Yes, with any brand: SMART, Promethean, BenQ, ViewSonic, Prestigio and others. Rupok runs in Chrome, Edge or Safari on the computer connected to the board, and uses its touch and pen like any browser app.
 
 ### Do I need to install anything?
 
-No. Open [rupok.app/board](https://rupok.app/board/) in Chrome or Edge. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](https://rupok.app/download/).
+No. Open [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](https://rupok.app/download/).
 
 ### How does the AI part work?
 

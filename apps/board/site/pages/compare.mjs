@@ -10,7 +10,7 @@ const VS_ART = (name) => `<div class="art vs" aria-hidden="true">
           </div>`;
 
 const SWITCH_TAIL = [
-  { b: "Open the board.", t: "Go to [rupok.app/board](/board/) in Chrome or Edge, on the panel's PC or your laptop. No install, no account." },
+  { b: "Open the board.", t: "Go to [rupok.app/board](/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account." },
   { b: "Drop the PDF in.", t: "Every page becomes a slide you can write on." },
   { b: "Add the live parts.", t: "Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](/ai-whiteboard/))." },
   { b: "Save and share.", t: "Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](/open/)." },
@@ -88,7 +88,7 @@ const note3 = comparePage({
   description:
     "Looking for a free alternative to Prestigio Note3 (EasiNote) whiteboard software? Compare price, platforms, AI, replay and Bangla support. Facts checked November 2026.",
   h1: "A free Note3 alternative: Rupok vs Note3",
-  lede: "Note3 is Prestigio’s paid, Windows-only whiteboard software, the updated EasiNote. Rupok is free and open source, runs in Chrome or Edge on any computer, and adds AI-made lessons and class replay. Here’s an honest comparison.",
+  lede: "Note3 is Prestigio’s paid, Windows-only whiteboard software, the updated EasiNote. Rupok is free and open source, runs in Chrome, Edge or Safari on any computer, and adds AI-made lessons and class replay. Here’s an honest comparison.",
   rows: {
     price: "no: Paid, one-time licence per device: €29 on Prestigio’s store (Nov 2026), after a 15-day trial^1^3",
     oss: "no: No",
@@ -112,7 +112,7 @@ const note3 = comparePage({
   ],
   rupok: [
     "**Free on every device.** No licence keys and no activation, so you can put it on every panel and laptop in your school.",
-    "**Not just Windows.** It runs in Chrome or Edge on Windows, macOS, Linux and ChromeOS.",
+    "**Not just Windows.** It runs in Chrome, Edge or Safari on Windows, macOS, Linux and ChromeOS.",
     "**AI Smart Objects.** Ask Claude or ChatGPT for a simulation or a quiz and it lands on your slide, live, ready to write on.",
     "**Class replay.** Every stroke is saved with its timing. Send the `.rpk` file to the class WhatsApp group; students replay it in their browser.",
     "**Bangla.** Bangla text and fonts work in lessons, and the interface is coming. Rupok is made in Bangladesh.",
@@ -125,10 +125,10 @@ const note3 = comparePage({
   ],
   switchFirst: [{ b: "Export from Note3.", t: "Note3 exports lessons as PDF^4." }],
   faq: [
-    { q: "Is there a free alternative to Note3?", a: "Yes. Rupok is free and open source. It runs in Chrome or Edge on any computer connected to your smartboard or panel, with no licence key, activation or account." },
+    { q: "Is there a free alternative to Note3?", a: "Yes. Rupok is free and open source. It runs in Chrome, Edge or Safari on any computer connected to your smartboard or panel, with no licence key, activation or account." },
     { q: "Is Note3 the same as EasiNote?", a: "Prestigio describes Note3 as the updated version of EasiNote, launched in July 2024^1. Its files use EasiNote’s `.enb` format^4." },
     { q: "Can Rupok open Note3 (.enb) files?", a: "No. Export the lesson from Note3 as a PDF and drop the PDF into Rupok; every page becomes a slide you can write on." },
-    { q: "Does Rupok work on a Prestigio MultiBoard?", a: "Rupok needs Chrome or Edge with WebGPU or WebGL2. On a panel with a Windows PC module or a connected computer, open rupok.app/board there. Whether a panel’s built-in Android browser is fast enough varies by model, so a PC is the safe choice." },
+    { q: "Does Rupok work on a Prestigio MultiBoard?", a: "Rupok needs Chrome, Edge or Safari with WebGPU or WebGL2. On a panel with a Windows PC module or a connected computer, open rupok.app/board there. Whether a panel’s built-in Android browser is fast enough varies by model, so a PC is the safe choice." },
     { q: "Is Rupok legal to use for free in schools?", a: "Yes. Rupok is open-source software under the AGPL-3.0. Any school can use it on any number of devices at no cost." },
   ],
   sources: [
@@ -175,7 +175,7 @@ const smart = comparePage({
   ],
   rupok: [
     "**Every feature is free, on any brand.** SMART’s free version limits touch on non-SMART displays^2; Rupok works the same on a SMART, Promethean, BenQ, ViewSonic or Prestigio panel.",
-    "**Runs on Linux and ChromeOS too**, in Chrome or Edge. Nothing to install.",
+    "**Runs on Linux and ChromeOS too**, in Chrome, Edge or Safari. Nothing to install.",
     "**AI that builds real simulations,** not only quizzes: projectile motion, 3D molecules, circuits. It works with the AI you already use, including Claude through MCP.",
     "**Class replay students can open.** They replay every stroke from a small `.rpk` file, in the browser, with no account.",
     "**Bangla text in lessons**, and an open-source codebase and file format.",
@@ -189,7 +189,7 @@ const smart = comparePage({
     { q: "Is SMART Notebook free?", a: "The basic desktop version is free. Notebook Plus with Lumio Standard costs US$59 a year^1, and full touch on non-SMART displays needs Plus^2. Rupok is free with every feature." },
     { q: "What is the best free alternative to SMART Notebook?", a: "For a free desktop app with a long history, OpenBoard. For a free browser app with AI-made interactive lessons and class replay, Rupok. Both are open source." },
     { q: "Can Rupok open .notebook files?", a: "Not yet. Save the lesson as a PDF from SMART Notebook and drop it into Rupok to write on every page." },
-    { q: "Does Rupok work on a SMART Board?", a: "Yes. Rupok runs in Chrome or Edge on the computer connected to the board, and works with the board’s touch and pen like any browser app." },
+    { q: "Does Rupok work on a SMART Board?", a: "Yes. Rupok runs in Chrome, Edge or Safari on the computer connected to the board, and works with the board’s touch and pen like any browser app." },
   ],
   sources: [
     "[Lumio and Notebook Plus pricing](https://www.smarttech.com/en-us/education/products/software/smart-notebook/lumio-and-notebook-plus-pricing), SMART Technologies (checked 23 Nov 2026).",
@@ -237,7 +237,7 @@ const openboard = comparePage({
     "**Institutional backing:** maintained with the Canton of Geneva’s public education department^1.",
   ],
   rupok: [
-    "**Nothing to install.** It runs in Chrome or Edge, so it also works on Chromebooks and locked-down school PCs.",
+    "**Nothing to install.** It runs in Chrome, Edge or Safari, so it also works on Chromebooks, Macs and locked-down school PCs. Prefer an app? The free desktop app runs on Windows, Mac and Linux.",
     "**AI Smart Objects.** Live simulations, 3D models and quizzes made by Claude, ChatGPT, Codex or OpenCode, with an MCP server for agents.",
     "**Stroke-by-stroke replay** in a small lesson file, instead of a large video. Students pause, zoom and still use the live objects.",
     "**GPU ink** that stays smooth with 100,000 strokes.",
@@ -314,7 +314,7 @@ const activinspire = comparePage({
     { q: "Is ActivInspire being discontinued?", a: "We found no announced end date as of November 2026. Promethean’s newest classroom software is ActivSuite^4. It retired ClassFlow at the end of 2023, saying that wouldn’t affect ActivInspire^5." },
     { q: "Is ActivInspire free?", a: "The Personal Edition is a free download. The Professional Edition comes with some ActivPanels or costs US$1,249 per device on Promethean’s January 2026 US price list^1^2." },
     { q: "Can Rupok open .flipchart files?", a: "No. Export or print the flipchart to PDF and drop it into Rupok. (SMART Notebook can import flipcharts, if you need the objects kept.)" },
-    { q: "Does Rupok work on a Promethean ActivPanel?", a: "Yes, from Chrome or Edge on the panel’s computer. Rupok works with any panel’s touch and pen like any browser app." },
+    { q: "Does Rupok work on a Promethean ActivPanel?", a: "Yes, from Chrome, Edge or Safari on the panel’s computer. Rupok works with any panel’s touch and pen like any browser app." },
   ],
   sources: [
     "[ActivInspire spec sheet v8.8](https://cdn.shopify.com/s/files/1/0753/1197/2628/files/ActivInspire_SS_1123v8.8_EN_INTL.pdf), Promethean, November 2023 (reseller-hosted copy; earlier [v8.3 on prometheanworld.com](https://www.prometheanworld.com/wp-content/uploads/pdf/ActivInspire_SS_0722v8.3_EN.pdf)).",
@@ -409,7 +409,7 @@ const jamboard = comparePage({
   rupok: [
     "**Free, with no account.** Nothing to sign up for, for you or your students.",
     "**Bring your Jams back.** Google converted Jams to PDFs in Drive^3. Download one and drop it into Rupok: every page becomes a slide you can write on.",
-    "**Fast pen ink** on any smartboard, panel, projector or laptop with Chrome or Edge, including the classroom panel that replaced your Jamboard.",
+    "**Fast pen ink** on any smartboard, panel, projector or laptop with Chrome, Edge or Safari, including the classroom panel that replaced your Jamboard.",
     "**AI Smart Objects:** live simulations and quizzes on the slide.",
     "**Class replay:** students replay your lesson from a small `.rpk` file.",
     "**Open source,** so it can’t be switched off the way Jamboard was.",
@@ -470,7 +470,7 @@ const ee = comparePage({
     "**No limits on the free plan:** unlimited lessons, pages and replay length.",
     "**Replay, not video:** students get every stroke in a small file. They can pause, zoom and still use the live Smart Objects, which a video can’t do.",
     "**AI from any assistant**, not tied to an Apple device or a paid plan: Claude, ChatGPT, Codex or OpenCode.",
-    "**Built for the classroom board:** fast GPU ink on smartboards and panels in Chrome or Edge.",
+    "**Built for the classroom board:** fast GPU ink on smartboards and panels in Chrome, Edge or Safari.",
     "**Bangla text in lessons**, and open source.",
   ],
   pick: [

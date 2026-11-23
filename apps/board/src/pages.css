@@ -216,7 +216,7 @@ sup a:hover { color: var(--ink); }
 .art.vs .vs-dot { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--sun); box-shadow: 0 0 0 1.5px var(--ink); font: 800 18px/1 var(--font); z-index: 1; }
 
 /* -------------------------------------------------------------- Bangla */
-:lang(bn) body, body:lang(bn) { line-height: 1.75; }
+:lang(bn) body, body:lang(bn) { line-height: 1.7; }
 :lang(bn) :is(h1, h2, h3, .drop-title, .faq summary, .linkcards b, .cards b, .steps b, .h-small) { letter-spacing: 0; }
 :lang(bn) .phero h1 { line-height: 1.22; }
 :lang(bn) .sec .head h2, :lang(bn) .sec .split .copy h2, :lang(bn) .final h2 { line-height: 1.25; }
@@ -263,3 +263,11 @@ sup a:hover { color: var(--ink); }
   .drop-title, .drop-or { display: none; }
   .drop .pill { margin-top: 14px; }
 }
+
+/* Anything on a mint or sun fill keeps dark text in both themes (in dark mode
+   --ink turns light, which put white text on bright mint/yellow). */
+.art.vs .card-a, .ticks li::before, .steps li:nth-child(3n + 2)::before,
+.v-yes .mk, .art.teacher .note.mint { color: var(--on-mint); }
+.steps li::before, .art .mini-obj, .art.online .t1, .art.teacher .note.sun,
+.v-part .mk, .art.vs .vs-dot { color: var(--on-sun); }
+.art.vs .card-a .chip { background: var(--on-mint); color: #ffffff; }

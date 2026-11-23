@@ -19,7 +19,7 @@ RPK stands for **Rich Presentation Kit**. Teachers make `.rpk` lessons in [Rupok
 - **Extension**: `.rpk`
 - **Media type**: `application/vnd.rupok.lesson+zip`
 - **Container**: ZIP, with a `mimetype` first entry (like EPUB)
-- **Opens with**: Rupok, free in Chrome or Edge ([rupok.app/open](https://rupok.app/open/))
+- **Opens with**: Rupok, free in Chrome, Edge or Safari ([rupok.app/open](https://rupok.app/open/))
 - **Specification**: Open, Apache-2.0 ([spec on GitHub](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))
 
 ## What's inside a .rpk file
@@ -43,7 +43,7 @@ lesson.rpk                 a ZIP archive
 
 ## How to open an RPK file
 
-1. **Go to rupok.app/open** in Chrome or Edge, on a phone or a computer.
+1. **Go to rupok.app/open** in Chrome, Edge or Safari, on a phone or a computer.
 2. **Drop the .rpk file on the page** or tap “Choose a .rpk file”. It opens in Student mode, read-only.
 3. **Replay the class,** flip through the pages and try the live activities.
 
@@ -125,7 +125,7 @@ An RPK file is one whole lesson: its pages, the teacher's handwriting with timin
 
 ### How do I open an RPK file?
 
-Go to [rupok.app/open](https://rupok.app/open/) in Chrome or Edge and drop the file on the page. It opens free in your browser, with no account and nothing uploaded.
+Go to [rupok.app/open](https://rupok.app/open/) in Chrome, Edge or Safari and drop the file on the page. It opens free in your browser, with no account and nothing uploaded.
 
 ### Is there a free RPK file viewer?
 

@@ -12,7 +12,7 @@ Most smartboard software is free only on its maker’s own hardware, or keeps th
 
 - **Any brand**: SMART, Promethean, BenQ, ViewSonic, Prestigio or no-name panels, projectors with a pen, laptops and tablets.
 - **Every feature free**: No “Plus” or “Professional” edition. Recording, PDF and AI aren’t locked away.
-- **Nothing to install**: Open rupok.app/board in Chrome or Edge. Works on Windows, macOS, Linux and ChromeOS.
+- **Nothing to install**: Open rupok.app/board in Chrome, Edge or Safari. Works on Windows, macOS, Linux and ChromeOS.
 
 ## Everything a smartboard lesson needs
 
@@ -47,7 +47,7 @@ Rupok is made by Shaitrish in Bangladesh, and built in the open on [GitHub](http
 
 ## Set it up on your board in two minutes
 
-1. **Open Chrome or Edge on the board’s computer.** The built-in PC (OPS module) of an interactive flat panel, or the laptop connected to your projector.
+1. **Open Chrome, Edge or Safari on the board’s computer.** The built-in PC (OPS module) of an interactive flat panel, or the laptop connected to your projector.
 2. **Go to rupok.app/board.** Pin it to the taskbar or install it from the browser’s menu so it opens like an app.
 3. **Drop in your slides.** Drag a PDF onto the board; every page becomes a slide.
 4. **Teach.** Switch to Teach mode, pick up the pen, and press the clicker to move on.
@@ -80,7 +80,7 @@ Yes. The whole app is free and open source, with no paid edition of the software
 
 ### Do I need to download smartboard software for my PC?
 
-No download is needed: Rupok runs in Chrome or Edge. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](https://rupok.app/download/).
+No download is needed: Rupok runs in Chrome, Edge or Safari. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](https://rupok.app/download/).
 
 ### Does it work with SMART, Promethean, BenQ, ViewSonic or Prestigio boards?
 

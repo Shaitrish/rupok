@@ -164,16 +164,19 @@ export function nav(page) {
   const links = n.links
     .map(([href, label]) => `<a href="${href}"${href === page.path ? ' aria-current="page"' : ""}>${label}</a>`)
     .join("");
+  // The language switch sits with the buttons, so it stays visible on phones
+  // (the text links collapse below 960px). Phones show the short label.
   const swap = other
     ? page.lang === "en"
-      ? `<a href="${other}" hreflang="bn" lang="bn">বাংলা</a>`
-      : `<a href="${other}" hreflang="en" lang="en">English</a>`
+      ? `<a class="lang-swap" href="${other}" hreflang="bn" lang="bn" aria-label="বাংলা"><span class="ls-long">বাংলা</span><span class="ls-short" aria-hidden="true">বাং</span></a>`
+      : `<a class="lang-swap" href="${other}" hreflang="en" lang="en" aria-label="English"><span class="ls-long">English</span><span class="ls-short" aria-hidden="true">EN</span></a>`
     : "";
   return `<header class="nav">
       <div class="wrap nav-in">
         <a class="brand" href="${n.home}" aria-label="${n.homeLabel}"><span class="mark">${MARK_SVG("#20C997")}</span><span class="word">rupok</span></a>
-        <nav class="links" aria-label="${n.label}">${links}${swap}</nav>
+        <nav class="links" aria-label="${n.label}">${links}</nav>
         <div class="nav-cta">
+          ${swap}
           ${themeToggle(page.lang)}
           <a class="pill ghost" href="${GITHUB}" rel="noopener">GitHub</a>
           <a class="pill dark" href="/board/">${n.board}</a>
@@ -238,8 +241,8 @@ export const APP = {
   url: `${SITE}/`,
   applicationCategory: "EducationalApplication",
   applicationSubCategory: "Interactive whiteboard software",
-  operatingSystem: "Any OS with Chrome or Edge (Windows, macOS, Linux, ChromeOS)",
-  browserRequirements: "Requires a recent Chrome or Edge browser with WebGPU or WebGL2.",
+  operatingSystem: "Any OS with Chrome, Edge or Safari (Windows, macOS, Linux, ChromeOS)",
+  browserRequirements: "Requires a recent Chrome, Edge or Safari browser with WebGPU or WebGL2.",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   isAccessibleForFree: true,
   license: "https://www.gnu.org/licenses/agpl-3.0.html",
@@ -455,14 +458,14 @@ export function pageHtml(page, source) {
   <body class="page${page.bodyClass ? " " + page.bodyClass : ""}">
     ${nav(page)}
     <main>
-    ${hero}
-    ${(page.sections ?? []).map(sectionHtml).join("\n    ")}
+    ${page.layout === "home" ? homeMain(page) : hero}
+    ${page.layout === "home" ? "" : (page.sections ?? []).map(sectionHtml).join("\n    ")}
     ${faq}
     ${sources}
-    ${fin}
+    ${page.layout === "home" ? homeFinal(page) : fin}
     </main>
     ${footer(page)}
-    <script type="module" src="/src/pages.ts"></script>
+    <script type="module" src="${page.layout === "home" ? "/src/site.ts" : "/src/pages.ts"}"></script>
   </body>
 </html>
 `;
@@ -474,7 +477,7 @@ export function pageMd(page) {
   out.push(`Canonical: ${SITE + page.path} · Language: ${page.lang} · Updated: ${page.updated ?? UPDATED}`, "");
   out.push(md(page.lede), "");
   if (page.mdIntro) out.push(page.mdIntro, "");
-  for (const s of page.sections ?? []) {
+  for (const s of page.layout === "home" ? page.parts.map(partSection) : page.sections ?? []) {
     out.push(`## ${plain(s.h2)}`, "");
     if (s.lede) out.push(md(s.lede), "");
     for (const b of [...(s.copy ?? []), ...(s.blocks ?? [])]) {
@@ -493,4 +496,145 @@ export function pageMd(page) {
     if (page.disclaimer) out.push(`*${md(page.disclaimer)}*`, "");
   }
   return out.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
+// ------------------------------------------------------------- home layout
+// `layout: "home"` renders the interactive home page (hero video, draw pad,
+// live Smart Object tabs, replay, students, plans) from data, with the same
+// markup and classes as the hand-written index.html, and loads src/site.ts.
+// Used by /bn/. `page.parts` is a list of { kind, ... }; kind "section" (or
+// none) is an ordinary content section.
+
+const more = (m) => (m ? ` <a class="more" href="${m.href}">${inline(m.label)}</a>` : "");
+const tagHtml = (t, light = false) => (t ? `<span class="tag${light ? " light" : ""}">${esc(t)}</span>` : "");
+const para = (p) => [].concat(p ?? []).map((x) => `<p>${inline(x)}</p>`);
+
+function homeHero(page) {
+  const h = page.hero;
+  const v = h.video;
+  return `<section class="hero">
+        <div class="wrap hero-in">
+          <div class="hero-copy">
+            <h1><span class="h1-kicker">${inline(h.kicker)}</span>${inline(h.title)}</h1>
+            <p class="lede">${inline(h.lede)}</p>
+            <div class="ctas">${h.cta.map(pill).join("")}</div>
+            <div class="dl" data-download="hero"><a class="dl-link" href="${h.dlHref}">${inline(h.dlLabel)}</a></div>
+            ${h.fine ? `<p class="fine">${inline(h.fine)}</p>` : ""}
+          </div>
+          ${h.collage ?? ""}
+        </div>
+        <div class="wrap">
+          <figure class="shot">
+            <video id="hero-video" class="demo" autoplay muted loop playsinline preload="metadata" width="1920" height="1080" poster="/demo/rupok-demo-light.webp" aria-label="${esc(v.label)}">
+              <source src="/demo/rupok-demo-light.webm" type="video/webm; codecs=vp9" />
+              <source src="/demo/rupok-demo-light.mp4" type="video/mp4" />
+            </video>
+            <script>(function(){var v=document.getElementById("hero-video"),d=document.documentElement;if(!v)return;var t=d.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");if(t==="dark"){v.poster=v.poster.replace("-light.","-dark.");v.querySelectorAll("source").forEach(function(s){s.src=s.src.replace("-light.","-dark.")})}if(matchMedia("(prefers-reduced-motion: reduce)").matches){v.autoplay=false;v.removeAttribute("autoplay")}})()</script>
+            <button class="vplay" type="button" hidden aria-label="${esc(v.play)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg></button>
+            <button class="vtoggle" type="button" aria-label="${esc(v.pause)}" title="${esc(v.pause)}"><svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM13 5h3v14h-3z"/></svg><svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg></button>
+          </figure>
+        </div>
+      </section>`;
+}
+
+const PARTS = {
+  draw: (p) => `<section id="${p.id}" class="band mint">
+        <div class="wrap split">
+          <div class="copy">
+            ${tagHtml(p.tag)}
+            <h2>${inline(p.h2)}</h2>
+            <p>${inline(p.p)}${more(p.more)}</p>
+            <ul class="facts">${p.facts.map(([b, t]) => `<li><b>${inline(b)}</b><span>${inline(t)}</span></li>`).join("")}</ul>
+          </div>
+          <div class="pad">
+            <div class="pad-top"><span>${inline(p.pad.label)}</span><div class="inks" role="group" aria-label="${esc(p.pad.group)}">${["#111418", "#1c7ed6", "#e03131", "#12b886"]
+              .map((c, i) => `<button type="button" data-ink="${c}"${i === 0 ? ' class="on"' : ""} aria-label="${esc(p.pad.colours[i])}"></button>`)
+              .join("")}</div><button class="clear" type="button">${inline(p.pad.clear)}</button></div>
+            <canvas id="pad" aria-label="${esc(p.pad.canvas)}"></canvas>
+          </div>
+        </div>
+      </section>`,
+  lessons: (p) => `<section id="${p.id}" class="plain">
+        <div class="wrap">
+          <div class="head">
+            ${tagHtml(p.tag)}
+            <h2>${inline(p.h2)}</h2>
+            <p>${inline(p.p)}${more(p.more)}</p>
+          </div>
+          <div class="tabs" role="tablist" id="tabs" aria-label="${esc(p.tabsLabel)}"></div>
+          <div class="stage">
+            <iframe id="demo" title="${esc(p.frame)}" sandbox="allow-scripts"></iframe>
+          </div>
+          <div class="prompt"><span class="who">${inline(p.who)}</span><p id="demo-prompt"></p></div>
+          ${p.note ? `<p class="fine">${inline(p.note)}</p>` : ""}
+        </div>
+      </section>`,
+  replay: (p) => `<section id="${p.id}" class="band sun">
+        <div class="wrap split rev">
+          <div class="copy">
+            ${tagHtml(p.tag)}
+            <h2>${inline(p.h2)}</h2>
+            <p>${inline(p.p)}${more(p.more)}</p>
+          </div>
+          <div class="replay">
+            <canvas id="rp" aria-label="${esc(p.canvas)}"></canvas>
+            <div class="rp-bar"><button id="rp-play" class="rp-btn" type="button" aria-label="${esc(p.play)}">▶</button><input id="rp-range" type="range" min="0" max="1000" value="0" aria-label="${esc(p.position)}" /><span id="rp-time">0:00</span></div>
+          </div>
+        </div>
+      </section>`,
+  students: (p) => `<section id="${p.id}" class="dark-band">
+        <div class="wrap split">
+          <div class="copy">
+            ${tagHtml(p.tag, true)}
+            <h2>${inline(p.h2)}</h2>
+            ${para(p.p).join("")}
+            ${pill({ ...p.cta, kind: "mint" })}
+          </div>
+          <ul class="cards">${p.cards.map((c) => `<li><b>${inline(c.b)}</b><span>${inline(c.t)}</span></li>`).join("")}</ul>
+        </div>
+      </section>`,
+  plans: (p) => `<section id="${p.id}" class="plain">
+        <div class="wrap">
+          <div class="head center">
+            ${tagHtml(p.tag)}
+            <h2>${inline(p.h2)}</h2>
+            <p>${inline(p.p)}</p>
+          </div>
+          <div class="plans">${p.plans
+            .map(
+              (x) => `<article class="plan${x.feat ? " feat" : ""}">${x.badge ? `<span class="badge">${esc(x.badge)}</span>` : ""}<h3>${inline(x.name)}</h3><p class="price">${inline(x.price)}</p><ul>${x.items
+                .map(([t, soon]) => `<li>${inline(t)}${soon ? ` <em>${esc(soon)}</em>` : ""}</li>`)
+                .join("")}</ul>${pill({ ...x.cta, kind: x.cta.kind ?? "ghost" }).replace(" lg", "")}</article>`,
+            )
+            .join("")}</div>
+        </div>
+      </section>`,
+};
+
+export function homeMain(page) {
+  return [homeHero(page), ...page.parts.map((p) => (PARTS[p.kind] ?? sectionHtml)(p))].join("\n    ");
+}
+
+export function homeFinal(page) {
+  const f = page.final;
+  return `<section class="final">
+        <div class="wrap">
+          <h2>${inline(f.h2)}</h2>
+          <p>${inline(f.p)}</p>
+          <div class="ctas center">${f.cta.map(pill).join("")}</div>
+          <div class="dl center" data-download="final"><a class="dl-link" href="${page.hero.dlHref}">${inline(page.hero.dlLabel)}</a></div>
+        </div>
+      </section>`;
+}
+
+/** A home part as an ordinary section, for the Markdown twin. */
+function partSection(p) {
+  if (!p.kind || p.kind === "section") return p;
+  const blocks = [].concat(p.p ?? []);
+  if (p.more) blocks.push(`[${p.more.label.replace(/\s*→$/, "")}](${p.more.href})`);
+  if (p.facts) blocks.push({ ul: p.facts.map(([b, t]) => `**${b}** ${t}`) });
+  if (p.cards) blocks.push({ cards: p.cards });
+  if (p.cta) blocks.push({ cta: [p.cta] });
+  if (p.plans) blocks.push({ ul: p.plans.map((x) => `**${x.name} (${x.price}):** ${x.items.map(([t, s]) => (s ? `${t} (${s})` : t)).join("; ")}`) });
+  return { h2: p.h2, blocks };
 }

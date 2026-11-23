@@ -1,5 +1,7 @@
 // Rupok website: fonts, the draw pad, live Smart Object tabs and the replay demo.
 import "@fontsource-variable/inter";
+import "@fontsource/hind-siliguri/400.css"; // Bangla body text on /bn/
+import "@fontsource/hind-siliguri/600.css";
 import "@fontsource/hind-siliguri/700.css";
 import "./site.css";
 import "./pages.css"; // FAQ and five-column footer, shared with the static pages
@@ -8,6 +10,10 @@ import { objectFontStyle } from "./objectFonts";
 import { PRESETS } from "./presets";
 import { currentTheme, onThemeChange, type Theme } from "./theme";
 import "./download"; // platform-matched download buttons
+
+// The same script runs the English home page and /bn/ (site/lib.mjs, layout
+// "home"); the few strings it writes follow the page language.
+const BN = document.documentElement.lang === "bn";
 
 // Ink that reads on the current theme. Colours are written as their light
 // versions; on a dark page they become the board's dark-board inks.
@@ -72,7 +78,7 @@ if (pad) {
     document.querySelectorAll<HTMLButtonElement>(".inks button").forEach((b) => {
       b.style.setProperty("--c", inkFor(b.dataset.ink!));
       // The default ink is black on a light page and white on a dark one.
-      if (b.dataset.ink === "#111418") b.setAttribute("aria-label", currentTheme() === "dark" ? "White" : "Black");
+      if (b.dataset.ink === "#111418") b.setAttribute("aria-label", currentTheme() === "dark" ? (BN ? "সাদা" : "White") : BN ? "কালো" : "Black");
     });
   swatches();
   onThemeChange(() => {
@@ -107,6 +113,18 @@ const META: Record<string, { label: string; color: string; prompt: string }> = {
   "computing-timeline": { label: "History", color: "#4dabf7", prompt: "A history-of-computing timeline from the abacus to AI, one era per click." },
   "quiz-networking": { label: "Quiz", color: "#ff6b57", prompt: "A four-question quiz on networking basics with instant feedback and a score at the end." },
 };
+// Bangla tab labels and prompts for /bn/ (teachers can ask their AI in Bangla).
+const META_BN: Record<string, { label: string; prompt: string }> = {
+  "physics-projectile": { label: "পদার্থবিজ্ঞান", prompt: "নবম শ্রেণির জন্য প্রাসের গতির একটি সিমুলেশন বানাও: কোণ আর বেগ বদলানোর স্লাইডার, পৃথিবী, চাঁদ আর মঙ্গলের তুলনা, আর ধাপে ধাপে সমীকরণ।" },
+  "chemistry-molecules-3d": { label: "রসায়ন 3D", prompt: "পানি, মিথেন আর বেনজিনের থ্রিডি গঠন দেখাও। প্রতিটি অণু একটি একটি পরমাণু করে গড়ো, আর বন্ধন কোণগুলো লিখে দাও।" },
+  "physics-circuit": { label: "বর্তনী", prompt: "ওহমের সূত্রের একটি বর্তনী: ব্যাটারি, রোধ আর বাল্ব; ভোল্টেজ বাড়ালে ইলেকট্রনের গতিও বাড়বে।" },
+  "chemistry-reaction": { label: "বিক্রিয়া", prompt: "কণা পর্যায়ে মিথেনের দহন অ্যানিমেশন করে দেখাও, তারপর ধাপে ধাপে সমীকরণটি সমতা করো।" },
+  "math-graph": { label: "গণিত", prompt: "y = a·sin(bx + c)-এর লেখচিত্র, স্লাইডারসহ, যাতে শিক্ষার্থীরা দেখে প্রতিটি অক্ষর কী বদলায়।" },
+  "binary-counter": { label: "ICT", prompt: "সপ্তম শ্রেণির জন্য একটি বাইনারি কাউন্টার: স্থানীয় মানগুলো একে একে দেখাও, তারপর শিক্ষার্থীরা নিজেরা বিট বদলাবে।" },
+  "computing-timeline": { label: "ইতিহাস", prompt: "অ্যাবাকাস থেকে AI পর্যন্ত কম্পিউটারের ইতিহাসের একটি টাইমলাইন, প্রতি ক্লিকে একটি যুগ।" },
+  "quiz-networking": { label: "কুইজ", prompt: "নেটওয়ার্কের মৌলিক বিষয়ে চার প্রশ্নের একটি কুইজ, সাথে সাথে উত্তর যাচাই আর শেষে স্কোর।" },
+};
+const label = (id: string) => (BN ? META_BN[id]?.label : undefined) ?? META[id].label;
 const ORDER = ["physics-projectile", "chemistry-molecules-3d", "physics-circuit", "chemistry-reaction", "math-graph", "binary-counter", "computing-timeline", "quiz-networking"];
 
 function srcdoc(html: string): string {
@@ -186,7 +204,7 @@ async function show(id: string) {
   step = steps;
   demoReady = false;
   demo.srcdoc = srcdoc((await loader()) as string);
-  if (promptEl) promptEl.textContent = `“${meta?.prompt ?? "Make an interactive lesson."}”`;
+  if (promptEl) promptEl.textContent = `“${(BN ? META_BN[id]?.prompt : undefined) ?? meta?.prompt ?? "Make an interactive lesson."}”`;
   tabs?.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.id === id)));
 }
 
@@ -194,7 +212,7 @@ if (tabs) {
   const available = new Set(Object.keys(files).map((p) => p.split("/").pop()!.replace(/\.html$/, "")));
   const ids = ORDER.filter((id) => available.has(id));
   tabs.innerHTML = ids
-    .map((id) => `<button role="tab" data-id="${id}" style="--c:${META[id].color}"><span class="dot"></span>${META[id].label}</button>`)
+    .map((id) => `<button role="tab" data-id="${id}" style="--c:${META[id].color}"><span class="dot"></span>${label(id)}</button>`)
     .join("");
   tabs.querySelectorAll<HTMLButtonElement>("button").forEach((b) => b.addEventListener("click", () => show(b.dataset.id!)));
   // Load the first demo when the section comes into view.
@@ -250,8 +268,8 @@ if (rp) {
   const draw = () => {
     ctx.clearRect(0, 0, 640, 400);
     ctx.fillStyle = inkFor("#111418");
-    ctx.font = "800 34px 'Inter Variable', Inter, sans-serif";
-    ctx.fillText("Projectile motion", 70, 78);
+    ctx.font = BN ? "700 34px 'Hind Siliguri', sans-serif" : "800 34px 'Inter Variable', Inter, sans-serif";
+    ctx.fillText(BN ? "প্রাসের গতি" : "Projectile motion", 70, 78);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     for (const s of strokes) {
@@ -321,8 +339,8 @@ if (video) {
     if (small) {
       small.hidden = !started;
       small.classList.toggle("paused", !wanted);
-      small.setAttribute("aria-label", wanted ? "Pause the demo" : "Play the demo");
-      small.title = wanted ? "Pause" : "Play";
+      small.setAttribute("aria-label", wanted ? (BN ? "ডেমো থামান" : "Pause the demo") : BN ? "ডেমো চালান" : "Play the demo");
+      small.title = wanted ? (BN ? "থামান" : "Pause") : BN ? "চালান" : "Play";
     }
   };
   const sync = () => {

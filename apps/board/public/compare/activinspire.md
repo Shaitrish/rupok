@@ -14,15 +14,15 @@ ActivInspire is Promethean’s long-running flipchart software, with a free Pers
 |---|---|---|
 | Price | ✓ Free, every feature, on every device. No licence keys | ◐ Personal Edition is a free download; Professional comes with some ActivPanels or costs US$1,249 per device (US list price, Jan 2026)[^1][^2] |
 | Open source | ✓ Yes: AGPL-3.0. The `.rpk` format spec is Apache-2.0 | ✗ No |
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | Windows, macOS and Ubuntu[^1]. No web, ChromeOS or mobile app |
-| AI | ✓ Live Smart Objects made by the AI you already use: Claude, Codex or OpenCode over MCP, or HTML pasted from any chatbot | ✗ None found[^1] |
+| Runs on | Chrome, Edge or Safari on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS (beta) and Linux; installers not code-signed yet | Windows, macOS and Ubuntu[^1]. No web, ChromeOS or mobile app |
+| AI | ✓ Your own AI (Claude, Codex or OpenCode): chat with it inside Rupok, let it edit the open board live, or connect it over MCP. It makes live Smart Objects and writes step-by-step solutions in handwriting (Solve this). HTML from any chatbot works too | ✗ None found[^1] |
 | Replay and recording | ✓ Stroke-by-stroke replay of every page, built in. Replay with audio: coming soon | ◐ Screen and sound recorder in Professional only[^1] |
-| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide | ✓ Activities, polls and learner-response devices; question manager and actions in Professional[^1] |
-| PDF and slides | ✓ Import a PDF and write on every page; Download PDF | ◐ PDF import and export in Professional only[^1] |
-| Bangla | ◐ Bangla text and fonts in lessons. Bangla interface: coming soon | ✗ About 33 interface languages, no Bangla[^1] |
-| Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome or Edge | ✓ Works with a wide range of interactive whiteboards and panels[^1] |
+| Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ✓ Activities, polls and learner-response devices; question manager and actions in Professional[^1] |
+| PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ◐ PDF import and export in Professional only[^1] |
+| Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ About 33 interface languages, no Bangla[^1] |
+| Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ✓ Works with a wide range of interactive whiteboards and panels[^1] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.flipchart`; imports SMART Notebook files[^1]; exports `.iwb`[^6] |
-| Status (Nov 2026) | Actively developed, pre-alpha (first public release) | Still offered. Latest build we could verify: 3.5.18 (Jan 2025)[^3]. Promethean’s newest software is ActivSuite (launched Jan 2025)[^4] |
+| Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Still offered. Latest build we could verify: 3.5.18 (Jan 2025)[^3]. Promethean’s newest software is ActivSuite (launched Jan 2025)[^4] |
 
 ## Where ActivInspire is stronger
 
@@ -52,7 +52,7 @@ Being honest about this saves you time.
 ## Switching from ActivInspire
 
 1. **Export from ActivInspire.** Professional exports flipcharts to PDF[^1]; with Personal Edition, print to PDF.
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome or Edge, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).
@@ -73,7 +73,7 @@ No. Export or print the flipchart to PDF and drop it into Rupok. (SMART Notebook
 
 ### Does Rupok work on a Promethean ActivPanel?
 
-Yes, from Chrome or Edge on the panel’s computer. Rupok works with any panel’s touch and pen like any browser app.
+Yes, from Chrome, Edge or Safari on the panel’s computer. Rupok works with any panel’s touch and pen like any browser app.
 
 ## Sources
 

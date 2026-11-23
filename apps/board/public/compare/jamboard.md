@@ -12,10 +12,10 @@ Google stopped Jamboard editing on 1 October 2024 and wound the app down on 31 D
 
 |  | Rupok | Jamboard |
 |---|---|---|
-| Runs on | Chrome or Edge on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS and Linux | ✗ Nowhere: no editing since 1 Oct 2024, and the app wound down on 31 Dec 2024[^1] |
-| Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome or Edge | ✗ The 55-inch Jamboard device reached end of life on 1 Oct 2024[^2] |
+| Runs on | Chrome, Edge or Safari on Windows, macOS, Linux and ChromeOS. Desktop app for Windows, macOS (beta) and Linux; installers not code-signed yet | ✗ Nowhere: no editing since 1 Oct 2024, and the app wound down on 31 Dec 2024[^1] |
+| Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ✗ The 55-inch Jamboard device reached end of life on 1 Oct 2024[^2] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | Old Jams were converted to PDFs in Google Drive[^3] |
-| Status (Nov 2026) | Actively developed, pre-alpha (first public release) | Discontinued. Google pointed users to FigJam, Lucidspark and Miro[^1] |
+| Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Discontinued. Google pointed users to FigJam, Lucidspark and Miro[^1] |
 
 *Jamboard no longer exists, so most rows don’t apply. The rows above are what changed.*
 
@@ -29,7 +29,7 @@ Being honest about this saves you time.
 
 - **Free, with no account.** Nothing to sign up for, for you or your students.
 - **Bring your Jams back.** Google converted Jams to PDFs in Drive[^3]. Download one and drop it into Rupok: every page becomes a slide you can write on.
-- **Fast pen ink** on any smartboard, panel, projector or laptop with Chrome or Edge, including the classroom panel that replaced your Jamboard.
+- **Fast pen ink** on any smartboard, panel, projector or laptop with Chrome, Edge or Safari, including the classroom panel that replaced your Jamboard.
 - **AI Smart Objects:** live simulations and quizzes on the slide.
 - **Class replay:** students replay your lesson from a small `.rpk` file.
 - **Open source,** so it can’t be switched off the way Jamboard was.
@@ -43,7 +43,7 @@ Being honest about this saves you time.
 ## Bringing your Jams to Rupok
 
 1. **Find your old Jams in Google Drive.** Google converted them to PDF files[^3]. Download the ones you want.
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome or Edge, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).
