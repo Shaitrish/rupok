@@ -247,7 +247,7 @@ jobs:
 
       - name: Cache wasm-bindgen CLI
         id: wasm-bindgen-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/bin/wasm-bindgen
           key: wasm-bindgen-${{ runner.os }}-${{ env.WASM_BINDGEN_VERSION }}
@@ -263,7 +263,7 @@ jobs:
             target/wasm32-unknown-unknown/release-wasm/rupok_wasm.wasm
 
       - uses: oven-sh/setup-bun@v2
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -282,7 +282,7 @@ jobs:
           echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
 
       - name: Cache the WebKit build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/Library/Caches/ms-playwright
           key: playwright-webkit-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
