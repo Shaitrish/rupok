@@ -12,7 +12,7 @@ Canonical: https://rupok.app/bn/ · Language: bn · Updated: 2026-11-23
 
 - **যেকোনো ব্র্যান্ড**: SMART, Promethean, BenQ, ViewSonic, Prestigio বা নাম-না-জানা প্যানেল, প্রজেক্টর, ল্যাপটপ।
 - **সব ফিচার ফ্রি**: কোনো “প্রো” সংস্করণ নেই। রিপ্লে, PDF, AI, স্মার্ট শেপ সব খোলা।
-- **ব্রাউজারেই চলে**: Chrome, Edge বা Safari-তে rupok.app/board খুলুন। চাইলে Windows বা Linux-এর ফ্রি ডেস্কটপ অ্যাপ নামিয়ে নিন।
+- **ব্রাউজারেই চলে**: Chrome, Edge বা Safari-তে rupok.app/board খুলুন। চাইলে Windows, Mac বা Linux-এর ফ্রি ডেস্কটপ অ্যাপ নামিয়ে নিন।
 
 ## কলম চলবে আপনার হাতের গতিতে।
 
@@ -85,7 +85,7 @@ Rupok ওপেন সোর্স (AGPL-3.0), তাই কেউ ফ্রি 
 
 ### কম্পিউটারে কি সফটওয়্যার ডাউনলোড করতে হবে?
 
-না, কিছু ডাউনলোড না করেই চলে: Chrome, Edge বা Safari-তে [rupok.app/board](https://rupok.app/board/) খুলুন। কেউ চাইলে Windows আর Linux-এর ফ্রি ডেস্কটপ অ্যাপ [ডাউনলোড পাতা](https://rupok.app/bn/download/) থেকে নামিয়ে নিতে পারেন; নতুন সংস্করণে Mac-এর অ্যাপও যোগ হচ্ছে।
+না, কিছু ডাউনলোড না করেই চলে: Chrome, Edge বা Safari-তে [rupok.app/board](https://rupok.app/board/) খুলুন। কেউ চাইলে Windows, Mac আর Linux-এর ফ্রি ডেস্কটপ অ্যাপ [ডাউনলোড পাতা](https://rupok.app/bn/download/) থেকে নামিয়ে নিতে পারেন।
 
 ### ইন্টারনেট ছাড়া কি চলে?
 

@@ -78,7 +78,7 @@ No. Export the lesson from Note3 as a PDF and drop the PDF into Rupok; every pag
 
 ### Does Rupok work on a Prestigio MultiBoard?
 
-Rupok needs Chrome, Edge or Safari with WebGPU or WebGL2. On a panel with a Windows PC module or a connected computer, open rupok.app/board there, or install the Rupok desktop app for Windows. Whether a panel’s built-in Android browser is fast enough varies by model, so a PC is the safe choice.
+Rupok needs Chrome, Edge or Safari with WebGPU or WebGL2. On a panel with a Windows PC module or a connected computer, open rupok.app/board there, or install the Rupok desktop app (Windows, Mac or Linux). Whether a panel’s built-in Android browser is fast enough varies by model, so a PC is the safe choice.
 
 ### Is Rupok legal to use for free in schools?
 

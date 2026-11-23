@@ -130,7 +130,7 @@ const note3 = comparePage({
     { q: "Is there a free alternative to Note3?", a: "Yes. Rupok is free and open source. It runs in Chrome, Edge or Safari on any computer connected to your smartboard or panel, with no licence key, activation or account." },
     { q: "Is Note3 the same as EasiNote?", a: "Prestigio describes Note3 as the updated version of EasiNote, launched in July 2024^1. Its files use EasiNote’s `.enb` format^4." },
     { q: "Can Rupok open Note3 (.enb) files?", a: "No. Export the lesson from Note3 as a PDF and drop the PDF into Rupok; every page becomes a slide you can write on." },
-    { q: "Does Rupok work on a Prestigio MultiBoard?", a: "Rupok needs Chrome, Edge or Safari with WebGPU or WebGL2. On a panel with a Windows PC module or a connected computer, open rupok.app/board there, or install the Rupok desktop app for Windows. Whether a panel’s built-in Android browser is fast enough varies by model, so a PC is the safe choice." },
+    { q: "Does Rupok work on a Prestigio MultiBoard?", a: "Rupok needs Chrome, Edge or Safari with WebGPU or WebGL2. On a panel with a Windows PC module or a connected computer, open rupok.app/board there, or install the Rupok desktop app (Windows, Mac or Linux). Whether a panel’s built-in Android browser is fast enough varies by model, so a PC is the safe choice." },
     { q: "Is Rupok legal to use for free in schools?", a: "Yes. Rupok is open-source software under the AGPL-3.0. Any school can use it on any number of devices at no cost." },
   ],
   sources: [
