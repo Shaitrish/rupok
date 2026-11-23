@@ -52,6 +52,10 @@ node pen-latency.mjs --headed --present           # adds the compositor estimate
 - The renderer draws both with the same shader. A segment's quad must not
   reach ahead of its end point (`ink.wgsl`), or dense wet strokes render
   thinner than their simplified dry copies.
+- Ink kept on the page (`engine/clip.rs`): wet ink is cut with `push_wet`,
+  dry with `finish_clipped`, both by `clip_points` with the same inset. The OS
+  ink trail is not drawn off the page, nor for a stroke that started off it
+  (`wetInk.ts` `onPage`). Any new wet path must clip the same way.
 - Guarded by `crates/rupok-render/tests/wet_dry.rs` (GPU), the bench budget
   "wet vs dry pixels differ", and the latency harness's "pen-up changed pixels".
 
@@ -67,7 +71,7 @@ Measured on the Linux dev machine below, synthetic pen, 240 Hz, 400 px/s.
 | **Smoothing 0 was not raw.** `from_smoothing(0)` still filtered at 6 Hz. | Zig-zag p95 2.8 px at smoothing 0. | Smoothing 0 bypasses the filter (`OneEuroParams::RAW`): 0.0 px. |
 | **Prediction overshot by ~2 frames.** All of Chromium's predicted events were drawn: the tip ran ~30 ms of travel ahead of the pen, overshot corners and retracted at pen-up. | Tip 12 px (30 ms) ahead of the newest sample, p50. | Predicted points ≤ 12 ms ahead; none when the OS ink trail is on. |
 | **Default smoothing rounded corners.** 50 % smoothing cuts a handwriting corner by ~5 px at writing speed. | Zig-zag p95 5 px; a simulation of the filter agrees (5.9 px). | Default 25 % (existing users keep their setting). 0 % is raw, as in Windows Ink. |
-| **Autosave ran mid-stroke.** Every 3 s, whatever the pen was doing, the whole lesson was serialised to an `.rpk` (`rupok-bench`: package write ≈ 1 s for a 100k-stroke lesson; it scales with strokes and imported PDFs and images). | `setInterval(autosave, 3000)`; profile shows `Package::write` (zip, crc32) inside the writing session. | Autosave waits for a 1 s pause in the writing (at most ~30 s, then the next gap between strokes) and never runs while a pointer is down. |
+| **Autosave ran mid-stroke.** Every 3 s, whatever the pen was doing, the whole lesson was serialised to an `.rpk` (`rupok-bench`: package write ≈ 1 s for a 100k-stroke lesson; it scales with strokes and imported PDFs and images). | `setInterval(autosave, 3000)`; profile shows `Package::write` (zip, crc32) inside the writing session. | Autosave waits for a 1 s pause in the writing (0.4 s once 30 s overdue, any gap after 2 min) and never runs while a pointer is down. |
 | **Maths preview could recognise mid-stroke.** It ran 160 ms after each stroke, often inside the next one. | `MathPreview.tsx` timer. | Waits until the pen has rested 120 ms. |
 | Style thrash in the pointer handler: the eraser ring's style was written on every move for every tool, and the board's rect read per event. | Profile: `getBoundingClientRect` and `hover` among the top JS self-time. | Ring updated only for the eraser; rect read once per frame. |
 

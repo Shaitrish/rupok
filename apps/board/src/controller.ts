@@ -86,11 +86,14 @@ export class Controller {
     this.loop();
     if (!studentEntry) {
       // Never mid-stroke: a save serialises the whole lesson (tens to
-      // hundreds of ms on a big one). Wait for a pause in the writing, or at
-      // most ~30 s for any gap between strokes (docs/performance.md).
+      // hundreds of ms on a big one) and would also delay the next stroke's
+      // first frame. Wait for a 1 s pause in the writing; after 30 s without
+      // a save, a 0.4 s pause (longer than the gaps between strokes of a
+      // word) will do; after 2 min, any gap (docs/performance.md).
       setInterval(() => {
-        if (!penBusy(performance.now() - this.lastAutosave > 30000 ? 0 : 1000)) void this.autosave();
-      }, 1000);
+        const due = performance.now() - this.lastAutosave;
+        if (!penBusy(due > 120000 ? 0 : due > 30000 ? 400 : 1000)) void this.autosave();
+      }, 250);
       window.addEventListener("beforeunload", () => this.autosave());
     }
     // Clicking into a Smart Object to use it dismisses the selection frame.
@@ -456,9 +459,9 @@ export class Controller {
       this.pointersDown++;
       notePointerDown();
       setPointerKind(e.pointerType);
-      this.inking.set(e.pointerId, drawsInk(e));
       this.rect = null;
       const [x, y] = pos(e);
+      this.inking.set(e.pointerId, drawsInk(e, x, y));
       this.board.pointer_down(e.pointerId, x, y, e.pressure, e.timeStamp, e.pointerType, e.button);
       e.preventDefault();
     });
@@ -471,7 +474,8 @@ export class Controller {
       const samples = c.length ? c : [e];
       this.board.pointer_move(e.pointerId, flat(samples), flat(predictedFor(e)));
       noteSamples(e, samples);
-      trailAfterMove(e, this.inking.get(e.pointerId) ?? false);
+      const [tx, ty] = pos(e);
+      trailAfterMove(e, this.inking.get(e.pointerId) ?? false, tx, ty);
       this.hover(e);
     });
     const released = (e: PointerEvent) => {
@@ -734,7 +738,11 @@ export class Controller {
   async autosave() {
     if (studentEntry) return;
     const rev = this.board.revision();
-    if (rev === this.savedAutosaveRev) return;
+    if (rev === this.savedAutosaveRev) {
+      // Nothing to save: "overdue" counts from the first unsaved change.
+      this.lastAutosave = performance.now();
+      return;
+    }
     try {
       // The readable summary inside is refreshed at most once a minute here;
       // explicit saves, closing and exports call save().

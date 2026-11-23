@@ -22,7 +22,7 @@
 // crates/rupok-render/tests/wet_dry.rs and bench/latency).
 
 import { createSignal } from "solid-js";
-import { camera, color, prefs, tool, width } from "./state";
+import { camera, color, pageIndex, pages, prefs, tool, width } from "./state";
 
 /** At most this far ahead (ms) of the newest real sample when predicting. */
 const PREDICT_MS = 12;
@@ -67,9 +67,10 @@ let penSeen = false;
 
 /** Whether this pointer's press draws ink (mirrors the engine's palm
  * rejection: touch draws until a pen is seen, unless set otherwise). */
-export function drawsInk(e: PointerEvent): boolean {
+export function drawsInk(e: PointerEvent, x: number, y: number): boolean {
   if (e.pointerType === "pen") penSeen = true;
-  if (!inking() || e.button > 0) return false;
+  // Ink that starts off a slide page draws nothing (engine/clip.rs).
+  if (!inking() || e.button > 0 || !onPage(x, y, 0)) return false;
   if (e.pointerType !== "touch") return true;
   const m = prefs().touchMode;
   return m === "draw" || (m === "auto" && !penSeen);
@@ -80,13 +81,32 @@ function css(rgba: number): string {
   return `rgb(${(rgba >>> 24) & 255}, ${(rgba >>> 16) & 255}, ${(rgba >>> 8) & 255})`;
 }
 
-/** After the board took a pen move: hand the OS trail its start point. */
-export function trailAfterMove(e: PointerEvent, drawing: boolean) {
+/** Whether a board point (CSS px from the board's corner) lies on the page
+ * with `margin` to spare, when ink is kept on the page (engine/clip.rs:
+ * slide pages clip ink to [0, 0, w, h] in world units; infinite pages never). */
+function onPage(x: number, y: number, margin: number): boolean {
+  if (!prefs().keepInkOnPage) return true;
+  const f = pages()[pageIndex()]?.frame;
+  if (!f) return true;
+  const [cx, cy, z] = camera();
+  const wx = cx + x / z;
+  const wy = cy + y / z;
+  const m = margin / z;
+  return wx >= m && wy >= m && wx <= f.w - m && wy <= f.h - m;
+}
+
+/** After the board took a pen move: hand the OS trail its start point.
+ * `x`, `y`: the move's position on the board (CSS px from its corner). */
+export function trailAfterMove(e: PointerEvent, drawing: boolean, x: number, y: number) {
   if (!presenter || !drawing || !inking()) return;
   // Mirror rupok_ink::point_radius (MIN_WIDTH_RATIO 0.35) and the pressure
   // curve, so the trail is as wide as the ink it leads.
   const p = e.pointerType === "pen" && e.pressure > 0 ? Math.pow(Math.min(1, e.pressure), prefs().pressure) : 0.5;
   const diameter = Math.max(1, width() * camera()[2] * (0.35 + 0.65 * p));
+  // Off the page the engine cuts the ink; the OS trail must not draw there
+  // either, or the tip would show ink that never lands. Skipping an update
+  // leaves that frame without a trail.
+  if (!onPage(x, y, diameter / 2)) return;
   try {
     presenter.updateInkTrailStartPoint(e, { color: css(color()), diameter });
   } catch {
