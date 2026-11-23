@@ -72,7 +72,7 @@ rupok-cli = { workspace = true, optional = true }
 # on-demand model download (HTTPS, checked against a pinned SHA-256).
 whisper-rs = { version = "0.16", optional = true }
 ureq = { version = "3", optional = true }
-sha2 = { version = "0.10", optional = true }
+sha2 = { version = "0.11", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 x11rb = { version = "0.13", optional = true }
