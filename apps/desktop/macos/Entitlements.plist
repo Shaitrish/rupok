@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for the macOS app, signed with the hardened runtime (required
+  for notarisation). Rupok asks for no exceptions:
+  - JavaScript and WebAssembly run in WebKit's own WebContent process, which
+    Apple signs with its own JIT entitlement, so the app needs no
+    com.apple.security.cs.allow-jit or allow-unsigned-executable-memory.
+  - The app is not sandboxed (it opens lessons anywhere and draws over other
+    apps), so it needs no com.apple.security.files.* or network entitlements.
+  - Screen Recording (overlay "Save to lesson") is a privacy permission the
+    teacher grants in System Settings, not an entitlement.
+  A Mac App Store build would add com.apple.security.app-sandbox and friends
+  here (see apps/desktop/README.md).
+-->
+<plist version="1.0">
+<dict/>
+</plist>

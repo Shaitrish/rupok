@@ -1,6 +1,6 @@
 [package]
 name = "rupok-desktop"
-description = "Rupok desktop app (Tauri 2) for Windows and Linux, with the draw-over-any-app overlay"
+description = "Rupok desktop app (Tauri 2) for Windows, macOS and Linux, with the draw-over-any-app overlay"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -36,9 +36,11 @@ app = [
   "dep:tauri-plugin-single-instance",
   "dep:tauri-plugin-window-state",
   "dep:percent-encoding",
+  "dep:objc2",
 ]
 # Screen capture for the overlay's "Save to lesson" (no system libraries
-# needed: pure-Rust X11 on Linux, xcap on Windows). Builds without WebKitGTK.
+# needed: pure-Rust X11 on Linux, xcap on Windows and macOS). Builds without
+# WebKitGTK.
 capture = ["dep:x11rb", "dep:xcap"]
 
 [dependencies]
@@ -56,8 +58,12 @@ percent-encoding = { version = "2", optional = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 x11rb = { version = "0.13", optional = true }
 
-[target.'cfg(windows)'.dependencies]
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 xcap = { version = "0.9", optional = true }
+
+# macOS overlay window levels and Spaces behaviour (already in Tauri's tree).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.6", optional = true }
 
 [build-dependencies]
 tauri-build = { version = "2.7", optional = true , features = [] }

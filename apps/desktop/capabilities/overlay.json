@@ -10,6 +10,7 @@
     "allow-overlay-set-click-through",
     "allow-overlay-toolbar-fit",
     "allow-overlay-capture",
+    "allow-overlay-open-screen-settings",
     "allow-overlay-deliver-page"
   ]
 }

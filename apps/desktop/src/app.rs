@@ -1,5 +1,5 @@
-//! The Tauri shell: plugins, the main window, file commands, and files the
-//! operating system asks us to open.
+//! The Tauri shell: plugins, the main window, file commands, files the
+//! operating system asks us to open, and the macOS menu bar.
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -27,7 +27,11 @@ struct PendingFiles(Mutex<Vec<PathBuf>>);
 pub fn run() {
     crate::prefer_x11_on_wayland();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(macos_menu);
+
+    builder
         // First, so a second launch hands its files over and exits early.
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             let args = argv.get(1..).unwrap_or_default();
@@ -64,6 +68,7 @@ pub fn run() {
             overlay::overlay_set_click_through,
             overlay::overlay_toolbar_fit,
             overlay::overlay_capture,
+            overlay::overlay_open_screen_settings,
             overlay::overlay_deliver_page,
             overlay::take_overlay_page,
         ])
@@ -80,8 +85,90 @@ pub fn run() {
                 window.app_handle().exit(0);
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Rupok");
+        .build(tauri::generate_context!())
+        .expect("error while starting Rupok")
+        .run(|app, event| {
+            // macOS hands files over as events, not argv: a double-clicked
+            // lesson in Finder, "Open With", a drop on the Dock icon, at
+            // launch or while running.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = event {
+                let paths = urls.iter().filter_map(|u| u.to_file_path().ok());
+                queue_files(app, files::openable_paths(paths));
+                focus_main(app);
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
+}
+
+/// The macOS menu bar: the app menu (About, Hide ⌘H, Quit ⌘Q), Edit (which
+/// also makes ⌘C/⌘V/⌘X/⌘A work in text fields: WKWebView only gets them
+/// through the menu), View (full screen) and Window. The board handles ⌘Z,
+/// ⌘C, ⌘S… itself first; the menu acts only on keys the page leaves alone.
+#[cfg(target_os = "macos")]
+fn macos_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<tauri::menu::Menu<R>> {
+    use tauri::menu::{AboutMetadata, Menu, PredefinedMenuItem, Submenu, WINDOW_SUBMENU_ID};
+
+    let name = app.package_info().name.clone();
+    let about = AboutMetadata {
+        name: Some(name.clone()),
+        version: Some(app.package_info().version.to_string()),
+        copyright: app.config().bundle.copyright.clone(),
+        credits: Some("Open-source whiteboard for teachers. https://rupok.app".into()),
+        ..Default::default()
+    };
+    let sep = || PredefinedMenuItem::separator(app);
+    let app_menu = Submenu::with_items(
+        app,
+        &name,
+        true,
+        &[
+            &PredefinedMenuItem::about(app, Some(&format!("About {name}")), Some(about))?,
+            &sep()?,
+            &PredefinedMenuItem::services(app, None)?,
+            &sep()?,
+            &PredefinedMenuItem::hide(app, None)?,
+            &PredefinedMenuItem::hide_others(app, None)?,
+            &PredefinedMenuItem::show_all(app, None)?,
+            &sep()?,
+            &PredefinedMenuItem::quit(app, None)?,
+        ],
+    )?;
+    let edit = Submenu::with_items(
+        app,
+        "Edit",
+        true,
+        &[
+            &PredefinedMenuItem::undo(app, None)?,
+            &PredefinedMenuItem::redo(app, None)?,
+            &sep()?,
+            &PredefinedMenuItem::cut(app, None)?,
+            &PredefinedMenuItem::copy(app, None)?,
+            &PredefinedMenuItem::paste(app, None)?,
+            &PredefinedMenuItem::select_all(app, None)?,
+        ],
+    )?;
+    let view = Submenu::with_items(
+        app,
+        "View",
+        true,
+        &[&PredefinedMenuItem::fullscreen(app, None)?],
+    )?;
+    // This id makes it the system Window menu, which lists the open windows.
+    let window = Submenu::with_id_and_items(
+        app,
+        WINDOW_SUBMENU_ID,
+        "Window",
+        true,
+        &[
+            &PredefinedMenuItem::minimize(app, None)?,
+            &PredefinedMenuItem::maximize(app, Some("Zoom"))?,
+            &sep()?,
+            &PredefinedMenuItem::close_window(app, None)?,
+        ],
+    )?;
+    Menu::with_items(app, &[&app_menu, &edit, &view, &window])
 }
 
 fn focus_main<R: Runtime>(app: &AppHandle<R>) {

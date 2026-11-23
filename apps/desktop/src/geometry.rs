@@ -16,6 +16,21 @@ impl Rect {
     }
 }
 
+/// A physical-pixel point in logical units (macOS points), for APIs that
+/// work in points: macOS reports window positions as points × the window's
+/// scale factor. A scale that is not a positive number counts as 1.
+pub fn logical_point((x, y): (i32, i32), scale: f64) -> (i32, i32) {
+    let s = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    (
+        (f64::from(x) / s).round() as i32,
+        (f64::from(y) / s).round() as i32,
+    )
+}
+
 /// Where the floating overlay toolbar goes: centred horizontally near the
 /// bottom of `monitor`, `margin` physical pixels above the edge, and always
 /// fully on that monitor even when it is wider than the screen.
@@ -106,6 +121,16 @@ mod tests {
             .center(),
             (-960, 540)
         );
+    }
+
+    #[test]
+    fn physical_to_logical_points() {
+        // Centre of a 1440×900 pt Retina display (2880×1800 px).
+        assert_eq!(logical_point((1440, 900), 2.0), (720, 450));
+        // A display left of the main one, at 1.5×.
+        assert_eq!(logical_point((-2160, 301), 1.5), (-1440, 201));
+        assert_eq!(logical_point((10, 20), 0.0), (10, 20));
+        assert_eq!(logical_point((10, 20), f64::NAN), (10, 20));
     }
 
     #[test]

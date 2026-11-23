@@ -41,6 +41,7 @@ function InkLayer() {
   const [error, setError] = createSignal<string | null>(null);
   const [through, setThrough] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
+  const [permissionHelp, setPermissionHelp] = createSignal(false);
 
   const status = (s: OverlayStatus) => {
     if (isDesktop) void desktopEmitTo(TOOLBAR_WINDOW, STATUS_EVENT, s);
@@ -55,6 +56,11 @@ function InkLayer() {
     status({ saving: true });
     try {
       showToast(await ink.saveToLesson(), 4000);
+      if (ink.needsScreenPermission) {
+        // Make the help clickable even if clicks were passing through.
+        void desktopInvoke("overlay_set_click_through", { enabled: false });
+        setPermissionHelp(true);
+      }
     } catch (e: any) {
       showToast(`Could not save to the lesson: ${e?.message ?? e}`, 5000);
     } finally {
@@ -109,6 +115,36 @@ function InkLayer() {
       <Show when={error()}>
         <div class="toast surface ov-error" role="alert"><Icon name="info" size={20} />The overlay could not start the GPU renderer: {error()}</div>
       </Show>
+      <Show when={permissionHelp()}>
+        <ScreenPermissionHelp onClose={() => setPermissionHelp(false)} />
+      </Show>
+    </div>
+  );
+}
+
+/** macOS: why the screen was not saved, and the way to System Settings. */
+function ScreenPermissionHelp(props: { onClose: () => void }) {
+  const open = () => {
+    props.onClose();
+    // Hides the overlay (it would cover System Settings) and opens the pane.
+    void desktopInvoke("overlay_open_screen_settings").catch((e) => showToast(String(e?.message ?? e), 5000));
+  };
+  return (
+    <div class="ov-permission dialog" role="alertdialog" aria-labelledby="ov-permission-title" aria-describedby="ov-permission-text">
+      <h2 id="ov-permission-title">Let Rupok see the screen</h2>
+      <p id="ov-permission-text" class="sub">
+        Your ink was saved as a new page. To save the screen behind it too, macOS needs to allow Rupok to record the screen.
+        Rupok only looks at the screen when you press Save to lesson.
+      </p>
+      <ol>
+        <li>Click <b>Open System Settings</b>. The overlay hides.</li>
+        <li>In <b>Screen &amp; System Audio Recording</b> (or <b>Screen Recording</b>), turn on <b>Rupok</b>.</li>
+        <li>Quit Rupok with <b>⌘Q</b> and open it again. macOS applies the change after a restart.</li>
+      </ol>
+      <div class="ov-permission-actions">
+        <button class="btn" onClick={props.onClose}>Not now</button>
+        <button class="btn solid" onClick={open}>Open System Settings</button>
+      </div>
     </div>
   );
 }
