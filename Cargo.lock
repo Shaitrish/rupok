@@ -415,12 +415,6 @@ checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "base64"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
-
-[[package]]
-name = "base64"
 version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
@@ -2181,7 +2175,7 @@ dependencies = [
  "serde",
  "thiserror 2.0.21",
  "windows-sys 0.59.0",
- "x11rb",
+ "x11rb 0.13.2",
  "xkeysym",
 ]
 
@@ -4380,12 +4374,6 @@ dependencies = [
 
 [[package]]
 name = "pollster"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f3a9f18d041e6d0e102a0a46750538147e5e8992d3b4873aaafee2520b00ce3"
-
-[[package]]
-name = "pollster"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e9b9cf600136f5b976fbc5727d58c26e1ecab8ee23088d44ef1c7af793550ab"
@@ -4899,7 +4887,7 @@ dependencies = [
 name = "rupok-bench"
 version = "0.2.0"
 dependencies = [
- "pollster 0.4.0",
+ "pollster",
  "rupok-core",
  "rupok-format",
  "rupok-ink",
@@ -4913,12 +4901,12 @@ version = "0.2.0"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bytes",
  "clap",
  "dirs",
  "futures-util",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "http-body-util",
  "hyper",
  "hyper-util",
@@ -4961,7 +4949,7 @@ dependencies = [
  "rupok-format",
  "serde",
  "serde_json",
- "sha2 0.10.9",
+ "sha2 0.11.1",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -4974,7 +4962,7 @@ dependencies = [
  "ureq",
  "webkit2gtk",
  "whisper-rs",
- "x11rb",
+ "x11rb 0.14.0",
  "xcap",
 ]
 
@@ -5017,7 +5005,7 @@ name = "rupok-render"
 version = "0.2.0"
 dependencies = [
  "bytemuck",
- "pollster 0.4.0",
+ "pollster",
  "rupok-core",
  "rupok-ink",
  "wgpu",
@@ -7936,7 +7924,18 @@ checksum = "9993aa5be5a26815fe2c3eacfc1fde061fc1a1f094bf1ad2a18bf9c495dd7414"
 dependencies = [
  "gethostname",
  "rustix 1.1.6",
- "x11rb-protocol",
+ "x11rb-protocol 0.13.2",
+]
+
+[[package]]
+name = "x11rb"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a8885a854a8bfdf87a301e53e41b17c5f8f33639903131338b997b1eb614f44"
+dependencies = [
+ "gethostname",
+ "rustix 1.1.6",
+ "x11rb-protocol 0.14.0",
 ]
 
 [[package]]
@@ -7944,6 +7943,12 @@ name = "x11rb-protocol"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea6fc2961e4ef194dcbfe56bb845534d0dc8098940c7e5c012a258bfec6701bd"
+
+[[package]]
+name = "x11rb-protocol"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acf4d1bc32aa46eec18caa634ec3cf4c05bfa151f12b93b510b15190f69a1ca8"
 
 [[package]]
 name = "xcap"
@@ -7966,7 +7971,7 @@ dependencies = [
  "objc2-foundation",
  "percent-encoding",
  "pipewire",
- "pollster 1.0.3",
+ "pollster",
  "rand 0.10.4",
  "scopeguard",
  "serde",

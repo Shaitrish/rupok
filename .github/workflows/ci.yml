@@ -21,7 +21,7 @@ jobs:
     name: Rust (fmt, clippy, test, wasm)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Installs the toolchain, components (rustfmt, clippy) and the
       # wasm32-unknown-unknown target pinned in rust-toolchain.toml.
@@ -49,8 +49,8 @@ jobs:
     name: Object SDK (node --test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       # Node 22+ treats test arguments as globs; a bare directory is not expanded.
@@ -61,7 +61,7 @@ jobs:
     name: Offline libraries (vendor rupoklib)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       # Copies the pinned libraries into apps/board/public/rupoklib/ and checks
       # them against LIBS in crates/rupok-format/src/object.rs.

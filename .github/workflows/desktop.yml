@@ -67,7 +67,7 @@ jobs:
               target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install WebKitGTK and bundling dependencies
         if: runner.os == 'Linux'
@@ -96,7 +96,7 @@ jobs:
 
       - name: Cache wasm-bindgen CLI
         id: wasm-bindgen-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin/wasm-bindgen
@@ -168,7 +168,7 @@ jobs:
       # macOS app ad hoc (signingIdentity "-").
       - name: Build installers
         if: steps.apple.outputs.signed != 'true'
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -186,7 +186,7 @@ jobs:
       # temporary keychain, signs with the hardened runtime and notarises.
       - name: Build, sign and notarise (macOS)
         if: steps.apple.outputs.signed == 'true'
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -233,7 +233,7 @@ jobs:
     name: WebKit e2e (macOS)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust from rust-toolchain.toml
         run: |
@@ -247,7 +247,7 @@ jobs:
 
       - name: Cache wasm-bindgen CLI
         id: wasm-bindgen-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/bin/wasm-bindgen
           key: wasm-bindgen-${{ runner.os }}-${{ env.WASM_BINDGEN_VERSION }}
@@ -263,7 +263,7 @@ jobs:
             target/wasm32-unknown-unknown/release-wasm/rupok_wasm.wasm
 
       - uses: oven-sh/setup-bun@v2
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -282,7 +282,7 @@ jobs:
           echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
 
       - name: Cache the WebKit build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/Library/Caches/ms-playwright
           key: playwright-webkit-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}

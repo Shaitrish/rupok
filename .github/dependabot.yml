@@ -1,4 +1,6 @@
-# Weekly dependency update PRs. Security fixes arrive immediately regardless.
+# Weekly dependency updates, grouped so each ecosystem opens at most two PRs:
+# one for minor and patch updates, one for major updates (which may need code
+# changes). Security fixes arrive immediately regardless.
 version: 2
 updates:
   - package-ecosystem: cargo
@@ -6,13 +8,19 @@ updates:
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
     groups:
-      rust-minor: { update-types: [minor, patch] }
+      cargo-minor-patch: { update-types: [minor, patch] }
+      cargo-major: { update-types: [major] }
   - package-ecosystem: npm
     directory: /apps/board
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
     groups:
-      npm-minor: { update-types: [minor, patch] }
+      npm-minor-patch: { update-types: [minor, patch] }
+      npm-major: { update-types: [major] }
   - package-ecosystem: github-actions
     directory: /
-    schedule: { interval: monthly }
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch: { update-types: [minor, patch] }
+      actions-major: { update-types: [major] }
