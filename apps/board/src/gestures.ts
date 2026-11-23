@@ -10,9 +10,10 @@
 //
 // Detection works with and without contact size. Boards that report it
 // (PointerEvent width/height) get a palm from one large contact. Boards that
-// don't (most IR frames, Linux WebKitGTK) get a palm from 3+ touches close
-// together that move together, or from one touch scrubbing fast back and
-// forth while fingers don't draw.
+// don't (most IR frames, Linux WebKitGTK; they report 0 or 1) get a palm
+// from 3+ touches close together that move together, from two touches close
+// together rubbing back and forth (an IR frame often sees a palm as two),
+// or from one touch scrubbing fast back and forth while fingers don't draw.
 //
 // Touches the engine already has (a finger that started drawing or panning)
 // are taken back with a cancel, and the camera returns to where the gesture
@@ -155,6 +156,10 @@ export function thresholds(c: GestureConfig) {
     /** Hand cluster: touches within this distance of their centre. */
     clusterRadius: spread > 0 ? clamp(spread * 1.5, 90, 320) : 170,
     clusterMin: 3,
+    /** Two touches this close (CSS px) rubbing back and forth are a palm. */
+    pairGap: 110,
+    pairReversals: 2,
+    pairTravel: 60,
     /** Mean path a cluster travels before it erases. */
     clusterTravel: 18,
     scrubAmplitude: 22,
@@ -617,6 +622,7 @@ export class GestureRecognizer {
   private clusterHit(t: number): boolean {
     const th = thresholds(this.config());
     const n = this.tracks.size;
+    if (n === 2 && this.maxTouches === 2) return this.pairRub(t);
     if (n < th.clusterMin) return false;
     const { spread } = this.centre();
     if (spread > th.clusterRadius) return false;
@@ -630,6 +636,17 @@ export class GestureRecognizer {
       return travel >= 40 && (reversals > 0 || t - this.sessionT0 > th.swipeMaxMs);
     }
     return travel >= th.clusterTravel;
+  }
+
+  /** Two touches close together rubbing back and forth: a palm the board
+   * reports as two contacts. A pinch or a two-finger swipe never reverses. */
+  private pairRub(t: number): boolean {
+    const th = thresholds(this.config());
+    const [a, b] = [...this.tracks.values()];
+    if (Math.hypot(a.x - b.x, a.y - b.y) > th.pairGap) return false;
+    const recent = (tr: Track) => tr.reversals.filter((r) => t - r <= th.scrubWindow).length;
+    if (recent(a) + recent(b) < th.pairReversals || !recent(a) || !recent(b)) return false;
+    return (a.travel + b.travel) / 2 >= th.pairTravel;
   }
 
   private scrubHit(tr: Track, t: number): boolean {

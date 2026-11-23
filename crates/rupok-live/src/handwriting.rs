@@ -389,6 +389,7 @@ pub fn run(
             }),
             created: now + s.start_ms,
             group: Some(group.clone()),
+            z: None,
         })
         .collect();
     tag(ctx.lesson, msg);

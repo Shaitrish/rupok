@@ -32,7 +32,7 @@ export const [color, setColor] = createSignal<number>(0x1c2024ff);
 export const [width, setWidth] = createSignal<number>(4);
 export const [hlColor, setHlColor] = createSignal<number>(0xffe629ff);
 /** Last chosen size per tool family. */
-export const [sizes, setSizes] = createSignal<Record<string, number>>({ pen: 4, highlighter: 22, eraser: 32 });
+export const [sizes, setSizes] = createSignal<Record<string, number>>({ pen: 4, highlighter: 22, eraser: 64 });
 export function sizeKey(t: string): string {
   return t === "highlighter" || t === "eraser" ? t : "pen";
 }
@@ -52,6 +52,8 @@ export const [selectionMeta, setSelectionMeta] = createSignal<{
   shape?: number[] | null; shapeName?: string | null;
   /** An axes-and-curve graph "Make it live" can replace. */
   live?: boolean;
+  /** Shared colour (#rrggbbaa) and stroke width when uniform; all ink is highlighter. */
+  style?: { color: string | null; width: number | null; highlighter: boolean };
 }>({ count: 0, strokes: 0, boxes: 0, groups: 0, grouped: false });
 /** Opened as the student viewer (`/board/?view`): starts in the Student
  * mode and never touches the teacher's autosave. */
@@ -115,12 +117,16 @@ export interface Prefs {
   modes?: Partial<ModesConfig>;
   /** Writing hand: dock popovers open away from it, so the arm never covers them. */
   hand: "right" | "left";
+  /** Eraser and palm duster: rub out only what they cover, or whole strokes. */
+  eraserMode: "partial" | "stroke";
+  /** Slide pages are the board: ink, shapes and placed items stay on them. */
+  keepInkOnPage: boolean;
 }
 // WebGL2 is the default until WebGPU presentation is verified on real boards (see ROADMAP).
 const defaults: Prefs = {
   theme: "system", accent: "mint", iconStyle: "linear", toolbar: "bottom", density: "comfortable",
   touchMode: "auto", smoothing: 0.5, pressure: 0.8, showStats: false, forceWebgl: true, showPages: true,
-  smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right",
+  smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right", eraserMode: "partial", keepInkOnPage: true,
   smartGraphs: true, smartFlowchart: true, smartGates: true, smartNumberLine: true,
   smartGeometry: true, smartTables: true, smartScience: false, smartMath: true,
 };
@@ -146,6 +152,8 @@ function loadPrefs(): Prefs {
     if (!["off", "auto", "hold"].includes(saved.smartShapes)) saved.smartShapes = "off";
     if (!["auto", "hold"].includes(saved.smartLast)) saved.smartLast = "auto";
     if (saved.hand !== "left") saved.hand = "right";
+    if (saved.eraserMode !== "stroke") saved.eraserMode = "partial";
+    saved.keepInkOnPage = saved.keepInkOnPage !== false;
     saved.modes = sanitizeModes(saved.modes);
     return saved;
   } catch {

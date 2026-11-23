@@ -36,9 +36,12 @@ const SHAPES: Tool[] = ["rect", "ellipse", "line", "arrow"];
 /** Tools whose strokes the dock gets out of the way of. */
 const DRAWING: Tool[] = ["pen", "highlighter", "eraser", "laser", "rect", "ellipse", "line", "arrow"];
 const HL_WIDTHS = [14, 22, 34];
-const ERASER_WIDTHS = [16, 32, 64];
+/** Eraser diameters, CSS px: from a fingertip to a board duster. */
+const ERASER_WIDTHS = [32, 64, 120, 200];
 const TEXT_SIZES = [24, 32, 40, 56, 72, 96, 128];
 
+/** A touch screen (a smartboard, a tablet): Teach keeps finger-sized cells. */
+const COARSE = typeof matchMedia !== "undefined" && matchMedia("(any-pointer: coarse)").matches;
 /** Teach: the dock fades after a few idle seconds (hover, a key or a touch brings it back). */
 const TEACH_IDLE_MS = 3000;
 /** Ink drawn this close to the dock fades it (CSS px from its edge). */
@@ -472,7 +475,8 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   const iconSize = () => {
     const d = prefs().density;
     if (isPhone()) return d === "large" ? 26 : 22; // 44px cells (52 large) for thumbs
-    if (mode() === "teach") return d === "large" ? 24 : 20;
+    // Teach is compact, except on a touch board, where fingers need the room (Dock.css).
+    if (mode() === "teach") return COARSE ? (d === "large" ? 28 : 24) : d === "large" ? 24 : 20;
     return d === "compact" ? 20 : d === "large" ? 28 : 24;
   };
   const dotFor = (t: "pen" | "highlighter" | "eraser") => {
@@ -863,7 +867,9 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
     setSizes({ ...sizes(), [sizeKey(t)]: w });
     controller.board.set_width(w);
   };
-  let clearArmed = 0;
+  /** Clear page asks for a second tap: the time of the first. */
+  const [clearArmed, setClearArmed] = createSignal(0);
+  const armedNow = () => clearArmed() > 0;
 
   return (
     <>
@@ -971,6 +977,24 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
               </Match>
               <Match when={p().kind === "eraser"}>
                 <div class="dock-pop-title">Eraser</div>
+                <div class="seg dock-seg" role="radiogroup" aria-label="What the eraser removes">
+                  <For each={[["partial", "Rub out"], ["stroke", "Whole strokes"]] as const}>
+                    {([v, l]) => (
+                      <button
+                        role="radio"
+                        aria-checked={prefs().eraserMode === v}
+                        classList={{ on: prefs().eraserMode === v }}
+                        title={v === "partial" ? "Rub out only what the eraser covers, like a duster" : "Erase every stroke the eraser touches"}
+                        onClick={() => {
+                          setPrefs({ eraserMode: v });
+                          controller.applyPrefs();
+                        }}
+                      >
+                        {l}
+                      </button>
+                    )}
+                  </For>
+                </div>
               </Match>
             </Switch>
             <Show when={(p().kind === "pen" || p().kind === "highlighter" || p().kind === "eraser") && cfg().chrome.sizes}>
@@ -1025,19 +1049,23 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
             <Show when={p().kind === "eraser" && !isView()}>
               <button
                 class="dock-row danger"
+                classList={{ armed: armedNow() }}
+                aria-live="polite"
                 onClick={() => {
                   const now = Date.now();
-                  if (now - clearArmed > 2500) {
-                    clearArmed = now;
-                    showToast("Tap Clear page again to erase everything on this page");
+                  if (now - clearArmed() > 3000) {
+                    setClearArmed(now);
+                    window.setTimeout(() => clearArmed() === now && setClearArmed(0), 3000);
                     return;
                   }
-                  clearArmed = 0;
+                  setClearArmed(0);
                   controller.board.clear_page();
+                  showToast("Page cleared. Undo brings it back.");
                   setPop(null);
                 }}
               >
-                <Icon name="trash" size={20} /><span class="grow">Clear page</span>
+                <Icon name="broom" size={20} />
+                <span class="grow">{armedNow() ? "Tap again to clear the page" : "Clear page"}</span>
               </button>
             </Show>
             <Show when={p().kind === "shapes"}>

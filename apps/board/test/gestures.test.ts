@@ -303,6 +303,53 @@ test("hand cluster: 3 touches close together that rub erase (no contact size)", 
   assert.equal(g.count("eraseEnd"), 1);
 });
 
+test("a palm seen as two touches (size 0 or 1) that rubs back and forth erases", () => {
+  for (const size of [0, 1]) {
+    const g = setup();
+    g.ev("down", 1, 500, 400, 0, size);
+    g.ev("down", 2, 560, 410, 4, size);
+    let v: Verdict = "pass";
+    // Short strokes back and forth: a rub, not a swipe.
+    const xs = [520, 540, 560, 540, 520, 500, 520, 540, 560, 540, 520, 500, 520, 540];
+    xs.forEach((x, i) => {
+      v = g.ev("move", 1, x, 400, 4 + (i + 1) * 30, size);
+      v = g.ev("move", 2, x + 60, 410, 4 + (i + 1) * 30, size);
+    });
+    assert.equal(v, "consume", `size ${size}`);
+    assert.equal(g.rec.state, "palm");
+    assert.equal(g.count("cancel"), 2, "both touches are taken back from the engine");
+    assert.ok(g.count("erase") > 0);
+    g.ev("up", 1, 0, 0, 600);
+    g.ev("up", 2, 0, 0, 600);
+    assert.equal(g.count("eraseEnd"), 1);
+    assert.equal(g.count("next") + g.count("prev"), 0);
+  }
+});
+
+test("two fingers far apart moving back and forth are not a palm", () => {
+  const g = setup();
+  g.ev("down", 1, 300, 400, 0);
+  g.ev("down", 2, 700, 400, 4);
+  const xs = [320, 340, 360, 340, 320, 300, 320, 340, 360, 340, 320];
+  xs.forEach((x, i) => {
+    g.ev("move", 1, x, 400, 4 + (i + 1) * 30);
+    g.ev("move", 2, x + 400, 400, 4 + (i + 1) * 30);
+  });
+  assert.notEqual(g.rec.state, "palm");
+  assert.equal(g.count("erase"), 0);
+});
+
+test("a finger with a large contact size is still a finger; a palm is much larger", () => {
+  const g = setup();
+  // A board that reports a finger as 24 px draws with it.
+  assert.equal(g.ev("down", 1, 300, 300, 0, 24), "pass");
+  for (let i = 1; i <= 10; i++) assert.equal(g.ev("move", 1, 300 + i * 10, 300, i * 16, 24), "pass");
+  g.ev("up", 1, 400, 300, 200);
+  // …and a 140 px palm erases.
+  assert.equal(g.ev("down", 2, 600, 400, 1000, 140), "consume");
+  assert.equal(g.rec.state, "palm");
+});
+
 test("hand cluster can be turned off; touches spread wide are not a hand", () => {
   const g = setup({ config: { handCluster: false } });
   g.ev("down", 1, 500, 400, 0);

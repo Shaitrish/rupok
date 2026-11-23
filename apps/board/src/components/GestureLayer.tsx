@@ -81,7 +81,8 @@ export default function GestureLayer(props: { onSettings?: (section?: string) =>
         const t = tool();
         if (t === "hand" || t === "interact") return "pan";
         if (t === "lasso") return "select";
-        if (t === "text") return "draw";
+        // The eraser tool: a finger rubs out, also once a pen has been seen.
+        if (t === "text" || t === "eraser") return "draw";
         const tm = prefs().touchMode;
         return tm === "draw" ? "draw" : tm === "navigate" ? "pan" : penSeen ? "pan" : "draw";
       },

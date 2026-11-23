@@ -157,7 +157,7 @@ How the top bar uses these keys:
 | Mode | Chrome on | Tools | Pinned on the dock |
 |---|---|---|---|
 | `prepare` | everything except `logo` | `pen highlighter eraser rect ellipse line arrow smartink text lasso laser hand interact undo redo` | `shapes text lasso` |
-| `teach` | `colors sizes` | `pen highlighter eraser laser smartink undo pager exit` | `smartink pager exit` |
+| `teach` | `colors sizes` | `pen highlighter eraser lasso laser smartink undo pager exit` | `lasso smartink pager exit` |
 | `view` | `switcher title pagesToggle open theme fullscreen overflow pages zoom` | `pager hand interact replay` | `pager hand interact replay` |
 
 `position` is `"auto"` in `prepare` and `teach` and `"bottom"` in `view`;

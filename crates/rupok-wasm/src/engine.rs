@@ -23,8 +23,14 @@ use crate::b64;
 use crate::replay::Replay;
 use crate::shapes::{ShapeKind, shape_points};
 
+mod clip;
+mod duster;
+mod restyle;
 mod reveal;
 mod smart;
+#[cfg(test)]
+mod ux_tests;
+pub use duster::EraserMode;
 pub use smart::{SmartInk, SmartMode};
 
 pub const GENERATOR: &str = concat!("rupok/", env!("CARGO_PKG_VERSION"));
@@ -161,6 +167,8 @@ enum Gesture {
         poly: Vec<[f32; 2]>,
         start_screen: [f32; 2],
         moved: bool,
+        /// Tap tolerance, screen px (a finger needs more than a pen).
+        tol: f32,
     },
     MoveSelection {
         last: [f32; 2],
@@ -241,6 +249,16 @@ pub struct Engine<S: InkSink> {
     highlighter: StrokeStyle,
     shape_style: StrokeStyle,
     eraser_radius: f32,
+    /// Partial (rub out what the eraser covers) or whole strokes.
+    eraser_mode: EraserMode,
+    /// The partial eraser's pending edit (`duster.rs`): committed as one
+    /// undo step when the rub ends.
+    cut: Option<duster::Cut>,
+    cut_seq: u64,
+    /// Keep ink, shapes and placed items inside a slide page (`clip.rs`).
+    clip_ink: bool,
+    /// The page rect of the gesture in progress, when ink is kept inside.
+    ink_clip: Option<[f32; 4]>,
     smoothing: f32,
     pressure_gamma: f32,
     pub touch_mode: TouchMode,
@@ -585,7 +603,12 @@ impl<S: InkSink> Engine<S> {
                 width: 3.0,
                 opacity: 1.0,
             },
-            eraser_radius: 14.0,
+            eraser_radius: 32.0,
+            eraser_mode: EraserMode::Partial,
+            cut: None,
+            cut_seq: 0,
+            clip_ink: true,
+            ink_clip: None,
             smoothing: 0.5,
             pressure_gamma: 0.8,
             touch_mode: TouchMode::Auto,
@@ -760,6 +783,7 @@ impl<S: InkSink> Engine<S> {
         self.scene = Scene::from_items(items);
         self.selection.clear();
         self.gestures.clear();
+        self.cut = None;
         self.sink.set_wet(&[]);
         self.bump();
     }
@@ -982,7 +1006,8 @@ impl<S: InkSink> Engine<S> {
         // where one finger selects and moves (two still pinch).
         if kind == PointerKind::Touch
             && (self.read_only
-                || (!self.touch_draws() && self.tool != ToolKind::Lasso)
+                || (!self.touch_draws()
+                    && !matches!(self.tool, ToolKind::Lasso | ToolKind::Eraser))
                 || !self.touches.is_empty()
                 || self.tool == ToolKind::Hand)
         {
@@ -1010,6 +1035,13 @@ impl<S: InkSink> Engine<S> {
             self.bump();
         }
         let w = self.world(x, y);
+        // On a slide page ink stays on the page: a stroke or shape that
+        // starts outside it draws nothing.
+        self.ink_clip = self.ink_bounds();
+        if self.starts_off_page(w) {
+            self.update_wet(now_ms);
+            return;
+        }
         let g = match self.tool {
             ToolKind::Pen | ToolKind::Highlighter => {
                 let style = if self.tool == ToolKind::Pen {
@@ -1041,12 +1073,17 @@ impl<S: InkSink> Engine<S> {
                 Gesture::Erase { last: w, hits }
             }
             ToolKind::Lasso => {
+                let tol = match kind {
+                    PointerKind::Touch => 18.0,
+                    PointerKind::Pen => 10.0,
+                    PointerKind::Mouse => 6.0,
+                };
                 if self.inside_selection(w) {
                     Gesture::MoveSelection {
                         last: w,
                         total: [0.0, 0.0],
                     }
-                } else if let Some(hit) = self.press_target(w) {
+                } else if let Some(hit) = self.press_target(w, tol) {
                     // One gesture: press on an item selects it (with its
                     // group) and dragging moves it right away.
                     self.selection = self.expand_groups(&[hit]);
@@ -1060,6 +1097,7 @@ impl<S: InkSink> Engine<S> {
                         poly: vec![w],
                         start_screen: [x, y],
                         moved: false,
+                        tol,
                     }
                 }
             }
@@ -1093,8 +1131,8 @@ impl<S: InkSink> Engine<S> {
     /// unless it is a page-sized box (an imported PDF slide, a full-slide
     /// object). Those would swallow every lasso drawn over them, so a drag
     /// there lassos and a plain click still selects them.
-    fn press_target(&self, w: [f32; 2]) -> Option<ItemId> {
-        let it = self.scene.hit_test(w[0], w[1], 6.0 / self.camera.zoom)?;
+    fn press_target(&self, w: [f32; 2], tol: f32) -> Option<ItemId> {
+        let it = self.scene.hit_test(w[0], w[1], tol / self.camera.zoom)?;
         if !matches!(it.data, ItemData::Stroke(_))
             && let Some(f) = self.lesson.page(&self.page).ok().and_then(|p| p.frame)
         {
@@ -1151,6 +1189,8 @@ impl<S: InkSink> Engine<S> {
         let zoom = self.camera.zoom;
         let cam = self.camera;
         let hold_mode = self.smart.mode == SmartMode::Hold;
+        let clip = self.ink_clip;
+        let shape_width = self.shape_style.width;
         let Some(g) = self.gestures.get_mut(&id) else {
             return;
         };
@@ -1202,6 +1242,7 @@ impl<S: InkSink> Engine<S> {
                 poly,
                 start_screen,
                 moved,
+                ..
             } => {
                 for s in samples.as_chunks::<4>().0 {
                     let w = to_world(s[0], s[1]);
@@ -1228,7 +1269,7 @@ impl<S: InkSink> Engine<S> {
             }
             Gesture::Shape { end, .. } => {
                 if let Some(s) = samples.as_chunks::<4>().0.iter().last() {
-                    *end = to_world(s[0], s[1]);
+                    *end = clip::clamp_point(to_world(s[0], s[1]), clip, shape_width);
                 }
             }
             Gesture::Pan { last } => {
@@ -1267,7 +1308,7 @@ impl<S: InkSink> Engine<S> {
             }
         }
         if let Some(Gesture::MoveSelection { total, .. }) = self.gestures.get(&id) {
-            let t = *total;
+            let t = self.clamp_move(*total);
             self.preview_move(t);
         }
         self.update_wet(now_ms);
@@ -1294,7 +1335,7 @@ impl<S: InkSink> Engine<S> {
                 let style = builder.style;
                 let pts = builder.finish();
                 if !pts.is_empty() {
-                    self.finish_ink(
+                    self.finish_clipped(
                         StrokeData {
                             tool: style.tool.as_str().into(),
                             color: style.color,
@@ -1316,13 +1357,14 @@ impl<S: InkSink> Engine<S> {
                 poly,
                 start_screen,
                 moved,
+                tol,
             } => {
                 let picked = if moved && poly.len() >= 3 {
                     self.scene.lasso(&poly)
                 } else {
                     let w = self.world(start_screen[0], start_screen[1]);
                     self.scene
-                        .hit_test(w[0], w[1], 6.0 / self.camera.zoom)
+                        .hit_test(w[0], w[1], tol / self.camera.zoom)
                         .map(|i| vec![i.id.clone()])
                         .unwrap_or_default()
                 };
@@ -1331,6 +1373,7 @@ impl<S: InkSink> Engine<S> {
             }
             Gesture::MoveSelection { total, .. } => {
                 self.drag_offset = [0.0, 0.0];
+                let total = self.clamp_move(total);
                 if total != [0.0, 0.0] {
                     let sel = self.selection.clone();
                     self.translate_with_connectors(&sel, f64::from(total[0]), f64::from(total[1]));
@@ -1453,6 +1496,11 @@ impl<S: InkSink> Engine<S> {
     /// Visually erase immediately; the document change is committed once per
     /// eraser gesture so a whole scrub is a single undo step.
     fn erase_at(&mut self, a: [f32; 2], b: [f32; 2], r: f32) -> Vec<ItemId> {
+        if self.eraser_mode == EraserMode::Partial {
+            // Rub out only what the eraser covers (`duster.rs`).
+            self.cut_at(a, b, r);
+            return Vec::new();
+        }
         let mut hits = self.scene.erase_hits(a, b, r);
         // Grouped (merged) strokes erase as one; box items in the group stay.
         if hits
@@ -1480,6 +1528,15 @@ impl<S: InkSink> Engine<S> {
     }
 
     fn commit_erase(&mut self, hits: Vec<ItemId>) {
+        // The partial eraser commits once every rub has ended.
+        if self.cut.is_some()
+            && !self
+                .gestures
+                .values()
+                .any(|g| matches!(g, Gesture::Erase { .. }))
+        {
+            self.commit_cut();
+        }
         if self.read_only {
             return;
         }
@@ -1506,8 +1563,9 @@ impl<S: InkSink> Engine<S> {
         }
         let r = r.min(400.0) / self.camera.zoom;
         let (wa, wb) = (self.world(a[0], a[1]), self.world(b[0], b[1]));
+        let cut_before = self.cut_touched();
         let new_hits = self.erase_at(wa, wb, r);
-        let n = new_hits.len();
+        let n = new_hits.len() + self.cut_touched() - cut_before;
         if let Gesture::Erase { last, hits } = self
             .gestures
             .entry(Self::AREA_ERASE_ID)
@@ -1527,7 +1585,7 @@ impl<S: InkSink> Engine<S> {
     pub fn area_erase_end(&mut self) -> usize {
         match self.gestures.remove(&Self::AREA_ERASE_ID) {
             Some(Gesture::Erase { hits, .. }) => {
-                let n = hits.len();
+                let n = hits.len() + self.cut_touched();
                 self.commit_erase(hits);
                 n
             }
@@ -1648,6 +1706,9 @@ impl<S: InkSink> Engine<S> {
             }),
             // An axes-and-curve graph that "Make it live" can replace.
             "live": self.graph_live_json() != "null",
+            // Shared colour (#rrggbbaa) and stroke width, when uniform, and
+            // whether all the ink is highlighter (`restyle.rs`).
+            "style": self.selection_style(),
         })
         .to_string()
     }
@@ -1905,6 +1966,7 @@ impl<S: InkSink> Engine<S> {
                     data,
                     created: now_ms + i as f64,
                     group,
+                    z: None,
                 });
             }
         }
@@ -2027,7 +2089,7 @@ impl<S: InkSink> Engine<S> {
         size: f64,
         now_ms: f64,
     ) -> Option<ItemId> {
-        let w = self.world(x, y);
+        let w = self.place_on_page(self.world(x, y), size);
         let data = ItemData::Text(TextData {
             latex: false,
             geom: BoxGeom {
@@ -2386,12 +2448,16 @@ impl<S: InkSink> Engine<S> {
                     let mut pts = builder.points().to_vec();
                     pts.extend_from_slice(predicted);
                     let st = builder.style;
-                    wet.push(WetStroke {
-                        points: pts,
-                        width: st.width,
-                        color: st.color,
-                        opacity: st.opacity,
-                    });
+                    clip::push_wet(
+                        &mut wet,
+                        WetStroke {
+                            points: pts,
+                            width: st.width,
+                            color: st.color,
+                            opacity: st.opacity,
+                        },
+                        self.ink_clip,
+                    );
                 }
                 Gesture::Lasso { poly, .. } if poly.len() > 1 => {
                     let mut pts: Vec<StrokePoint> = poly
@@ -2578,13 +2644,19 @@ pub(crate) mod tests {
         }
     }
 
-    fn engine() -> Engine<MockSink> {
+    pub(crate) fn engine() -> Engine<MockSink> {
         let mut e = Engine::new(MockSink::default(), "Test", 0.0);
         e.set_view(1280.0, 720.0);
         e
     }
 
-    fn draw(e: &mut Engine<MockSink>, id: i32, kind: PointerKind, from: [f32; 2], to: [f32; 2]) {
+    pub(crate) fn draw(
+        e: &mut Engine<MockSink>,
+        id: i32,
+        kind: PointerKind,
+        from: [f32; 2],
+        to: [f32; 2],
+    ) {
         e.pointer_down(id, from[0], from[1], 0.5, 0.0, kind, 0, 0.0);
         let mut s = Vec::new();
         for i in 1..=20 {
@@ -2617,6 +2689,8 @@ pub(crate) mod tests {
     #[test]
     fn eraser_scrub_is_one_undo_step() {
         let mut e = engine();
+        // Whole-stroke erasing (the partial eraser: duster.rs).
+        e.set_eraser_mode(EraserMode::Stroke);
         draw(
             &mut e,
             1,
@@ -2642,6 +2716,8 @@ pub(crate) mod tests {
     #[test]
     fn area_erase_is_one_undo_step_and_spares_boxes() {
         let mut e = engine();
+        // Whole-stroke erasing (the partial eraser: duster.rs).
+        e.set_eraser_mode(EraserMode::Stroke);
         draw(&mut e, 1, PointerKind::Pen, [100.0, 100.0], [400.0, 100.0]);
         draw(&mut e, 1, PointerKind::Pen, [100.0, 200.0], [400.0, 200.0]);
         draw(&mut e, 1, PointerKind::Pen, [100.0, 600.0], [400.0, 600.0]);
@@ -2799,7 +2875,7 @@ pub(crate) mod tests {
         assert_eq!(e.pkg.outline_at, 10.0 + OUTLINE_MAX_AGE_MS + 1.0);
     }
 
-    fn select_rect(e: &mut Engine<MockSink>, a: [f32; 2], b: [f32; 2]) {
+    pub(crate) fn select_rect(e: &mut Engine<MockSink>, a: [f32; 2], b: [f32; 2]) {
         e.set_tool(ToolKind::Lasso);
         e.pointer_down(9, a[0], a[1], 0.5, 0.0, PointerKind::Mouse, 0, 0.0);
         e.pointer_move(
@@ -3410,6 +3486,8 @@ pub(crate) mod tests {
     #[test]
     fn merge_strokes_moves_and_erases_as_one_and_mixed_merge_groups() {
         let mut e = engine();
+        // Whole-stroke erasing (the partial eraser: duster.rs).
+        e.set_eraser_mode(EraserMode::Stroke);
         draw(
             &mut e,
             1,

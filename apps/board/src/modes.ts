@@ -126,8 +126,8 @@ export const DEFAULT_MODES: ModesConfig = {
   },
   teach: {
     chrome: chrome(["colors", "sizes"]),
-    tools: ["pen", "highlighter", "eraser", "laser", "smartink", "undo", "pager", "exit"],
-    dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["smartink", "pager", "exit"] },
+    tools: ["pen", "highlighter", "eraser", "lasso", "laser", "smartink", "undo", "pager", "exit"],
+    dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["lasso", "smartink", "pager", "exit"] },
   },
   view: {
     chrome: chrome(["switcher", "title", "pagesToggle", "open", "theme", "fullscreen", "overflow", "pages", "zoom"]),

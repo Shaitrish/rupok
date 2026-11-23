@@ -7,7 +7,7 @@ import { PagesPanel, StatusChips, TopBar } from "./components/Chrome";
 import { ObjectDialog } from "./components/Dialogs";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
 import { closeSettings, openSettings, settingsRequest } from "./settings/open";
-import { prefs, toast, tool } from "./state";
+import { prefs, sizes, toast, tool } from "./state";
 import { Icon, Mark } from "./components/Icon";
 import { APP_NAME, FILE_EXT, TAGLINE, WORDMARK } from "./brand";
 import { Suspense, lazy } from "solid-js";
@@ -51,6 +51,10 @@ export default function App() {
     root.dataset.density = p.density;
     if (ready()) queueMicrotask(() => controller.objects.broadcastTheme());
   });
+  // The eraser circle goes with the eraser tool.
+  createEffect(() => {
+    if (tool() !== "eraser" && eraser) eraser.style.display = "none";
+  });
   // Re-fit when the chrome layout changes (toolbar side, size, pages panel).
   createEffect(() => {
     const p = prefs();
@@ -68,6 +72,20 @@ export default function App() {
         eraser.style.left = `${x}px`;
         eraser.style.top = `${y}px`;
       };
+      // The eraser circle also shows while a finger or pen rubs (no hover on
+      // touch) and goes when it lifts or leaves the board.
+      const eraserAt = (e: PointerEvent) => {
+        if (tool() !== "eraser") return;
+        const r = root.getBoundingClientRect();
+        controller.eraserCursor?.(e.clientX - r.left, e.clientY - r.top, true);
+        eraser.classList.add("rubbing");
+      };
+      const eraserOff = (e: PointerEvent) => {
+        eraser.classList.remove("rubbing");
+        if (e.type !== "pointerup" || e.pointerType === "touch") eraser.style.display = "none";
+      };
+      input.addEventListener("pointerdown", eraserAt);
+      for (const t of ["pointerup", "pointercancel", "pointerleave"]) input.addEventListener(t, eraserOff as EventListener);
       setReady(true);
       void import("./solve").then((m) => m.initSolve()); // Solve this: AI handwriting, preview, reveal
       startLibrary(controller); // the Library home and saving lessons to their files (before files below arrive)
@@ -107,7 +125,7 @@ export default function App() {
         <World ref={(el) => (world = el)} />
         <canvas class="ink" ref={canvas} />
         <div class="input-layer" classList={{ interact: tool() === "interact" }} ref={input} style={{ cursor: cursorFor(tool()) }} />
-        <div class="eraser-cursor" ref={eraser} style={{ display: "none", width: "28px", height: "28px" }} />
+        <div class="eraser-cursor" ref={eraser} style={{ display: "none", width: `${sizes().eraser ?? 64}px`, height: `${sizes().eraser ?? 64}px` }} />
         <GestureLayer onSettings={openSettings} />
       </div>
       <Show when={ready()}>

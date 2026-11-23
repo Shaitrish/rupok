@@ -29,6 +29,19 @@ registerSettings([
     ...pref("hand"),
   },
   {
+    id: "pen.eraserMode", category: "pen", group: "Eraser and page", order: 60, type: "segmented", label: "Eraser",
+    description: "Rub out only what the eraser covers, like a board duster, or erase every stroke it touches. The palm eraser does the same.",
+    keywords: ["eraser", "duster", "partial", "pixel", "whole stroke", "rub", "ইরেজার", "ডাস্টার", "মুছুন"],
+    options: [{ value: "partial", label: "Rub out (duster)" }, { value: "stroke", label: "Whole strokes" }],
+    ...pref("eraserMode"),
+  },
+  {
+    id: "pen.keepInkOnPage", category: "pen", group: "Eraser and page", order: 70, type: "toggle", label: "Keep ink on the page",
+    description: "On slide pages the page is the board: ink that starts outside it does not draw, ink stops at its edge, and shapes and text stay inside. Infinite pages are never limited.",
+    keywords: ["clip", "outside", "edge", "margin", "canvas", "slide", "পৃষ্ঠা", "বাইরে"],
+    ...pref("keepInkOnPage"),
+  },
+  {
     id: "pen.smartShapes", category: "pen", group: "Smart ink", order: 110, type: "segmented", label: "Smart shapes",
     description: "Rough circles, boxes, lines and arrows become clean. Handwriting stays as written; Undo brings your drawing back.",
     keywords: ["shape recognition", "snap", "auto shapes", "hold to snap", "আকৃতি", "smart ink"],
