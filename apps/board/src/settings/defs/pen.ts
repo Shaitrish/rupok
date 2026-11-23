@@ -16,7 +16,7 @@ registerSettings([
   },
   {
     id: "pen.smoothing", category: "pen", order: 20, type: "slider", label: "Smoothing",
-    description: "Higher removes shake on large boards; lower feels more direct.",
+    description: "0% is raw: the ink follows every pen sample. Higher steadies a shaky board but rounds corners.",
     keywords: ["stabilizer", "shaky", "jitter", "smooth", "মসৃণ"],
     min: 0, max: 1, step: 0.05, format: (v) => `${Math.round(v * 100)}%`,
     ...pref("smoothing"),

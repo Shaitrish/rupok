@@ -3,6 +3,8 @@
 import { APP_NAME, SITE_URL } from "../../brand";
 import type { SettingProps } from "../../settings/registry";
 import { Mark } from "../Icon";
+import { controller } from "../../controller";
+import { graphicsAdapter } from "../../inkLatency";
 
 export const VERSION = "0.2.1";
 const REPO = "https://github.com/shaitrish/rupok";
@@ -29,5 +31,22 @@ export function AboutSection(props: SettingProps) {
         <a class="st-btn" href={`${REPO}/issues`} target="_blank" rel="noreferrer">Report a problem</a>
       </div>
     </div>
+  );
+}
+
+/** Settings → About → Troubleshooting → Graphics: the adapter and backend. */
+export function GraphicsInfo(props: SettingProps) {
+  const a = graphicsAdapter();
+  let backend = "";
+  try {
+    backend = controller.board.backend().replace("BrowserWebGpu", "WebGPU").replace(/^Gl\b/, "WebGL2");
+  } catch {
+    backend = "not started";
+  }
+  return (
+    <dl class="st-facts" id={props.descId}>
+      <dt>Renderer</dt><dd>{backend}</dd>
+      <dt>Adapter</dt><dd>{a.software ? `Software, no GPU (${a.name})` : a.name}</dd>
+    </dl>
   );
 }

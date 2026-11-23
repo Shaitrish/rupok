@@ -21,6 +21,7 @@ import VoiceLayer from "./voice/VoiceLayer";
 import { LibraryRoot } from "./components/Library";
 import { startLibrary } from "./library/session";
 import { isPhone, pagesShown } from "./viewport";
+import { drawCursor } from "./wetInk";
 
 const OverlayApp = lazy(() => import("./overlay/OverlayApp"));
 
@@ -180,6 +181,7 @@ function cursorFor(t: string): string {
     case "lasso": return "default";
     case "eraser": return "none";
     case "interact": return "default";
-    default: return "crosshair";
+    // Pen, highlighter, shapes, laser: no crosshair over the ink (wetInk.ts).
+    default: return drawCursor();
   }
 }

@@ -10,6 +10,7 @@ import init, { Board } from "../wasm/rupok.js";
 import wasmUrl from "../wasm/rupok_bg.wasm?url";
 import { prefs } from "../state";
 import { desktopInvoke } from "../platform";
+import { predictedFor } from "../wetInk";
 
 export type OverlayTool = "pen" | "highlighter" | "eraser" | "laser";
 
@@ -127,7 +128,14 @@ export class OverlayInk {
       });
       return out;
     };
+    // No cursor over a pen's or finger's ink; the stylesheet's dot for a mouse.
+    const cursor = (e: PointerEvent) => {
+      const c = e.pointerType === "mouse" ? "" : "none";
+      if (el.style.cursor !== c) el.style.cursor = c;
+    };
+    el.addEventListener("pointerover", cursor);
     el.addEventListener("pointerdown", (e) => {
+      cursor(e);
       if (!this.board) return;
       el.setPointerCapture(e.pointerId);
       const r = this.root.getBoundingClientRect();
@@ -137,8 +145,7 @@ export class OverlayInk {
     el.addEventListener("pointermove", (e) => {
       if (!this.board || !el.hasPointerCapture(e.pointerId)) return;
       const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
-      const predicted = e.getPredictedEvents ? e.getPredictedEvents() : [];
-      this.board.pointer_move(e.pointerId, flat(coalesced.length ? coalesced : [e]), flat(predicted));
+      this.board.pointer_move(e.pointerId, flat(coalesced.length ? coalesced : [e]), flat(predictedFor(e)));
     });
     el.addEventListener("pointerup", (e) => {
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);

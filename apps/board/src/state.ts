@@ -125,7 +125,7 @@ export interface Prefs {
 // WebGL2 is the default until WebGPU presentation is verified on real boards (see ROADMAP).
 const defaults: Prefs = {
   theme: "system", accent: "mint", iconStyle: "linear", toolbar: "bottom", density: "comfortable",
-  touchMode: "auto", smoothing: 0.5, pressure: 0.8, showStats: false, forceWebgl: true, showPages: true,
+  touchMode: "auto", smoothing: 0.25, pressure: 0.8, showStats: false, forceWebgl: true, showPages: true,
   smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right", eraserMode: "partial", keepInkOnPage: true,
   smartGraphs: true, smartFlowchart: true, smartGates: true, smartNumberLine: true,
   smartGeometry: true, smartTables: true, smartScience: false, smartMath: true,

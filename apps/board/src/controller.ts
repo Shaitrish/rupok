@@ -17,6 +17,8 @@ import { cssPx, isPhone, safeArea } from "./viewport";
 import { ObjectHost } from "./objects";
 import { attachTrackpadPinch } from "./pinch";
 import { autosaveLoad, autosaveStore } from "./storage";
+import { noteFrame, noteSamples } from "./inkLatency";
+import { attachTrail, drawsInk, notePointerDown, notePointerUp, penBusy, predictedFor, setPointerKind, trailAfterMove } from "./wetInk";
 import { APP_NAME, FILE_EXT, LESSON_MIME } from "./brand";
 import { forgetLessonPath, openLessonFiles, openLessonInto, saveLessonBytes } from "./platform";
 import { onPresentFullscreenLost, presentFullscreen, toggleFullscreen } from "./fullscreen";
@@ -83,7 +85,12 @@ export class Controller {
     setSavedRevision(this.board.revision());
     this.loop();
     if (!studentEntry) {
-      setInterval(() => this.autosave(), 3000);
+      // Never mid-stroke: a save serialises the whole lesson (tens to
+      // hundreds of ms on a big one). Wait for a pause in the writing, or at
+      // most ~30 s for any gap between strokes (docs/performance.md).
+      setInterval(() => {
+        if (!penBusy(performance.now() - this.lastAutosave > 30000 ? 0 : 1000)) void this.autosave();
+      }, 1000);
       window.addEventListener("beforeunload", () => this.autosave());
     }
     // Clicking into a Smart Object to use it dismisses the selection frame.
@@ -193,7 +200,10 @@ export class Controller {
   // ------------------------------------------------------------------ loop
 
   private loop = () => {
+    const t0 = performance.now();
     const drew = this.board.frame();
+    noteFrame(drew, performance.now() - t0);
+    this.rect = null;
     this.sync(false);
     const now = performance.now();
     this.snapBack(now);
@@ -414,13 +424,14 @@ export class Controller {
   // ----------------------------------------------------------------- input
 
   attachInput(el: HTMLElement) {
+    attachTrail(this.canvas);
     const pos = (e: PointerEvent) => {
-      const r = this.root.getBoundingClientRect();
+      const r = this.rootRect();
       return [e.clientX - r.left, e.clientY - r.top] as const;
     };
     const flat = (list: PointerEvent[]) => {
       const out = new Float64Array(list.length * 4);
-      const r = this.root.getBoundingClientRect();
+      const r = this.rootRect();
       list.forEach((e, i) => {
         out[i * 4] = e.clientX - r.left;
         out[i * 4 + 1] = e.clientY - r.top;
@@ -443,6 +454,10 @@ export class Controller {
       }
       el.setPointerCapture(e.pointerId);
       this.pointersDown++;
+      notePointerDown();
+      setPointerKind(e.pointerType);
+      this.inking.set(e.pointerId, drawsInk(e));
+      this.rect = null;
       const [x, y] = pos(e);
       this.board.pointer_down(e.pointerId, x, y, e.pressure, e.timeStamp, e.pointerType, e.button);
       e.preventDefault();
@@ -452,23 +467,27 @@ export class Controller {
         this.hover(e);
         return;
       }
-      const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
-      const predicted = e.getPredictedEvents ? e.getPredictedEvents() : [];
-      this.board.pointer_move(e.pointerId, flat(coalesced.length ? coalesced : [e]), flat(predicted));
+      const c = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+      const samples = c.length ? c : [e];
+      this.board.pointer_move(e.pointerId, flat(samples), flat(predictedFor(e)));
+      noteSamples(e, samples);
+      trailAfterMove(e, this.inking.get(e.pointerId) ?? false);
       this.hover(e);
     });
-    const released = () => {
+    const released = (e: PointerEvent) => {
+      this.inking.delete(e.pointerId);
+      notePointerUp();
       this.pointersDown = Math.max(0, this.pointersDown - 1);
       this.lastNav = performance.now();
     };
     const up = (e: PointerEvent) => {
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-      released();
+      released(e);
       this.board.pointer_up(e.pointerId);
     };
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", (e) => {
-      released();
+      released(e);
       this.board.pointer_cancel(e.pointerId);
     });
     el.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -501,11 +520,25 @@ export class Controller {
   }
 
   eraserCursor: ((x: number, y: number, show: boolean) => void) | null = null;
+  private eraserShown = false;
   private hover(e: PointerEvent) {
-    if (this.eraserCursor) {
-      const r = this.root.getBoundingClientRect();
-      this.eraserCursor(e.clientX - r.left, e.clientY - r.top, tool() === "eraser");
+    if (e.pointerType !== "touch" || e.buttons) setPointerKind(e.pointerType);
+    // Only touch the eraser ring's style when it shows (or must hide): a
+    // style write on every pen move forced a style recalc on the next one.
+    const show = tool() === "eraser";
+    if (this.eraserCursor && (show || this.eraserShown)) {
+      const r = this.rootRect();
+      this.eraserCursor(e.clientX - r.left, e.clientY - r.top, show);
+      this.eraserShown = show;
     }
+  }
+
+  /** Pointer ids whose press draws ink (for the OS ink trail). */
+  private inking = new Map<number, boolean>();
+  /** The board's client rect, read once per frame (cleared in the loop). */
+  private rect: DOMRect | null = null;
+  private rootRect(): DOMRect {
+    return (this.rect ??= this.root.getBoundingClientRect());
   }
 
   itemAt(clientX: number, clientY: number): DomItem | undefined {
@@ -706,6 +739,7 @@ export class Controller {
       // The readable summary inside is refreshed at most once a minute here;
       // explicit saves, closing and exports call save().
       const bytes = this.board.save_autosave();
+      this.lastAutosave = performance.now();
       await autosaveStore(bytes);
       this.savedAutosaveRev = rev;
       this.libraryHooks.saved?.(bytes, rev);
@@ -714,6 +748,7 @@ export class Controller {
     }
   }
   private savedAutosaveRev = -1;
+  private lastAutosave = performance.now();
 
   async saveFile() {
     const bytes = this.board.save();

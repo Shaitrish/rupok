@@ -1,9 +1,10 @@
 import { For, Show, createMemo, createSignal } from "solid-js";
 import { controller } from "../controller";
 import {
-  BOARD_COLORS, camera, pageIndex, pages, prefs, replay, showToast, stats, isView, modeConfig,
+  BOARD_COLORS, camera, pageIndex, pages, prefs, replay, showToast, isView, modeConfig,
 } from "../state";
 import { hasTopBar } from "../modes";
+import LatencyOverlay from "./LatencyOverlay";
 import { Icon } from "./Icon";
 import { SelectionOverlay } from "./Selection";
 import { MathPreview } from "./MathPreview";
@@ -299,12 +300,9 @@ export function StatusChips() {
         <button class="btn icon" onClick={() => controller.zoomBy(1.25)} title="Zoom in  ·  +" aria-label="Zoom in"><Icon name="zoomIn" size={20} /></button>
       </div>
       </Show>
-      <Show when={c().stats && prefs().showStats && stats()}>
-        {(s) => (
-          <div class="stats surface" title="Renderer statistics">
-            {s().backend.split(" · ")[0].replace("BrowserWebGpu", "WebGPU").replace("Gl", "WebGL2")} · {s().strokes} strokes · {s().fps} fps
-          </div>
-        )}
+      {/* Performance and pen latency overlay (Settings → About → Troubleshooting). */}
+      <Show when={c().stats && prefs().showStats}>
+        <LatencyOverlay />
       </Show>
     </div>
   );

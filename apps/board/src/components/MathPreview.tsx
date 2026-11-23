@@ -10,6 +10,7 @@ import { renderTex } from "../katex";
 import { PREVIEW_CONFIDENCE, looksLikeMath, mathPlacement, recognize, type MathCandidate } from "../mathInk";
 import { camera, editingText, isView, prefs, replay, revision, showToast, tool } from "../state";
 import { Icon } from "./Icon";
+import { penBusy } from "../wetInk";
 
 interface Cluster {
   ids: string[];
@@ -46,6 +47,13 @@ export function MathPreview() {
     prefs().smartMath && prefs().smartShapes !== "off" && tool() === "pen" && !isView() && !replay() && !editingText();
 
   const update = () => {
+    // Recognition waits for the pen to rest: never mid-stroke, nor in the
+    // first frames of the next stroke (wetInk.ts, docs/performance.md).
+    if (penBusy(120)) {
+      clearTimeout(timer);
+      timer = window.setTimeout(update, 120);
+      return;
+    }
     if (!enabled()) {
       setCluster(null);
       return;
