@@ -59,6 +59,17 @@ node pen-latency.mjs --headed --present           # adds the compositor estimate
 - Guarded by `crates/rupok-render/tests/wet_dry.rs` (GPU), the bench budget
   "wet vs dry pixels differ", and the latency harness's "pen-up changed pixels".
 
+### Page design and the pen
+
+Page backgrounds and branding (`components/PageBackdrop.tsx`) are DOM under
+the ink canvas. They change only when the design does, so the browser
+rasterises them once (per zoom level) and pen frames never touch them: a
+trace of six strokes shows the same paint and raster work with and without a
+tiled background, a logo and a footer (8 paints, about 1 ms of raster in
+all). Agent SVG backgrounds may not animate (`rupok-live` refuses it). To
+check after a change, write over a designed lesson:
+`node pen-latency.mjs --lesson designed.rpk`.
+
 ## What we found (v0.2.1)
 
 Measured on the Linux dev machine below, synthetic pen, 240 Hz, 400 px/s.
