@@ -148,7 +148,12 @@ fn seg(a: Disc, b: Disc) -> Seg {
 /// `[x0, y0, x1, y1, …]` in world units and all winding the same way. Fill
 /// them together with the non-zero rule. Empty when the stroke has no usable
 /// points.
-pub fn stroke_outline(points: &[StrokePoint], width: f32, offset: [f32; 2], tol: f32) -> Vec<Vec<f32>> {
+pub fn stroke_outline(
+    points: &[StrokePoint],
+    width: f32,
+    offset: [f32; 2],
+    tol: f32,
+) -> Vec<Vec<f32>> {
     let tol = tol.max(0.01);
     chains(points, width, offset)
         .iter()
@@ -308,7 +313,12 @@ pub fn page_export_json(lesson: &Lesson, pkg: &Package, index: usize, strokes: b
         let b = it.data.aabb();
         bounds = Some(match bounds {
             None => b,
-            Some(a) => [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])],
+            Some(a) => [
+                a[0].min(b[0]),
+                a[1].min(b[1]),
+                a[2].max(b[2]),
+                a[3].max(b[3]),
+            ],
         });
         out.push(match &it.data {
             ItemData::Stroke(_) if !strokes => continue,
@@ -458,7 +468,10 @@ mod tests {
         let poly = pairs(&out[0]);
         let max_x = poly.iter().map(|p| p[0]).fold(f32::MIN, f32::max);
         let min_x = poly.iter().map(|p| p[0]).fold(f32::MAX, f32::min);
-        assert!((max_x - 105.0).abs() < 0.2 && (min_x + 5.0).abs() < 0.2, "round caps");
+        assert!(
+            (max_x - 105.0).abs() < 0.2 && (min_x + 5.0).abs() < 0.2,
+            "round caps"
+        );
     }
 
     #[test]
@@ -479,7 +492,11 @@ mod tests {
         let pts: Vec<_> = (0..200)
             .map(|i| {
                 let t = i as f32 * 0.07;
-                pt(t * 30.0, (t * 3.1).sin() * 25.0 + (t * 11.0).sin() * 3.0, 0.5 + 0.5 * (t * 2.0).sin())
+                pt(
+                    t * 30.0,
+                    (t * 3.1).sin() * 25.0 + (t * 11.0).sin() * 3.0,
+                    0.5 + 0.5 * (t * 2.0).sin(),
+                )
             })
             .collect();
         check_cover(&pts, 8.0);
@@ -487,7 +504,10 @@ mod tests {
 
     #[test]
     fn full_reversal_and_closed_shapes() {
-        check_cover(&[pt(0.0, 0.0, 0.6), pt(80.0, 0.0, 0.6), pt(0.0, 0.0, 0.6)], 6.0);
+        check_cover(
+            &[pt(0.0, 0.0, 0.6), pt(80.0, 0.0, 0.6), pt(0.0, 0.0, 0.6)],
+            6.0,
+        );
         let rect = crate::shapes::shape_points(
             crate::shapes::ShapeKind::Rect,
             [0.0, 0.0],
@@ -615,6 +635,9 @@ mod tests {
             .map(|x| x.as_f64().unwrap())
             .fold(f64::MAX, f64::min);
         assert!((min_x - (15.0 - 0.5 * 22.0 * (0.35 + 0.65 * 0.5))).abs() < 0.3);
-        assert_eq!(page_export_json(&lesson, &Package::default(), 7, true), "null");
+        assert_eq!(
+            page_export_json(&lesson, &Package::default(), 7, true),
+            "null"
+        );
     }
 }

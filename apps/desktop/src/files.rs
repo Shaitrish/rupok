@@ -199,7 +199,10 @@ mod tests {
         assert!(matches!(save_pdf(&path, b"<html>"), Err(FileError::NotPdf)));
         assert_eq!(fs::read(&path).unwrap(), pdf, "the old file is kept");
         let lesson = dir.path().join("lesson.rpk");
-        assert!(matches!(save_pdf(&lesson, pdf), Err(FileError::PdfExtension)));
+        assert!(matches!(
+            save_pdf(&lesson, pdf),
+            Err(FileError::PdfExtension)
+        ));
         assert!(!lesson.exists());
         assert!(is_pdf_path(Path::new("A.PDF")));
     }

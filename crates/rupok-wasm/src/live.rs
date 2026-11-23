@@ -22,7 +22,8 @@ pub fn apply<S: InkSink>(
     agent: &str,
     now_ms: f64,
 ) -> Result<String, String> {
-    let op: Op = serde_json::from_str(op_json).map_err(|err| error_json(format!("bad op: {err}")))?;
+    let op: Op =
+        serde_json::from_str(op_json).map_err(|err| error_json(format!("bad op: {err}")))?;
     let page = e.page_id().to_string();
     let selection = e.selection().to_vec();
     let read_only = e.read_only();
@@ -76,7 +77,8 @@ pub fn attribution_json<S: InkSink>(e: &Engine<S>, index: usize) -> String {
     let Ok(page) = e.lesson.page_id_at(index) else {
         return "{}".into();
     };
-    serde_json::to_string(&rupok_live::agent_items(&e.lesson, &page)).unwrap_or_else(|_| "{}".into())
+    serde_json::to_string(&rupok_live::agent_items(&e.lesson, &page))
+        .unwrap_or_else(|_| "{}".into())
 }
 
 #[cfg(test)]
@@ -102,7 +104,10 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&r).unwrap();
         let id = v["item_id"].as_str().unwrap().to_string();
         assert!(e.dom_items_json().contains(&id), "scene refreshed");
-        assert_eq!(attribution_json(&e, 0), format!(r#"{{"{id}":"Claude Code"}}"#));
+        assert_eq!(
+            attribution_json(&e, 0),
+            format!(r#"{{"{id}":"Claude Code"}}"#)
+        );
         assert!(e.undo());
         assert!(!e.dom_items_json().contains(&id));
         assert!(e.redo());
@@ -119,11 +124,25 @@ mod tests {
         assert_eq!(e.page_index(), 1);
 
         // bad input is a JSON error, the board is unchanged
-        let err = apply(&mut e, r#"{"op":"add_text","text":"","x":0,"y":0}"#, "A", 4.0).unwrap_err();
+        let err = apply(
+            &mut e,
+            r#"{"op":"add_text","text":"","x":0,"y":0}"#,
+            "A",
+            4.0,
+        )
+        .unwrap_err();
         assert!(err.contains("\"error\""));
         assert!(apply(&mut e, "{", "A", 4.0).is_err());
         e.set_read_only(true);
-        assert!(apply(&mut e, r#"{"op":"add_text","text":"x","x":0,"y":0}"#, "A", 4.0).is_err());
+        assert!(
+            apply(
+                &mut e,
+                r#"{"op":"add_text","text":"x","x":0,"y":0}"#,
+                "A",
+                4.0
+            )
+            .is_err()
+        );
         assert!(apply(&mut e, r#"{"op":"get_page"}"#, "A", 4.0).is_ok());
     }
 
@@ -135,8 +154,16 @@ mod tests {
         let base = rupok_live::sync::version(&mirror);
 
         // the agent edits on the board; the teacher keeps writing too
-        apply(&mut board, r#"{"op":"add_text","text":"A","x":1,"y":1}"#, "Codex", 2.0).unwrap();
-        mirror.import(&export_updates(&board, &base).unwrap()).unwrap();
+        apply(
+            &mut board,
+            r#"{"op":"add_text","text":"A","x":1,"y":1}"#,
+            "Codex",
+            2.0,
+        )
+        .unwrap();
+        mirror
+            .import(&export_updates(&board, &base).unwrap())
+            .unwrap();
         assert_eq!(mirror.version(), board.lesson.version());
 
         // a concurrent change on the mirror side merges into the board

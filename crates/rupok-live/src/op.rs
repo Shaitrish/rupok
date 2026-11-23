@@ -283,8 +283,8 @@ mod tests {
 
     #[test]
     fn json_shape() {
-        let op: Op = serde_json::from_str(r#"{"op":"add_text","text":"Hi","x":10,"y":20}"#)
-            .unwrap();
+        let op: Op =
+            serde_json::from_str(r#"{"op":"add_text","text":"Hi","x":10,"y":20}"#).unwrap();
         assert_eq!(
             op,
             Op::AddText {

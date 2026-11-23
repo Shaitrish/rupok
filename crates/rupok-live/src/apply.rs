@@ -253,7 +253,8 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
             color,
             show,
         } => {
-            let idx0 = page_index(ctx.lesson, ctx.page_id).map_or(ctx.lesson.page_count(), |i| i + 1);
+            let idx0 =
+                page_index(ctx.lesson, ctx.page_id).map_or(ctx.lesson.page_count(), |i| i + 1);
             let spec = new_page_spec(ctx.lesson, ctx.page_id, title, *pattern, color)?;
             tag(ctx.lesson, msg);
             let id = ctx.lesson.add_page(Some(idx0), spec)?;
@@ -402,7 +403,11 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
                 let known: Vec<&str> = ctx.pkg.objects.keys().map(String::as_str).collect();
                 return Err(LiveError::NotFound(format!(
                     "no smart object bundle `{bundle_id}` on this board (bundles: {}); call get_current_page for bundle ids",
-                    if known.is_empty() { "none".to_string() } else { known.join(", ") }
+                    if known.is_empty() {
+                        "none".to_string()
+                    } else {
+                        known.join(", ")
+                    }
                 )));
             };
             let b = updated_bundle(existing, html, *steps, network_hosts.clone());
@@ -522,7 +527,9 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
             let lines = text.split('\n').count().max(1) as f64;
             let size = match size {
                 Some(s) => positive("size", *s)?,
-                None => ((b.h / lines) * 0.7).round().clamp(MIN_PROJECTOR_TEXT, 160.0),
+                None => ((b.h / lines) * 0.7)
+                    .round()
+                    .clamp(MIN_PROJECTOR_TEXT, 160.0),
             };
             let x = finite("x", x.unwrap_or(b.x))?;
             let y = finite("y", y.unwrap_or(b.y))?;
@@ -608,11 +615,13 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
             };
             let steps = declared(o);
             let max = if steps > 0 { steps } else { MAX_STEPS };
-            let target = match step {
-                Some(s) => *s,
-                None => (i64::from(o.step) + i64::from(delta.unwrap_or(1))).clamp(0, i64::from(max)) as u32,
-            }
-            .min(max);
+            let target =
+                match step {
+                    Some(s) => *s,
+                    None => (i64::from(o.step) + i64::from(delta.unwrap_or(1)))
+                        .clamp(0, i64::from(max)) as u32,
+                }
+                .min(max);
             let mut out = json!({
                 "item_id": item.id,
                 "page": idx + 1,
@@ -673,7 +682,11 @@ fn new_page_spec(
     let cur = lesson.page(current).ok();
     Ok(PageSpec {
         title: title.clone().unwrap_or_default(),
-        frame: Some(cur.as_ref().and_then(|p| p.frame).unwrap_or(Frame::SLIDE_16_9)),
+        frame: Some(
+            cur.as_ref()
+                .and_then(|p| p.frame)
+                .unwrap_or(Frame::SLIDE_16_9),
+        ),
         pattern: pattern
             .map(Pattern::from)
             .or(cur.as_ref().map(|p| p.pattern))
@@ -888,7 +901,12 @@ fn union_bounds<'a>(items: impl Iterator<Item = &'a Item>) -> Option<BoxGeom> {
         let a = it.data.aabb();
         b = Some(match b {
             None => a,
-            Some(c) => [c[0].min(a[0]), c[1].min(a[1]), c[2].max(a[2]), c[3].max(a[3])],
+            Some(c) => [
+                c[0].min(a[0]),
+                c[1].min(a[1]),
+                c[2].max(a[2]),
+                c[3].max(a[3]),
+            ],
         });
     }
     b.map(|b| BoxGeom {
@@ -1129,7 +1147,11 @@ fn fnv1a(bytes: &[u8], seed: u64) -> u64 {
 
 /// `<slug>-<4 base36 chars>` from the title and HTML, unique among `existing`
 /// (no clock or randomness: this runs in wasm).
-pub fn unique_bundle_id(title: &str, html: &str, existing: &BTreeMap<String, ObjectBundle>) -> String {
+pub fn unique_bundle_id(
+    title: &str,
+    html: &str,
+    existing: &BTreeMap<String, ObjectBundle>,
+) -> String {
     const D: &[u8; 36] = b"0123456789abcdefghijklmnopqrstuvwxyz";
     let base = slug(title);
     for seed in 0..10_000u64 {
@@ -1220,7 +1242,9 @@ mod tests {
                 shape: None,
                 geom: None,
             });
-            self.lesson.add_item(&self.page.clone(), &data, 4_000.0).unwrap()
+            self.lesson
+                .add_item(&self.page.clone(), &data, 4_000.0)
+                .unwrap()
         }
     }
 
@@ -1277,7 +1301,11 @@ mod tests {
         assert!(matches!(err, LiveError::Diagnostics(_)));
         assert_eq!(err.to_json()["saved"], false);
         b.stroke();
-        assert_eq!(last_message(&b.lesson), None, "teacher stroke stays untagged");
+        assert_eq!(
+            last_message(&b.lesson),
+            None,
+            "teacher stroke stays untagged"
+        );
     }
 
     #[test]
@@ -1452,7 +1480,13 @@ mod tests {
             })
             .unwrap();
         assert_eq!(d.result["kind"], "text");
-        assert!(b.run(Op::DeleteItem { page: None, item_id: id }).is_err());
+        assert!(
+            b.run(Op::DeleteItem {
+                page: None,
+                item_id: id
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -1476,9 +1510,17 @@ mod tests {
         assert!(parse_color("#12345").is_err());
         assert_eq!(board_color("Paper").unwrap(), 0xfbf7edff);
         assert!(board_color("purple").is_err());
-        assert_eq!(doc_key(&b.lesson), doc_key(&Package::read(&{
-            b.pkg.update_lesson(&b.lesson, "t", 1.0);
-            b.pkg.write().unwrap()
-        }).unwrap().lesson().unwrap()));
+        assert_eq!(
+            doc_key(&b.lesson),
+            doc_key(
+                &Package::read(&{
+                    b.pkg.update_lesson(&b.lesson, "t", 1.0);
+                    b.pkg.write().unwrap()
+                })
+                .unwrap()
+                .lesson()
+                .unwrap()
+            )
+        );
     }
 }

@@ -615,7 +615,8 @@ mod web {
 
         /// Run an agent op (JSON). Returns the result JSON; throws the error JSON.
         pub fn live_apply(&mut self, op_json: &str, agent: &str) -> Result<String, JsValue> {
-            crate::live::apply(&mut self.engine, op_json, agent, now()).map_err(|e| JsValue::from_str(&e))
+            crate::live::apply(&mut self.engine, op_json, agent, now())
+                .map_err(|e| JsValue::from_str(&e))
         }
 
         /// The lesson's encoded Loro version vector.

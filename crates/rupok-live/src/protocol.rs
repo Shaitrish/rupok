@@ -170,8 +170,13 @@ pub enum ServerSession {
         channels: Vec<String>,
     },
     /// The agent's display name changed (the MCP client identified itself).
-    Agent { agent: String },
-    Error { error: String, code: String },
+    Agent {
+        agent: String,
+    },
+    Error {
+        error: String,
+        code: String,
+    },
 }
 
 /// `doc` channel, both directions: Loro sync of the open lesson.
@@ -371,10 +376,21 @@ mod tests {
             .unwrap();
         assert!(matches!(
             r,
-            Frame::Known(BoardMsg::Tools(BoardTools::Result { id: 7, ok: false, .. }))
+            Frame::Known(BoardMsg::Tools(BoardTools::Result {
+                id: 7,
+                ok: false,
+                ..
+            }))
         ));
-        let d = serde_json::to_value(ServerMsg::Doc(DocMsg::Sync { key: None, vv: None })).unwrap();
-        assert_eq!(d, serde_json::json!({"ch": "doc", "t": "sync", "key": null, "vv": null}));
+        let d = serde_json::to_value(ServerMsg::Doc(DocMsg::Sync {
+            key: None,
+            vv: None,
+        }))
+        .unwrap();
+        assert_eq!(
+            d,
+            serde_json::json!({"ch": "doc", "t": "sync", "key": null, "vv": null})
+        );
     }
 
     #[test]
