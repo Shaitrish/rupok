@@ -13,7 +13,9 @@ Write on slides with a pen. Drop in live, interactive lessons your AI made. Repl
 > **Status: early alpha (v0.1).** The board works in the browser today at
 > [rupok.app](https://rupok.app): pen and highlighter, slides and PDFs,
 > Smart Objects with presets, Teach mode, replay and `.rpk` lesson files.
-> Windows and Linux installers are built by CI. Much more is in active
+> **Desktop app for Windows and Linux** is out: download it from
+> [Releases](https://github.com/Shaitrish/rupok/releases/latest) (macOS is
+> coming next). Much more is in active
 > development. See [ROADMAP.md](ROADMAP.md) for what is done, what is in
 > progress, and what you can help build.
 
@@ -55,7 +57,8 @@ online and classroom teaching.
 | ✅ | AI agents create lessons and Smart Objects through the Rupok MCP server |
 | ✅ | Smart Object SDK, examples and an AI skill pack |
 | 🚧 | Board in the browser: toolbar, PDF import, Smart Objects, save/open, replay |
-| 📋 | Desktop app for Windows and Linux; draw over any app (overlay) |
+| ✅ | Desktop app for Windows and Linux ([download](https://github.com/Shaitrish/rupok/releases/latest)) |
+| 🚧 | Desktop app for macOS; draw over any app (overlay, beta) |
 | 📋 | Rupok Cloud sync and student share links, course library, agent panel inside the app |
 | 📋 | Live broadcast to students, live quizzes, subject tools, Bangla |
 
@@ -87,7 +90,7 @@ rupok validate examples/objects/binary-counter.html --steps 10
 ## For contributors
 
 Rupok is a Rust core compiled natively and to WebAssembly, a SolidJS UI, and
-(soon) a Tauri 2 desktop shell. Read [AGENTS.md](AGENTS.md) for conventions
+a Tauri 2 desktop shell. Read [AGENTS.md](AGENTS.md) for conventions
 (it is written for AI coding agents, but it is the shortest tour for humans
 too) and [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
 
@@ -101,7 +104,7 @@ too) and [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
  │ rupok CLI + MCP      │          │ Board UI: SolidJS (apps/board)        │
  │ crates/rupok-cli        │          │   Smart Object host: sandboxed        │
  └──────────┬────────────┘          │   iframes + SDK (packages/object-sdk) │
-            │                       │ Desktop shell: Tauri 2 (planned)      │
+            │                       │ Desktop shell: Tauri 2                │
             │                       └───────────────────┬───────────────────┘
             │                                           │ wasm-bindgen
             │                       ┌───────────────────▼───────────────────┐

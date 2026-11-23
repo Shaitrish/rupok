@@ -47,8 +47,9 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 | 🚧 | Smart Object host: sandboxed iframes, CSP, SDK injection, bridge | `apps/board/src/objects.ts` | |
 | 🚧 | Save and open `.rpk`, autosave | `apps/board`, `crates/rupok-wasm` | |
 | 🚧 | Replay a page stroke by stroke (play, seek, speed) | `crates/rupok-wasm/src/replay.rs` | |
-| 🚧 | Desktop app (Tauri 2) for Windows and Linux: shell, `.rpk` association, single instance, atomic save, installers in CI | [tauri-desktop](docs/roadmap/tauri-desktop.md), `apps/desktop` | intermediate |
-| 🚧 | Desktop overlay: draw over any app on the screen (ink, toolbar, click-through, save to lesson) | [desktop-overlay](docs/roadmap/desktop-overlay.md), `apps/desktop/src/overlay.rs` | advanced |
+| ✅ | Desktop app (Tauri 2) for Windows and Linux: shell, `.rpk` association, single instance, atomic save, installers in CI (v0.1.0, unsigned) |
+| 🚧 | Desktop app for macOS: universal `.dmg`, ⌘ shortcuts, WebKit fixes; signing/notarisation once an Apple Developer account exists | [tauri-desktop](docs/roadmap/tauri-desktop.md), `apps/desktop` | intermediate |
+| 🚧 | Desktop overlay (beta): draw over any app on the screen (ink, toolbar, click-through, save to lesson) | [desktop-overlay](docs/roadmap/desktop-overlay.md), `apps/desktop/src/overlay.rs` | advanced |
 | 🚧 | Touch and pen settings: palm rejection modes, smoothing, pressure curve | engine done; UI in `apps/board` | |
 | 🚧 | Themes: light/dark, accent colour, board colours | [DESIGN.md](DESIGN.md) | |
 | ✅ | Website: landing page, RPK viewer page (`/open/`, `/bn/open/`), smartboard / AI / online-class / teacher pages, honest comparison pages, Bangla pages, `llms.txt`, sitemap and JSON-LD | `apps/board/site/` (`node site/build.mjs`), [docs/seo](docs/seo/keywords.md) | |
@@ -84,6 +85,7 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 | 💡 | Submissions (students hand in annotated pages) | | |
 | 📋 | Subject tools: ruler, protractor, compass, graphing, periodic table | [subject-tools](docs/roadmap/subject-tools.md) | intermediate |
 | 📋 | Handwriting to text and math | [handwriting-recognition](docs/roadmap/handwriting-recognition.md) | advanced |
+| 🚧 | Offline handwritten maths → LaTeX (no model, no network): $Q symbol classifier, layout, grammar, n-best with confidence, live-preview API and `MathInk` wasm binding done; Smart Ink UI wiring to do | [math-recognition](docs/design/math-recognition.md), `crates/rupok-ink/src/math` | advanced |
 | 💡 | MP4 export of a replay | | |
 | 💡 | Plugin API | | |
 | 📋 | Android app and overlay | [android](docs/roadmap/android.md) | advanced |
