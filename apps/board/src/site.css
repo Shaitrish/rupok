@@ -292,6 +292,13 @@ h2 { margin: 18px 0 0; font: 800 clamp(36px, 4.4vw, 60px)/1.02 var(--font); lett
   .vplay svg { width: 28px; height: 28px; }
 }
 
+/* The narrowest phones (360px): a little less padding so the main pill fits. */
+@media (max-width: 380px) {
+  .nav-in { gap: 8px; }
+  .word { font-size: 22px; }
+  .nav-cta .pill { padding-left: 14px; padding-right: 14px; }
+}
+
 /* Download buttons (src/download.ts): the hero, the final call to action,
  * the footer and /download/. */
 .dl { margin-top: 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
