@@ -117,7 +117,7 @@ jobs:
         run: cargo clippy -p rupok-desktop --features app -- -D warnings
 
       - name: Build installers
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
