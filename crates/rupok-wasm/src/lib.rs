@@ -803,6 +803,13 @@ mod web {
             self.engine.save(now()).map_err(err)
         }
 
+        /// The lesson as `.rpk` bytes for an autosave: the readable summary
+        /// inside is refreshed at most once a minute (explicit saves,
+        /// closing and exports use `save`, which always refreshes it).
+        pub fn save_autosave(&mut self) -> Result<Vec<u8>, JsValue> {
+            self.engine.autosave(now()).map_err(err)
+        }
+
         pub fn load(&mut self, bytes: &[u8]) -> Result<(), JsValue> {
             self.engine.load(bytes).map_err(err)
         }

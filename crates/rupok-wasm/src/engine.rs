@@ -11,6 +11,7 @@ use rupok_core::{
     BoxGeom, Frame, ImageData, Item, ItemData, ItemId, Lesson, NewItem, ObjectData, PageId,
     PageSpec, Pattern, Scene, ShapeGeom, StrokeData, TextData,
 };
+use rupok_format::package::OUTLINE_MAX_AGE_MS;
 use rupok_format::{ObjectBundle, ObjectManifest, Package};
 use rupok_ink::filter::OneEuroParams;
 use rupok_ink::pressure::PressureCurve;
@@ -2138,6 +2139,17 @@ impl<S: InkSink> Engine<S> {
     // ------------------------------------------------------- persistence
 
     pub fn save(&mut self, now_ms: f64) -> Result<Vec<u8>, String> {
+        self.save_with(now_ms, f64::NEG_INFINITY)
+    }
+
+    /// [`Engine::save`] for the board's autosave: reuses the readable
+    /// outline (`README.md`/`content.md`/`content.json`) for up to
+    /// [`OUTLINE_MAX_AGE_MS`] instead of rebuilding it on every save.
+    pub fn autosave(&mut self, now_ms: f64) -> Result<Vec<u8>, String> {
+        self.save_with(now_ms, OUTLINE_MAX_AGE_MS)
+    }
+
+    fn save_with(&mut self, now_ms: f64, outline_max_age_ms: f64) -> Result<Vec<u8>, String> {
         // Drop bundles no longer referenced by any page.
         let mut used = HashSet::new();
         for p in self.lesson.pages() {
@@ -2155,7 +2167,8 @@ impl<S: InkSink> Engine<S> {
         }
         self.pkg.objects.retain(|k, _| used.contains(k));
         self.pkg.assets.retain(|k, _| used.contains(k));
-        self.pkg.update_lesson(&self.lesson, GENERATOR, now_ms);
+        self.pkg
+            .update_lesson_throttled(&self.lesson, GENERATOR, now_ms, outline_max_age_ms);
         self.pkg.write().map_err(|e| e.to_string())
     }
 
@@ -2771,6 +2784,19 @@ pub(crate) mod tests {
         assert_eq!(e2.object_html("hello-world").unwrap(), "<h1>Hello</h1>");
         let dom: serde_json::Value = serde_json::from_str(&e2.dom_items_json()).unwrap();
         assert_eq!(dom[0]["step"], 2);
+        // Autosaves reuse the readable outline for a minute; the doc is current.
+        let outline_at = e.pkg.outline_at;
+        e.set_object_step(&id, 3);
+        let auto = e.autosave(20.0).unwrap();
+        assert_eq!(e.pkg.outline_at, outline_at);
+        let mut e3 = engine();
+        e3.load(&auto).unwrap();
+        let dom: serde_json::Value = serde_json::from_str(&e3.dom_items_json()).unwrap();
+        assert_eq!(dom[0]["step"], 3);
+        e.autosave(10.0 + OUTLINE_MAX_AGE_MS).unwrap();
+        assert_eq!(e.pkg.outline_at, 10.0 + OUTLINE_MAX_AGE_MS);
+        e.save(10.0 + OUTLINE_MAX_AGE_MS + 1.0).unwrap();
+        assert_eq!(e.pkg.outline_at, 10.0 + OUTLINE_MAX_AGE_MS + 1.0);
     }
 
     fn select_rect(e: &mut Engine<MockSink>, a: [f32; 2], b: [f32; 2]) {

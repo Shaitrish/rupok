@@ -697,7 +697,9 @@ export class Controller {
     const rev = this.board.revision();
     if (rev === this.savedAutosaveRev) return;
     try {
-      const bytes = this.board.save();
+      // The readable summary inside is refreshed at most once a minute here;
+      // explicit saves, closing and exports call save().
+      const bytes = this.board.save_autosave();
       await autosaveStore(bytes);
       this.savedAutosaveRev = rev;
       this.libraryHooks.saved?.(bytes, rev);

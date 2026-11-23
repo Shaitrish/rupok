@@ -1636,9 +1636,13 @@ mod tests {
         let p = l.page_id_at(0).unwrap();
         let t = l.add_item(&p, &text_item(0.0), 1.0).unwrap();
         l.set_text_color(&p, &t, 0xe5484dff).unwrap();
-        assert!(matches!(l.item(&p, &t).unwrap().data, ItemData::Text(td) if td.color == 0xe5484dff));
+        assert!(
+            matches!(l.item(&p, &t).unwrap().data, ItemData::Text(td) if td.color == 0xe5484dff)
+        );
         assert!(l.undo().unwrap());
-        assert!(matches!(l.item(&p, &t).unwrap().data, ItemData::Text(td) if td.color == 0x112233ff));
+        assert!(
+            matches!(l.item(&p, &t).unwrap().data, ItemData::Text(td) if td.color == 0x112233ff)
+        );
         assert!(l.set_text_color(&p, "nope", 0).is_err());
     }
 

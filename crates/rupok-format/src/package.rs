@@ -54,7 +54,14 @@ pub struct Package {
     pub outline: Option<Outline>,
     /// Recognised handwriting kept between saves (see [`ReadableCache`]).
     pub readable_cache: ReadableCache,
+    /// `now_ms` of the last outline refresh (see
+    /// [`Package::update_lesson_throttled`]).
+    pub outline_at: f64,
 }
+
+/// How long an autosave may reuse the readable outline before rebuilding it.
+/// Rebuilding reads every item (about 0.8 s on a 100k-stroke lesson).
+pub const OUTLINE_MAX_AGE_MS: f64 = 60_000.0;
 
 impl Package {
     /// Snapshot a lesson into a package (assets/objects added separately).
@@ -66,9 +73,36 @@ impl Package {
 
     /// Refresh the document and manifest, keeping assets/objects.
     pub fn update_lesson(&mut self, lesson: &Lesson, generator: &str, now_ms: f64) {
+        self.outline = Some(Outline::from_lesson(lesson, Some(&mut self.readable_cache)));
+        self.outline_at = now_ms;
+        self.update_doc(lesson, generator, now_ms);
+    }
+
+    /// [`Package::update_lesson`] for frequent saves (the board's autosave):
+    /// the readable outline is rebuilt only when there is none or it is
+    /// older than `max_age_ms`; otherwise the last one is kept, so the
+    /// readable entries may lag `doc.loro` by up to `max_age_ms` (they are
+    /// derived and never authoritative). Returns whether it was rebuilt.
+    pub fn update_lesson_throttled(
+        &mut self,
+        lesson: &Lesson,
+        generator: &str,
+        now_ms: f64,
+        max_age_ms: f64,
+    ) -> bool {
+        let stale = self.outline.is_none() || !(now_ms - self.outline_at < max_age_ms);
+        if stale {
+            self.update_lesson(lesson, generator, now_ms);
+        } else {
+            self.update_doc(lesson, generator, now_ms);
+        }
+        stale
+    }
+
+    /// Refresh `doc` and the manifest only.
+    fn update_doc(&mut self, lesson: &Lesson, generator: &str, now_ms: f64) {
         let course = self.manifest.as_ref().and_then(|m| m.course.clone());
         self.doc = lesson.save();
-        self.outline = Some(Outline::from_lesson(lesson, Some(&mut self.readable_cache)));
         self.manifest = Some(Manifest {
             format: "rupok-lesson".into(),
             version: FORMAT_VERSION,
@@ -572,6 +606,49 @@ mod tests {
         // The mimetype is still first and the package still reads.
         assert_eq!(&bytes[30..38], b"mimetype");
         Package::read(&bytes).unwrap().lesson().unwrap();
+    }
+
+    #[test]
+    fn throttled_update_reuses_a_fresh_outline() {
+        use rupok_core::{BoxGeom, ItemData, TextData};
+        let mut lesson = sample_package().lesson().unwrap();
+        let mut pkg = Package::default();
+        let t0 = 1_763_870_400_000.0;
+        // No outline yet: built.
+        assert!(pkg.update_lesson_throttled(&lesson, "test", t0, OUTLINE_MAX_AGE_MS));
+        let page = lesson.page_id_at(0).unwrap();
+        let text = TextData {
+            geom: BoxGeom {
+                x: 100.0,
+                y: 900.0,
+                w: 400.0,
+                h: 60.0,
+                rot: 0.0,
+            },
+            text: "Added later".into(),
+            size: 40.0,
+            color: 0xff,
+            latex: false,
+        };
+        lesson.add_item(&page, &ItemData::Text(text), 3.0).unwrap();
+        // Within the window: doc and manifest move on, the outline is kept.
+        assert!(!pkg.update_lesson_throttled(&lesson, "test", t0 + 1_000.0, OUTLINE_MAX_AGE_MS));
+        assert_eq!(pkg.manifest.as_ref().unwrap().modified, t0 + 1_000.0);
+        assert_eq!(
+            pkg.lesson().unwrap().items(&page).unwrap().len(),
+            lesson.items(&page).unwrap().len()
+        );
+        let md = entry(&pkg.write().unwrap(), "content.md").unwrap();
+        assert!(!md.contains("Added later"), "{md}");
+        // After the window (or on a full update): rebuilt.
+        assert!(pkg.update_lesson_throttled(
+            &lesson,
+            "test",
+            t0 + OUTLINE_MAX_AGE_MS,
+            OUTLINE_MAX_AGE_MS
+        ));
+        let md = entry(&pkg.write().unwrap(), "content.md").unwrap();
+        assert!(md.contains("Added later"), "{md}");
     }
 
     #[test]
