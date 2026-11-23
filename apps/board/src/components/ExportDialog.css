@@ -1,0 +1,46 @@
+/* Export PDF dialog. Uses the design tokens from styles.css; flat, no
+ * gradients. */
+
+.export-dialog { width: min(560px, 100%); }
+.export-row { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.export-range { width: 140px; height: 36px; font-variant-numeric: tabular-nums; }
+.export-hint { font: 450 12px/18px var(--font); color: var(--text-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.export-hint.error { color: var(--danger); white-space: normal; }
+
+.layout-cards { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
+.layout-card {
+  display: flex; align-items: center; gap: var(--s3); padding: var(--s3); border: 0; border-radius: 14px; cursor: pointer; text-align: left;
+  background: var(--gray-a3); color: var(--text); font: inherit; box-shadow: inset 0 0 0 1px transparent;
+  transition: background-color 120ms var(--ease), box-shadow 120ms var(--ease);
+}
+.layout-card:hover { background: var(--gray-a4); }
+.layout-card.on { background: var(--accent-3); box-shadow: inset 0 0 0 2px var(--accent-9); }
+.layout-card b { display: block; font: 600 14px/20px var(--font); }
+.layout-card b + span { display: block; font: 450 12px/16px var(--font); color: var(--text-2); }
+
+/* Little drawings of each layout. */
+.mini { flex: none; width: 56px; height: 46px; display: grid; place-items: center; }
+.mini-slide, .mini-sheet { background: var(--surface-solid); box-shadow: 0 0 0 1px var(--hairline), 0 1px 2px rgba(0, 0, 40, 0.06); }
+.mini-slide { width: 52px; height: 30px; border-radius: 4px; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
+.mini-slide i { display: block; height: 3px; border-radius: 2px; background: var(--gray-7); }
+.mini-slide i:first-child { width: 60%; background: var(--accent-9); }
+.mini-slide i:last-child { width: 85%; }
+.mini-sheet { width: 34px; height: 46px; border-radius: 3px; padding: 4px; display: flex; flex-direction: column; justify-content: space-between; }
+.mini-sheet i { display: flex; gap: 3px; height: 10px; align-items: stretch; }
+.mini-sheet em { width: 13px; border-radius: 1.5px; background: var(--gray-6); }
+.mini-sheet s { flex: 1; background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--gray-7) 2px 3px); }
+.layout-card.on .mini-sheet em { background: var(--accent-9); }
+
+.export-checks { display: flex; flex-direction: column; gap: 2px; margin: 0 calc(-1 * var(--s2)) var(--s4); }
+.export-checks .check { align-items: flex-start; padding: 6px var(--s2); border-radius: var(--s2); }
+.export-checks .check:hover { background: var(--hover); }
+.export-checks .check input { margin-top: 2px; }
+.export-checks .check small { display: block; margin-top: 2px; font: 450 12px/16px var(--font); color: var(--text-2); }
+
+.export-actions { margin-top: var(--s4); min-height: var(--ctl); }
+.export-progress { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 180px; max-width: 260px; }
+.export-progress .bar { height: 6px; border-radius: 3px; background: var(--gray-a4); overflow: hidden; }
+.export-progress .bar > div { height: 100%; border-radius: 3px; background: var(--accent-9); transition: width 160ms var(--ease); }
+.export-progress span { font: 500 12px/16px var(--font); color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 520px) { .layout-cards { grid-template-columns: 1fr; } }

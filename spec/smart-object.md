@@ -157,17 +157,21 @@ connect-src 'none';
   MUST make `window.rupok` available, for example by inserting the SDK as
   the first `<script>` in `<head>` when it serves the entry file. Objects
   SHOULD NOT ship their own copy. If two copies load, the first one wins.
-- **Serve `rupoklib://`.** `rupoklib` is not a registrable URL scheme (a scheme
-  must start with a letter). Browsers parse `rupoklib://three/x.js` in `src`,
-  `href` and `url()` as a *relative* URL, and in `import` as a *bare
-  specifier*. Hosts MUST make both work. They rewrite `rupoklib://<name>/` to
-  their library base URL when serving the bundle's HTML, JS and CSS, and/or
-  serve relative requests whose path contains `rupoklib:/<name>/` from the
-  vendored copy. They also inject an import map before any module script:
-  `<script type="importmap">{"imports": {"rupoklib://": "<library base>/"}}</script>`.
+- **Serve `rupoklib://`.** `rupoklib:` is a syntactically valid URL scheme,
+  so browsers parse `rupoklib://three/x.js` as an absolute URL everywhere
+  (`src`, `href`, CSS `url()`, `import`) and cannot fetch it: no browser has
+  a handler for it. Hosts MUST therefore rewrite the literal string
+  `rupoklib://` to their library base URL (for example
+  `https://example.org/rupoklib/`) in the bundle's HTML, JS and CSS before
+  the object loads them. Hosts MAY also inject an import map before any
+  module script, `<script type="importmap">{"imports": {"rupoklib://": "<library base>/"}}</script>`,
+  which also resolves module specifiers assembled at run time. Objects SHOULD
+  write `rupoklib://` URLs as literal strings so the rewrite finds them.
   Library responses MUST carry the right MIME type and
-  `Access-Control-Allow-Origin: *`, because module scripts from an
-  opaque-origin frame need CORS.
+  `Access-Control-Allow-Origin: *`, because module scripts and fonts loaded
+  from an opaque-origin frame need CORS.
+- **Provide the theme fonts.** Hosts SHOULD make the [theme fonts](#fonts)
+  available inside the object (the object cannot see the host's own fonts).
 - **Ink stays on top.** The pen layer is drawn above every object. While a
   pen or eraser tool is active, pointer events go to the ink layer, not the
   iframe.
@@ -185,16 +189,16 @@ Reference them as `rupoklib://<name>/<file>`. Library names are exactly the
 
 | Name | Entry file(s) | Use as |
 |---|---|---|
-| `three` | `rupoklib://three/three.module.js` | ES module: `import * as THREE from "rupoklib://three/three.module.js"` |
+| `three` | `rupoklib://three/three.module.js` | ES module: `import * as THREE from "rupoklib://three/three.module.js"` (it imports its sibling `three.core.js`). Extras, not guaranteed: addons under `rupoklib://three/addons/` (`controls/OrbitControls.js`, `controls/TrackballControls.js`, `renderers/CSS2DRenderer.js`, `environments/RoomEnvironment.js`) with their `three` import rewritten to a relative path, so they need no import map |
 | `d3` | `rupoklib://d3/d3.min.js` | classic script, global `d3` |
-| `katex` | `rupoklib://katex/katex.min.js` + `rupoklib://katex/katex.min.css` | global `katex`; the CSS loads fonts from `rupoklib://katex/fonts/` |
+| `katex` | `rupoklib://katex/katex.min.js` + `rupoklib://katex/katex.min.css` | global `katex`; the CSS loads fonts from `rupoklib://katex/fonts/`. Extra: `auto-render.min.js` |
 | `mermaid` | `rupoklib://mermaid/mermaid.min.js` | global `mermaid` |
 | `chart.js` | `rupoklib://chart.js/chart.umd.min.js` | global `Chart` |
 | `gsap` | `rupoklib://gsap/gsap.min.js` | global `gsap` |
-| `p5` | `rupoklib://p5/p5.min.js` | global `p5` |
+| `p5` | `rupoklib://p5/p5.min.js` | global `p5` (p5.js 2.x) |
 | `matter-js` | `rupoklib://matter-js/matter.min.js` | global `Matter` |
-| `animejs` | `rupoklib://animejs/anime.min.js` | global `anime` |
-| `tailwind` | `rupoklib://tailwind/tailwind.js` | Tailwind's browser build: generates CSS for the classes on the page |
+| `animejs` | `rupoklib://animejs/anime.min.js` | global `anime` (Anime.js 4 API: `anime.animate()`, `anime.createTimeline()`, `anime.stagger()`) |
+| `tailwind` | `rupoklib://tailwind/tailwind.js` | Tailwind's browser build (v4): generates CSS for the classes on the page |
 | `lucide` | `rupoklib://lucide/lucide.min.js` | global `lucide`; call `lucide.createIcons()` |
 
 - The entry files above are guaranteed in v1. Other files of a library MAY be
@@ -225,7 +229,8 @@ your own SDK.
 - Both sides MUST ignore messages with an unknown `type`, a missing or
   different `rupok`, or malformed fields.
 - Hosts SHOULD rate-limit each object (for example drop messages beyond 100 per
-  second) and MUST drop any message larger than 300 KiB.
+  second) and MUST drop any message larger than 300 KiB, except a `snapshot`
+  reply, which MUST be dropped above 16 MiB.
 
 ### Object → host
 
@@ -239,6 +244,7 @@ your own SDK.
 | `quiz` | `payload`: `{ questionId, answer, correct?, score? }` | Record an answer. |
 | `log` | `level`: `"info"` \| `"warn"` \| `"error"`, `message`: string | Diagnostic text for the teacher or agent. |
 | `key` | `key`: `"PageDown"` \| `"PageUp"` \| `"ArrowRight"` \| `"ArrowLeft"` \| `"ArrowDown"` \| `"ArrowUp"` \| `"Escape"` | A presenter key the object received while focused and did **not** handle (`defaultPrevented` stayed false). The SDK sends it so a clicker keeps working after the teacher touches an object. Objects that use these keys themselves MUST call `event.preventDefault()`. Keys typed into inputs are never forwarded. |
+| `snapshot` | `id`: the request's `id`; then `dataUrl`: string, or `error`: string | Reply to a host `snapshot` request: a `data:image/png;base64,…` picture of the object's viewport, or a short reason it could not be drawn. See [Snapshots](#snapshots). |
 
 `quiz.payload` fields: `questionId` string; `answer` any JSON value (the
 option id, text or number the learner chose); `correct` optional boolean;
@@ -252,6 +258,7 @@ option id, text or number the learner chose); `correct` optional boolean;
 | `step` | `step`: integer | The current step changed. |
 | `theme` | `theme`: object | The theme changed. Carries the full theme. |
 | `mode` | `mode`: string | The mode changed. |
+| `snapshot` | `id`: string (`[A-Za-z0-9._:-]{1,64}`) or number; `scale`: number, optional | Ask for a PNG picture of the object as it looks now. `scale` is device pixels per CSS pixel (default 2, clamped to `[0.25, 4]`). The object replies with `snapshot` and the same `id`. |
 
 `init` fields:
 
@@ -294,6 +301,36 @@ object (iframe)                         host
 - On `log`, the host shows the message to the teacher (for example in a
   developer panel) and MAY pass it to the agent that made the object.
 
+### Snapshots
+
+A host that needs a still picture of an object (the reference host uses it
+for **Export PDF**) sends `snapshot`. The object answers with a PNG data URL
+of its viewport (`innerWidth` × `innerHeight` CSS pixels at `scale`).
+
+The SDK answers automatically; authors do nothing:
+
+1. Inside the next animation frame (or after 150 ms if the frame never
+   paints) it copies every visible `<canvas>`. Copying right after the
+   object's own frame callbacks lets it read WebGL canvases created without
+   `preserveDrawingBuffer`.
+2. It clones the document, freezes form values, replaces each canvas with an
+   image of its copy, inlines images it can read, removes scripts and
+   frames, and draws the clone through an SVG `<foreignObject>`.
+   Stylesheets and fonts loaded from other URLs (including `rupoklib://`) do
+   not load inside an SVG image, so inline styles and inline SVG render best.
+3. If the browser refuses that picture (a tainted canvas, no
+   `XMLSerializer`), it draws only the canvas copies over the page
+   background. With no canvas either, it replies with `error`.
+4. Output is capped at 4096 × 4096 pixels; while the data URL exceeds 16 MiB
+   the scale is halved (up to three times).
+
+Hosts MUST treat a missing or late reply as normal: the reference host waits
+about 1.5 s, then draws a placeholder card with the object's title. Hosts
+SHOULD take snapshots in a separate, hidden iframe of the same bundle, given
+the item's saved `step` and `state` in `init`, and MUST NOT store `state`,
+`goto`, `steps` or `resize` messages from such a frame (exporting must not
+change the lesson).
+
 ## SDK API (`window.rupok`)
 
 `packages/object-sdk/sdk.js` (npm: `@rupok/object-sdk`) is a
@@ -321,6 +358,7 @@ dependency-free script that the host injects. Types are in
 | `quiz.submit(payload)` | Send a `quiz` message. `questionId` is required. |
 | `resize(w, h)` | Send a `resize` message. |
 | `log(level, ...args)` | Log to the console and send a `log` message. Non-string args are JSON-encoded; the message is cut at 4,000 characters. |
+| *(automatic)* | Answers host `snapshot` requests; see [Snapshots](#snapshots). |
 
 `InitInfo` is `{ id, step, steps, state, theme, mode, standalone }`. In
 standalone mode `id` is `"standalone"`.
@@ -421,17 +459,36 @@ tokens. The SDK mirrors each token to a CSS custom property on `:root`:
 
 | Token | CSS variable | SDK default |
 |---|---|---|
+| `scheme` | `--rupok-scheme`, plus `data-scheme` on `<html>` | `light` (`light` \| `dark`) |
 | `color.bg` | `--rupok-color-bg` | `#ffffff` |
-| `color.fg` | `--rupok-color-fg` | `#1d2433` |
-| `color.accent` | `--rupok-color-accent` | `#2563eb` |
-| `color.accent2` | `--rupok-color-accent2` | `#7c3aed` |
-| `color.muted` | `--rupok-color-muted` | `#64748b` |
-| `color.success` | `--rupok-color-success` | `#15803d` |
-| `color.danger` | `--rupok-color-danger` | `#dc2626` |
-| `font.body` | `--rupok-font-body` | `system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif` |
+| `color.surface` | `--rupok-color-surface` | `#f4f5f4` |
+| `color.line` | `--rupok-color-line` | `rgba(17, 20, 24, 0.12)` |
+| `color.fg` | `--rupok-color-fg` | `#111418` |
+| `color.accent` | `--rupok-color-accent` | `#0ca678` |
+| `color.accent2` | `--rupok-color-accent2` | `#1c7ed6` |
+| `color.muted` | `--rupok-color-muted` | `#5f6670` |
+| `color.success` | `--rupok-color-success` | `#2b8a3e` |
+| `color.danger` | `--rupok-color-danger` | `#e03131` |
+| `font.body` | `--rupok-font-body` | `"Inter Variable", Inter, "Hind Siliguri", system-ui, …` |
 | `font.heading` | `--rupok-font-heading` | same as `font.body` |
 | `font.mono` | `--rupok-font-mono` | `ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace` |
 | `radius` | `--rupok-radius` | `12px` |
+
+### Light and dark
+
+Objects sit on the slide, so the host derives `scheme` from the **page
+colour**, not from the app's chrome theme: a white or paper page sends
+`light`, a chalkboard or blackboard page sends `dark`, and `color.bg` is the
+page colour itself. Every object MUST render correctly in both schemes:
+
+- Paint the document background with `var(--rupok-color-bg)` and text with
+  `var(--rupok-color-fg)`; use `--rupok-color-surface` for cards and
+  `--rupok-color-line` for rules and gridlines.
+- Never hard-code white or black surfaces. For colours that need a different
+  value per scheme, use `:root[data-scheme="dark"] { … }`.
+- Canvas and WebGL code reads `rupok.theme.get(...)` and redraws in
+  `rupok.theme.onChange` (the scheme changes when the teacher recolours the
+  page).
 
 - Defaults apply as soon as the SDK loads, before `init`.
 - `init.theme` and `theme` messages carry the full theme; tokens they omit
@@ -441,6 +498,33 @@ tokens. The SDK mirrors each token to a CSS custom property on `:root`:
   `color: var(--rupok-color-fg, #1d2433);`
 - In canvas or WebGL code, read `rupok.theme.get("color.accent", "#2563eb")`
   and redraw in `theme.onChange`.
+
+### Fonts
+
+An object runs in an opaque-origin frame and cannot see the fonts the host
+app loaded, and the teacher's machine may not have them installed. So the
+host provides the theme fonts itself. The reference host injects
+`@font-face` rules for these files into every object document, serving them
+from the library base (`<libs>`, so the recommended `font-src` already
+allows them):
+
+| Family | Weights | Scripts |
+|---|---|---|
+| `Inter Variable` (also answers to `Inter`) | 100–900, variable | Latin |
+| `Hind Siliguri` | 400, 500, 600, 700 | Bengali, Latin |
+
+- Use the theme variables, `font-family: var(--rupok-font-body)`. Bangla
+  text falls through Inter (Latin only) to Hind Siliguri by itself.
+- Other weights snap to the nearest face. There is no italic face; the
+  browser slants the upright one.
+- A font loads when something first uses it. Canvas text drawn before that
+  uses the fallback and stays wrong until the next redraw, so await
+  `document.fonts.load('700 1em "Inter Variable"')` (and `"Hind Siliguri"`
+  for Bangla) before the first canvas draw, or redraw on
+  `document.fonts.onloadingdone`.
+- Keep the fallbacks in the stack: other hosts may not provide these fonts.
+- Never load fonts from the network. For another font, ship a subset woff2
+  in the bundle and declare it with your own `@font-face`.
 
 ## Modes
 
@@ -551,7 +635,7 @@ back of the room, and written on with a pen.
 **Offline and safe**
 
 - No CDNs. Inline everything or use `rupoklib://`. No web fonts from the
-  internet; use the theme fonts.
+  internet; use the [theme fonts](#fonts).
 - No `localStorage`, cookies, `alert()` or popups.
 - Validate, fix every error, and re-validate.
 
@@ -631,17 +715,8 @@ are in `examples/objects/`.
 Known gaps between this spec and the reference implementation at the time of
 writing:
 
-- **Validator panic.** The URL scan in `remote_resources`
-  (`crates/rupok-format/src/object.rs`) slices a 48-byte context window at a
-  byte offset. When a multi-byte UTF-8 character straddles that offset,
-  `validate()` panics. This happens before a resource is even detected: any
-  `//` (including a plain JS `//` comment) within 48 bytes after non-ASCII
-  text can trigger it, so non-English objects are affected.
 - **`steps` warning.** The check looks for the text `rupok` anywhere, not
   for use of `rupok.steps`.
 - **Unknown manifest fields** are ignored on read but dropped when a bundle
   is rewritten.
 - **Bundle size** is enforced by `validate()`, not by `Package::read`.
-- **`scripts/vendor-libs.mjs`** (named in `object.rs` as the source of the
-  vendored libraries) does not exist yet. The host side (sandbox, CSP,
-  `rupoklib://` serving, SDK injection) is not implemented yet.

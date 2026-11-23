@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "The board window: open and save lessons, export PDFs, open the overlay, receive overlay snapshots.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:allow-read-file",
+    "allow-take-pending-files",
+    "allow-save-lesson",
+    "allow-save-pdf",
+    "allow-take-overlay-page",
+    "allow-overlay-show",
+    "allow-overlay-toggle",
+    "allow-overlay-hide"
+  ]
+}

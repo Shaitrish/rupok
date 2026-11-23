@@ -6,7 +6,8 @@ use std::path::PathBuf;
 
 use rupok_format::{ObjectBundle, Severity};
 
-/// (file, title, width, height, steps)
+/// (file, title, width, height, steps). Keep in sync with the presets gallery
+/// in `apps/board/src/presets.ts`, which places these with the same values.
 const EXAMPLES: &[(&str, &str, f64, f64, u32)] = &[
     ("binary-counter.html", "Binary counter", 1280.0, 720.0, 10),
     (
@@ -23,6 +24,44 @@ const EXAMPLES: &[(&str, &str, f64, f64, u32)] = &[
         720.0,
         4,
     ),
+    (
+        "physics-projectile.html",
+        "Projectile motion",
+        1920.0,
+        1080.0,
+        4,
+    ),
+    (
+        "physics-circuit.html",
+        "Ohm's law: a simple circuit",
+        1920.0,
+        1080.0,
+        6,
+    ),
+    (
+        "chemistry-molecules-3d.html",
+        "Molecules in 3D",
+        1920.0,
+        1080.0,
+        4,
+    ),
+    (
+        "chemistry-reaction.html",
+        "Burning methane",
+        1920.0,
+        1080.0,
+        4,
+    ),
+    ("math-graph.html", "Function grapher", 1920.0, 1080.0, 5),
+];
+
+/// The rupoklib libraries each example uses (detected from `rupoklib://`).
+const EXAMPLE_LIBS: &[(&str, &[&str])] = &[
+    ("physics-projectile.html", &["katex"]),
+    ("physics-circuit.html", &["katex"]),
+    ("chemistry-molecules-3d.html", &["katex", "three"]),
+    ("chemistry-reaction.html", &["katex"]),
+    ("math-graph.html", &["katex"]),
 ];
 
 fn examples_dir() -> PathBuf {
@@ -77,5 +116,42 @@ fn examples_have_no_warnings_and_need_no_network() {
             bundle.entry_html().is_some_and(|h| h.contains("rupok")),
             "{file}: must use the rupok SDK"
         );
+    }
+}
+
+#[test]
+fn every_example_file_is_listed() {
+    let mut listed: Vec<&str> = EXAMPLES.iter().map(|e| e.0).collect();
+    listed.sort_unstable();
+    let mut found: Vec<String> = std::fs::read_dir(examples_dir())
+        .expect("examples/objects")
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n.ends_with(".html"))
+        .collect();
+    found.sort_unstable();
+    assert_eq!(found, listed, "add new example objects to EXAMPLES");
+}
+
+#[test]
+fn examples_declare_size_steps_and_libs() {
+    for &(file, title, w, h, steps) in EXAMPLES {
+        let bundle = load(file, title, w, h, steps);
+        let m = &bundle.manifest;
+        assert_eq!((m.size.w, m.size.h, m.steps), (w, h, steps), "{file}");
+        let html = bundle.entry_html().unwrap_or_default();
+        if steps > 0 {
+            assert!(
+                html.contains("rupok.steps.setCount("),
+                "{file}: stepped objects declare their step count"
+            );
+        }
+        let want: &[&str] = EXAMPLE_LIBS
+            .iter()
+            .find(|(f, _)| *f == file)
+            .map_or(&[], |(_, libs)| *libs);
+        let mut libs: Vec<&str> = m.libs.iter().map(String::as_str).collect();
+        libs.sort_unstable();
+        assert_eq!(libs, want, "{file}: rupoklib libraries");
     }
 }

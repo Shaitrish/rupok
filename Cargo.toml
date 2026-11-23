@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/rupok-ink", "crates/rupok-core", "crates/rupok-format", "crates/rupok-render", "crates/rupok-cli", "crates/rupok-wasm", "bench"]
+members = ["crates/rupok-ink", "crates/rupok-core", "crates/rupok-format", "crates/rupok-live", "crates/rupok-render", "crates/rupok-cli", "crates/rupok-wasm", "bench", "apps/desktop"]
 
 [workspace.package]
 version = "0.1.0"
@@ -15,6 +15,7 @@ rupok-ink = { path = "crates/rupok-ink" }
 rupok-core = { path = "crates/rupok-core" }
 rupok-format = { path = "crates/rupok-format" }
 rupok-render = { path = "crates/rupok-render" }
+rupok-live = { path = "crates/rupok-live" }
 
 loro = "1.18"
 serde = { version = "1", features = ["derive"] }

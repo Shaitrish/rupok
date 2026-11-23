@@ -66,8 +66,8 @@ rupok info lesson.rpk
 ## The object contract
 
 - **One HTML file**, everything inline (CSS, JS, SVG, data). No build step.
-- **Offline.** No CDNs, no web fonts, no remote images. Use `rupoklib://`
-  libraries or inline code. Any remote resource is a validation error unless
+- **Offline.** No CDNs, no web fonts from the network, no remote images. Use
+  `rupoklib://` libraries or inline code; the host provides the theme fonts. Any remote resource is a validation error unless
   its host is in `network_hosts` (avoid; lessons must work without Wi-Fi).
 - **Sandboxed.** `sandbox="allow-scripts"`, opaque origin: no
   `localStorage`/`sessionStorage`/`indexedDB`/cookies, no `alert`/`confirm`,
@@ -98,6 +98,14 @@ Theme CSS variables: `--rupok-color-bg`, `--rupok-color-fg`, `--rupok-color-acce
 `--rupok-color-danger`, `--rupok-font-body`, `--rupok-font-heading`,
 `--rupok-font-mono`, `--rupok-radius`. Always write a fallback:
 `var(--rupok-color-fg, #1d2433)`.
+
+**Fonts.** The host provides **Inter** (variable, 100–900, Latin) and **Hind
+Siliguri** (400–700, Bengali and Latin) inside every object, even on machines
+without them installed. Use `font-family: var(--rupok-font-body)`; Bangla falls
+through to Hind Siliguri by itself. Canvas text drawn before a font has loaded
+uses the fallback, so before the first canvas draw:
+`await document.fonts.load('700 1em "Inter Variable"')` (and `"Hind Siliguri"`
+for Bangla).
 
 ## Steps: render state, not events
 
@@ -188,19 +196,60 @@ in a browser; it is not needed inside rupok.
 
 | Name | Entry | Use |
 |---|---|---|
-| `three` | `rupoklib://three/three.module.js` | `import * as THREE from "rupoklib://three/three.module.js"` |
+| `three` | `rupoklib://three/three.module.js` | `import * as THREE from "rupoklib://three/three.module.js"` (see notes) |
 | `d3` | `rupoklib://d3/d3.min.js` | global `d3` |
-| `katex` | `rupoklib://katex/katex.min.js` + `katex.min.css` | global `katex` (maths) |
+| `katex` | `rupoklib://katex/katex.min.js` + `katex.min.css` | global `katex` (maths); extra `auto-render.min.js` |
 | `mermaid` | `rupoklib://mermaid/mermaid.min.js` | global `mermaid` (diagrams) |
 | `chart.js` | `rupoklib://chart.js/chart.umd.min.js` | global `Chart` |
 | `gsap` | `rupoklib://gsap/gsap.min.js` | global `gsap` |
-| `p5` | `rupoklib://p5/p5.min.js` | global `p5` |
+| `p5` | `rupoklib://p5/p5.min.js` | global `p5`, **p5.js 2.x** |
 | `matter-js` | `rupoklib://matter-js/matter.min.js` | global `Matter` (physics) |
-| `animejs` | `rupoklib://animejs/anime.min.js` | global `anime` |
+| `animejs` | `rupoklib://animejs/anime.min.js` | global `anime`, **Anime.js 4** |
 | `tailwind` | `rupoklib://tailwind/tailwind.js` | utility classes |
 | `lucide` | `rupoklib://lucide/lucide.min.js` | global `lucide`, `lucide.createIcons()` |
 
-Prefer plain HTML, CSS and SVG when they are enough.
+Prefer plain HTML, CSS and SVG when they are enough. Write `rupoklib://` URLs
+as literal strings: the host rewrites that text to its library address, so a
+URL assembled at run time will not load.
+
+**Library API notes.** These are the current major versions. Older tutorials
+(and your memory) often show the previous API, which fails here.
+
+- **Anime.js 4, not v3.** There is no `anime({ targets, … })` call and no
+  `anime.timeline()`. Use the functions on the global:
+  ```js
+  const { animate, createTimeline, stagger } = anime;
+  animate(".dot", { x: "16rem", delay: stagger(80), duration: 600, ease: "outQuad" });
+  const tl = createTimeline({ autoplay: false });
+  tl.add(".a", { opacity: [0, 1] }).add(".b", { y: -20 }, "-=200");
+  ```
+  Targets are the first argument; easing is `ease` (`"outQuad"`, `"inOutSine"`,
+  no `easeOut…` prefix); callbacks are `onComplete`, `onUpdate` (not
+  `complete`, `update`). For steps, seek instead of replaying: `tl.seek(ms)`.
+- **p5.js 2.x, not 1.x.** `preload()` is gone: load assets in
+  `async function setup() { img = await loadImage(…); }`. `curveVertex()` is
+  now `splineVertex()` and `curve()` is `spline()`. `bezierVertex(x, y)` takes
+  one point per call (three calls make a cubic segment), and
+  `quadraticVertex()` is gone (use `bezierOrder(2)`). Global and instance mode
+  (`new p5(sketch, element)`) both work.
+- **three.js** (r187). Import only
+  `rupoklib://three/three.module.js`; it loads its sibling `three.core.js`
+  itself, so never import `three.core.js` on its own, and never the bare
+  specifier `"three"` (there is no import map). Four addons are available, with
+  their imports already pointing at the same `three.module.js`, so they share
+  one instance:
+  `rupoklib://three/addons/controls/OrbitControls.js`,
+  `rupoklib://three/addons/controls/TrackballControls.js`,
+  `rupoklib://three/addons/renderers/CSS2DRenderer.js`,
+  `rupoklib://three/addons/environments/RoomEnvironment.js`.
+  Any other addon: inline it. Use a `<script type="module">` with a static
+  `import` or `await import("rupoklib://three/three.module.js")`.
+- **KaTeX auto-render.** After `katex.min.js` (and `katex.min.css`), load
+  `rupoklib://katex/auto-render.min.js` and call
+  `renderMathInElement(element, { delimiters })`. Its defaults are `$$…$$`,
+  `\[…\]` and `\(…\)`; single `$…$` is **off** unless you add
+  `{ left: "$", right: "$", display: false }` to `delimiters`. For one formula,
+  `katex.render("V = IR", el, { throwOnError: false })` is simpler.
 
 ## Fixing validation diagnostics
 
@@ -216,11 +265,6 @@ Prefer plain HTML, CSS and SVG when they are enough.
 | `lib` | warning | Unknown `rupoklib://` name; use one from the table. |
 | `storage` | warning | Replace `localStorage`/`indexedDB` with `rupok.state`. |
 | `sandbox` | warning | Remove `window.top` / `parent.document` / `top.location`. |
-
-**Known validator bug (until fixed):** the validator can crash on a `//`
-sequence (for example a `// comment`) that comes shortly after non-ASCII text
-such as Bangla or accented letters. In object HTML, write JavaScript comments
-as `/* … */` and avoid `//` outside URLs.
 
 ## Checklist before placing
 

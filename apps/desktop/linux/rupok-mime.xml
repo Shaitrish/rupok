@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Registers .rpk lessons with shared-mime-info so file managers open them in Rupok. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/vnd.rupok.lesson+zip">
+    <comment>Rupok lesson</comment>
+    <sub-class-of type="application/zip"/>
+    <glob pattern="*.rpk"/>
+  </mime-type>
+</mime-info>

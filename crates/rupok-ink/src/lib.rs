@@ -11,6 +11,7 @@ pub mod builder;
 pub mod codec;
 pub mod filter;
 pub mod pressure;
+pub mod recognize;
 pub mod simplify;
 
 pub use builder::{BuilderConfig, StrokeBuilder, StrokeStyle, Tool};

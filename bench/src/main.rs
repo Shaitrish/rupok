@@ -65,6 +65,7 @@ fn synth_stroke(rng: &mut Rng, cx: f32, cy: f32, t0: f64) -> StrokeData {
         points: b.finish(),
         offset: [0.0, 0.0],
         shape: None,
+        geom: None,
     }
 }
 
@@ -267,6 +268,7 @@ fn main() {
         ],
         offset: [0.0, 0.0],
         shape: None,
+        geom: None,
     };
     r.add_stroke("probe", &probe);
     r.render(&gpu.device, &gpu.queue, &view, w, h, Camera::default(), 1.0);

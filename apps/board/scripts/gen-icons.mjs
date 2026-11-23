@@ -48,6 +48,23 @@ const MAP = {
   info: ["info-circle"],
   insert: ["widget-add"],
   more: ["menu-dots"],
+  duplicate: ["copy"],
+  front: ["layers-arrow-up", "layer-arrow-up"],
+  prev: ["alt-arrow-left"],
+  next: ["alt-arrow-right"],
+  eye: ["eye"],
+  up: ["alt-arrow-up"],
+  down: ["alt-arrow-down"],
+  group: ["link-round-angle", "link"],
+  ungroup: ["link-broken", "unlink"],
+  merge: ["union"],
+  import: ["import"],
+  export: ["export"],
+  restart: ["restart"],
+  exit: ["exit", "logout"],
+  overlay: ["layers-minimalistic", "layers"],
+  smartink: ["ruler-cross-pen", "ruler-pen"],
+  totext: ["text-field-focus", "text-field"],
 };
 
 function body(name) {

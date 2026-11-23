@@ -1,0 +1,23 @@
+{
+  "name": "@rupok/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "board": "cd ../board && bun install && bun run wasm && bun run build",
+    "build": "bun run board && tauri build",
+    "bundle": "tauri build",
+    "icons": "tauri icon ../../brand/rupok-app-icon.svg && rm -rf icons/android icons/ios"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.12.5",
+    "@tauri-apps/plugin-dialog": "^2.8.4",
+    "@tauri-apps/plugin-fs": "^2.7.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.6"
+  }
+}

@@ -85,10 +85,11 @@ evaluate in task 1:
 
 Whatever wins must satisfy `spec/smart-object.md#sandbox` (exactly
 `sandbox="allow-scripts"`, network blocked by CSP unless
-`permissions.network` allows hosts). `rupoklib://` is a *relative* URL to the
-browser (schemes must start with a letter), so the viewer rewrites
-`rupoklib://<name>/<file>` references and injects an import map
-`{"imports": {"rupoklib://": "<viewer>/libs/"}}`, as the desktop host does.
+`permissions.network` allows hosts). `rupoklib:` is a valid URL scheme that
+no browser can fetch, so the viewer rewrites the literal `rupoklib://` to its
+library base (`<viewer>/rupoklib/`), as the board does, and may add an import
+map `{"imports": {"rupoklib://": "<viewer>/rupoklib/"}}` for module
+specifiers built at run time.
 
 ### Opening remote files
 

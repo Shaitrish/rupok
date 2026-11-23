@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Burning methane</title>
+<!--
+  rupok Smart Object: Chemistry, combustion of methane at particle level
+  (CH4 + 2 O2 -> CO2 + 2 H2O), Grade 8-10.
+  Size 1920 x 1080 (full slide), 4 steps:
+    0      the reactants: one CH4 and two O2 molecules
+    1      a spark: the molecules collide
+    2      bonds break (glow), energy is taken in
+    3      new bonds form, heat and light are given out
+    4      conservation of mass: 1 C, 4 H, 4 O on both sides, 80 g = 80 g
+  The same nine atoms are tracked through every step. The balanced equation,
+  the atom tallies and the energy diagram build up with the steps; formulas
+  and labels are LaTeX, typeset by the SDK with KaTeX.
+  Light and dark (chalkboard) schemes.
+-->
+<style>
+  :root {
+    --bg: var(--rupok-color-bg, #ffffff);
+    --fg: var(--rupok-color-fg, #111418);
+    --muted: var(--rupok-color-muted, #5f6670);
+    --surface: var(--rupok-color-surface, #f4f5f4);
+    --line: var(--rupok-color-line, rgba(17, 20, 24, 0.12));
+    --accent: var(--rupok-color-accent, #0ca678);
+    /* accent text (4.5:1 on the page), text on accent fills, highlight background */
+    --accent-text: var(--rupok-color-accent-text, #087f5b);
+    --on-accent: var(--rupok-color-on-accent, #04241b);
+    --accent-soft: var(--rupok-color-accent-soft, #e6fcf5);
+    --font: var(--rupok-font-body, "Inter Variable", Inter, "Hind Siliguri", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    --font-h: var(--rupok-font-heading, var(--font));
+    --sky: #1c7ed6; --coral: #f0533c; --sun: #f59f00; --ok: var(--rupok-color-success, #2b8a3e);
+    /* the same hues as text: 4.5:1 on light pages */
+    --sky-text: #1864ab; --coral-text: #c92a2a; --sun-text: #a06800;
+    --glass: color-mix(in srgb, var(--bg) 90%, transparent);
+    --shadow: 0 .75rem 2.5rem rgba(17, 20, 24, .14), 0 .125rem .375rem rgba(17, 20, 24, .08);
+    --hl: var(--accent-soft);
+  }
+  :root[data-scheme="dark"] {
+    --sky: #74c0fc; --coral: #ff8a7a; --sun: #ffd43b;
+    --sky-text: #74c0fc; --coral-text: #ffa294; --sun-text: #ffe066;
+    --glass: color-mix(in srgb, var(--bg) 86%, transparent);
+    --shadow: 0 .75rem 2.5rem rgba(0, 0, 0, .45), 0 .125rem .375rem rgba(0, 0, 0, .3);
+  }
+  /* Designed at 1280 x 720: 1rem = 16px there (24px on a 1920 slide). */
+  html { font-size: min(calc(100vw * 16 / 1280), calc(100vh * 16 / 720)); }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font); -webkit-user-select: none; user-select: none; }
+  #cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .top { position: fixed; left: 2.5rem; top: 2rem; right: 2.5rem; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
+  .eyebrow { margin: 0 0 .4rem; font: 800 1rem/1 var(--font); letter-spacing: .14em; text-transform: uppercase; color: var(--accent-text); }
+  h1 { margin: 0; font: 900 3.25rem/1.05 var(--font-h); letter-spacing: -.035em; }
+  .caption { margin: .75rem 0 0; max-width: 42rem; font: 500 1.625rem/1.3 var(--font); color: var(--muted); }
+  .caption b { color: var(--fg); font-weight: 750; }
+  .right { display: flex; flex-direction: column; align-items: flex-end; gap: 1rem; }
+  .dots { display: flex; gap: .5rem; padding: .25rem 0; }
+  .dots i { width: .75rem; height: .75rem; border-radius: 50%; background: var(--line); transition: background-color .3s, transform .3s; }
+  .dots i.on { background: var(--accent); }
+  .dots i.now { transform: scale(1.4); }
+  .card { background: linear-gradient(var(--surface), var(--surface)), var(--glass); border: .0625rem solid var(--line); border-radius: 1.25rem; box-shadow: var(--shadow); }
+  .eq { width: 27rem; padding: 1rem 1.375rem 1.125rem; display: grid; gap: .6rem; }
+  .k { font: 800 .9375rem/1 var(--font); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .eq .line { font: 650 1.55rem/1.3 var(--font); white-space: nowrap; min-height: 1.3em; }
+  .eq .vals { font: 600 1.2rem/1.3 var(--font); color: var(--muted); }
+  .eq .vals b { color: var(--fg); font-weight: 800; }
+  .tally { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+  .t { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .1rem .5rem; padding: .5rem .6rem; border-radius: .75rem; background: var(--surface); border: .0625rem solid var(--line); transition: border-color .3s, background-color .3s; }
+  .t .dot { grid-row: span 2; width: 1.6rem; height: 1.6rem; border-radius: 50%; box-shadow: inset -.2rem -.25rem .4rem rgba(0,0,0,.3), inset .15rem .15rem .3rem rgba(255,255,255,.5); }
+  .t .el { font: 850 1.125rem/1 var(--font); }
+  .t .n { font: 750 1.125rem/1 var(--font); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .t .n b { color: var(--fg); }
+  .t.ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .t.ok .n::after { content: " ✓"; color: var(--ok); font-weight: 900; }
+  .mass { font: 700 1.2rem/1.2 var(--font); color: var(--fg); }
+  .swap { animation: swap .45s ease-out; }
+  @keyframes swap { from { opacity: 0; transform: translateY(-.5rem); } to { opacity: 1; transform: none; } }
+  /* Floating labels on the scene, typeset with LaTeX (tag()). */
+  .tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; left: 0; top: 0; padding: .32rem .7rem; border-radius: 999px; white-space: nowrap; font: 650 1.15rem/1.15 var(--font); color: var(--fg); background: color-mix(in srgb, var(--bg) 90%, transparent); border: .1rem solid var(--line); will-change: transform; }
+  .tag.bare { padding: 0 .1rem; background: none; border: 0; border-radius: 0; text-shadow: 0 0 .2em var(--bg), 0 0 .2em var(--bg), 0 0 .08em var(--bg); }
+  /* Plain-HTML stand-in for maths until KaTeX has loaded. */
+  .tx { font-style: normal; }
+  .nw { white-space: nowrap; }
+  .tx sub, .tx sup { font-size: .68em; }
+  .hl { color: var(--accent-text); background: var(--hl); border-radius: .4rem; padding: 0 .1em; }
+  .energy { position: relative; width: 27rem; height: 15.5rem; }
+  .energy .k { position: absolute; left: 1.375rem; top: 1rem; }
+  .energy canvas { position: absolute; left: .5rem; top: 2.25rem; width: calc(100% - 1rem); height: calc(100% - 2.75rem); }
+  .dock { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); display: flex; align-items: center; gap: .5rem; padding: .5rem; border-radius: 999px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; min-height: 4rem; min-width: 4rem; padding: 0 1.5rem; border: .125rem solid var(--line); border-radius: 999px; font: 800 1.3rem/1 var(--font); color: var(--fg); background: transparent; cursor: pointer; touch-action: manipulation; }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; box-shadow: 0 .25rem .75rem color-mix(in srgb, var(--accent) 40%, transparent); }
+  .btn svg { width: 1.5rem; height: 1.5rem; fill: currentColor; }
+  .btn:active { transform: scale(.96); }
+  .btn:focus-visible { outline: .2rem solid var(--fg); outline-offset: .15rem; }
+  .btn:disabled { opacity: .35; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+  <canvas id="cv" aria-label="Particle view of methane burning in oxygen"></canvas>
+  <div class="top">
+    <div data-avoid>
+      <p class="eyebrow">Chemistry · Chemical reactions</p>
+      <h1>Burning methane</h1>
+      <p class="caption" id="caption" aria-live="polite"></p>
+    </div>
+    <div class="right">
+      <div class="dots" id="dots" aria-hidden="true"></div>
+      <div class="card eq" id="eq" data-avoid>
+        <span class="k" id="eq-k">Word equation</span>
+        <div class="line" id="eq-line"></div>
+        <div class="tally" id="tally"></div>
+        <div class="vals" id="eq-vals"></div>
+      </div>
+      <div class="card energy" data-avoid><span class="k">Energy</span><canvas id="ecv" aria-label="Energy level diagram"></canvas></div>
+    </div>
+  </div>
+  <div class="card dock" data-avoid>
+    <button class="btn" id="back" type="button" aria-label="Previous step"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7z"/></svg></button>
+    <button class="btn primary" id="replay" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Replay</button>
+    <button class="btn" id="next" type="button" aria-label="Next step"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7z"/></svg></button>
+  </div>
+
+<script>
+  /* rupok injects window.rupok before this script runs. This small stand-in
+     is only used when the file is opened directly in a browser without the SDK,
+     so the object still previews (arrow keys step through it). */
+  const rupok = window.rupok || (function () {
+    let cur = 0, count = 0, saved;
+    const subs = [];
+    const set = (n) => {
+      n = Math.max(0, Math.min(count, n));
+      if (n !== cur) { cur = n; subs.forEach((f) => f(cur, { source: "local" })); }
+    };
+    document.addEventListener("keydown", (e) => {
+      const k = e.key, tag = e.target.tagName;
+      if (k === "ArrowRight" || k === "PageDown" || (k === " " && tag !== "BUTTON")) { e.preventDefault(); set(cur + 1); }
+      if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); set(cur - 1); }
+    });
+    return {
+      mode: "present",
+      ready: Promise.resolve({ standalone: true }),
+      steps: {
+        get current() { return cur; },
+        get count() { return count; },
+        setCount(n) { count = n; set(cur); },
+        onChange(f) { subs.push(f); setTimeout(() => f(cur, { source: "init" })); return () => {}; },
+        next() { set(cur + 1); },
+        prev() { set(cur - 1); },
+        goto: set,
+      },
+      state: { load: () => saved, save: (v) => { saved = v; } },
+      theme: { get: (k, d) => d, all: () => ({}), onChange: () => () => {} },
+      quiz: { submit() {} },
+      resize() {},
+      log() {},
+    };
+  })();
+
+  const STEPS = 4;
+  const $ = (id) => document.getElementById(id);
+  const cv = $("cv"), ctx = cv.getContext("2d"), ecv = $("ecv"), ectx = ecv.getContext("2d");
+
+  /* ---------------------------------------------------------- LaTeX
+     Maths is typeset by the SDK (rupok.tex / data-tex, KaTeX from rupoklib).
+     Until KaTeX has loaded, or when this file is opened without Rupok, a
+     plain-HTML approximation stands in. */
+  const TEX_SYM = { theta: "θ", pi: "π", times: "×", cdot: "·", Delta: "Δ", Omega: "Ω", to: "→", longrightarrow: "→", circ: "°", approx: "≈", quad: " ", ",": " ", ";": " ", ":": " ", "!": "", sin: "sin ", cos: "cos ", tan: "tan " };
+  function texHtml(t) {
+    let s = String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    for (let i = 0; i < 2; i++) s = s.replace(/\\hl\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g, '<span class="hl">$1</span>');
+    s = s.replace(/\\(?:begin|end)\{array\}(?:\{[^{}]*\})?/g, "").replace(/\\\\/g, "<br>");
+    s = s.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2").replace(/\\(?:mathrm|text|mathit|operatorname)\{([^{}]*)\}/g, "$1");
+    s = s.replace(/\\([A-Za-z]+|[,;:!])/g, (m, w) => TEX_SYM[w] ?? "");
+    s = s.replace(/\^\{([^{}]*)\}|\^(\S)/g, (m, a, b) => `<sup>${a ?? b}</sup>`).replace(/_\{([^{}]*)\}|_(\S)/g, (m, a, b) => `<sub>${a ?? b}</sub>`);
+    return `<span class="tx">${s.replace(/[{}]/g, "").replace(/(^|[^a-z"])-/g, "$1−")}</span>`;
+  }
+  /* Typeset `src` into `el`; cheap to call again with the same formula. */
+  function tex(el, src, display) {
+    if (!el.querySelector(".katex")) el.innerHTML = texHtml(src);
+    if (rupok.tex) rupok.tex(el, src, { display: !!display });
+  }
+  /* Rich text with $…$ formulas (captions): each becomes a [data-tex] span the SDK typesets. */
+  function rich(el, html) {
+    /* punctuation right after a formula stays on its line */
+    el.innerHTML = html.replace(/\$([^$]+)\$([.,;:!?)]*)/g, (m, t, p) =>
+      `<span class="nw"><span data-tex="${t.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">${texHtml(t)}</span>${p}</span>`);
+    if (rupok.math) rupok.math.render(el);
+  }
+
+  /* ---------------------------------------------------------- floating labels
+     Labels on the scene are HTML typeset with LaTeX, placed every frame so they
+     never cover the cards, the dock ([data-avoid]) or each other: a label tries
+     its preferred side, flips, then clamps inside the frame. */
+  const tagLayer = document.createElement("div");
+  tagLayer.className = "tags";
+  tagLayer.setAttribute("aria-hidden", "true");
+  cv.after(tagLayer);
+  /* labels that sit inside a card (opts.over) go above the cards */
+  const tagOver = tagLayer.cloneNode();
+  document.body.appendChild(tagOver);
+  const tagMap = new Map();
+  const TAG_FLIP = { right: ["left"], left: ["right"], above: ["below"], below: ["above"], "above-right": ["above-left", "below-right"], "above-left": ["above-right", "below-left"], "below-right": ["below-left", "above-right"], "below-left": ["below-right", "above-left"] };
+  let tagGen = 0, tagAvoid = [], tagUsed = [];
+  function tagsBegin() {
+    tagGen++; tagUsed = [];
+    tagAvoid = [...document.querySelectorAll("[data-avoid]")].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => ({ l: r.left, t: r.top, r: r.right, b: r.bottom }));
+  }
+  function tagsEnd() { for (const t of tagMap.values()) if (t.gen !== tagGen && t.on) { t.on = false; t.el.style.display = "none"; } }
+  function overlap(a, b) { const w = Math.min(a.r, b.r) - Math.max(a.l, b.l), h = Math.min(a.b, b.b) - Math.max(a.t, b.t); return w > 0 && h > 0 ? w * h : 0; }
+  function tag(key, x, y, src, color, opts = {}) {
+    let t = tagMap.get(key);
+    if (!t) { const el = document.createElement("div"); (opts.over ? tagOver : tagLayer).appendChild(el); t = { el, on: true }; tagMap.set(key, t); }
+    t.gen = tagGen;
+    const cls = (opts.bare ? "tag bare" : "tag") + (opts.cls ? " " + opts.cls : "");
+    if (t.cls !== cls) { t.cls = cls; t.el.className = cls; t.w = 0; }
+    const size = opts.size || 1.15;
+    if (t.size !== size) { t.size = size; t.el.style.fontSize = size + "rem"; t.w = 0; }
+    if (t.color !== color) { t.color = color; t.el.style.borderColor = color || ""; }
+    const ink = opts.ink || "";
+    if (t.ink !== ink) { t.ink = ink; t.el.style.color = ink; }
+    if (!t.on) { t.on = true; t.el.style.display = ""; }
+    if (t.src !== src) { t.src = src; tex(t.el, src); t.w = 0; }
+    const k = !!t.el.querySelector(".katex");
+    if (!t.w || k !== t.k) { t.k = k; t.w = t.el.offsetWidth; t.h = t.el.offsetHeight; }
+    const w = t.w, h = t.h, g = opts.gap ?? 0.55 * R, m = 0.4 * R, d = g * 0.7;
+    const spots = { center: [x - w / 2, y - h / 2], right: [x + g, y - h / 2], left: [x - g - w, y - h / 2], above: [x - w / 2, y - g - h], below: [x - w / 2, y + g],
+      "above-right": [x + d, y - d - h], "above-left": [x - d - w, y - d - h], "below-right": [x + d, y + d], "below-left": [x - d - w, y + d] };
+    const at = opts.at || "center";
+    const order = opts.fixed ? [at] : [at, ...(TAG_FLIP[at] || []), "above", "below", "above-right", "above-left", "below-right", "below-left", "right", "left"];
+    let best = null, cost = Infinity;
+    for (const a of order) {
+      const lx = Math.max(m, Math.min(W - w - m, spots[a][0])), ly = Math.max(m, Math.min(H - h - m, spots[a][1]));
+      if (opts.fixed) { best = [lx, ly]; break; }
+      const box = { l: lx - 4, t: ly - 4, r: lx + w + 4, b: ly + h + 4 };
+      let c = 0;
+      for (const o of tagAvoid) c += overlap(box, o) * 4;
+      for (const o of tagUsed) c += overlap(box, o);
+      if (c < cost) { cost = c; best = [lx, ly]; }
+      if (c === 0) break;
+    }
+    tagUsed.push({ l: best[0], t: best[1], r: best[0] + w, b: best[1] + h });
+    t.el.style.transform = `translate(${Math.round(best[0])}px, ${Math.round(best[1])}px)`;
+    return best;
+  }
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const CAPTIONS = [
+    "One <b>methane</b> ($\\mathrm{CH_4}$) and two <b>oxygen</b> ($\\mathrm{O_2}$) molecules. Count the atoms.",
+    "A <b>spark</b> gives them enough energy to collide hard.",
+    "The collision <b>breaks every bond</b>. Breaking bonds takes in energy.",
+    "Atoms <b>rejoin</b> as $\\mathrm{CO_2}$ and $\\mathrm{H_2O}$. Making bonds gives out <b>heat and light</b>.",
+    "The same nine atoms before and after: <b>mass is conserved</b>.",
+  ];
+  const EL = {
+    C: { r: 1.55, light: "#343a40", dark: "#6c757d", ink: "#fff", mass: 12 },
+    H: { r: 1.0, light: "#f1f3f5", dark: "#f1f3f5", ink: "#111418", mass: 1 },
+    O: { r: 1.42, light: "#e03131", dark: "#f03e3e", ink: "#fff", mass: 16 },
+  };
+  /* nine atoms, tracked through the whole reaction */
+  const ATOMS = ["C", "H", "H", "H", "H", "O", "O", "O", "O"];
+  const B_REACT = [[0, 1, 1], [0, 2, 1], [0, 3, 1], [0, 4, 1], [5, 6, 2], [7, 8, 2]];
+  const B_PROD = [[0, 5, 2], [0, 7, 2], [6, 1, 1], [6, 2, 1], [8, 3, 1], [8, 4, 1]];
+
+  /* positions in "scene units" (rem) relative to the scene centre */
+  function layoutFor(s) {
+    const P = new Array(9);
+    const put = (i, x, y) => (P[i] = [x, y]);
+    const ch4 = (cx, cy) => { put(0, cx, cy); const d = 2.7; [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([a, b], k) => put(1 + k, cx + a * d * 0.72, cy + b * d * 0.72)); };
+    const o2 = (i, cx, cy, ang = 0) => { const d = 1.3; put(i, cx - Math.cos(ang) * d, cy - Math.sin(ang) * d); put(i + 1, cx + Math.cos(ang) * d, cy + Math.sin(ang) * d); };
+    if (s === 0) { ch4(-11, 0.5); o2(5, 6, -5.5, 0.4); o2(7, 8.5, 5.5, -0.3); }
+    else if (s === 1) { ch4(-3.6, 0.3); o2(5, 2.6, -2.6, 0.8); o2(7, 2.9, 3.2, -0.8); }
+    else if (s === 2) {
+      const pts = [[0, 0], [-7, -6.5], [-9.5, 2], [-5, 7.5], [3, 8], [5.5, -7], [9.5, -2.5], [10, 4], [-1.5, -8.5]];
+      pts.forEach(([x, y], i) => put(i, x * 1.05, y * 0.92));
+    } else {
+      put(0, -8.5, 0); put(5, -11.3, 0); put(7, -5.7, 0);
+      const h2o = (o, h1, h2, cx, cy) => { put(o, cx, cy); put(h1, cx - 2.05, cy + 1.6); put(h2, cx + 2.05, cy + 1.6); };
+      h2o(6, 1, 2, 6, -4.8); h2o(8, 3, 4, 8.5, 4.2);
+    }
+    return P;
+  }
+
+  let step = 0, stepAt = -1e9, prevLayout = layoutFor(0), W = 0, H = 0, R = 16, EW = 0, EH = 0, raf = 0, lastT = 0;
+  let particles = [], waves = [], C = {};
+
+  /* ---------------------------------------------------------- colour */
+  const pc = document.createElement("canvas").getContext("2d");
+  function rgba(c) {
+    pc.fillStyle = "#000"; pc.fillStyle = c; const s = pc.fillStyle;
+    if (s[0] === "#") return [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16), 1];
+    const m = s.match(/[\d.]+/g) || [0, 0, 0, 1]; return [+m[0], +m[1], +m[2], m[3] === undefined ? 1 : +m[3]];
+  }
+  function mix(a, b, t, alpha = 1) { const x = rgba(a), y = rgba(b), m = (i) => Math.round(x[i] + (y[i] - x[i]) * t); return `rgba(${m(0)}, ${m(1)}, ${m(2)}, ${alpha})`; }
+  function readTheme() {
+    const s = getComputedStyle(document.documentElement), v = (n, fb) => s.getPropertyValue(n).trim() || fb;
+    C = { bg: v("--bg", "#fff"), fg: v("--fg", "#111418"), muted: v("--muted", "#5f6670"), line: v("--line", "rgba(17,20,24,.12)"), accent: v("--accent", "#0ca678"), accentText: v("--accent-text", "#087f5b"),
+      sky: v("--sky", "#1c7ed6"), coral: v("--coral", "#f0533c"), sun: v("--sun", "#f59f00"),
+      skyText: v("--sky-text", "#1864ab"), coralText: v("--coral-text", "#c92a2a"), sunText: v("--sun-text", "#a06800"), ok: v("--ok", "#2b8a3e"), font: v("--font", "system-ui, sans-serif") };
+    const L = rgba(C.bg); C.dark = document.documentElement.getAttribute("data-scheme") === "dark" || (0.2126 * L[0] + 0.7152 * L[1] + 0.0722 * L[2]) / 255 < 0.45;
+    C.bond = mix(C.bg, C.fg, C.dark ? 0.62 : 0.5);
+  }
+  const atomColor = (el) => (C.dark ? EL[el].dark : EL[el].light);
+
+  /* ---------------------------------------------------------- scene */
+  const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+  const clamp01 = (u) => Math.max(0, Math.min(1, u));
+  function center() { return [W * 0.33, H * 0.575]; }
+  function scale() { return R * Math.min(1.38, (W * 0.6) / (R * 27), (H * 0.5) / (R * 19)); }
+
+  function positions(now) {
+    const u = reduced ? 1 : clamp01((now - stepAt - (step === 3 ? 0 : 100)) / (step === 1 ? 1000 : 900));
+    const target = layoutFor(step), k = ease(u);
+    return target.map((p, i) => [prevLayout[i][0] + (p[0] - prevLayout[i][0]) * k, prevLayout[i][1] + (p[1] - prevLayout[i][1]) * k]);
+  }
+
+  function glow(x, y, r, color, a) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, mix(color, color, 0, a)); g.addColorStop(1, mix(color, color, 0, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  function atom(x, y, el, s) {
+    const r = EL[el].r * s, col = atomColor(el);
+    ctx.save();
+    ctx.fillStyle = mix(C.bg, "#000000", 1, C.dark ? 0.35 : 0.12); ctx.beginPath(); ctx.ellipse(x + r * 0.15, y + r * 0.95, r * 0.8, r * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+    const g = ctx.createRadialGradient(x - r * 0.38, y - r * 0.42, r * 0.08, x, y, r);
+    g.addColorStop(0, mix(col, "#ffffff", 0.8)); g.addColorStop(0.4, col); g.addColorStop(1, mix(col, "#000000", el === "H" ? 0.25 : 0.4));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    if (el === "H") { ctx.strokeStyle = mix(C.bg, C.fg, 0.25); ctx.lineWidth = 0.06 * R; ctx.stroke(); }
+    ctx.font = `850 ${r * 0.85}px ${C.font}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = EL[el].ink; ctx.fillText(el, x, y + r * 0.05);
+    ctx.restore();
+  }
+  function bond(a, b, order, k, s) {
+    if (k <= 0) return;
+    const [x0, y0] = a, [x1, y1] = b, dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+    ctx.save(); ctx.strokeStyle = C.bond; ctx.lineCap = "round"; ctx.lineWidth = (order === 2 ? 0.32 : 0.5) * s;
+    const offs = order === 2 ? [-0.32 * s, 0.32 * s] : [0];
+    for (const o of offs) {
+      ctx.beginPath();
+      ctx.moveTo(mx + nx * o - (dx / 2) * k, my + ny * o - (dy / 2) * k);
+      ctx.lineTo(mx + nx * o + (dx / 2) * k, my + ny * o + (dy / 2) * k);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function burst(x, y, color, n, power) {
+    if (reduced) return;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = (0.3 + Math.random()) * power * R;
+      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: (0.12 + Math.random() * 0.22) * R, life: 0, max: 0.5 + Math.random() * 0.7, color });
+    }
+  }
+  let fired = {};
+  function events(now, P, cx, cy, s) {
+    const t = now - stepAt;
+    const once = (key, at, fn) => { if (!fired[key] && t >= at) { fired[key] = true; fn(); } };
+    if (step === 1) once("spark", 820, () => { burst(cx + 0 * s, cy, C.sun, 46, 9); waves.push({ x: cx - 0.5 * s, y: cy, t0: now, color: C.sun, max: 9 * s }); });
+    if (step === 2) once("break", 60, () => {
+      for (const [a, b] of B_REACT) { const x = cx + (prevLayout[a][0] + prevLayout[b][0]) / 2 * s, y = cy + (prevLayout[a][1] + prevLayout[b][1]) / 2 * s; burst(x, y, C.sky, 14, 6); waves.push({ x, y, t0: now, color: C.sky, max: 3.5 * s }); }
+    });
+    if (step === 3) {
+      once("form", 760, () => {
+        for (const [a, b] of B_PROD) { const x = cx + (P[a][0] + P[b][0]) / 2 * s, y = cy + (P[a][1] + P[b][1]) / 2 * s; burst(x, y, C.sun, 16, 7); }
+      });
+      for (let i = 0; i < 4; i++) once("heat" + i, 900 + i * 380, () => waves.push({ x: cx - 1 * s, y: cy, t0: now, color: i % 2 ? C.coral : C.sun, max: 17 * s }));
+    }
+  }
+
+  function drawScene(now) {
+    if (!W) return false;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+    const [cx, cy] = center(), s = scale(), t = now - stepAt;
+    let busy = t < 3000;
+    const P = positions(now);
+    events(now, P, cx, cy, s);
+    /* warm glow when products have formed */
+    if (step >= 3) glow(cx - 1 * s, cy, 15 * s, C.sun, (C.dark ? 0.16 : 0.1) * (step === 3 ? clamp01((t - 700) / 600) : 1));
+    if (step === 1) glow(cx, cy, 7 * s, C.sun, 0.3 * clamp01((t - 700) / 200) * (1 - clamp01((t - 1100) / 1400)) + 0.06);
+    /* waves */
+    for (const w of waves) {
+      const u = (now - w.t0) / 1400;
+      if (u > 1) continue;
+      ctx.strokeStyle = mix(w.color, w.color, 0, (1 - u) * 0.8); ctx.lineWidth = (0.35 - 0.25 * u) * R;
+      ctx.beginPath(); ctx.arc(w.x, w.y, w.max * ease(u), 0, Math.PI * 2); ctx.stroke();
+    }
+    waves = waves.filter((w) => now - w.t0 < 1400);
+    /* bonds */
+    const S = (i) => [cx + P[i][0] * s, cy + P[i][1] * s];
+    if (step <= 1) for (const [a, b, o] of B_REACT) bond(S(a), S(b), o, 1, s);
+    if (step === 2) { const k = 1 - clamp01(t / 260); for (const [a, b, o] of B_REACT) bond(S(a), S(b), o, k, s); }
+    if (step >= 3) { const k = step === 3 ? clamp01((t - 620) / 420) : 1; for (const [a, b, o] of B_PROD) bond(S(a), S(b), o, reduced ? 1 : k, s); }
+    /* atoms: a jitter while they are free (energy taken in) */
+    const jit = step === 2 ? 0.18 * s : 0;
+    const order = [...ATOMS.keys()].sort((a, b) => P[a][1] - P[b][1]);
+    for (const i of order) {
+      let [x, y] = S(i);
+      if (jit && !reduced) { x += Math.sin(now / 47 + i * 1.7) * jit; y += Math.cos(now / 53 + i * 2.3) * jit; }
+      if (step === 2 && t < 500) glow(x, y, 3 * s, C.sky, 0.35 * (1 - t / 500));
+      atom(x, y, ATOMS[i], s);
+    }
+    if (step === 2) busy = true;
+    /* molecule labels */
+    let li = 0;
+    const lab = (src, x, y) => tag("mol" + li++, x, y, `\\mathrm{${src}}`, null, { bare: true, size: 1.35, ink: C.muted, at: "center" });
+    const ready = t > (step === 1 ? 1100 : 1000) || reduced;
+    if (step === 0 && ready) { lab("CH_4", cx - 11 * s, cy + 5.6 * s); lab("O_2", cx + 6 * s, cy - 8.4 * s); lab("O_2", cx + 8.5 * s, cy + 8.6 * s); }
+    if (step >= 3 && ready) { lab("CO_2", cx - 8.5 * s, cy + 3.3 * s); lab("H_2O", cx + 6 * s, cy - 1.6 * s); lab("H_2O", cx + 8.5 * s, cy + 7.6 * s); }
+    /* particles */
+    for (const p of particles) {
+      const u = p.life / p.max;
+      ctx.globalAlpha = (1 - u) * 0.9; ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1 - u * 0.5), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    return busy || particles.length > 0 || waves.length > 0;
+  }
+
+  /* ---------------------------------------------------------- energy diagram */
+  function drawEnergy(now) {
+    if (!EW) return false;
+    const g = ectx, t = now - stepAt;
+    g.clearRect(0, 0, EW, EH);
+    const l = 1.6 * R, r = 0.8 * R, tp = 1.5 * R, b = 1.7 * R, pw = EW - l - r, ph = EH - tp - b;
+    const Y = (e) => tp + ph * (1 - (e + 900) / 3550);
+    const X = (u) => l + u * pw;
+    const txt = (s2, x, y, col, size = 1, align = "left", w = 700) => { g.font = `${w} ${size * R}px ${C.font}`; g.textAlign = align; g.textBaseline = "middle"; g.fillStyle = col; g.fillText(s2, x, y); };
+    /* LaTeX labels over the diagram, in page coordinates */
+    const er = ecv.getBoundingClientRect();
+    const et = (key, src, x, y, ink, align = "left") => tag("e-" + key, er.left + x, er.top + y, src, null,
+      { bare: true, fixed: true, over: true, size: 1, ink, gap: 0, cls: "in-card", at: align === "left" ? "right" : align === "right" ? "left" : "center" });
+    g.strokeStyle = C.fg; g.lineWidth = 2; g.lineCap = "round";
+    g.beginPath(); g.moveTo(l, tp); g.lineTo(l, tp + ph); g.lineTo(l + pw, tp + ph); g.stroke();
+    g.beginPath(); g.moveTo(l - 0.35 * R, tp + 0.5 * R); g.lineTo(l, tp); g.lineTo(l + 0.35 * R, tp + 0.5 * R); g.stroke();
+    txt("progress →", l, tp + ph + 1.1 * R, C.muted, 1, "left", 650);
+    const seg = (pts, k, col, w = 0.28 * R, dash) => {
+      if (k <= 0) return;
+      let total = 0; for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      g.save(); g.strokeStyle = col; g.lineWidth = w; g.lineJoin = "round"; if (dash) g.setLineDash(dash);
+      g.beginPath(); let left = total * k; g.moveTo(...pts[0]);
+      for (let i = 1; i < pts.length && left > 0; i++) {
+        const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]), u = Math.min(1, left / d);
+        g.lineTo(pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * u, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * u); left -= d;
+      }
+      g.stroke(); g.restore();
+    };
+    const grow = (from) => (reduced ? 1 : clamp01((t - from) / 900));
+    const R0 = Y(0), A = Y(2648), Pd = Y(-818);
+    seg([[X(0.02), R0], [X(0.3), R0]], 1, C.fg);
+    et("react", "\\mathrm{CH_4 + 2\\,O_2}", X(0.03), R0 - 0.8 * R, C.fg);
+    if (step === 1) seg([[X(0.3), R0], [X(0.37), R0 - 2 * R]], grow(200), C.sun, 0.2 * R, [0.3 * R, 0.3 * R]);
+    if (step >= 1 && step < 2) et("spark", "\\text{spark}", X(0.38), R0 - 2.2 * R, C.sunText);
+    if (step >= 2) {
+      const k = step === 2 ? grow(100) : 1;
+      seg([[X(0.3), R0], [X(0.4), A], [X(0.58), A]], k, C.fg);
+      if (k > 0.6) {
+        et("atoms", "\\mathrm{C + 4\\,H + 4\\,O}", X(0.49), A - 0.8 * R, C.fg, "center");
+        g.strokeStyle = C.sky; g.lineWidth = 0.18 * R; g.beginPath(); g.moveTo(X(0.06), R0 - 1.8 * R); g.lineTo(X(0.06), A + 0.6 * R); g.stroke();
+        g.fillStyle = C.sky; g.beginPath(); g.moveTo(X(0.06), A + 0.1 * R); g.lineTo(X(0.06) - 0.4 * R, A + 0.8 * R); g.lineTo(X(0.06) + 0.4 * R, A + 0.8 * R); g.fill();
+        et("in", "\\begin{array}{l}+2648\\,\\text{kJ}\\\\ \\text{taken in}\\end{array}", X(0.09), (R0 + A) / 2, C.skyText);
+      }
+    }
+    if (step >= 3) {
+      const k = step === 3 ? grow(500) : 1;
+      seg([[X(0.58), A], [X(0.68), Pd], [X(0.97), Pd]], k, C.fg);
+      if (k > 0.7) {
+        et("prod", "\\mathrm{CO_2 + 2\\,H_2O}", X(0.97), tp + ph + 1.15 * R, C.fg, "right");
+        g.strokeStyle = C.coral; g.lineWidth = 0.18 * R; g.beginPath(); g.moveTo(X(0.74), A); g.lineTo(X(0.74), Pd - 1.6 * R); g.stroke();
+        g.fillStyle = C.coral; g.beginPath(); g.moveTo(X(0.74), Pd - 1.1 * R); g.lineTo(X(0.74) - 0.4 * R, Pd - 1.8 * R); g.lineTo(X(0.74) + 0.4 * R, Pd - 1.8 * R); g.fill();
+        et("out", "\\begin{array}{l}-3466\\,\\text{kJ}\\\\ \\text{given out}\\end{array}", X(0.77), (A + Pd) / 2 - 0.6 * R, C.coralText);
+      }
+    }
+    if (step >= 4) {
+      g.save(); g.setLineDash([0.25 * R, 0.25 * R]); g.strokeStyle = C.muted; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(X(0.3), R0); g.lineTo(X(0.97), R0); g.stroke(); g.restore();
+      g.strokeStyle = C.accent; g.lineWidth = 0.22 * R; g.beginPath(); g.moveTo(X(0.9), R0); g.lineTo(X(0.9), Pd - 0.5 * R); g.stroke();
+      g.fillStyle = C.accent; g.beginPath(); g.moveTo(X(0.9), Pd); g.lineTo(X(0.9) - 0.4 * R, Pd - 0.7 * R); g.lineTo(X(0.9) + 0.4 * R, Pd - 0.7 * R); g.fill();
+      et("dh", "\\Delta H", X(0.88), (R0 + Pd) / 2, C.accentText, "right");
+    }
+    return t < 1600;
+  }
+
+  /* ---------------------------------------------------------- equation card */
+  function renderEq(swap) {
+    const s = step;
+    const heads = ["Reactants", "Reactants + energy", "Bonds break", "New bonds form", "Balanced equation"];
+    $("eq-k").textContent = heads[s];
+    const react = "CH_4 + 2\\,O_2";
+    let src;
+    if (s <= 1) src = `\\mathrm{\\hl{${react}} \\longrightarrow\\; ?}`;
+    else if (s === 2) src = `\\mathrm{${react} \\longrightarrow \\hl{C + 4\\,H + 4\\,O}}`;
+    else if (s === 3) src = `\\mathrm{${react} \\longrightarrow \\hl{CO_2 + 2\\,H_2O}}`;
+    else src = `\\mathrm{CH_4 + \\hl{2}\\,O_2 \\longrightarrow CO_2 + \\hl{2}\\,H_2O}`;
+    tex($("eq-line"), src);
+    const prod = s >= 2;
+    $("tally").innerHTML = [["C", 1], ["H", 4], ["O", 4]].map(([el, n]) =>
+      `<div class="t${s >= 4 ? " ok" : ""}"><span class="dot" style="background:${atomColor(el)}"></span><span class="el">${el}</span><span class="n" data-tex="${n} \\to ${prod ? n : "?"}">${n} → ${prod ? n : "?"}</span></div>`).join("");
+    if (rupok.math) rupok.math.render($("tally"));
+    const vals = [
+      "Left side: $1\\,\\mathrm{C},\\ 4\\,\\mathrm{H},\\ 4\\,\\mathrm{O}$",
+      "Activation energy: the <b>spark</b> starts it",
+      "Breaking bonds <b>takes in</b> $2648\\,\\text{kJ}$",
+      "Making bonds <b>gives out</b> $3466\\,\\text{kJ}$",
+      `<span class="mass">$16\\,\\text{g} + 64\\,\\text{g} = 44\\,\\text{g} + 36\\,\\text{g} = \\hl{80\\,\\text{g}}$</span><br>$\\Delta H = -818\\,\\text{kJ}$ per mole: exothermic`,
+    ];
+    rich($("eq-vals"), vals[s]);
+    if (swap) { const b = $("eq"); b.classList.remove("swap"); void b.offsetWidth; b.classList.add("swap"); }
+  }
+
+  /* ---------------------------------------------------------- loop */
+  function tick(now) {
+    raf = 0;
+    const dt = Math.min(0.05, (now - (lastT || now)) / 1000); lastT = now;
+    for (const p of particles) { p.life += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.95; p.vy *= 0.95; }
+    particles = particles.filter((p) => p.life < p.max);
+    tagsBegin();
+    const a = drawScene(now), b = drawEnergy(now);
+    tagsEnd();
+    if (a || b) raf = requestAnimationFrame(tick);
+  }
+  function kick() { if (!raf) { lastT = 0; raf = requestAnimationFrame(tick); } }
+
+  /* ---------------------------------------------------------- steps */
+  function go(s, animate) {
+    const now = performance.now();
+    prevLayout = animate ? positionsSafe(now) : layoutFor(s);
+    step = s; stepAt = animate ? now : -1e9; fired = animate ? {} : { spark: 1, break: 1, form: 1, heat0: 1, heat1: 1, heat2: 1, heat3: 1 };
+    if (!animate) { particles = []; waves = []; }
+    rich($("caption"), CAPTIONS[s]);
+    document.querySelectorAll("#dots i").forEach((d, i) => { d.classList.toggle("on", i <= s); d.classList.toggle("now", i === s); });
+    $("back").disabled = s === 0; $("next").disabled = s === STEPS;
+    renderEq(animate);
+    kick();
+  }
+  function positionsSafe(now) { try { return positions(now); } catch (e) { return layoutFor(step); } }
+  function renderStep(s, info) { go(s, !info || info.source !== "init"); }
+
+  for (let i = 0; i <= STEPS; i++) $("dots").appendChild(document.createElement("i"));
+  $("back").addEventListener("click", () => rupok.steps.prev());
+  $("next").addEventListener("click", () => rupok.steps.next());
+  $("replay").addEventListener("click", () => {
+    /* replay the current step's transition from the previous step's picture */
+    const s = step; prevLayout = layoutFor(Math.max(0, s - 1)); stepAt = performance.now(); fired = {}; particles = []; waves = []; kick();
+  });
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    R = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const r = ecv.getBoundingClientRect(); EW = r.width; EH = r.height;
+    ecv.width = Math.round(EW * dpr); ecv.height = Math.round(EH * dpr); ectx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    stepAt = Math.min(stepAt, performance.now() - 5000);
+    kick();
+  }
+
+  readTheme();
+  new ResizeObserver(resize).observe(document.documentElement);
+  rupok.theme.onChange(() => { readTheme(); renderEq(false); stepAt = Math.min(stepAt, performance.now() - 5000); kick(); });
+  rupok.steps.setCount(STEPS);
+  renderEq(false);
+  rupok.ready.then(() => rupok.steps.onChange(renderStep));
+</script>
+</body>
+</html>

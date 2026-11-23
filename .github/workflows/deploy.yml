@@ -2,7 +2,9 @@ name: Deploy to rupok.app
 
 # Builds the board (Rust → wasm + Vite) and deploys it to Cloudflare.
 # Requires repository secrets: CLOUDFLARE_API_TOKEN (Workers Scripts:Edit,
-# Workers Routes:Edit, Zone:Read for rupok.app and shaitrish.com) and CLOUDFLARE_ACCOUNT_ID.
+# Workers Routes:Edit, Zone:Read for rupok.app and shaitrish.com) and CLOUDFLARE_ACCOUNT_ID,
+# plus the repository variable DEPLOY_ENABLED=true. Until that variable is set
+# (and on forks) the job is skipped instead of failing.
 
 on:
   push:
@@ -15,6 +17,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +36,7 @@ jobs:
         working-directory: apps/board
         run: |
           bun install --frozen-lockfile
+          bun run vendor   # offline Smart Object libraries -> public/rupoklib/
           bunx vite build
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3

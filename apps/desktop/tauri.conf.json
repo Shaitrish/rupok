@@ -1,0 +1,95 @@
+{
+  "$schema": "./node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Rupok",
+  "identifier": "app.rupok.desktop",
+  "build": {
+    "frontendDist": "../board/dist",
+    "devUrl": "http://127.0.0.1:3737/board/",
+    "beforeDevCommand": { "script": "./scripts/dev.sh", "cwd": "../.." },
+    "features": ["app"]
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Rupok",
+        "url": "/board/",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 560,
+        "center": true,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data:",
+        "style-src": "'self' 'unsafe-inline' data:",
+        "img-src": "'self' data: blob:",
+        "font-src": "'self' data:",
+        "media-src": "'self' data: blob:",
+        "connect-src": "'self' ipc: http://ipc.localhost blob: data:",
+        "worker-src": "'self' blob:",
+        "frame-src": "'self' blob: data:",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "form-action": "'none'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data:",
+        "style-src": "'self' 'unsafe-inline' data:",
+        "img-src": "'self' data: blob:",
+        "font-src": "'self' data:",
+        "media-src": "'self' data: blob:",
+        "connect-src": "'self' ipc: http://ipc.localhost ws://127.0.0.1:3737 blob: data:",
+        "worker-src": "'self' blob:",
+        "frame-src": "'self' blob: data:",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "form-action": "'none'"
+      },
+      "dangerousDisableAssetCspModification": ["script-src", "style-src"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi", "deb", "appimage"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Education",
+    "publisher": "Shaitrish",
+    "copyright": "Copyright © Shaitrish and Rupok contributors",
+    "license": "AGPL-3.0-or-later",
+    "homepage": "https://rupok.app",
+    "shortDescription": "GPU whiteboard for teachers",
+    "longDescription": "Rupok is an open-source GPU whiteboard and presentation app for teachers: low-latency ink, live Smart Objects, replayable lessons, and drawing over any app on the screen.",
+    "fileAssociations": [
+      {
+        "ext": ["rpk"],
+        "name": "Rupok lesson",
+        "description": "Rupok lesson",
+        "mimeType": "application/vnd.rupok.lesson+zip",
+        "role": "Editor"
+      }
+    ],
+    "windows": {
+      "nsis": { "installMode": "currentUser" }
+    },
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux/rupok.desktop",
+        "files": {
+          "/usr/share/mime/packages/rupok.xml": "linux/rupok-mime.xml"
+        }
+      }
+    }
+  }
+}

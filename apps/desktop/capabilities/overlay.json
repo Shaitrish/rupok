@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "overlay",
+  "description": "The draw-over-any-app ink window and its floating toolbar.",
+  "windows": ["overlay", "overlay-toolbar"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "allow-overlay-hide",
+    "allow-overlay-set-click-through",
+    "allow-overlay-toolbar-fit",
+    "allow-overlay-capture",
+    "allow-overlay-deliver-page"
+  ]
+}

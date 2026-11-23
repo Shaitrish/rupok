@@ -1,0 +1,35 @@
+# rupok.app: search engines and AI assistants are welcome.
+#
+# Content Signals (https://contentsignals.org):
+#   search=yes    index the site and show links and snippets
+#   ai-input=yes  use pages to answer questions in AI assistants (grounding, RAG)
+#   ai-train is left unset on purpose: no preference is expressed either way.
+#   Rupok is open source and wants models to know it exists; the founder may
+#   set ai-train=yes (or no) later. See docs/seo/launch-checklist.md.
+#
+# Note: Cloudflare's "managed robots.txt" / AI Crawl Control can prepend its own
+# rules to this file. Keep it off (or set to allow) for rupok.app.
+
+User-agent: *
+Content-Signal: search=yes, ai-input=yes
+Allow: /
+
+# Named explicitly so that no default block list can override them.
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: Applebot
+User-agent: DuckDuckBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: GPTBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: ClaudeBot
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+Content-Signal: search=yes, ai-input=yes
+Allow: /
+
+Sitemap: https://rupok.app/sitemap.xml

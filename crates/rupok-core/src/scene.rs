@@ -6,9 +6,9 @@
 
 use std::collections::HashMap;
 
-use rupok_ink::Aabb;
 use rstar::primitives::{GeomWithData, Rectangle};
 use rstar::{AABB, RTree};
+use rupok_ink::Aabb;
 
 use crate::model::{Item, ItemData, ItemId};
 
@@ -286,6 +286,7 @@ mod tests {
 
     fn stroke(id: &str, z: f64, x0: f32, y: f32) -> Item {
         Item {
+            group: None,
             id: id.into(),
             z,
             created: z,
@@ -304,6 +305,7 @@ mod tests {
                     .collect(),
                 offset: [0.0, 0.0],
                 shape: None,
+                geom: None,
             }),
         }
     }
@@ -341,6 +343,7 @@ mod tests {
     #[test]
     fn lasso_selects_enclosed_items() {
         let obj = Item {
+            group: None,
             id: "o".into(),
             z: 3.0,
             created: 3.0,

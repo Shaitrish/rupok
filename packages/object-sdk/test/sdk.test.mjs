@@ -236,18 +236,23 @@ test("state.save is debounced by 200 ms and drops oversize payloads", async () =
 
 test("theme tokens are mirrored to CSS variables, with defaults before init", async () => {
   const env = makeEnv();
-  assert.equal(env.cssVars["--rupok-color-accent"], "#2563eb");
+  assert.equal(env.cssVars["--rupok-color-accent"], "#0ca678");
+  // Contrast-safe accent companions: text in the accent colour, text on an accent fill, highlight background.
+  assert.equal(env.cssVars["--rupok-color-accent-text"], "#087f5b");
+  assert.equal(env.cssVars["--rupok-color-on-accent"], "#04241b");
+  assert.equal(env.cssVars["--rupok-color-accent-soft"], "#e6fcf5");
+  assert.equal(env.rupok.theme.get("color.accent-text"), "#087f5b");
   assert.equal(env.cssVars["--rupok-color-bg"], "#ffffff");
   assert.equal(env.cssVars["--rupok-radius"], "12px");
   assert.ok(env.cssVars["--rupok-font-body"].includes("system-ui"));
-  assert.equal(env.rupok.theme.get("color.accent"), "#2563eb");
+  assert.equal(env.rupok.theme.get("color.accent"), "#0ca678");
 
   const themes = [];
   env.rupok.theme.onChange((t) => themes.push(plain(t)));
   env.fromHost(INIT);
   await env.rupok.ready;
   assert.equal(env.cssVars["--rupok-color-accent"], "#ff0000");
-  assert.equal(env.cssVars["--rupok-color-fg"], "#1d2433", "omitted tokens keep defaults");
+  assert.equal(env.cssVars["--rupok-color-fg"], "#111418", "omitted tokens keep defaults");
   assert.equal(env.rupok.theme.get("color.accent", "#000"), "#ff0000");
   assert.equal(env.rupok.theme.get("nope", "fallback"), "fallback");
   assert.equal(themes.length, 1);
@@ -260,8 +265,8 @@ test("theme tokens are mirrored to CSS variables, with defaults before init", as
   });
   assert.equal(env.cssVars["--rupok-color-bg"], "#0b1020");
   assert.equal(env.cssVars["--rupok-color-warning"], "#f59e0b", "extra tokens are mirrored");
-  assert.equal(env.cssVars["--rupok-color-accent"], "#2563eb", "full theme: accent back to default");
-  assert.equal(env.cssVars["--rupok-color-fg"], "#1d2433", "non-string values ignored");
+  assert.equal(env.cssVars["--rupok-color-accent"], "#0ca678", "full theme: accent back to default");
+  assert.equal(env.cssVars["--rupok-color-fg"], "#111418", "non-string values ignored");
   assert.equal(Object.keys(env.cssVars).some((k) => k.includes("bad")), false);
   assert.equal(themes.length, 2);
 
@@ -408,4 +413,154 @@ test("embedded: presenter keys the object ignores are forwarded to the host", as
   await sleep(5);
   const keys = env.posted.filter((p) => p.msg.type === "key").map((p) => p.msg.key);
   assert.deepEqual(keys, ["PageDown", "ArrowLeft"]);
+});
+
+test("scheme token sets data-scheme and color-scheme on the document", async () => {
+  const env = makeEnv();
+  env.fromHost({ ...INIT, theme: { scheme: "dark", "color.bg": "#17191c" } });
+  await env.rupok.ready;
+  assert.equal(env.cssVars["--rupok-color-bg"], "#17191c");
+  assert.equal(env.cssVars["--rupok-scheme"], "dark");
+});
+
+// ------------------------------------------------------------------ snapshot
+
+/** A recording 2D canvas; `toDataURL` answers through `encode(canvas)`. */
+function fakeCanvasFactory(encode = () => "data:image/png;base64,UE5H") {
+  const made = [];
+  const create = () => {
+    const ops = [];
+    const canvas = {
+      tagName: "CANVAS",
+      width: 0,
+      height: 0,
+      ops,
+      getContext: () => ({
+        set fillStyle(v) {
+          ops.push(["fillStyle", v]);
+        },
+        fillRect: (...a) => ops.push(["fillRect", ...a]),
+        drawImage: (src, ...a) => ops.push(["drawImage", src, ...a]),
+      }),
+      toDataURL: () => encode(canvas),
+    };
+    made.push(canvas);
+    return canvas;
+  };
+  return { made, create };
+}
+
+/** Give the fake frame a viewport, animation frames and `canvas` support. */
+function withPage(env, { canvases = [], encode, serializer = false } = {}) {
+  const f = fakeCanvasFactory(encode);
+  const { ctx } = env;
+  ctx.innerWidth = 400;
+  ctx.innerHeight = 300;
+  ctx.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+  ctx.getComputedStyle = () => ({ visibility: "visible", display: "block", opacity: "1", backgroundColor: "rgb(1, 2, 3)" });
+  ctx.document.createElement = (tag) => (tag === "canvas" ? f.create() : { tagName: tag.toUpperCase(), style: {}, setAttribute() {} });
+  ctx.document.querySelectorAll = (sel) => (sel === "canvas" ? canvases : []);
+  if (serializer) {
+    const clone = { style: {}, querySelectorAll: () => [] };
+    ctx.document.documentElement.cloneNode = () => clone;
+    ctx.document.documentElement.querySelectorAll = () => [];
+    ctx.XMLSerializer = function () {
+      this.serializeToString = () => '<html xmlns="http://www.w3.org/1999/xhtml"><body>hi</body></html>';
+    };
+    ctx.Image = function () {
+      const img = this;
+      Object.defineProperty(img, "src", {
+        set(v) {
+          img.loaded = v;
+          setTimeout(() => img.onload(), 0);
+        },
+      });
+    };
+  }
+  return f;
+}
+
+const screenCanvas = () => ({
+  tagName: "CANVAS",
+  width: 200,
+  height: 100,
+  getBoundingClientRect: () => ({ left: 10, top: 20, width: 100, height: 50, right: 110, bottom: 70 }),
+});
+
+test("snapshot: without DOM rendering, canvases are composited over the background", async () => {
+  const env = makeEnv();
+  env.fromHost(INIT);
+  await env.rupok.ready;
+  const shown = screenCanvas();
+  const f = withPage(env, { canvases: [shown] });
+  env.fromHost({ rupok: 1, type: "snapshot", id: "snap-1", scale: 2 });
+  await sleep(30);
+  assert.deepEqual(env.last("snapshot"), { type: "snapshot", id: "snap-1", dataUrl: "data:image/png;base64,UE5H", rupok: 1 });
+  // The on-screen canvas is copied inside a frame, then drawn in place at 2×.
+  const [copy, out] = f.made;
+  assert.deepEqual(copy.ops, [["drawImage", shown, 0, 0]]);
+  assert.equal(out.width, 800);
+  assert.equal(out.height, 600);
+  assert.deepEqual(out.ops, [
+    ["fillStyle", "rgb(1, 2, 3)"],
+    ["fillRect", 0, 0, 800, 600],
+    ["drawImage", copy, 20, 40, 200, 100],
+  ]);
+});
+
+test("snapshot: the DOM is drawn through an SVG foreignObject", async () => {
+  const env = makeEnv();
+  env.fromHost(INIT);
+  await env.rupok.ready;
+  const f = withPage(env, { serializer: true });
+  env.fromHost({ rupok: 1, type: "snapshot", id: 7 });
+  await sleep(30);
+  const reply = env.last("snapshot");
+  assert.equal(reply.id, 7);
+  assert.equal(reply.dataUrl, "data:image/png;base64,UE5H");
+  const out = f.made.at(-1);
+  const [op, img, ...rect] = out.ops[0];
+  assert.equal(op, "drawImage");
+  assert.deepEqual(rect, [0, 0, 800, 600], "default scale is 2");
+  const svg = decodeURIComponent(img.loaded.replace(/^data:image\/svg\+xml;charset=utf-8,/, ""));
+  assert.match(svg, /^<svg xmlns="http:\/\/www.w3.org\/2000\/svg" width="400" height="300"/);
+  assert.match(svg, /<foreignObject x="0" y="0" width="400" height="300"><html xmlns="http:\/\/www.w3.org\/1999\/xhtml">/);
+});
+
+test("snapshot: failures are replied, bad requests ignored, nothing throws", async () => {
+  const env = makeEnv();
+  env.fromHost(INIT);
+  await env.rupok.ready;
+  // No canvas, no serialiser: an error reply, not an exception.
+  env.ctx.innerWidth = 300;
+  env.ctx.innerHeight = 200;
+  env.fromHost({ rupok: 1, type: "snapshot", id: "a" });
+  await sleep(200);
+  const err = env.last("snapshot");
+  assert.equal(err.id, "a");
+  assert.equal(typeof err.error, "string");
+  assert.equal(err.dataUrl, undefined);
+  // Ids must be short tokens or numbers; other windows are ignored.
+  const before = env.posted.length;
+  env.fromHost({ rupok: 1, type: "snapshot", id: { x: 1 } });
+  env.fromHost({ rupok: 1, type: "snapshot", id: "has spaces" });
+  env.fromHost({ rupok: 1, type: "snapshot", id: "b" }, { postMessage() {} });
+  await sleep(200);
+  assert.equal(env.posted.length, before);
+});
+
+test("snapshot: scale is clamped and an oversize PNG is retried smaller", async () => {
+  const env = makeEnv();
+  env.fromHost(INIT);
+  await env.rupok.ready;
+  const huge = "data:image/png;base64," + "A".repeat(16 * 1024 * 1024);
+  const f = withPage(env, {
+    canvases: [screenCanvas()],
+    encode: (c) => (c.width > 400 ? huge : "data:image/png;base64,c21hbGw="),
+  });
+  env.fromHost({ rupok: 1, type: "snapshot", id: "big", scale: 50 });
+  await sleep(30);
+  assert.equal(env.last("snapshot").dataUrl, "data:image/png;base64,c21hbGw=");
+  // Copy, then 4× (clamped), 2×, 1×.
+  assert.deepEqual(f.made.slice(1).map((c) => c.width), [1600, 800, 400]);
 });

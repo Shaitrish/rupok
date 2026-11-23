@@ -117,8 +117,52 @@ pub struct StrokeData {
     pub points: Vec<StrokePoint>,
     /// Translation applied at render time (moving a stroke never rewrites points).
     pub offset: [f32; 2],
-    /// Set when produced by a shape tool ("rect", "ellipse", "line", "arrow").
+    /// Set when produced by a shape tool or Smart Ink ("rect", "ellipse",
+    /// "line", "arrow", "circle", "triangle", …).
     pub shape: Option<String>,
+    /// Editable geometry of a shape stroke (the optional `geom` key), so the
+    /// shape can be resized by regenerating `points` at a constant width.
+    pub geom: Option<ShapeGeom>,
+}
+
+/// Geometry of a shape stroke, in the same coordinate frame as its points
+/// (the rendered shape is moved by the stroke's offset like the points).
+///
+/// - `rect`, `ellipse`: the unrotated box (`x`, `y` top-left, `w`, `h`)
+///   rotated by `rot` radians about its centre.
+/// - `line`, `arrow`: the segment from (`x`, `y`) to (`x + w`, `y + h`);
+///   `w`/`h` may be negative; for arrows the second end is the tip.
+/// - `poly`: a closed polyline through `v` (flat `[x0, y0, x1, y1, …]`,
+///   normalised to the box, 0..1), rotated by `rot` about the box centre.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ShapeGeom {
+    pub kind: String,
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+    #[serde(default)]
+    pub rot: f64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub v: Vec<f64>,
+}
+
+impl ShapeGeom {
+    /// Longest vertex list a reader accepts (pairs).
+    pub const MAX_VERTICES: usize = 64;
+
+    /// Finite numbers, a known size, sane vertex list: anything else is
+    /// treated as absent (the stroke still draws from its points).
+    pub fn is_valid(&self) -> bool {
+        let nums = [self.x, self.y, self.w, self.h, self.rot];
+        nums.iter().all(|v| v.is_finite() && v.abs() < 1e9)
+            && !self.kind.is_empty()
+            && self.kind.len() <= 16
+            && self.v.len().is_multiple_of(2)
+            && self.v.len() <= 2 * Self::MAX_VERTICES
+            && self.v.iter().all(|v| v.is_finite() && v.abs() <= 16.0)
+            && (self.kind != "poly" || self.v.len() >= 6)
+    }
 }
 
 impl StrokeData {
@@ -201,5 +245,16 @@ pub struct Item {
     pub z: f64,
     /// Creation wall-clock time (ms since Unix epoch) — drives replay order.
     pub created: f64,
+    /// Group id: items sharing one select, move, copy and delete together.
+    /// Optional `group` key in the document; opaque, unique within a page.
+    pub group: Option<String>,
     pub data: ItemData,
+}
+
+/// An item to add with [`crate::Lesson::add_items`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct NewItem {
+    pub data: ItemData,
+    pub created: f64,
+    pub group: Option<String>,
 }

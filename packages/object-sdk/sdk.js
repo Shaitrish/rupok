@@ -24,15 +24,24 @@
   var GOTO_PENDING_MS = 1000;
   var MODES = ["edit", "present", "replay", "student"];
   var TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
-  var SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif';
+  var SANS = '"Inter Variable", Inter, "Hind Siliguri", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif';
+  /* Light defaults. The host sends a full theme (including "scheme") that
+   * follows the board's page colour, so objects match light and dark boards. */
   var DEFAULT_THEME = {
+    "scheme": "light",
     "color.bg": "#ffffff",
-    "color.fg": "#1d2433",
-    "color.accent": "#2563eb",
-    "color.accent2": "#7c3aed",
-    "color.muted": "#64748b",
-    "color.success": "#15803d",
-    "color.danger": "#dc2626",
+    "color.surface": "#f4f5f4",
+    "color.line": "rgba(17, 20, 24, 0.12)",
+    "color.fg": "#111418",
+    "color.accent": "#0ca678",
+    /* accent-coloured text (4.5:1 on the page), text on an accent fill, highlight background */
+    "color.accent-text": "#087f5b",
+    "color.on-accent": "#04241b",
+    "color.accent-soft": "#e6fcf5",
+    "color.accent2": "#1c7ed6",
+    "color.muted": "#5f6670",
+    "color.success": "#2b8a3e",
+    "color.danger": "#e03131",
     "font.body": SANS,
     "font.heading": SANS,
     "font.mono": 'ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
@@ -276,6 +285,15 @@
       }
     }
     appliedVars = names;
+    // Expose the scheme so authors can write :root[data-scheme="dark"] rules,
+    // and so native controls (scrollbars, inputs) match.
+    var scheme = theme.scheme === "dark" ? "dark" : "light";
+    try {
+      if (el.setAttribute) el.setAttribute("data-scheme", scheme);
+      style.colorScheme = scheme;
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   function setTheme(t, notify) {
@@ -450,6 +468,8 @@
       if (!standalone) setTheme(d.theme, true);
     } else if (d.type === "mode") {
       if (!standalone) setMode(d.mode, true);
+    } else if (d.type === "snapshot") {
+      onSnapshot(d);
     }
   }
 
@@ -459,6 +479,254 @@
     var message = prefix + format([err]) + (line ? " (line " + line + ")" : "");
     whenReady(function () {
       post({ type: "log", level: "error", message: message.slice(0, MAX_LOG_CHARS) });
+    });
+  }
+
+  /* ---------------------------------------------------------- snapshot */
+
+  /* The host asks for a picture of the object (for example to put it in an
+   * exported PDF). The SDK draws the page into a PNG: the DOM through an SVG
+   * foreignObject, with every canvas (2D or WebGL) copied in place; if the
+   * browser refuses that, just the canvases over the page background. */
+  var SNAPSHOT_MAX_PIXELS = 4096 * 4096;
+  var SNAPSHOT_MAX_CHARS = 16 * 1024 * 1024;
+  var SNAPSHOT_FRAME_MS = 150;
+  var SNAPSHOT_ID_RE = /^[A-Za-z0-9._:-]{1,64}$/;
+
+  function onSnapshot(d) {
+    var id = d.id;
+    var okId = (typeof id === "string" && SNAPSHOT_ID_RE.test(id)) || (typeof id === "number" && isFinite(id));
+    if (!okId) return;
+    var scale = Number(d.scale);
+    if (!isFinite(scale) || scale <= 0) scale = 2;
+    var reply = function (fields) {
+      fields.type = "snapshot";
+      fields.id = id;
+      post(fields);
+    };
+    var p;
+    try {
+      p = snapshot(clamp(scale, 0.25, 4));
+    } catch (e) {
+      p = Promise.reject(e);
+    }
+    p.then(
+      function (url) {
+        reply({ dataUrl: url });
+      },
+      function (e) {
+        reply({ error: format([e || "snapshot failed"]).slice(0, 200) });
+      }
+    );
+  }
+
+  /* Run fn inside the next animation frame, right after the object's own
+   * frame callbacks: a WebGL drawing buffer can only be read then. Hidden
+   * or throttled frames never paint, so a timer runs it anyway. */
+  function inFrame(fn) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      function run() {
+        if (done) return;
+        done = true;
+        try {
+          resolve(fn());
+        } catch (e) {
+          reject(e);
+        }
+      }
+      try {
+        if (typeof root.requestAnimationFrame === "function") root.requestAnimationFrame(run);
+      } catch (e) {
+        /* no animation frames */
+      }
+      setTimeout(run, SNAPSHOT_FRAME_MS);
+    });
+  }
+
+  function newCanvas(w, h) {
+    var c = doc.createElement("canvas");
+    c.width = Math.max(1, Math.round(w));
+    c.height = Math.max(1, Math.round(h));
+    return c;
+  }
+
+  function list(nodes) {
+    return nodes ? Array.prototype.slice.call(nodes) : [];
+  }
+
+  function viewSize() {
+    var el = doc.documentElement || {};
+    var w = Number(root.innerWidth) || Number(el.clientWidth) || 0;
+    var h = Number(root.innerHeight) || Number(el.clientHeight) || 0;
+    return [Math.max(1, Math.round(w)), Math.max(1, Math.round(h))];
+  }
+
+  /* Copies of the canvases on screen, taken inside a frame. */
+  function copyCanvases(w, h) {
+    var out = [];
+    var all = list(doc.querySelectorAll ? doc.querySelectorAll("canvas") : null);
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      try {
+        var r = el.getBoundingClientRect();
+        if (!(r.width > 0 && r.height > 0 && el.width > 0 && el.height > 0)) continue;
+        if (r.right <= 0 || r.bottom <= 0 || r.left >= w || r.top >= h) continue;
+        var cs = root.getComputedStyle ? root.getComputedStyle(el) : null;
+        if (cs && (cs.visibility === "hidden" || cs.display === "none" || Number(cs.opacity) === 0)) continue;
+        var copy = newCanvas(el.width, el.height);
+        copy.getContext("2d").drawImage(el, 0, 0);
+        out.push({ el: el, rect: { left: r.left, top: r.top, width: r.width, height: r.height }, copy: copy });
+      } catch (e) {
+        /* unreadable canvas: left out */
+      }
+    }
+    return out;
+  }
+
+  function loadImage(src) {
+    return new Promise(function (resolve, reject) {
+      if (typeof root.Image !== "function") {
+        reject(new Error("no Image"));
+        return;
+      }
+      var img = new root.Image();
+      img.onload = function () {
+        resolve(img);
+      };
+      img.onerror = function () {
+        reject(new Error("the page could not be drawn"));
+      };
+      img.src = src;
+    });
+  }
+
+  /* The page as an SVG foreignObject image (canvases and form values
+   * frozen into the copy). External stylesheets and fonts do not load
+   * inside an SVG image; inline styles and inline SVG do. */
+  function domImage(w, h, copies) {
+    if (typeof root.XMLSerializer !== "function" || !doc.documentElement || !doc.documentElement.cloneNode) {
+      return Promise.reject(new Error("no DOM serialiser"));
+    }
+    var html = doc.documentElement;
+    var clone = html.cloneNode(true);
+    var q = function (node, sel) {
+      return list(node.querySelectorAll(sel));
+    };
+    // Live form values are properties, not attributes: copy them over.
+    var srcFields = q(html, "input, textarea, select");
+    var dstFields = q(clone, "input, textarea, select");
+    for (var i = 0; i < srcFields.length && i < dstFields.length; i++) {
+      var a = srcFields[i];
+      var b = dstFields[i];
+      var tag = String(a.tagName).toLowerCase();
+      if (tag === "textarea") b.textContent = a.value;
+      else if (tag === "select") {
+        var opts = q(b, "option");
+        for (var k = 0; k < opts.length; k++) {
+          if (k === a.selectedIndex) opts[k].setAttribute("selected", "");
+          else opts[k].removeAttribute("selected");
+        }
+      } else if (a.type === "checkbox" || a.type === "radio") {
+        if (a.checked) b.setAttribute("checked", "");
+        else b.removeAttribute("checked");
+      } else b.setAttribute("value", a.value);
+    }
+    // Images the object can read become data URLs (others cannot load).
+    var srcImgs = q(html, "img");
+    var dstImgs = q(clone, "img");
+    for (var m = 0; m < srcImgs.length && m < dstImgs.length; m++) {
+      var im = srcImgs[m];
+      if (!im.complete || !im.naturalWidth || /^data:/.test(im.src)) continue;
+      try {
+        var ic = newCanvas(im.naturalWidth, im.naturalHeight);
+        ic.getContext("2d").drawImage(im, 0, 0);
+        dstImgs[m].setAttribute("src", ic.toDataURL("image/png"));
+      } catch (e) {
+        /* cross-origin: left as is */
+      }
+    }
+    // Canvases become images of their frozen copies, in place.
+    var srcCanvases = q(html, "canvas");
+    var dstCanvases = q(clone, "canvas");
+    for (var n = 0; n < srcCanvases.length && n < dstCanvases.length; n++) {
+      var found = null;
+      for (var c = 0; c < copies.length; c++) if (copies[c].el === srcCanvases[n]) found = copies[c];
+      var node = dstCanvases[n];
+      if (!found) continue;
+      var img = doc.createElement("img");
+      var attrs = ["id", "class", "style"];
+      for (var t = 0; t < attrs.length; t++) {
+        var v = node.getAttribute(attrs[t]);
+        if (v !== null) img.setAttribute(attrs[t], v);
+      }
+      img.style.width = found.rect.width + "px";
+      img.style.height = found.rect.height + "px";
+      img.setAttribute("src", found.copy.toDataURL("image/png"));
+      node.parentNode.replaceChild(img, node);
+    }
+    var dead = q(clone, "script, iframe, noscript, object, embed");
+    for (var z = 0; z < dead.length; z++) if (dead[z].parentNode) dead[z].parentNode.removeChild(dead[z]);
+    clone.style.width = w + "px";
+    clone.style.height = h + "px";
+    var xml = new root.XMLSerializer().serializeToString(clone);
+    var svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '">' +
+      '<foreignObject x="0" y="0" width="' + w + '" height="' + h + '">' + xml + "</foreignObject></svg>";
+    return loadImage("data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg));
+  }
+
+  function backgroundColor() {
+    var picks = [doc.body, doc.documentElement];
+    for (var i = 0; i < picks.length; i++) {
+      try {
+        var bg = picks[i] && root.getComputedStyle ? root.getComputedStyle(picks[i]).backgroundColor : "";
+        if (bg && bg !== "transparent" && !/rgba\([^)]*,\s*0\)$/.test(bg)) return bg;
+      } catch (e) {
+        /* no computed style */
+      }
+    }
+    return theme["color.bg"] || "#ffffff";
+  }
+
+  /* Draw `img` (the DOM picture) or, without it, the canvas copies over the
+   * page background, at scale s. Halves the scale while the PNG is too big. */
+  function encode(w, h, s, img, copies) {
+    for (var tries = 0; tries < 4; tries++, s /= 2) {
+      var out = newCanvas(w * s, h * s);
+      var ctx = out.getContext("2d");
+      if (img) ctx.drawImage(img, 0, 0, w * s, h * s);
+      else {
+        ctx.fillStyle = backgroundColor();
+        ctx.fillRect(0, 0, w * s, h * s);
+        for (var i = 0; i < copies.length; i++) {
+          var r = copies[i].rect;
+          ctx.drawImage(copies[i].copy, r.left * s, r.top * s, r.width * s, r.height * s);
+        }
+      }
+      var url = out.toDataURL("image/png");
+      if (typeof url === "string" && url.length <= SNAPSHOT_MAX_CHARS && /^data:image\/png[;,]/.test(url)) return url;
+    }
+    throw new Error("snapshot too large");
+  }
+
+  function snapshot(scale) {
+    var size = viewSize();
+    var w = size[0];
+    var h = size[1];
+    var s = Math.min(scale, Math.sqrt(SNAPSHOT_MAX_PIXELS / (w * h)));
+    return inFrame(function () {
+      return copyCanvases(w, h);
+    }).then(function (copies) {
+      return domImage(w, h, copies)
+        .then(function (img) {
+          return encode(w, h, s, img, copies);
+        })
+        .catch(function (e) {
+          // Tainted, unsupported or broken: fall back to the canvases.
+          if (!copies.length) throw e;
+          return encode(w, h, s, null, copies);
+        });
     });
   }
 
@@ -623,6 +891,402 @@
     api.__rupoksdk = SDK_VERSION;
   }
   root.rupok = api;
+
+  /* ------------------------------------------------------------- maths */
+  /* Built-in LaTeX (spec/smart-object.md, "Maths (LaTeX)"). Text written as
+   * $…$, $$…$$, \(…\) or \[…\], and [data-tex] elements, is typeset with the
+   * KaTeX the host vendors in rupoklib. KaTeX loads lazily: only when the page
+   * contains maths or calls rupok.tex(). The host names the library base URL in
+   * <meta name="rupok-lib" content="…/rupoklib/"> (written before the SDK).
+   * <meta name="rupok-math" content="off"> turns automatic rendering off;
+   * rupok.tex() and rupok.math.render() still work. \hl{…} highlights a term in
+   * the theme accent. Maths inherits the text colour, so dark boards just work. */
+
+  var MATH_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, PRE: 1, CODE: 1, NOSCRIPT: 1, TEMPLATE: 1, OPTION: 1, SVG: 1, MATH: 1, CANVAS: 1 };
+  var MATH_MACROS = { "\\hl": "\\htmlClass{rupok-hl}{#1}" };
+  var MATH_CSS =
+    /* \hl: accent-text on accent-soft, AA contrast in both schemes */
+    ".rupok-hl{color:var(--rupok-color-accent-text,#087f5b);background:var(--rupok-color-accent-soft,#e6fcf5);" +
+    "border-radius:.2em;padding:0 .12em;margin:0 -.02em}" +
+    ".rupok-math-display{display:block;margin:.4em 0;text-align:center}";
+  var mathState = 0; /* 0 idle, 1 loading, 2 ready, -1 unavailable */
+  var mathWaiters = [];
+  var mathStyled = false;
+  var mathObserver = null;
+  var mathDirty = [];
+  var mathFlushQueued = false;
+
+  function metaContent(name) {
+    try {
+      var m = typeof doc.querySelector === "function" ? doc.querySelector('meta[name="' + name + '"]') : null;
+      return m && typeof m.getAttribute === "function" ? String(m.getAttribute("content") || "").trim() : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function katexLib() {
+    var k = root.katex;
+    return k && typeof k.render === "function" ? k : null;
+  }
+
+  function styleMath() {
+    if (mathStyled) return;
+    mathStyled = true;
+    try {
+      var s = doc.createElement("style");
+      s.setAttribute("data-rupok", "math");
+      s.textContent = MATH_CSS;
+      (doc.head || doc.documentElement).appendChild(s);
+    } catch (e) {
+      /* no DOM */
+    }
+  }
+
+  function settleMath(ok) {
+    mathState = ok ? 2 : -1;
+    if (ok) {
+      styleMath();
+      /* Fetch the main maths fonts now, so a later formula doesn't flash. */
+      try {
+        if (doc.fonts && typeof doc.fonts.load === "function") {
+          doc.fonts.load("1em KaTeX_Main");
+          doc.fonts.load("italic 1em KaTeX_Math");
+        }
+      } catch (e) {
+        /* optional */
+      }
+    }
+    var w = mathWaiters;
+    mathWaiters = [];
+    for (var i = 0; i < w.length; i++) safeCall(w[i], ok);
+  }
+
+  /* Load KaTeX (JS + CSS; the CSS pulls its fonts) once. Resolves to whether it is usable. */
+  function loadMath() {
+    return new Promise(function (resolve) {
+      if (katexLib()) {
+        if (mathState !== 2) settleMath(true);
+        resolve(true);
+        return;
+      }
+      if (mathState === -1) {
+        resolve(false);
+        return;
+      }
+      mathWaiters.push(resolve);
+      if (mathState === 1) return;
+      var base = metaContent("rupok-lib");
+      if (!base || typeof doc.createElement !== "function") {
+        warn('maths: KaTeX is not available (no <meta name="rupok-lib"> from the host); LaTeX stays as source text.');
+        settleMath(false);
+        return;
+      }
+      if (base.charAt(base.length - 1) !== "/") base += "/";
+      mathState = 1;
+      var pending = 2;
+      var scriptOk = false;
+      var done = function () {
+        if (--pending === 0) settleMath(scriptOk && !!katexLib());
+      };
+      try {
+        var link = doc.createElement("link");
+        link.rel = "stylesheet";
+        link.href = base + "katex/katex.min.css";
+        link.onload = link.onerror = done; /* the CSS is cosmetic; render either way */
+        var script = doc.createElement("script");
+        script.src = base + "katex/katex.min.js";
+        script.onload = function () {
+          scriptOk = true;
+          done();
+        };
+        script.onerror = function () {
+          warn("maths: could not load " + script.src);
+          done();
+        };
+        var head = doc.head || doc.documentElement;
+        head.appendChild(link);
+        head.appendChild(script);
+      } catch (e) {
+        settleMath(false);
+      }
+    });
+  }
+
+  function mathOptions(display) {
+    return {
+      displayMode: !!display,
+      throwOnError: false,
+      strict: "ignore",
+      macros: assign({}, MATH_MACROS),
+      /* Only the \hl macro's class is trusted: no links, styles or other HTML. */
+      trust: function (c) {
+        return !!c && c.command === "\\htmlClass" && c["class"] === "rupok-hl";
+      }
+    };
+  }
+
+  function renderInto(el, latex, display) {
+    var k = katexLib();
+    if (!k) return false;
+    try {
+      k.render(latex, el, mathOptions(display));
+      el.__rupokTex = (display ? "D" : "I") + latex;
+      return true;
+    } catch (e) {
+      consoleCall("warn", ["[rupok] maths:", e && e.message ? e.message : e]);
+      return false;
+    }
+  }
+
+  /* Split text into plain strings and { tex, display } parts, or null if it has no maths.
+   * $…$ follows the pandoc rule: no space just inside the dollars and no digit
+   * right after the closing one, so "$5 and $10" stays text. \$ is a literal $. */
+  function splitMath(s) {
+    if (typeof s !== "string" || (s.indexOf("$") < 0 && s.indexOf("\\(") < 0 && s.indexOf("\\[") < 0)) return null;
+    var out = [];
+    var buf = "";
+    var found = false;
+    var escaped = false;
+    var i = 0;
+    var n = s.length;
+    var push = function (tex, display, end) {
+      if (buf) out.push(buf);
+      buf = "";
+      out.push({ tex: tex, display: display });
+      found = true;
+      i = end;
+    };
+    while (i < n) {
+      var c = s.charAt(i);
+      var d = s.charAt(i + 1);
+      if (c === "\\" && d === "$") {
+        buf += "$";
+        escaped = true;
+        i += 2;
+        continue;
+      }
+      if (c === "\\" && (d === "(" || d === "[")) {
+        var j = s.indexOf(d === "(" ? "\\)" : "\\]", i + 2);
+        if (j > i + 2) {
+          push(s.slice(i + 2, j), d === "[", j + 2);
+          continue;
+        }
+      }
+      if (c === "$" && d === "$") {
+        var k = s.indexOf("$$", i + 2);
+        if (k > i + 2) {
+          push(s.slice(i + 2, k), true, k + 2);
+          continue;
+        }
+      } else if (c === "$" && d && !/\s/.test(d)) {
+        for (var m = i + 1; m < n; m++) {
+          var e = s.charAt(m);
+          if (e === "\\") {
+            m++;
+          } else if (e === "$") {
+            if (!/\s/.test(s.charAt(m - 1)) && !/[0-9]/.test(s.charAt(m + 1))) break;
+          } else if (e === "\n" && s.charAt(m + 1) === "\n") {
+            m = n;
+          }
+        }
+        if (m < n) {
+          push(s.slice(i + 1, m), false, m + 1);
+          continue;
+        }
+      }
+      buf += c;
+      i++;
+    }
+    if (buf) out.push(buf);
+    return found || escaped ? out : null;
+  }
+
+  function attrOf(node, name) {
+    try {
+      return typeof node.getAttribute === "function" ? node.getAttribute(name) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function hasClass(node, name) {
+    var c = attrOf(node, "class");
+    return !!c && (" " + c + " ").indexOf(" " + name + " ") >= 0;
+  }
+
+  /* An element whose content the maths scanner leaves alone. */
+  function mathOpaque(node) {
+    var tag = String(node.tagName || "").toUpperCase();
+    return !!(MATH_SKIP[tag] || hasClass(node, "katex") || hasClass(node, "rupok-math") ||
+      attrOf(node, "data-no-math") !== null || node.isContentEditable === true);
+  }
+
+  function insideMath(node) {
+    for (var p = node, depth = 0; p && p !== doc && depth < 64; p = p.parentNode, depth++) {
+      if (p.nodeType === 1 && mathOpaque(p) && attrOf(p, "data-tex") === null) return true;
+    }
+    return false;
+  }
+
+  function scanMath(start, jobs) {
+    var stack = [start];
+    while (stack.length) {
+      var node = stack.pop();
+      if (!node) continue;
+      if (node.nodeType === 3) {
+        var parts = splitMath(node.nodeValue);
+        if (parts) jobs.push({ node: node, parts: parts });
+        continue;
+      }
+      if (node.nodeType !== 1 && node.nodeType !== 9 && node.nodeType !== 11) continue;
+      if (node.nodeType === 1) {
+        var tex = attrOf(node, "data-tex");
+        if (tex !== null) {
+          jobs.push({ el: node, tex: tex, display: attrOf(node, "data-display") !== null });
+          continue;
+        }
+        if (mathOpaque(node)) continue;
+      }
+      var kids = node.childNodes || [];
+      for (var i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    }
+  }
+
+  function applyMath(jobs) {
+    var n = 0;
+    for (var i = 0; i < jobs.length; i++) {
+      var job = jobs[i];
+      if (job.el) {
+        if (job.el.__rupokTex !== (job.display ? "D" : "I") + job.tex && renderInto(job.el, job.tex, job.display)) n++;
+        continue;
+      }
+      var node = job.node;
+      var parent = node.parentNode;
+      if (!parent || node.nodeValue === null) continue;
+      for (var j = 0; j < job.parts.length; j++) {
+        var p = job.parts[j];
+        if (typeof p === "string") {
+          parent.insertBefore(doc.createTextNode(p), node);
+          continue;
+        }
+        var span = doc.createElement("span");
+        span.setAttribute("class", p.display ? "rupok-math rupok-math-display" : "rupok-math");
+        if (renderInto(span, p.tex, p.display)) n++;
+        else span.textContent = p.display ? "$$" + p.tex + "$$" : "$" + p.tex + "$";
+        parent.insertBefore(span, node);
+      }
+      parent.removeChild(node);
+    }
+    return n;
+  }
+
+  /* Typeset the maths under `start` (the whole body by default). Resolves to the number of formulas rendered. */
+  function renderMath(start) {
+    var top = start || doc.body;
+    if (!top) return Promise.resolve(0);
+    var jobs = [];
+    scanMath(top, jobs);
+    if (!jobs.length) return Promise.resolve(0);
+    if (katexLib()) {
+      if (mathState !== 2) settleMath(true);
+      return Promise.resolve(applyMath(jobs));
+    }
+    return loadMath().then(function (ok) {
+      if (!ok) return 0;
+      var again = [];
+      scanMath(top, again); /* the page may have changed while KaTeX loaded */
+      return applyMath(again);
+    });
+  }
+
+  function tex(el, latex, options) {
+    if (!el || typeof el !== "object" || typeof latex !== "string") {
+      warn("tex(el, latex, options): el must be an element and latex a string");
+      return Promise.resolve(false);
+    }
+    var display = !!(options && options.display);
+    var key = (display ? "D" : "I") + latex;
+    try {
+      el.__rupokTexWant = key;
+      if (katexLib()) {
+        if (mathState !== 2) settleMath(true);
+        return Promise.resolve(el.__rupokTex === key || renderInto(el, latex, display));
+      }
+    } catch (e) {
+      return Promise.resolve(false);
+    }
+    /* Until KaTeX arrives the element keeps its current content (a fallback, if any). */
+    return loadMath().then(function (ok) {
+      if (!ok || el.__rupokTexWant !== key) return false;
+      return el.__rupokTex === key || renderInto(el, latex, display);
+    });
+  }
+
+  /* Re-typeset maths that appears later (innerHTML, textContent, data-tex changes). */
+  function flushMathDirty() {
+    mathFlushQueued = false;
+    var list = mathDirty;
+    mathDirty = [];
+    for (var i = 0; i < list.length; i++) {
+      var node = list[i];
+      if (node && node.parentNode && !insideMath(node)) renderMath(node);
+    }
+  }
+
+  function watchMath() {
+    if (mathObserver || typeof root.MutationObserver !== "function" || !doc.body) return;
+    try {
+      mathObserver = new root.MutationObserver(function (records) {
+        for (var i = 0; i < records.length; i++) {
+          var r = records[i];
+          if (r.type === "childList") {
+            for (var j = 0; j < r.addedNodes.length; j++) mathDirty.push(r.addedNodes[j]);
+          } else mathDirty.push(r.type === "characterData" ? r.target.parentNode : r.target);
+        }
+        if (!mathFlushQueued && mathDirty.length) {
+          mathFlushQueued = true;
+          later(flushMathDirty);
+        }
+      });
+      mathObserver.observe(doc.body, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ["data-tex"] });
+    } catch (e) {
+      mathObserver = null;
+    }
+  }
+
+  function startMath() {
+    var go = function () {
+      if (metaContent("rupok-math").toLowerCase() === "off") return;
+      renderMath(doc.body);
+      watchMath();
+    };
+    try {
+      if (doc.readyState === "loading" && typeof doc.addEventListener === "function") doc.addEventListener("DOMContentLoaded", go);
+      else later(go);
+    } catch (e) {
+      /* no DOM */
+    }
+  }
+
+  api.tex = tex;
+  api.math = {
+    render: function (el) {
+      try {
+        return renderMath(el && typeof el === "object" ? el : null);
+      } catch (e) {
+        return Promise.resolve(0);
+      }
+    },
+    load: function () {
+      try {
+        return loadMath();
+      } catch (e) {
+        return Promise.resolve(false);
+      }
+    }
+  };
+  startMath();
 
   /* ------------------------------------------------------------- start */
 

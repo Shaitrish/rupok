@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Molecules in 3D</title>
+<!--
+  rupok Smart Object: Chemistry, molecular shapes and VSEPR (Grade 9-12).
+  Size 1920 x 1080 (full slide), 4 steps:
+    0      the atoms of the chosen molecule, side by side (count them)
+    1      atoms fly into place one by one (real VSEPR geometry)
+    2      bonds form (single, double, aromatic ring)
+    3      lone-pair lobes, bond-angle arcs and the shape name
+    4      CH4, NH3 and H2O side by side: lone pairs squeeze the angle
+  Molecules: H2O, CO2, CH4, NH3, C2H5OH, C6H6. Ball-and-stick and
+  space-filling (they morph), CPK colours, physically based materials,
+  soft contact shadow, gentle auto-rotation until touched. Drag to rotate,
+  pinch or scroll to zoom. Uses three.js from rupoklib. Light and dark
+  schemes. The molecule and view mode are saved with the lesson.
+-->
+<link rel="stylesheet" href="rupoklib://katex/katex.min.css">
+<script src="rupoklib://katex/katex.min.js"></script>
+<style>
+  :root {
+    --bg: var(--rupok-color-bg, #ffffff);
+    --fg: var(--rupok-color-fg, #111418);
+    --muted: var(--rupok-color-muted, #5f6670);
+    --surface: var(--rupok-color-surface, #f4f5f4);
+    --line: var(--rupok-color-line, rgba(17, 20, 24, 0.12));
+    --accent: var(--rupok-color-accent, #0ca678);
+    /* accent text (4.5:1 on the page), text on accent fills, highlight background */
+    --accent-text: var(--rupok-color-accent-text, #087f5b);
+    --on-accent: var(--rupok-color-on-accent, #04241b);
+    --accent-soft: var(--rupok-color-accent-soft, #e6fcf5);
+    --font: var(--rupok-font-body, "Inter Variable", Inter, "Hind Siliguri", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    --font-h: var(--rupok-font-heading, var(--font));
+    --glass: color-mix(in srgb, var(--bg) 90%, transparent);
+    --shadow: 0 .75rem 2.5rem rgba(17, 20, 24, .14), 0 .125rem .375rem rgba(17, 20, 24, .08);
+    --hl: var(--accent-soft);
+    --halo: color-mix(in srgb, var(--accent) 7%, transparent);
+  }
+  :root[data-scheme="dark"] {
+    --glass: color-mix(in srgb, var(--bg) 86%, transparent);
+    --shadow: 0 .75rem 2.5rem rgba(0, 0, 0, .45), 0 .125rem .375rem rgba(0, 0, 0, .3);
+    --halo: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  /* Designed at 1280 x 720: 1rem = 16px there (24px on a 1920 slide). */
+  html { font-size: min(calc(100vw * 16 / 1280), calc(100vh * 16 / 720)); }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font); -webkit-user-select: none; user-select: none; }
+  .halo { position: fixed; inset: 0; background: radial-gradient(ellipse 45% 50% at 46% 56%, var(--halo), transparent 70%); pointer-events: none; }
+  #view { position: fixed; inset: 0; touch-action: none; cursor: grab; }
+  #view.dragging { cursor: grabbing; }
+  #view canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .labels { position: fixed; inset: 0; pointer-events: none; }
+  .lbl { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; transition: opacity .35s; }
+  .lbl.atom { font: 850 1.15rem/1 var(--font); }
+  .lbl.angle { padding: .35rem .7rem; border-radius: 999px; font: 850 1.3rem/1 var(--font); color: var(--fg); background: var(--glass); border: .14rem solid var(--accent); box-shadow: var(--shadow); }
+  .lbl.cap { display: grid; justify-items: center; gap: .35rem; text-align: center; }
+  .lbl.cap b { font: 900 1.9rem/1 var(--font); }
+  .lbl.cap span { font: 650 1.2rem/1.1 var(--font); color: var(--muted); }
+  .lbl.cap em { font: 850 1.6rem/1 var(--font); font-style: normal; color: var(--accent-text); }
+  .lbl.count { font: 700 1.4rem/1 var(--font); color: var(--muted); }
+
+  .top { position: fixed; left: 2.5rem; top: 2rem; right: 2.5rem; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
+  .eyebrow { margin: 0 0 .4rem; font: 800 1rem/1 var(--font); letter-spacing: .14em; text-transform: uppercase; color: var(--accent-text); }
+  h1 { margin: 0; font: 900 3.25rem/1.05 var(--font-h); letter-spacing: -.035em; }
+  .caption { margin: .75rem 0 0; max-width: 40rem; font: 500 1.625rem/1.3 var(--font); color: var(--muted); }
+  .caption b { color: var(--fg); font-weight: 750; }
+  .right { display: flex; flex-direction: column; align-items: flex-end; gap: 1rem; }
+  .dots { display: flex; gap: .5rem; padding: .25rem 0; }
+  .dots i { width: .75rem; height: .75rem; border-radius: 50%; background: var(--line); transition: background-color .3s, transform .3s; }
+  .dots i.on { background: var(--accent); }
+  .dots i.now { transform: scale(1.4); }
+  .card { background: linear-gradient(var(--surface), var(--surface)), var(--glass); border: .0625rem solid var(--line); border-radius: 1.25rem; box-shadow: var(--shadow); }
+  .info { width: 22rem; padding: 1rem 1.375rem 1.125rem; display: grid; gap: .45rem; }
+  .info .k { font: 800 .9375rem/1 var(--font); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .info .f { font: 650 2.25rem/1.15 var(--font); }
+  .info .n { font: 850 1.625rem/1.1 var(--font-h); letter-spacing: -.01em; }
+  .info.cmp .f, .info.cmp .a { font-size: 1.5rem; white-space: nowrap; }
+  .legend.cmp { display: none; }
+  .info .n:empty { display: none; }
+  .info .a { font: 900 2.5rem/1 var(--font); color: var(--accent-text); font-variant-numeric: tabular-nums; }
+  .info p { margin: .1rem 0 0; font: 550 1.125rem/1.35 var(--font); color: var(--muted); }
+  .info .gone { display: none; }
+  .swap { animation: swap .45s ease-out; }
+  @keyframes swap { from { opacity: 0; transform: translateY(-.5rem); } to { opacity: 1; transform: none; } }
+  .katex { font-family: var(--font) !important; font-size: 1em !important; font-weight: 650; line-height: 1.25; }
+  .katex .mathnormal, .katex .mathit { font-family: var(--font); font-style: italic; }
+  .katex .mord, .katex .mbin, .katex .mrel, .katex .mop, .katex .mopen, .katex .mclose, .katex .mpunct, .katex .mathrm, .katex .text, .katex .textrm { font-family: var(--font); }
+  .hl { color: var(--accent-text); background: var(--hl); border-radius: .4rem; padding: 0 .1em; }
+
+  .legend { position: fixed; left: 2.5rem; bottom: 7.5rem; display: grid; gap: .55rem; pointer-events: none; }
+  .legend .it { display: flex; align-items: center; gap: .6rem; font: 650 1.0625rem/1 var(--font); color: var(--muted); }
+  .legend .it b { color: var(--fg); font-weight: 800; min-width: 1.1em; }
+  .sw { flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%; box-shadow: inset -.2rem -.25rem .4rem rgba(0,0,0,.3), inset .15rem .15rem .3rem rgba(255,255,255,.5); }
+  .legend svg { width: 1.6rem; height: 1.6rem; flex: none; }
+
+  .dock { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); display: flex; align-items: center; gap: .35rem; padding: .5rem; border-radius: 999px; }
+  .dock .sep { width: .0625rem; align-self: stretch; margin: .5rem .3rem; background: var(--line); }
+  .chip {
+    min-height: 3.75rem; min-width: 5.25rem; padding: 0 1rem; border: .125rem solid transparent; border-radius: 999px;
+    font: 750 1.375rem/1 var(--font); color: var(--fg); background: transparent; cursor: pointer; touch-action: manipulation; transition: background-color .2s, border-color .2s, opacity .3s;
+  }
+  .chip.on { background: var(--hl); border-color: var(--accent); }
+  .chip:active { transform: scale(.96); }
+  .chip:focus-visible { outline: .2rem solid var(--fg); outline-offset: .15rem; }
+  .mols.locked .chip { opacity: .4; pointer-events: none; }
+  .mols { display: flex; gap: .2rem; }
+  .chip.small { font-size: 1.125rem; font-weight: 700; padding: 0 1.1rem; white-space: nowrap; }
+  .chip svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; vertical-align: -.3rem; }
+  .fallback { position: fixed; inset: 0; display: none; place-content: center; padding: 3rem; text-align: center; font: 600 1.5rem/1.4 var(--font); color: var(--muted); pointer-events: none; }
+  .fallback.shown { display: grid; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+  <div class="halo"></div>
+  <div id="view" aria-label="3D molecule. Drag to rotate, pinch to zoom."></div>
+  <div class="labels" id="labels"></div>
+  <div class="fallback" id="fallback">The 3D view could not load three.js from Rupok's offline libraries (rupoklib).<br>The shapes, angles and steps still work in the panel.</div>
+
+  <div class="top">
+    <div>
+      <p class="eyebrow">Chemistry · Molecular shapes</p>
+      <h1>Molecules in 3D</h1>
+      <p class="caption" id="caption" aria-live="polite"></p>
+    </div>
+    <div class="right">
+      <div class="dots" id="dots" aria-hidden="true"></div>
+      <div class="card info" id="info" aria-live="polite">
+        <span class="k" id="i-k"></span>
+        <div class="f" id="i-f"></div>
+        <span class="n" id="i-n"></span>
+        <span class="a" id="i-a"></span>
+        <p id="i-p"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="card dock">
+    <div class="mols" id="mols" role="group" aria-label="Molecule"></div>
+    <span class="sep"></span>
+    <button class="chip small" type="button" id="m-ball" aria-pressed="true">Ball &amp; stick</button>
+    <button class="chip small" type="button" id="m-fill" aria-pressed="false">Space-filling</button>
+    <span class="sep"></span>
+    <button class="chip small" type="button" id="spin" aria-pressed="true" aria-label="Auto-rotate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+  </div>
+
+<script type="module">
+  /* rupok injects window.rupok before this script runs. This small stand-in
+     is only used when the file is opened directly in a browser without the SDK,
+     so the object still previews (arrow keys step through it). */
+  const rupok = window.rupok || (function () {
+    let cur = 0, count = 0, saved;
+    const subs = [];
+    const set = (n) => {
+      n = Math.max(0, Math.min(count, n));
+      if (n !== cur) { cur = n; subs.forEach((f) => f(cur, { source: "local" })); }
+    };
+    document.addEventListener("keydown", (e) => {
+      const k = e.key, tag = e.target.tagName;
+      if (k === "ArrowRight" || k === "PageDown" || (k === " " && tag !== "BUTTON")) { e.preventDefault(); set(cur + 1); }
+      if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); set(cur - 1); }
+    });
+    return {
+      mode: "present",
+      ready: Promise.resolve({ standalone: true }),
+      steps: {
+        get current() { return cur; },
+        get count() { return count; },
+        setCount(n) { count = n; set(cur); },
+        onChange(f) { subs.push(f); setTimeout(() => f(cur, { source: "init" })); return () => {}; },
+        next() { set(cur + 1); },
+        prev() { set(cur - 1); },
+        goto: set,
+      },
+      state: { load: () => saved, save: (v) => { saved = v; } },
+      theme: { get: (k, d) => d, all: () => ({}), onChange: () => () => {} },
+      quiz: { submit() {} },
+      resize() {},
+      log() {},
+    };
+  })();
+
+  const STEPS = 4;
+  const DEG = Math.PI / 180;
+  const $ = (id) => document.getElementById(id);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* CPK colours (a lighter carbon on dark boards), ball radius and van der Waals radius in angstrom. */
+  const EL = {
+    H: { name: "Hydrogen", color: "#f1f3f5", dark: "#f1f3f5", ball: 0.27, vdw: 1.1, ink: "#111418" },
+    C: { name: "Carbon", color: "#343a40", dark: "#5c6570", ball: 0.4, vdw: 1.7, ink: "#ffffff" },
+    N: { name: "Nitrogen", color: "#1c7ed6", dark: "#339af0", ball: 0.38, vdw: 1.55, ink: "#ffffff" },
+    O: { name: "Oxygen", color: "#e03131", dark: "#f03e3e", ball: 0.38, vdw: 1.52, ink: "#ffffff" },
+  };
+
+  /* ---------------------------------------------------------- geometry */
+  const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+  function ring(n, polar, len, phase = 0) {
+    return Array.from({ length: n }, (_, i) => { const p = phase + (i * 2 * Math.PI) / n; return mul([Math.sin(polar) * Math.cos(p), Math.cos(polar), Math.sin(polar) * Math.sin(p)], len); });
+  }
+  function zmat(A, B, C, len, ang, dih) {
+    const bc = norm(sub(C, B)), n = norm(cross(sub(B, A), bc)), m = cross(n, bc), a = ang * DEG, d = dih * DEG;
+    return add(C, add(add(mul(bc, -len * Math.cos(a)), mul(m, len * Math.sin(a) * Math.cos(d))), mul(n, len * Math.sin(a) * Math.sin(d))));
+  }
+  function twoPairs(center, b1, b2) {
+    const u = norm(sub(b1, center)), w = norm(sub(b2, center)), bis = mul(norm(add(u, w)), -1), n = norm(cross(u, w)), h = 57 * DEG;
+    return [norm(add(mul(bis, Math.cos(h)), mul(n, Math.sin(h)))), norm(add(mul(bis, Math.cos(h)), mul(n, -Math.sin(h))))];
+  }
+  function water() {
+    const d = 0.958, h = 52.25 * DEG;
+    const atoms = [["O", [0, 0, 0]], ["H", [Math.sin(h) * d, -Math.cos(h) * d, 0]], ["H", [-Math.sin(h) * d, -Math.cos(h) * d, 0]]];
+    return { atoms, bonds: [[0, 1, 1], [0, 2, 1]], lps: twoPairs(atoms[0][1], atoms[1][1], atoms[2][1]).map((dir) => [0, dir]), angles: [[1, 0, 2, "104.5°"]] };
+  }
+  function co2() { return { atoms: [["C", [0, 0, 0]], ["O", [1.16, 0, 0]], ["O", [-1.16, 0, 0]]], bonds: [[0, 1, 2], [0, 2, 2]], lps: [], angles: [[1, 0, 2, "180°"]], plane: [0, 0, 1] }; }
+  function methane() {
+    const hs = [[0, 1.087, 0], ...ring(3, Math.acos(-1 / 3), 1.087, 30 * DEG)];
+    return { atoms: [["C", [0, 0, 0]], ...hs.map((p) => ["H", p])], bonds: [[0, 1, 1], [0, 2, 1], [0, 3, 1], [0, 4, 1]], lps: [], angles: [[1, 0, 2, "109.5°"]] };
+  }
+  function ammonia() {
+    const c = Math.sqrt((Math.cos(107 * DEG) + 0.5) / 1.5), hs = ring(3, Math.acos(-c), 1.012, 30 * DEG);
+    return { atoms: [["N", [0, 0, 0]], ...hs.map((p) => ["H", p])], bonds: [[0, 1, 1], [0, 2, 1], [0, 3, 1]], lps: [[0, [0, 1, 0]]], angles: [[1, 0, 2, "107°"]] };
+  }
+  function ethanol() {
+    const C1 = [0, 0, 0], C2 = [1.53, 0, 0], O = zmat([-0.5, 1, 0], C1, C2, 1.43, 109.5, 0), HO = zmat(C1, C2, O, 0.96, 108.5, 180);
+    const hs = [zmat(O, C2, C1, 1.09, 109.5, 180), zmat(O, C2, C1, 1.09, 109.5, 60), zmat(O, C2, C1, 1.09, 109.5, -60), zmat(O, C1, C2, 1.09, 109.5, 120), zmat(O, C1, C2, 1.09, 109.5, -120)];
+    const atoms = [["C", C1], ["C", C2], ["O", O], ["H", HO], ...hs.map((p) => ["H", p])];
+    return { atoms, bonds: [[0, 1, 1], [1, 2, 1], [2, 3, 1], [0, 4, 1], [0, 5, 1], [0, 6, 1], [1, 7, 1], [1, 8, 1]], lps: twoPairs(O, C2, HO).map((dir) => [2, dir]), angles: [[0, 1, 2, "109.5°"], [1, 2, 3, "108.5°"]] };
+  }
+  function benzene() {
+    const atoms = [], bonds = [];
+    for (let i = 0; i < 6; i++) { const a = (i * 60 + 30) * DEG; atoms.push(["C", [Math.cos(a) * 1.39, Math.sin(a) * 1.39, 0]]); }
+    for (let i = 0; i < 6; i++) { const a = (i * 60 + 30) * DEG; atoms.push(["H", [Math.cos(a) * 2.48, Math.sin(a) * 2.48, 0]]); }
+    for (let i = 0; i < 6; i++) bonds.push([i, (i + 1) % 6, i % 2 ? 1 : 2]);
+    for (let i = 0; i < 6; i++) bonds.push([i, i + 6, 1]);
+    return { atoms, bonds, lps: [], angles: [[5, 0, 1, "120°"]], plane: [0, 0, 1], aromatic: true };
+  }
+
+  const MOLS = [
+    { id: "h2o", f: "H₂O", tex: "H_2O", name: "Water", make: water, tilt: [8, 28], shape: "Bent", angle: "104.5°", ax: "AX_2E_2",
+      info: "2 bonding pairs + 2 lone pairs on O. The lone pairs push the H atoms closer." },
+    { id: "co2", f: "CO₂", tex: "CO_2", name: "Carbon dioxide", make: co2, tilt: [14, 28], shape: "Linear", angle: "180°", ax: "AX_2",
+      info: "2 double bonds and no lone pairs on C: they point in opposite directions." },
+    { id: "ch4", f: "CH₄", tex: "CH_4", name: "Methane", make: methane, tilt: [18, 22], shape: "Tetrahedral", angle: "109.5°", ax: "AX_4",
+      info: "4 bonding pairs spread out as far apart as they can in 3D." },
+    { id: "nh3", f: "NH₃", tex: "NH_3", name: "Ammonia", make: ammonia, tilt: [20, 18], shape: "Trigonal pyramidal", angle: "107°", ax: "AX_3E",
+      info: "3 bonding pairs + 1 lone pair on N. The lone pair pushes the bonds down." },
+    { id: "eth", f: "C₂H₅OH", tex: "C_2H_5OH", name: "Ethanol", make: ethanol, tilt: [20, -18], shape: "Tetrahedral C, bent O", angle: "≈ 109.5°", ax: "AX_4\\;\\cdot\\;AX_2E_2",
+      info: "Each carbon is tetrahedral. O has 2 lone pairs, so C–O–H is bent." },
+    { id: "c6h6", f: "C₆H₆", tex: "C_6H_6", name: "Benzene", make: benzene, tilt: [-55, 0], shape: "Flat hexagon", angle: "120°", ax: "AX_3",
+      info: "Each carbon is trigonal planar. Ring electrons are shared above and below it." },
+  ];
+  const COMPARE = ["ch4", "nh3", "h2o"];
+  const mdef = (id) => MOLS.find((m) => m.id === id);
+  function counts(m) { const c = {}; for (const [el] of m.make().atoms) c[el] = (c[el] || 0) + 1; return c; }
+  function countWords(m) { return Object.entries(counts(m)).map(([el, n]) => `${n} ${EL[el].name.toLowerCase()}`).join(" + "); }
+  const CAPTIONS = (m) => [
+    `<b>${m.name}</b> is built from ${countWords(m)}. Count them.`,
+    `The atoms <b>fly into place</b>, one by one, in real 3D geometry.`,
+    `<b>Bonds</b> form: shared electron pairs hold the atoms together.`,
+    `Electron pairs repel, so ${m.f} is <b>${m.shape.toLowerCase()}</b>.`,
+    `Same 4 electron pairs, more <b>lone pairs</b>: the bond angle shrinks.`,
+  ];
+
+  let molId = "h2o", mode = "ball", step = 0, spin = true;
+  const cssVar = (n, fb) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || fb;
+  const isDark = () => document.documentElement.getAttribute("data-scheme") === "dark";
+
+  /* ---------------------------------------------------------- panel */
+  const TRUST = { throwOnError: false, trust: (c) => c.command === "\\htmlClass", strict: false };
+  function tex(el, src, html) {
+    if (window.katex) { try { window.katex.render(src, el, TRUST); return; } catch (e) { /* fall back */ } }
+    el.innerHTML = html;
+  }
+  const HL = (s) => `\\htmlClass{hl}{${s}}`;
+  for (let i = 0; i <= STEPS; i++) $("dots").appendChild(document.createElement("i"));
+  for (const m of MOLS) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.dataset.id = m.id; b.textContent = m.f; b.setAttribute("aria-label", m.name);
+    b.addEventListener("click", () => { if (step >= 4 || molId === m.id) return; molId = m.id; persist(); rebuild(true); updatePanel(true); });
+    $("mols").appendChild(b);
+  }
+  function updatePanel(swap) {
+    const m = mdef(molId);
+    document.querySelectorAll("#mols .chip").forEach((b) => { const on = b.dataset.id === molId; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+    $("mols").classList.toggle("locked", step >= 4);
+    for (const [id, on] of [["m-ball", mode === "ball"], ["m-fill", mode === "fill"], ["spin", spin]]) { $(id).classList.toggle("on", on); $(id).setAttribute("aria-pressed", String(on)); }
+    $("caption").innerHTML = CAPTIONS(m)[step];
+    document.querySelectorAll("#dots i").forEach((d, i) => { d.classList.toggle("on", i <= step); d.classList.toggle("now", i === step); });
+    const f = $("i-f"), shapeOn = step >= 3;
+    if (step >= 4) {
+      $("i-k").textContent = "Lone pairs (E) squeeze";
+      tex(f, `AX_4 \\to AX_3${HL("E")} \\to AX_2${HL("E_2")}`, "AX₄ → AX₃<span class='hl'>E</span> → AX₂<span class='hl'>E₂</span>");
+      $("i-n").textContent = "";
+      $("i-a").textContent = "109.5° → 107° → 104.5°";
+      $("i-p").textContent = "A lone pair belongs to one atom only, so it spreads out and pushes the bonds closer.";
+    } else if (shapeOn) {
+      $("i-k").textContent = "VSEPR shape";
+      const ax = m.ax.replace(/E(_\d)?/, (e) => HL(e));
+      tex(f, ax, m.ax.replace(/_(\d)/g, "<sub>$1</sub>"));
+      $("i-n").textContent = m.shape; $("i-a").textContent = m.angle; $("i-p").textContent = m.info;
+    } else {
+      $("i-k").textContent = step === 0 ? "Count the atoms" : step === 1 ? "Molecular formula" : "Bonds";
+      const t = step === 0 ? m.tex.replace(/_(\d)/g, (s, d) => `_{${HL(d)}}`) : m.tex;
+      tex(f, `\\mathrm{${t}}`, m.f);
+      const nb = m.make().bonds.length;
+      $("i-n").textContent = step === 2 ? `${nb} bonds` : m.name;
+      $("i-a").textContent = step === 0 ? String(m.make().atoms.length) + " atoms" : "";
+      $("i-p").textContent = step === 0 ? countWords(m) : step === 1 ? "Each atom sits where its electron pairs are farthest apart." : m.make().bonds.some((b) => b[2] === 2) ? "Double bonds share two pairs of electrons." : "Each line is one shared pair of electrons.";
+    }
+    $("i-a").classList.toggle("gone", !$("i-a").textContent);
+    $("info").classList.toggle("cmp", step >= 4);
+    $("legend").classList.toggle("cmp", step >= 4);
+    if (swap) { const box = $("info"); box.classList.remove("swap"); void box.offsetWidth; box.classList.add("swap"); }
+    /* legend */
+    const list = step >= 4 ? COMPARE.map(mdef) : [m];
+    const els = new Set(); for (const mm of list) for (const el of Object.keys(counts(mm))) els.add(el);
+    const dark = isDark();
+    let html = ["C", "H", "N", "O"].filter((e) => els.has(e)).map((e) => `<div class="it"><span class="sw" style="background:${dark ? EL[e].dark : EL[e].color}"></span><b>${e}</b>${EL[e].name}</div>`).join("");
+    if (step >= 3 && list.some((mm) => mm.make().lps.length)) html += `<div class="it"><svg viewBox="0 0 28 28"><ellipse cx="14" cy="14" rx="7" ry="12" fill="var(--accent)" opacity=".4"/><circle cx="11" cy="12" r="2.2" fill="currentColor"/><circle cx="17" cy="12" r="2.2" fill="currentColor"/></svg>Lone pair</div>`;
+    $("legend").innerHTML = html;
+  }
+  function persist() { rupok.state.save({ mol: molId, mode }); }
+  $("m-ball").addEventListener("click", () => { if (mode === "ball") return; mode = "ball"; persist(); updatePanel(); modeChanged(); });
+  $("m-fill").addEventListener("click", () => { if (mode === "fill") return; mode = "fill"; persist(); updatePanel(); modeChanged(); });
+  $("spin").addEventListener("click", () => { spin = !spin; updatePanel(); kick(); });
+
+  /* ---------------------------------------------------------- three.js */
+  let THREE = null, RoomEnvironment = null;
+  try {
+    THREE = await import("rupoklib://three/three.module.js");
+    try { ({ RoomEnvironment } = await import("rupoklib://three/addons/environments/RoomEnvironment.js")); } catch (e) { RoomEnvironment = null; }
+  } catch (e) {
+    $("fallback").classList.add("shown");
+    rupok.log("warn", "three.js did not load from rupoklib:", String((e && e.message) || e));
+  }
+
+  const view = $("view"), labelsEl = $("labels");
+  let renderer, scene, camera, root, sphereGeo, cylGeo, shadow, lights = {};
+  let groups = [], mats = {}, accentMat, accentLine, pairDotMat;
+  let W = 1, H = 1, dist = 10, zoom = 1, quat, home;
+  let stepAt = 0, modeAt = -1e9, prevMode = "ball", buildAt = -1e9, animStep = -1, raf = 0, lastT = 0;
+  const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : 1 - Math.pow(1 - u, 3));
+  const prog = (now, start, dur) => (reduced ? 1 : ease((now - start) / dur));
+
+  if (THREE) {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.toneMapping = THREE.NeutralToneMapping || THREE.ACESFilmicToneMapping;
+    view.appendChild(renderer.domElement);
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(30, 1, 0.1, 300);
+    if (RoomEnvironment) {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    }
+    lights.hemi = new THREE.HemisphereLight(0xffffff, 0x8a93a3, 1); scene.add(lights.hemi);
+    lights.key = new THREE.DirectionalLight(0xffffff, 2.2); lights.key.position.set(-4, 7, 8); scene.add(lights.key);
+    lights.fill = new THREE.DirectionalLight(0xffffff, 0.6); lights.fill.position.set(6, -2, 4); scene.add(lights.fill);
+    lights.rim = new THREE.DirectionalLight(0xffffff, 1); lights.rim.position.set(2, 5, -9); scene.add(lights.rim);
+    root = new THREE.Group(); scene.add(root);
+    sphereGeo = new THREE.SphereGeometry(1, 56, 36);
+    cylGeo = new THREE.CylinderGeometry(1, 1, 1, 32, 1, false);
+    for (const el of Object.keys(EL)) mats[el] = new THREE.MeshPhysicalMaterial({ color: EL[el].color, roughness: el === "H" ? 0.3 : 0.34, metalness: 0, clearcoat: 0.7, clearcoatRoughness: 0.18, sheen: 0.25 });
+    accentMat = new THREE.MeshPhysicalMaterial({ color: 0x0ca678, transparent: true, opacity: 0.32, roughness: 0.2, clearcoat: 1, depthWrite: false, emissive: 0x0ca678, emissiveIntensity: 0.15 });
+    accentLine = new THREE.MeshBasicMaterial({ color: 0x0ca678 });
+    pairDotMat = new THREE.MeshStandardMaterial({ color: 0x111418, roughness: 0.5 });
+    /* soft contact shadow: a radial-gradient disc under the molecule */
+    const sc = document.createElement("canvas"); sc.width = sc.height = 256;
+    const sg = sc.getContext("2d"), grd = sg.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grd.addColorStop(0, "rgba(0,0,0,1)"); grd.addColorStop(0.45, "rgba(0,0,0,.45)"); grd.addColorStop(1, "rgba(0,0,0,0)");
+    sg.fillStyle = grd; sg.fillRect(0, 0, 256, 256);
+    shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), transparent: true, depthWrite: false, opacity: 0.2 }));
+    shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
+    quat = new THREE.Quaternion(); home = new THREE.Quaternion();
+    applyTheme();
+    new ResizeObserver(resize).observe(document.documentElement);
+    setupPointer();
+  }
+
+  function applyTheme() {
+    if (!THREE) return;
+    const dark = isDark();
+    const a = new THREE.Color(cssVar("--accent", "#0ca678"));
+    accentMat.color.copy(a); accentMat.emissive.copy(a); accentMat.emissiveIntensity = dark ? 0.7 : 0.12; accentMat.opacity = dark ? 0.46 : 0.3;
+    accentLine.color.copy(a);
+    for (const g of groups) g.fans.forEach((f) => f.material.color.copy(a));
+    for (const el of Object.keys(EL)) mats[el].color.set(dark ? EL[el].dark : EL[el].color);
+    pairDotMat.color.set(dark ? 0xf1f3f5 : 0x111418);
+    renderer.toneMappingExposure = dark ? 1.15 : 1.0;
+    scene.environmentIntensity = dark ? 0.75 : 0.55;
+    lights.hemi.intensity = RoomEnvironment ? (dark ? 0.8 : 0.9) : 1.6;
+    lights.hemi.groundColor.set(dark ? 0x30343a : 0x8a93a3);
+    lights.rim.intensity = dark ? 2.4 : 0.9;
+    shadow.material.opacity = dark ? 0.55 : 0.2;
+    updatePanel();
+    kick();
+  }
+
+  function resize() {
+    W = Math.max(1, innerWidth); H = Math.max(1, innerHeight);
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    camera.setViewOffset(W, H, W * (step >= 4 ? 0.13 : 0.06), -H * 0.04, W, H);
+    fitCamera(); kick();
+  }
+
+  /* ---------------------------------------------------------- build */
+  function label(cls, html) { const d = document.createElement("div"); d.className = "lbl " + cls; d.innerHTML = html; labelsEl.appendChild(d); return d; }
+
+  function buildMolecule(def, offsetX) {
+    const data = def.make();
+    const g = new THREE.Group(), inner = new THREE.Group();
+    g.add(inner); g.position.x = offsetX; root.add(g);
+    const c = data.atoms.reduce((s, [, p]) => add(s, p), [0, 0, 0]).map((v) => v / data.atoms.length);
+    const P = data.atoms.map(([, p]) => new THREE.Vector3(...sub(p, c)));
+    const atoms = data.atoms.map(([el], i) => {
+      const mesh = new THREE.Mesh(sphereGeo, mats[el]); inner.add(mesh);
+      const lbl = label("atom", el); lbl.style.color = EL[el].ink;
+      return { el, mesh, pos: P[i], lbl, start: null };
+    });
+    const bonds = [];
+    for (const [a, b, order] of data.bonds) {
+      const pa = P[a], pb = P[b], dir = new THREE.Vector3().subVectors(pb, pa).normalize(), perp = new THREE.Vector3();
+      if (order === 2) { perp.crossVectors(dir, new THREE.Vector3(...(data.plane || [0, 0, 1]))); if (perp.lengthSq() < 1e-6) perp.set(0, 1, 0); perp.normalize(); }
+      for (const o of order === 2 ? [0.09, -0.09] : [0]) {
+        for (const [from, to, el] of [[pa, pb, atoms[a].el], [pb, pa, atoms[b].el]]) {
+          const mesh = new THREE.Mesh(cylGeo, mats[el]); inner.add(mesh);
+          bonds.push({ mesh, from: from.clone().addScaledVector(perp, o), to: to.clone().addScaledVector(perp, o), rad: order === 2 ? 0.075 : 0.115 });
+        }
+      }
+    }
+    const lps = data.lps.map(([ai, d]) => {
+      const grp = new THREE.Group();
+      const lobe = new THREE.Mesh(sphereGeo, accentMat); lobe.scale.set(0.28, 0.52, 0.28); lobe.position.y = 0.72; grp.add(lobe);
+      for (const s of [-1, 1]) { const e = new THREE.Mesh(sphereGeo, pairDotMat); e.scale.setScalar(0.07); e.position.set(0.1 * s, 0.8, 0); grp.add(e); }
+      grp.position.copy(P[ai]); grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...d).normalize());
+      inner.add(grp); return grp;
+    });
+    const angles = [], fans = [];
+    for (const [a, ci, b, text] of data.angles) {
+      const C = P[ci], u = new THREE.Vector3().subVectors(P[a], C), v = new THREE.Vector3().subVectors(P[b], C);
+      const r = 0.6 * Math.min(u.length(), v.length());
+      u.normalize(); v.normalize();
+      const th = Math.acos(Math.max(-1, Math.min(1, u.dot(v))));
+      const w = new THREE.Vector3().copy(v).addScaledVector(u, -u.dot(v));
+      if (w.lengthSq() < 1e-6) w.set(0, 1, 0).addScaledVector(u, -u.y);
+      w.normalize();
+      const pts = [];
+      for (let i = 0; i <= 36; i++) { const t = (th * i) / 36; pts.push(C.clone().addScaledVector(u, r * Math.cos(t)).addScaledVector(w, r * Math.sin(t))); }
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, 0.026, 8, false), accentLine);
+      const pos = [C.x, C.y, C.z]; for (const p of pts) pos.push(p.x, p.y, p.z);
+      const idx = []; for (let i = 1; i < pts.length; i++) idx.push(0, i, i + 1);
+      const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx);
+      const fan = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: accentLine.color.clone(), transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false }));
+      inner.add(tube); inner.add(fan); fans.push(fan);
+      const mid = C.clone().addScaledVector(u, Math.cos(th / 2)).addScaledVector(w, Math.sin(th / 2)).sub(C).normalize();
+      angles.push({ tube, fan, anchor: C.clone().addScaledVector(mid, r + 0.42), lbl: label("angle", text) });
+    }
+    const extras = [];
+    if (data.aromatic) for (const z of [-0.45, 0.45]) { const t = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.12, 20, 72), accentMat); t.position.z = z; inner.add(t); extras.push(t); }
+    let x = 0;
+    const widths = atoms.map((a) => EL[a.el].ball * 2 + 0.6), total = widths.reduce((s, w2) => s + w2, 0);
+    const row = atoms.map((a, i) => { const p = -total / 2 + x + widths[i] / 2; x += widths[i]; return p; });
+    let rBall = 0, rFill = 0;
+    for (const a of atoms) { rBall = Math.max(rBall, a.pos.length() + EL[a.el].ball + 0.15); rFill = Math.max(rFill, a.pos.length() + EL[a.el].vdw); }
+    for (const [ai] of data.lps) rBall = Math.max(rBall, P[ai].length() + 1.25);
+    rBall = Math.max(rBall, total / 2 + 0.1, 1.15);
+    return { def, g, inner, atoms, bonds, lps, angles, fans, extras, row, rBall, rFill };
+  }
+
+  function clearScene() {
+    const old = {};
+    for (const g of groups) {
+      for (const a of g.atoms) (old[a.el] = old[a.el] || []).push(a.mesh.position.clone().add(g.g.position));
+      root.remove(g.g);
+      g.g.traverse((o) => { if (o.geometry && o.geometry !== sphereGeo && o.geometry !== cylGeo) o.geometry.dispose(); });
+      g.fans.forEach((f) => f.material.dispose());
+    }
+    groups = []; labelsEl.textContent = "";
+    return old;
+  }
+
+  function rebuild(fly) {
+    if (!THREE) return;
+    const old = clearScene();
+    if (step >= 4) {
+      COMPARE.map(mdef).forEach((d, i) => {
+        const g = buildMolecule(d, (i - 1) * 3.3);
+        g.cap = label("cap", `<b>${d.f}</b><span>${d.shape}</span>`);
+        groups.push(g);
+      });
+      home.setFromEuler(new THREE.Euler(14 * DEG, 26 * DEG, 0));
+    } else {
+      const d = mdef(molId), g = buildMolecule(d, 0);
+      groups.push(g);
+      home.setFromEuler(new THREE.Euler(d.tilt[0] * DEG, d.tilt[1] * DEG, 0));
+    }
+    /* atoms fly in from where atoms of the same element were */
+    for (const g of groups) for (const a of g.atoms) {
+      const pool = old[a.el];
+      a.start = fly && pool && pool.length ? pool.shift().sub(g.g.position) : fly ? new THREE.Vector3((Math.random() - 0.5) * 9, (Math.random() - 0.3) * 6, (Math.random() - 0.5) * 4) : null;
+    }
+    if (!fly) quat.copy(home);
+    zoom = 1; buildAt = fly ? performance.now() : -1e9;
+    fitCamera(); kick();
+  }
+
+  /* camera distance and shadow follow the model style (space-filling is bigger) */
+  function fitCamera(fillK = mode === "fill" ? 1 : 0) {
+    if (!THREE || !groups.length) return;
+    const t = Math.tan((camera.fov * DEG) / 2);
+    if (step >= 4) {
+      const r = Math.max(...groups.map((g) => g.rBall + (g.rFill - g.rBall) * fillK * 0.7));
+      dist = Math.max((3.3 + r) / (t * camera.aspect * 0.66), r / (t * 0.62));
+      shadow.position.y = -1.75; shadow.scale.set(12, 3.5, 1);
+    } else {
+      const g = groups[0], r = g.rBall + (g.rFill - g.rBall) * fillK;
+      dist = r / (t * 0.78);
+      shadow.position.y = -(r + 0.25); shadow.scale.setScalar(r * 2.6);
+    }
+  }
+  function modeChanged() { prevMode = mode === "ball" ? "fill" : "ball"; modeAt = performance.now(); kick(); }
+
+  /* ---------------------------------------------------------- per-frame */
+  const Y = THREE ? new THREE.Vector3(0, 1, 0) : null;
+  function update(now) {
+    const mu = prog(now, modeAt, 500), mt = mode === "fill" ? 1 : 0, mf = prevMode === "fill" ? 1 : 0;
+    const fillK = mu >= 1 ? mt : mf + (mt - mf) * mu;
+    const compare = step >= 4;
+    fitCamera(fillK);
+    for (const g of groups) {
+      g.inner.quaternion.copy(quat);
+      const inv = quat.clone().invert();
+      g.atoms.forEach((a, i) => {
+        let tPlace = 1;
+        if (!compare) { if (step === 0) tPlace = 0; else if (animStep === 1) tPlace = prog(now, stepAt + i * 240, 560); }
+        const rowP = new THREE.Vector3(g.row[i], 0, 0).applyQuaternion(inv);
+        const target = new THREE.Vector3().lerpVectors(rowP, a.pos, tPlace);
+        const fu = a.start ? prog(now, buildAt + i * 45, 750) : 1;
+        if (a.start && fu < 1) {
+          const s = a.start.clone().applyQuaternion(inv);
+          a.mesh.position.lerpVectors(s, target, fu);
+        } else a.mesh.position.copy(target);
+        const rr = EL[a.el].ball + (EL[a.el].vdw - EL[a.el].ball) * fillK * (step >= 1 || compare ? 1 : 0);
+        const pop = !compare && animStep === 1 ? 0.55 + 0.45 * tPlace : 1;
+        a.mesh.scale.setScalar(rr * pop);
+      });
+      const bondsOn = compare || step >= 2;
+      g.bonds.forEach((b, j) => {
+        let k = bondsOn ? 1 : 0;
+        if (!compare && animStep === 2) k = prog(now, stepAt + Math.floor(j / 2) * 110, 420);
+        k *= 1 - fillK;
+        const fu = buildAt > -1e8 ? prog(now, buildAt + 350, 500) : 1;
+        k *= fu;
+        b.mesh.visible = k > 0.01;
+        if (!b.mesh.visible) return;
+        const half = new THREE.Vector3().subVectors(b.to, b.from).multiplyScalar(0.5 * k);
+        b.mesh.position.copy(b.from).addScaledVector(half, 0.5);
+        b.mesh.quaternion.setFromUnitVectors(Y, half.clone().normalize());
+        b.mesh.scale.set(b.rad, half.length(), b.rad);
+      });
+      let pairs = compare || step >= 3 ? 1 : 0;
+      if (!compare && animStep === 3) pairs = prog(now, stepAt + 150, 520);
+      pairs *= (1 - fillK) * (buildAt > -1e8 ? prog(now, buildAt + 500, 500) : 1);
+      g.lps.forEach((lp) => { lp.visible = pairs > 0.01; lp.scale.setScalar(Math.max(0.001, pairs)); });
+      g.extras.forEach((e) => { e.visible = pairs > 0.01; e.scale.setScalar(Math.max(0.001, 0.6 + 0.4 * pairs)); });
+      g.angles.forEach((an) => { an.tube.visible = an.fan.visible = pairs > 0.3 && fillK < 0.5; });
+    }
+  }
+
+  const proj = (v) => { const p = v.clone().project(camera); return [(p.x * 0.5 + 0.5) * W, (-p.y * 0.5 + 0.5) * H]; };
+  function placeLabels(now) {
+    const compare = step >= 4, fill = mode === "fill";
+    const camPos = camera.position;
+    for (const g of groups) {
+      g.g.updateMatrixWorld(true);
+      const center = g.g.getWorldPosition(new THREE.Vector3());
+      for (const a of g.atoms) {
+        const wp = a.mesh.getWorldPosition(new THREE.Vector3()), [x, y] = proj(wp);
+        a.lbl.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+        const toward = new THREE.Vector3().subVectors(wp, center).dot(new THREE.Vector3().subVectors(camPos, center).normalize());
+        const front = a.el !== "H" || toward > -0.3;
+        a.lbl.style.opacity = front && !(fill && (step >= 1 || compare)) ? 1 : 0;
+      }
+      const on = (compare || step >= 3) && !fill;
+      for (const an of g.angles) {
+        const [x, y] = proj(an.anchor.clone().applyMatrix4(g.inner.matrixWorld));
+        an.lbl.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+        an.lbl.style.opacity = on && (compare || animStep !== 3 || now - stepAt > 380) ? 1 : 0;
+      }
+      if (g.cap) { const [x, y] = proj(new THREE.Vector3(g.g.position.x, shadow.position.y + 0.1, 0)); g.cap.style.transform = `translate(${x}px, ${y}px) translate(-50%, 0)`; }
+      if (g.count) {
+        const [x, y] = proj(new THREE.Vector3(0, -1.3, 0));
+        g.count.style.transform = `translate(${x}px, ${y}px) translate(-50%, 0)`;
+        g.count.textContent = countWords(g.def);
+        g.count.style.opacity = step === 0 ? 1 : 0;
+      }
+    }
+  }
+
+  /* ---------------------------------------------------------- input */
+  const pointers = new Map();
+  let vel = { x: 0, y: 0 }, lastMove = 0, pinch0 = 0, zoom0 = 1;
+  function setupPointer() {
+    view.addEventListener("pointerdown", (e) => {
+      view.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      view.classList.add("dragging");
+      if (spin) { spin = false; updatePanel(); }
+      vel = { x: 0, y: 0 };
+      if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); zoom0 = zoom; }
+      kick();
+    });
+    view.addEventListener("pointermove", (e) => {
+      const p = pointers.get(e.pointerId);
+      if (!p) return;
+      const dx = e.clientX - p.x, dy = e.clientY - p.y;
+      p.x = e.clientX; p.y = e.clientY;
+      if (pointers.size === 1) { rotateBy(dx, dy); const now = performance.now(), dt = Math.max(8, now - lastMove); vel = { x: (dx / dt) * 16, y: (dy / dt) * 16 }; lastMove = now; }
+      else if (pointers.size === 2 && pinch0) { const [a, b] = [...pointers.values()]; zoom = Math.max(0.5, Math.min(2.2, zoom0 * (pinch0 / Math.max(10, Math.hypot(a.x - b.x, a.y - b.y))))); }
+      kick();
+    });
+    const end = (e) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch0 = 0;
+      if (!pointers.size) { view.classList.remove("dragging"); if (performance.now() - lastMove > 80) vel = { x: 0, y: 0 }; }
+      kick();
+    };
+    view.addEventListener("pointerup", end);
+    view.addEventListener("pointercancel", end);
+    view.addEventListener("wheel", (e) => { e.preventDefault(); zoom = Math.max(0.5, Math.min(2.2, zoom * Math.exp(e.deltaY * 0.0012))); kick(); }, { passive: false });
+  }
+  function rotateBy(dx, dy) {
+    const k = 0.0105 * (1280 / Math.max(400, W));
+    quat.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), dx * k)).premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), dy * k)).normalize();
+  }
+
+  /* ---------------------------------------------------------- loop */
+  function frame(now) {
+    raf = 0;
+    const dt = Math.min(50, now - (lastT || now)); lastT = now;
+    if (!pointers.size && (Math.abs(vel.x) > 0.02 || Math.abs(vel.y) > 0.02)) { rotateBy(vel.x, vel.y); const d = Math.pow(0.92, dt / 16); vel.x *= d; vel.y *= d; }
+    if (spin && !pointers.size && !reduced) quat.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), dt * 0.00035));
+    update(now);
+    const d = dist * zoom;
+    camera.setViewOffset(W, H, W * (step >= 4 ? 0.13 : 0.06), step >= 4 ? H * 0.05 : -H * 0.04, W, H);
+    camera.position.set(0, d * 0.22, d);
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+    placeLabels(now);
+    const busy = now - stepAt < 3400 || now - modeAt < 650 || now - buildAt < 1600 || pointers.size || spin || Math.abs(vel.x) > 0.02 || Math.abs(vel.y) > 0.02;
+    if (busy) raf = requestAnimationFrame(frame);
+  }
+  function kick() { if (THREE && !raf) { lastT = 0; raf = requestAnimationFrame(frame); } }
+
+  /* ---------------------------------------------------------- steps */
+  function renderStep(s, info) {
+    const animate = !info || info.source !== "init";
+    const wasCompare = step >= 4, prev = step;
+    step = s;
+    animStep = animate && s === prev + 1 ? s : -1;
+    stepAt = performance.now();
+    if ((s >= 4) !== wasCompare || !groups.length) rebuild(animate && groups.length > 0);
+    else if (s === 0) { quat.copy(home); zoom = 1; }
+    fitCamera();
+    updatePanel(animate);
+    kick();
+  }
+
+  rupok.theme.onChange(() => applyTheme());
+  rupok.steps.setCount(STEPS);
+  updatePanel();
+  rupok.ready.then(() => {
+    const saved = rupok.state.load();
+    if (saved && typeof saved === "object") {
+      if (MOLS.some((m) => m.id === saved.mol)) molId = saved.mol;
+      if (saved.mode === "ball" || saved.mode === "fill") { mode = saved.mode; prevMode = mode; }
+    }
+    updatePanel();
+    rupok.steps.onChange(renderStep);
+  });
+</script>
+</body>
+</html>

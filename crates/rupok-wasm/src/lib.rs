@@ -5,7 +5,10 @@
 //! surface bound to an HTML canvas and exposes a `wasm-bindgen` API that the
 //! SolidJS UI (and the Tauri desktop shell, which loads the same UI) drives.
 
+mod b64;
 pub mod engine;
+pub mod export;
+pub mod live;
 pub mod replay;
 pub mod shapes;
 
@@ -15,7 +18,7 @@ mod web {
     use rupok_render::{Gpu, InkRenderer};
     use wasm_bindgen::prelude::*;
 
-    use crate::engine::{Engine, PointerKind, ToolKind, TouchMode};
+    use crate::engine::{Engine, PointerKind, SmartInk, SmartMode, ToolKind, TouchMode};
 
     fn now() -> f64 {
         js_sys::Date::now()
@@ -216,6 +219,16 @@ mod web {
             };
         }
 
+        /// Smart Ink: `mode` is "off" | "auto" (snap on pen-up) | "hold"
+        /// (hold the pen still to snap); `scratch` turns scratch-out to
+        /// erase on while smart shapes are on. Pen only.
+        pub fn set_smart_ink(&mut self, mode: &str, scratch: bool) {
+            self.engine.set_smart_ink(SmartInk {
+                mode: SmartMode::parse(mode),
+                scratch,
+            });
+        }
+
         // ------------------------------------------------------------ input
 
         #[allow(clippy::too_many_arguments)]
@@ -276,6 +289,17 @@ mod web {
             self.engine.fit_page();
         }
 
+        /// Fit the page leaving `margin` (fraction of its size) around it.
+        pub fn fit_page_margin(&mut self, margin: f32) {
+            self.engine.fit_page_margin(margin);
+        }
+
+        /// Margin for `fit_page`, page changes and loads: 0.03 by default,
+        /// 0 in Teach mode so the slide touches the screen edges.
+        pub fn set_fit_margin(&mut self, margin: f32) {
+            self.engine.set_fit_margin(margin);
+        }
+
         /// Screen margins covered by floating UI: top, right, bottom, left (CSS px).
         pub fn set_insets(&mut self, top: f32, right: f32, bottom: f32, left: f32) {
             self.engine.set_insets(top, right, bottom, left);
@@ -309,6 +333,29 @@ mod web {
 
         pub fn move_page(&mut self, from: usize, to: usize) {
             self.engine.move_page(from, to);
+        }
+
+        /// Copy the page at `index` (items, bundle and asset references)
+        /// right after it and show the copy. Returns the copy's index.
+        pub fn duplicate_page(&mut self, index: usize) -> Option<usize> {
+            self.engine.duplicate_page(index)
+        }
+
+        /// Thumbnail drawing list for the page at `index`:
+        /// `{frame, bg, pattern, bounds, items: [{kind: "stroke", color,
+        /// width, opacity, pts: [x, y, …]} | {kind: "image", rect, asset} |
+        /// {kind: "object", rect, title} | {kind: "text", rect, text, size,
+        /// color}]}` in stacking order; `null` for a bad index.
+        pub fn page_preview_json(&self, index: usize, max_points_per_stroke: usize) -> String {
+            self.engine.page_preview_json(index, max_points_per_stroke)
+        }
+
+        /// Vector export data for the page at `index` (PDF export): items in
+        /// stacking order, strokes as filled outline polygons (left out when
+        /// `strokes` is false). Read-only. See
+        /// [`crate::export::page_export_json`].
+        pub fn page_export_json(&self, index: usize, strokes: bool) -> String {
+            crate::export::page_export_json(&self.engine.lesson, &self.engine.pkg, index, strokes)
         }
 
         pub fn set_background(&mut self, pattern: &str, rgba: u32) {
@@ -376,6 +423,133 @@ mod web {
             self.engine.bring_to_front(id);
         }
 
+        /// Raise several items to the top, keeping their order (one undo step).
+        pub fn bring_to_front_many(&mut self, ids: Vec<String>) {
+            self.engine.bring_to_front_many(&ids);
+        }
+
+        /// Resize a text item: box and font size (one undo step).
+        pub fn resize_text(&mut self, id: &str, x: f64, y: f64, w: f64, h: f64, size: f64) {
+            self.engine.resize_text(
+                id,
+                BoxGeom {
+                    x,
+                    y,
+                    w,
+                    h,
+                    rot: 0.0,
+                },
+                size,
+            );
+        }
+
+        /// `{count, strokes, boxes, groups, grouped, shape}` for the
+        /// selection toolbar; `shape` is `[x0, y0, x1, y1]` (geometric
+        /// bounds, world units) when the selection is one resizable shape.
+        pub fn selection_meta_json(&self) -> String {
+            self.engine.selection_meta_json()
+        }
+
+        /// Resize a shape stroke so its geometric bounds become the box;
+        /// the points are regenerated at the same line width. `commit:
+        /// false` previews only; `true` is one undo step.
+        pub fn resize_shape(
+            &mut self,
+            id: &str,
+            x0: f64,
+            y0: f64,
+            x1: f64,
+            y1: f64,
+            commit: bool,
+        ) -> bool {
+            self.engine.resize_shape(id, [x0, y0, x1, y1], commit)
+        }
+
+        /// Drop a resize preview.
+        pub fn resize_shape_cancel(&mut self, id: &str) {
+            self.engine.resize_shape_cancel(id);
+        }
+
+        /// The selected ink in writing order for handwriting recognition:
+        /// `{bounds, strokes: [{color, width, pts: [x, y, t, …]}]}`, or
+        /// `null`.
+        pub fn selection_ink_json(&self) -> String {
+            self.engine.selection_ink_json()
+        }
+
+        /// Replace the selected ink with a text item (one undo step brings
+        /// the ink back). Returns the text item's id.
+        pub fn replace_selection_with_text(
+            &mut self,
+            text: &str,
+            x: f64,
+            y: f64,
+            w: f64,
+            size: f64,
+        ) -> Option<String> {
+            self.engine
+                .replace_selection_with_text(text, x, y, w, size, now())
+        }
+
+        /// Group the selection (2+ items). Returns the group id.
+        pub fn group_selection(&mut self) -> Option<String> {
+            self.engine.group_selection()
+        }
+
+        /// Dissolve the groups in the selection. Returns how many.
+        pub fn ungroup_selection(&mut self) -> usize {
+            self.engine.ungroup_selection()
+        }
+
+        /// Merge selected ink into one unit (moves and erases as one); a
+        /// selection with box items is grouped instead. Returns
+        /// `"merged"`, `"grouped"` or `"none"`.
+        pub fn merge_selection(&mut self) -> String {
+            self.engine.merge_selection().into()
+        }
+
+        // -------------------------------------------------------- clipboard
+
+        /// Clipboard JSON for items on the current page. Self-contained:
+        /// Smart Object bundles and image assets are embedded as base64, so
+        /// it pastes into another lesson or tab. Starts with
+        /// `{"rupok":"clipboard/v1"`.
+        pub fn export_items_json(&self, ids: Vec<String>) -> String {
+            self.engine.export_items_json(&ids)
+        }
+
+        /// Paste clipboard JSON onto the current page moved by `(dx, dy)`
+        /// world units, as one undo step. The new items become the
+        /// selection. Returns their ids; throws on invalid input.
+        pub fn import_items_json(
+            &mut self,
+            json: &str,
+            dx: f64,
+            dy: f64,
+        ) -> Result<Vec<String>, JsValue> {
+            self.engine
+                .import_items_json(json, dx, dy, now())
+                .map_err(err)
+        }
+
+        /// Copy items in place moved by `(dx, dy)`; the copies become the
+        /// selection. Returns their ids.
+        pub fn duplicate_items(&mut self, ids: Vec<String>, dx: f64, dy: f64) -> Vec<String> {
+            self.engine.duplicate_items(&ids, dx, dy, now())
+        }
+
+        // -------------------------------------------------------- view mode
+
+        /// Student view: reject every document edit. Navigation, zoom,
+        /// replay and opening lessons keep working.
+        pub fn set_read_only(&mut self, read_only: bool) {
+            self.engine.set_read_only(read_only);
+        }
+
+        pub fn read_only(&self) -> bool {
+            self.engine.read_only()
+        }
+
         /// Place a Smart Object. Returns the item id; throws the validation
         /// errors as a string when the object is not allowed.
         pub fn add_object_html(
@@ -435,6 +609,40 @@ mod web {
             self.engine.lesson.can_redo()
         }
 
+        // ------------------------------------------------- live agent bridge
+        // See `crate::live` and `rupok_live`: agent ops run here as local,
+        // attributed changes; Loro updates go to and come from the agent's mirror.
+
+        /// Run an agent op (JSON). Returns the result JSON; throws the error JSON.
+        pub fn live_apply(&mut self, op_json: &str, agent: &str) -> Result<String, JsValue> {
+            crate::live::apply(&mut self.engine, op_json, agent, now()).map_err(|e| JsValue::from_str(&e))
+        }
+
+        /// The lesson's encoded Loro version vector.
+        pub fn live_version(&self) -> Vec<u8> {
+            crate::live::version(&self.engine)
+        }
+
+        /// Loro updates since encoded version `from` (empty: everything).
+        pub fn live_export_updates(&self, from: &[u8]) -> Result<Vec<u8>, JsValue> {
+            crate::live::export_updates(&self.engine, from).map_err(err)
+        }
+
+        /// Merge Loro updates from the agent's mirror.
+        pub fn live_import_updates(&mut self, bytes: &[u8]) -> Result<(), JsValue> {
+            crate::live::import_updates(&mut self.engine, bytes).map_err(err)
+        }
+
+        /// `{key, title}` identifying the open lesson.
+        pub fn live_doc_json(&self) -> String {
+            crate::live::doc_info_json(&self.engine)
+        }
+
+        /// `{itemId: agentName}` for agent-made items on page `index`.
+        pub fn live_attribution_json(&self, index: usize) -> String {
+            crate::live::attribution_json(&self.engine, index)
+        }
+
         // ------------------------------------------------------ persistence
 
         pub fn title(&self) -> String {
@@ -442,7 +650,7 @@ mod web {
         }
 
         pub fn set_title(&mut self, title: &str) {
-            self.engine.lesson.set_title(title);
+            self.engine.set_title(title);
         }
 
         /// The lesson as `.rpk` bytes.

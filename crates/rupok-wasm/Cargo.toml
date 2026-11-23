@@ -15,6 +15,7 @@ crate-type = ["cdylib", "rlib"]
 rupok-ink.workspace = true
 rupok-core.workspace = true
 rupok-format.workspace = true
+rupok-live.workspace = true
 rupok-render.workspace = true
 serde.workspace = true
 serde_json.workspace = true

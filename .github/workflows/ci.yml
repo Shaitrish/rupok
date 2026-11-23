@@ -56,3 +56,17 @@ jobs:
       # Node 22+ treats test arguments as globs; a bare directory is not expanded.
       - name: Test
         run: node --test "packages/object-sdk/test/*.test.mjs"
+
+  rupoklib:
+    name: Offline libraries (vendor rupoklib)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      # Copies the pinned libraries into apps/board/public/rupoklib/ and checks
+      # them against LIBS in crates/rupok-format/src/object.rs.
+      - name: Vendor
+        working-directory: apps/board
+        run: |
+          bun install --frozen-lockfile
+          bun run vendor

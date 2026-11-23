@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Function grapher</title>
+<!--
+  rupok Smart Object: Maths, transformations of graphs (Grade 9-12).
+  Size 1920 x 1080 (full slide), 5 steps:
+    0      y = sin x: drag the point along the wave
+    1      a, the amplitude: drag the peak up and down
+    2      b, the period 2 pi / b: drag the next peak sideways
+    3      c, the phase shift -c / b: drag the peak sideways
+    4      d, the midline y = d: drag the midline
+    5      the quadratic y = ax^2 + bx + c: drag the vertex; roots and discriminant
+  Sliders in the dock change any parameter; the LaTeX equation (typeset by the
+  SDK with KaTeX) highlights the one that is changing. Labels are LaTeX too
+  and keep clear of the cards, the dock and the drag handles. Light and dark (chalkboard) schemes. Parameters and
+  the function family are saved with the lesson.
+-->
+<style>
+  :root {
+    --bg: var(--rupok-color-bg, #ffffff);
+    --fg: var(--rupok-color-fg, #111418);
+    --muted: var(--rupok-color-muted, #5f6670);
+    --surface: var(--rupok-color-surface, #f4f5f4);
+    --line: var(--rupok-color-line, rgba(17, 20, 24, 0.12));
+    --accent: var(--rupok-color-accent, #0ca678);
+    /* accent text (4.5:1 on the page), text on accent fills, highlight background */
+    --accent-text: var(--rupok-color-accent-text, #087f5b);
+    --on-accent: var(--rupok-color-on-accent, #04241b);
+    --accent-soft: var(--rupok-color-accent-soft, #e6fcf5);
+    --font: var(--rupok-font-body, "Inter Variable", Inter, "Hind Siliguri", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    --font-h: var(--rupok-font-heading, var(--font));
+    --sky: #1c7ed6; --coral: #f0533c; --sun: #e8890c;
+    --glass: color-mix(in srgb, var(--bg) 90%, transparent);
+    --shadow: 0 .75rem 2.5rem rgba(17, 20, 24, .14), 0 .125rem .375rem rgba(17, 20, 24, .08);
+    --hl: var(--accent-soft);
+  }
+  :root[data-scheme="dark"] {
+    --sky: #74c0fc; --coral: #ff8a7a; --sun: #ffd43b;
+    --glass: color-mix(in srgb, var(--bg) 86%, transparent);
+    --shadow: 0 .75rem 2.5rem rgba(0, 0, 0, .45), 0 .125rem .375rem rgba(0, 0, 0, .3);
+  }
+  /* Designed at 1280 x 720: 1rem = 16px there (24px on a 1920 slide). */
+  html { font-size: min(calc(100vw * 16 / 1280), calc(100vh * 16 / 720)); }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font); -webkit-user-select: none; user-select: none; }
+  #cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .top { position: fixed; left: 2.5rem; top: 2rem; right: 2.5rem; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
+  .titles { padding: .25rem .5rem .5rem 0; background: linear-gradient(to right, var(--bg) 70%, transparent); border-radius: 0 0 1rem 0; }
+  .eyebrow { margin: 0 0 .4rem; font: 800 1rem/1 var(--font); letter-spacing: .14em; text-transform: uppercase; color: var(--accent-text); }
+  h1 { margin: 0; font: 900 3.25rem/1.05 var(--font-h); letter-spacing: -.035em; }
+  .caption { margin: .75rem 0 0; max-width: 44rem; font: 500 1.625rem/1.3 var(--font); color: var(--muted); }
+  .caption b { color: var(--fg); font-weight: 750; }
+  .right { display: flex; flex-direction: column; align-items: flex-end; gap: 1rem; }
+  .dots { display: flex; gap: .5rem; padding: .25rem 0; }
+  .dots i { width: .75rem; height: .75rem; border-radius: 50%; background: var(--line); transition: background-color .3s, transform .3s; }
+  .dots i.on { background: var(--accent); }
+  .dots i.now { transform: scale(1.4); }
+  .card { background: linear-gradient(var(--surface), var(--surface)), var(--glass); border: .0625rem solid var(--line); border-radius: 1.25rem; box-shadow: var(--shadow); }
+  .eq { min-width: 24rem; padding: 1rem 1.375rem 1.125rem; display: grid; gap: .5rem; justify-items: start; }
+  .eq .k { font: 800 .9375rem/1 var(--font); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .eq .line { font: 650 1.6rem/1.3 var(--font); white-space: nowrap; }
+  .eq .line.sm { font-size: 1.3rem; }
+  .eq .vals { font: 600 1.15rem/1.35 var(--font); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .eq .vals b { color: var(--fg); font-weight: 800; }
+  .swap { animation: swap .45s ease-out; }
+  @keyframes swap { from { opacity: 0; transform: translateY(-.5rem); } to { opacity: 1; transform: none; } }
+  /* Floating labels on the scene, typeset with LaTeX (tag()). */
+  .tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; left: 0; top: 0; padding: .32rem .7rem; border-radius: 999px; white-space: nowrap; font: 650 1.15rem/1.15 var(--font); color: var(--fg); background: color-mix(in srgb, var(--bg) 90%, transparent); border: .1rem solid var(--line); will-change: transform; }
+  .tag.bare { padding: 0 .1rem; background: none; border: 0; border-radius: 0; text-shadow: 0 0 .2em var(--bg), 0 0 .2em var(--bg), 0 0 .08em var(--bg); }
+  /* Plain-HTML stand-in for maths until KaTeX has loaded. */
+  .tx { font-style: normal; }
+  .nw { white-space: nowrap; }
+  .tx sub, .tx sup { font-size: .68em; }
+  .hl { color: var(--accent-text); background: var(--hl); border-radius: .4rem; padding: 0 .1em; }
+  .fx i { font-style: italic; }
+
+  .dock { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); display: flex; align-items: center; gap: .75rem; padding: .5rem 1.25rem .5rem .5rem; border-radius: 999px; }
+  .dock .sep { width: .0625rem; align-self: stretch; margin: .375rem 0; background: var(--line); }
+  .fam { display: flex; padding: .25rem; gap: .25rem; border-radius: 999px; background: var(--surface); }
+  .fam button { min-height: 3.5rem; padding: 0 1rem; border: 0; border-radius: 999px; font: 750 1.05rem/1 var(--font); color: var(--muted); background: transparent; cursor: pointer; touch-action: manipulation; white-space: nowrap; }
+  .fam button.on { background: var(--accent); color: var(--on-accent); }
+  .fam button:focus-visible { outline: .2rem solid var(--fg); outline-offset: .15rem; }
+  .ctl { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0 .6rem; width: 11.5rem; padding: .25rem .5rem; border-radius: .9rem; transition: background-color .3s; }
+  .ctl.focus { background: var(--hl); }
+  .ctl[hidden] { display: none; }
+  .ctl .name { font: italic 800 1.4rem/1 var(--font); color: var(--muted); }
+  .ctl.focus .name { color: var(--accent-text); }
+  .ctl .val { justify-self: end; font: 850 1.35rem/1 var(--font); font-variant-numeric: tabular-nums; }
+  .ctl input { grid-column: 1 / 3; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 2.4rem; margin: 0; background: transparent; cursor: pointer; touch-action: none; }
+  input[type=range]::-webkit-slider-runnable-track { height: .45rem; border-radius: 999px; background: var(--line); }
+  input[type=range]::-moz-range-track { height: .45rem; border-radius: 999px; background: var(--line); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 2.25rem; height: 2.25rem; margin-top: -.9rem; border-radius: 50%; background: var(--bg); border: .25rem solid var(--accent); box-shadow: 0 .125rem .5rem rgba(0,0,0,.25); }
+  input[type=range]::-moz-range-thumb { width: 1.8rem; height: 1.8rem; border-radius: 50%; background: var(--bg); border: .25rem solid var(--accent); }
+  input[type=range]:focus-visible { outline: .2rem solid var(--fg); outline-offset: .2rem; border-radius: .5rem; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+  <canvas id="cv" aria-label="Coordinate plane. Drag the handles on the curve."></canvas>
+  <div class="top">
+    <div class="titles" data-avoid>
+      <p class="eyebrow">Maths · Graphs of functions</p>
+      <h1>Function grapher</h1>
+      <p class="caption" id="caption" aria-live="polite"></p>
+    </div>
+    <div class="right">
+      <div class="dots" id="dots" aria-hidden="true"></div>
+      <div class="card eq" id="eq" aria-live="polite" data-avoid></div>
+    </div>
+  </div>
+  <div class="card dock" data-avoid>
+    <div class="fam" role="group" aria-label="Function">
+      <button type="button" id="f-trig" class="on" aria-pressed="true" aria-label="Sine wave" data-tex="y = a\sin(bx + c) + d">y = a sin(bx + c) + d</button>
+      <button type="button" id="f-quad" aria-pressed="false" aria-label="Quadratic" data-tex="y = ax^2 + bx + c">y = ax² + bx + c</button>
+    </div>
+    <span class="sep"></span>
+    <div id="ctls" style="display:flex; gap:.25rem"></div>
+  </div>
+
+<script>
+  /* rupok injects window.rupok before this script runs. This small stand-in
+     is only used when the file is opened directly in a browser without the SDK,
+     so the object still previews (arrow keys step through it). */
+  const rupok = window.rupok || (function () {
+    let cur = 0, count = 0, saved;
+    const subs = [];
+    const set = (n) => {
+      n = Math.max(0, Math.min(count, n));
+      if (n !== cur) { cur = n; subs.forEach((f) => f(cur, { source: "local" })); }
+    };
+    document.addEventListener("keydown", (e) => {
+      const k = e.key, tag = e.target.tagName;
+      if (tag === "INPUT") return;
+      if (k === "ArrowRight" || k === "PageDown" || (k === " " && tag !== "BUTTON")) { e.preventDefault(); set(cur + 1); }
+      if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); set(cur - 1); }
+    });
+    return {
+      mode: "present",
+      ready: Promise.resolve({ standalone: true }),
+      steps: {
+        get current() { return cur; },
+        get count() { return count; },
+        setCount(n) { count = n; set(cur); },
+        onChange(f) { subs.push(f); setTimeout(() => f(cur, { source: "init" })); return () => {}; },
+        next() { set(cur + 1); },
+        prev() { set(cur - 1); },
+        goto: set,
+      },
+      state: { load: () => saved, save: (v) => { saved = v; } },
+      theme: { get: (k, d) => d, all: () => ({}), onChange: () => () => {} },
+      quiz: { submit() {} },
+      resize() {},
+      log() {},
+    };
+  })();
+
+  const STEPS = 5;
+  const PI = Math.PI;
+  const $ = (id) => document.getElementById(id);
+  const cv = $("cv"), ctx = cv.getContext("2d");
+
+  /* ---------------------------------------------------------- LaTeX
+     Maths is typeset by the SDK (rupok.tex / data-tex, KaTeX from rupoklib).
+     Until KaTeX has loaded, or when this file is opened without Rupok, a
+     plain-HTML approximation stands in. */
+  const TEX_SYM = { theta: "θ", pi: "π", times: "×", cdot: "·", Delta: "Δ", Omega: "Ω", to: "→", longrightarrow: "→", circ: "°", approx: "≈", quad: " ", ",": " ", ";": " ", ":": " ", "!": "", sin: "sin ", cos: "cos ", tan: "tan " };
+  function texHtml(t) {
+    let s = String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    for (let i = 0; i < 2; i++) s = s.replace(/\\hl\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g, '<span class="hl">$1</span>');
+    s = s.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2").replace(/\\(?:mathrm|text|mathit|operatorname)\{([^{}]*)\}/g, "$1");
+    s = s.replace(/\\([A-Za-z]+|[,;:!])/g, (m, w) => TEX_SYM[w] ?? "");
+    s = s.replace(/\^\{([^{}]*)\}|\^(\S)/g, (m, a, b) => `<sup>${a ?? b}</sup>`).replace(/_\{([^{}]*)\}|_(\S)/g, (m, a, b) => `<sub>${a ?? b}</sub>`);
+    return `<span class="tx">${s.replace(/[{}]/g, "").replace(/(^|[^a-z"])-/g, "$1−")}</span>`;
+  }
+  /* Typeset `src` into `el`; cheap to call again with the same formula. */
+  function tex(el, src, display) {
+    if (!el.querySelector(".katex")) el.innerHTML = texHtml(src);
+    if (rupok.tex) rupok.tex(el, src, { display: !!display });
+  }
+  /* Rich text with $…$ formulas (captions): each becomes a [data-tex] span the SDK typesets. */
+  function rich(el, html) {
+    /* punctuation right after a formula stays on its line */
+    el.innerHTML = html.replace(/\$([^$]+)\$([.,;:!?)]*)/g, (m, t, p) =>
+      `<span class="nw"><span data-tex="${t.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">${texHtml(t)}</span>${p}</span>`);
+    if (rupok.math) rupok.math.render(el);
+  }
+
+  /* ---------------------------------------------------------- floating labels
+     Labels on the scene are HTML typeset with LaTeX, placed every frame so they
+     never cover the cards, the dock ([data-avoid]) or each other: a label tries
+     its preferred side, flips, then clamps inside the frame. */
+  const tagLayer = document.createElement("div");
+  tagLayer.className = "tags";
+  tagLayer.setAttribute("aria-hidden", "true");
+  cv.after(tagLayer);
+  /* labels that sit inside a card (opts.over) go above the cards */
+  const tagOver = tagLayer.cloneNode();
+  document.body.appendChild(tagOver);
+  const tagMap = new Map();
+  const TAG_FLIP = { right: ["left"], left: ["right"], above: ["below"], below: ["above"], "above-right": ["above-left", "below-right"], "above-left": ["above-right", "below-left"], "below-right": ["below-left", "above-right"], "below-left": ["below-right", "above-left"] };
+  let tagGen = 0, tagAvoid = [], tagUsed = [];
+  function tagsBegin() {
+    tagGen++; tagUsed = [];
+    tagAvoid = [...document.querySelectorAll("[data-avoid]")].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => ({ l: r.left, t: r.top, r: r.right, b: r.bottom }));
+  }
+  function tagsEnd() { for (const t of tagMap.values()) if (t.gen !== tagGen && t.on) { t.on = false; t.el.style.display = "none"; } }
+  function overlap(a, b) { const w = Math.min(a.r, b.r) - Math.max(a.l, b.l), h = Math.min(a.b, b.b) - Math.max(a.t, b.t); return w > 0 && h > 0 ? w * h : 0; }
+  function tag(key, x, y, src, color, opts = {}) {
+    let t = tagMap.get(key);
+    if (!t) { const el = document.createElement("div"); (opts.over ? tagOver : tagLayer).appendChild(el); t = { el, on: true }; tagMap.set(key, t); }
+    t.gen = tagGen;
+    const cls = (opts.bare ? "tag bare" : "tag") + (opts.cls ? " " + opts.cls : "");
+    if (t.cls !== cls) { t.cls = cls; t.el.className = cls; t.w = 0; }
+    const size = opts.size || 1.15;
+    if (t.size !== size) { t.size = size; t.el.style.fontSize = size + "rem"; t.w = 0; }
+    if (t.color !== color) { t.color = color; t.el.style.borderColor = color || ""; }
+    const ink = opts.ink || "";
+    if (t.ink !== ink) { t.ink = ink; t.el.style.color = ink; }
+    if (!t.on) { t.on = true; t.el.style.display = ""; }
+    if (t.src !== src) { t.src = src; tex(t.el, src); t.w = 0; }
+    const k = !!t.el.querySelector(".katex");
+    if (!t.w || k !== t.k) { t.k = k; t.w = t.el.offsetWidth; t.h = t.el.offsetHeight; }
+    const w = t.w, h = t.h, g = opts.gap ?? 0.55 * R, m = 0.4 * R, d = g * 0.7;
+    const spots = { center: [x - w / 2, y - h / 2], right: [x + g, y - h / 2], left: [x - g - w, y - h / 2], above: [x - w / 2, y - g - h], below: [x - w / 2, y + g],
+      "above-right": [x + d, y - d - h], "above-left": [x - d - w, y - d - h], "below-right": [x + d, y + d], "below-left": [x - d - w, y + d] };
+    const at = opts.at || "center";
+    const order = opts.fixed ? [at] : [at, ...(TAG_FLIP[at] || []), "above", "below", "above-right", "above-left", "below-right", "below-left", "right", "left"];
+    let best = null, cost = Infinity;
+    for (const a of order) {
+      const lx = Math.max(m, Math.min(W - w - m, spots[a][0])), ly = Math.max(m, Math.min(H - h - m, spots[a][1]));
+      if (opts.fixed) { best = [lx, ly]; break; }
+      const box = { l: lx - 4, t: ly - 4, r: lx + w + 4, b: ly + h + 4 };
+      let c = 0;
+      for (const o of tagAvoid) c += overlap(box, o) * 4;
+      for (const o of tagUsed) c += overlap(box, o);
+      if (c < cost) { cost = c; best = [lx, ly]; }
+      if (c === 0) break;
+    }
+    tagUsed.push({ l: best[0], t: best[1], r: best[0] + w, b: best[1] + h });
+    t.el.style.transform = `translate(${Math.round(best[0])}px, ${Math.round(best[1])}px)`;
+    return best;
+  }
+  /* keep labels off a drag handle */
+  function tagBlock(x, y, r) { tagUsed.push({ l: x - r, t: y - r, r: x + r, b: y + r }); }
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const SPEC = {
+    trig: { a: [-3, 3, 0.1], b: [0.25, 4, 0.05], c: [-PI, PI, PI / 12], d: [-2, 2, 0.1] },
+    quad: { a: [-2, 2, 0.1], b: [-5, 5, 0.1], c: [-4, 4, 0.1] },
+  };
+  /* what each step shows, and the values it demonstrates */
+  const DEMO = [
+    { fam: "trig", p: { a: 1, b: 1, c: 0, d: 0 } },
+    { fam: "trig", p: { a: 2, b: 1, c: 0, d: 0 }, focus: "a" },
+    { fam: "trig", p: { a: 2, b: 2, c: 0, d: 0 }, focus: "b" },
+    { fam: "trig", p: { a: 2, b: 2, c: PI / 2, d: 0 }, focus: "c" },
+    { fam: "trig", p: { a: 2, b: 2, c: PI / 2, d: 1 }, focus: "d" },
+    { fam: "quad", p: { a: 1, b: -2, c: -3 } },
+  ];
+  const CAPTIONS = [
+    "<b>Drag the point</b> along the wave: the pattern repeats every $2\\pi$.",
+    "$a$ stretches the wave up and down. Drag the peak: amplitude $= |a|$.",
+    "$b$ squeezes the wave sideways. Drag the next peak: period $= 2\\pi/b$.",
+    "$c$ slides the wave sideways. Drag the peak: shift $= -c/b$.",
+    "$d$ lifts the whole wave. Drag the midline: it sits at $y = d$.",
+    "A <b>parabola</b>: drag the vertex. Watch the roots move.",
+  ];
+
+  let step = 0, fam = "trig";
+  let P = { trig: { a: 1, b: 1, c: 0, d: 0 }, quad: { a: 1, b: -2, c: -3 } };
+  let tween = null, focus = null, focusTimer = 0, tracerX = 1.2, drag = null;
+  let W = 0, H = 0, R = 16, raf = 0, C = {};
+
+  /* ---------------------------------------------------------- colour */
+  function readTheme() {
+    const s = getComputedStyle(document.documentElement), v = (n, fb) => s.getPropertyValue(n).trim() || fb;
+    C = { bg: v("--bg", "#fff"), fg: v("--fg", "#111418"), muted: v("--muted", "#5f6670"), line: v("--line", "rgba(17,20,24,.12)"), accent: v("--accent", "#0ca678"), accentText: v("--accent-text", "#087f5b"),
+      sky: v("--sky", "#1c7ed6"), coral: v("--coral", "#f0533c"), sun: v("--sun", "#e8890c"), font: v("--font", "system-ui, sans-serif"),
+      dark: document.documentElement.getAttribute("data-scheme") === "dark" };
+  }
+
+  /* ---------------------------------------------------------- maths */
+  const cur = () => P[fam];
+  function f(x, p = cur()) { return fam === "trig" ? p.a * Math.sin(p.b * x + p.c) + p.d : p.a * x * x + p.b * x + p.c; }
+  function gcd(a, b) { return b ? gcd(b, a % b) : Math.abs(a); }
+  /* a multiple of pi as a fraction: [tex, text] */
+  function piFrac(v) {
+    const n = Math.round((v / PI) * 12);
+    if (Math.abs(v - (n * PI) / 12) > 1e-6) return [v.toFixed(2), v.toFixed(2)];
+    if (n === 0) return ["0", "0"];
+    const g = gcd(n, 12), num = n / g, den = 12 / g, sign = num < 0 ? "-" : "", an = Math.abs(num);
+    const top = an === 1 ? "\\pi" : an + "\\pi", ttop = an === 1 ? "π" : an + "π";
+    return den === 1 ? [sign + top, (sign ? "−" : "") + ttop] : [`${sign}\\tfrac{${top}}{${den}}`, `${sign ? "−" : ""}${ttop}/${den}`];
+  }
+  const num = (v, d = 2) => { const s = (Math.round(v * 100) / 100).toFixed(d).replace(/\.?0+$/, ""); return s === "-0" ? "0" : s; };
+  const numT = (v) => num(v).replace("-", "−");
+  const coef = (v) => (Math.abs(Math.abs(v) - 1) < 1e-9 ? (v < 0 ? "-" : "") : num(v));
+
+  /* ---------------------------------------------------------- plane */
+  function plane() {
+    const left = 3 * R, right = 3 * R, top = 14.5 * R, bottom = 8 * R;
+    const pw = W - left - right, ph = H - top - bottom;
+    const xr = fam === "trig" ? [-2 * PI - 0.4, 2 * PI + 0.4] : [-6.5, 6.5];
+    const yr = [-5, 5];
+    const sx = pw / (xr[1] - xr[0]), sy = ph / (yr[1] - yr[0]);
+    return { left, top, pw, ph, xr, yr, sx, sy, X: (x) => left + (x - xr[0]) * sx, Y: (y) => top + (yr[1] - y) * sy, IX: (px) => xr[0] + (px - left) / sx, IY: (py) => yr[1] - (py - top) / sy };
+  }
+
+  function text(str, x, y, color, size = 1, align = "center", weight = 650, halo = false) {
+    ctx.font = `${weight} ${size * R}px ${C.font}`; ctx.textAlign = align; ctx.textBaseline = "middle";
+    if (halo) { ctx.strokeStyle = C.bg; ctx.lineWidth = 0.35 * R; ctx.lineJoin = "round"; ctx.strokeText(str, x, y); }
+    ctx.fillStyle = color; ctx.fillText(str, x, y);
+  }
+  function pill(str, x, y, color, size = 1.05, align = "center") {
+    ctx.font = `800 ${size * R}px ${C.font}`;
+    const w = ctx.measureText(str).width + 1.1 * R, h = size * R * 1.8, ax = align === "left" ? x : align === "right" ? x - w : x - w / 2;
+    ctx.fillStyle = C.bg; ctx.globalAlpha = 0.92; ctx.beginPath(); ctx.roundRect(ax, y - h / 2, w, h, h / 2); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = color; ctx.lineWidth = 0.12 * R; ctx.stroke();
+    ctx.fillStyle = C.fg; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(str, ax + w / 2, y + 0.05 * R);
+  }
+  function arrowLine(x0, y0, x1, y1, color, both = true) {
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 0.2 * R; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    const head = (xa, ya, xb, yb) => {
+      const a = Math.atan2(yb - ya, xb - xa), h = 0.75 * R;
+      ctx.beginPath(); ctx.moveTo(xb, yb); ctx.lineTo(xb - Math.cos(a - 0.45) * h, yb - Math.sin(a - 0.45) * h); ctx.lineTo(xb - Math.cos(a + 0.45) * h, yb - Math.sin(a + 0.45) * h); ctx.fill();
+    };
+    if (Math.hypot(x1 - x0, y1 - y0) > R) { head(x0, y0, x1, y1); if (both) head(x1, y1, x0, y0); }
+  }
+  function handle(x, y, color, now, hot) {
+    const pulse = hot && !drag && !reduced ? (Math.sin(now / 360) + 1) / 2 : 0;
+    ctx.fillStyle = color; ctx.globalAlpha = 0.18; ctx.beginPath(); ctx.arc(x, y, (1.6 + pulse * 0.4) * R, 0, PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = C.bg; ctx.strokeStyle = color; ctx.lineWidth = 0.28 * R; ctx.beginPath(); ctx.arc(x, y, 0.85 * R, 0, PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, 0.35 * R, 0, PI * 2); ctx.fill();
+    return pulse > 0;
+  }
+
+  /* handles available at this step: [id, x, y, color] in world coordinates */
+  function handles() {
+    const p = cur(), out = [];
+    if (fam === "trig") {
+      const xp = (PI / 2 - p.c) / p.b;
+      const peak = p.a >= 0 ? xp : xp + PI / p.b;
+      if (step === 1 || step === 3) out.push(["peak", peak, p.a >= 0 ? p.a + p.d : p.d - p.a, step === 1 ? C.coral : C.sun]);
+      if (step === 2) out.push(["period", peak + (2 * PI) / p.b, p.a >= 0 ? p.a + p.d : p.d - p.a, C.sky]);
+      if (step === 4) out.push(["mid", -2 * PI + 0.9, p.d, C.accent]);
+    } else {
+      const h = -p.b / (2 * p.a || 1e-9);
+      out.push(["vertex", h, f(h), C.coral]);
+    }
+    return out;
+  }
+
+  function draw(now) {
+    if (!W) return false;
+    let busy = false;
+    if (tween) {
+      const u = reduced ? 1 : Math.min(1, (now - tween.t0) / 650), k = 1 - Math.pow(1 - u, 3);
+      for (const key of Object.keys(tween.to)) P[tween.fam][key] = tween.from[key] + (tween.to[key] - tween.from[key]) * k;
+      if (u >= 1) { tween = null; syncControls(); renderEq(false); } else busy = true;
+    }
+    const pl = plane(), p = cur();
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+    /* grid */
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    const xStep = fam === "trig" ? PI / 2 : 1;
+    for (let x = Math.ceil(pl.xr[0] / xStep) * xStep; x <= pl.xr[1] + 1e-9; x += xStep) { ctx.beginPath(); ctx.moveTo(pl.X(x), pl.top); ctx.lineTo(pl.X(x), pl.top + pl.ph); ctx.stroke(); }
+    for (let y = pl.yr[0]; y <= pl.yr[1]; y++) { ctx.beginPath(); ctx.moveTo(pl.left, pl.Y(y)); ctx.lineTo(pl.left + pl.pw, pl.Y(y)); ctx.stroke(); }
+    /* axes */
+    ctx.strokeStyle = C.fg; ctx.lineWidth = 0.13 * R; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.moveTo(pl.left, pl.Y(0)); ctx.lineTo(pl.left + pl.pw, pl.Y(0)); ctx.moveTo(pl.X(0), pl.top); ctx.lineTo(pl.X(0), pl.top + pl.ph); ctx.stroke(); ctx.globalAlpha = 1;
+    tagsBegin();
+    /* handles first, so no label lands on one */
+    tracerX = Math.max(pl.xr[0] + 0.2, Math.min(pl.xr[1] - 0.2, tracerX));
+    tagBlock(pl.X(tracerX), pl.Y(Math.max(pl.yr[0], Math.min(pl.yr[1], f(tracerX)))), 1.7 * R);
+    for (const [, hx, hy] of handles()) tagBlock(pl.X(hx), pl.Y(hy), 1.7 * R);
+    let ti = 0;
+    for (let x = Math.ceil(pl.xr[0] / xStep) * xStep; x <= pl.xr[1] + 1e-9; x += xStep) {
+      if (Math.abs(x) < 1e-9) continue;
+      const lab = fam === "trig" ? piFrac(x)[0] : String(Math.round(x));
+      tag("tx" + ti++, pl.X(x), pl.Y(0) + (fam === "trig" && Math.abs(x / PI - Math.round(x / PI)) > 1e-6 ? 1.75 : 1.2) * R, lab, null, { bare: true, fixed: true, size: 0.95, ink: C.muted });
+    }
+    for (let y = pl.yr[0] + 1; y < pl.yr[1]; y++) if (y) tag("ty" + y, pl.X(0) - 0.45 * R, pl.Y(y), String(y), null, { bare: true, at: "left", fixed: true, gap: 0, size: 0.95, ink: C.muted });
+    tag("ax", pl.left + pl.pw + 1.2 * R, pl.Y(0), "x", null, { bare: true, fixed: true, size: 1.3 });
+    tag("ay", pl.X(0) + 0.3 * R, pl.top + 0.6 * R, "y", null, { bare: true, at: "right", gap: 0.3 * R, size: 1.3 });
+    {
+      /* the point's coordinates go first: they flip or clamp to stay clear of the cards and the dock */
+      const py = f(tracerX), ty2 = pl.Y(Math.max(pl.yr[0], Math.min(pl.yr[1], py)));
+      const xl = fam === "trig" && Math.abs(tracerX / (PI / 12) - Math.round(tracerX / (PI / 12))) < 1e-6 ? piFrac(tracerX)[0] : num(tracerX);
+      tag("pt", pl.X(tracerX), ty2, `(${xl},\\ ${num(py)})`, C.fg, { at: "above-right", gap: 1.7 * R });
+    }
+
+    ctx.save(); ctx.beginPath(); ctx.rect(pl.left, pl.top - 0.5 * R, pl.pw, pl.ph + R); ctx.clip();
+    const curve = (fn, color, width, dash, glow) => {
+      ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = "round"; ctx.lineCap = "round";
+      if (dash) ctx.setLineDash(dash);
+      if (glow && C.dark) { ctx.shadowColor = color; ctx.shadowBlur = 0.9 * R; }
+      ctx.beginPath();
+      const n = 400;
+      for (let i = 0; i <= n; i++) { const x = pl.xr[0] + ((pl.xr[1] - pl.xr[0]) * i) / n, y = fn(x); i ? ctx.lineTo(pl.X(x), pl.Y(y)) : ctx.moveTo(pl.X(x), pl.Y(y)); }
+      ctx.stroke(); ctx.restore();
+    };
+    if (fam === "trig" && step >= 1 && step <= 4) curve((x) => Math.sin(x), C.muted, 0.12 * R, [0.4 * R, 0.4 * R]);
+    /* annotations */
+    if (fam === "trig") {
+      const xp0 = (PI / 2 - p.c) / p.b, xp = p.a >= 0 ? xp0 : xp0 + PI / p.b, top = p.d + Math.abs(p.a);
+      if (step === 1) { arrowLine(pl.X(xp) + 2.2 * R, pl.Y(p.d), pl.X(xp) + 2.2 * R, pl.Y(top), C.coral); tag("amp", pl.X(xp) + 2.2 * R, pl.Y((p.d + top) / 2), `\\text{amplitude } |a| = ${num(Math.abs(p.a))}`, C.coral, { at: "right" }); }
+      if (step === 2) {
+        const y = pl.Y(top) - 1.6 * R, x1 = pl.X(xp + (2 * PI) / p.b);
+        ctx.save(); ctx.setLineDash([0.3 * R, 0.3 * R]); ctx.strokeStyle = C.sky; ctx.lineWidth = 0.1 * R;
+        ctx.beginPath(); ctx.moveTo(pl.X(xp), pl.Y(top)); ctx.lineTo(pl.X(xp), y); ctx.moveTo(x1, pl.Y(top)); ctx.lineTo(x1, y); ctx.stroke(); ctx.restore();
+        arrowLine(pl.X(xp), y, x1, y, C.sky); tag("per", (pl.X(xp) + x1) / 2, y, `\\text{period } \\tfrac{2\\pi}{b} = ${piFrac((2 * PI) / p.b)[0]}`, C.sky, { at: "above" });
+      }
+      if (step === 3 && Math.abs(p.c) > 1e-6) {
+        const shift = -p.c / p.b, y = pl.Y(top) + 0 * R, xs0 = pl.X(PI / 2 / p.b), xs1 = pl.X(PI / 2 / p.b + shift);
+        ctx.save(); ctx.setLineDash([0.3 * R, 0.3 * R]); ctx.strokeStyle = C.sun; ctx.lineWidth = 0.1 * R;
+        ctx.beginPath(); ctx.moveTo(xs0, pl.Y(top)); ctx.lineTo(xs0, pl.Y(top) - 2.4 * R); ctx.stroke(); ctx.restore();
+        arrowLine(xs0, y - 2 * R, xs1, y - 2 * R, C.sun, false); tag("shift", (xs0 + xs1) / 2, y - 2 * R, `\\text{shift } {-\\tfrac{c}{b}} = ${piFrac(shift)[0]}`, C.sun, { at: "above" });
+      }
+      if (step >= 4 || Math.abs(p.d) > 0.01) {
+        ctx.save(); ctx.setLineDash([0.6 * R, 0.4 * R]); ctx.strokeStyle = C.accent; ctx.lineWidth = 0.12 * R; ctx.globalAlpha = step >= 4 ? 1 : 0.5;
+        ctx.beginPath(); ctx.moveTo(pl.left, pl.Y(p.d)); ctx.lineTo(pl.left + pl.pw, pl.Y(p.d)); ctx.stroke(); ctx.restore();
+        if (step >= 4) tag("mid", pl.left + pl.pw - 0.5 * R, pl.Y(p.d), `\\text{midline } y = d = ${num(p.d)}`, C.accent, { at: "above-left" });
+      }
+    } else {
+      const h = -p.b / (2 * p.a || 1e-9), k = f(h), D = p.b * p.b - 4 * p.a * p.c;
+      ctx.save(); ctx.setLineDash([0.5 * R, 0.4 * R]); ctx.strokeStyle = C.coral; ctx.lineWidth = 0.1 * R; ctx.globalAlpha = 0.7;
+      ctx.beginPath(); ctx.moveTo(pl.X(h), pl.top); ctx.lineTo(pl.X(h), pl.top + pl.ph); ctx.stroke(); ctx.restore();
+      if (Math.abs(p.a) > 1e-6 && D >= 0) {
+        const roots = [(-p.b - Math.sqrt(D)) / (2 * p.a), (-p.b + Math.sqrt(D)) / (2 * p.a)].sort((m, n) => m - n);
+        roots.forEach((r, i) => {
+          ctx.fillStyle = C.sky; ctx.beginPath(); ctx.arc(pl.X(r), pl.Y(0), 0.6 * R, 0, PI * 2); ctx.fill();
+          ctx.strokeStyle = C.bg; ctx.lineWidth = 0.15 * R; ctx.stroke();
+          if (i === 0 || Math.abs(roots[1] - roots[0]) > 1e-6) tag("root" + i, pl.X(r), pl.Y(0), `x_${i + 1} = ${num(r)}`, C.sky, { at: (p.a > 0 ? "above-" : "below-") + (i ? "right" : "left") });
+        });
+      }
+      tag("vertex", pl.X(h), pl.Y(k), `\\text{vertex } (${num(h)},\\ ${num(k)})`, C.coral, { at: p.a > 0 ? "below-right" : "above-right", gap: 1.6 * R });
+    }
+    curve((x) => f(x), C.accent, 0.32 * R, null, true);
+    ctx.restore();
+
+    /* the tracer point */
+    const ty = f(tracerX), tx = pl.X(tracerX), typ = pl.Y(Math.max(pl.yr[0], Math.min(pl.yr[1], ty)));
+    ctx.save(); ctx.setLineDash([0.25 * R, 0.3 * R]); ctx.strokeStyle = C.muted; ctx.lineWidth = 0.1 * R;
+    ctx.beginPath(); ctx.moveTo(tx, typ); ctx.lineTo(tx, pl.Y(0)); ctx.moveTo(tx, typ); ctx.lineTo(pl.X(0), typ); ctx.stroke(); ctx.restore();
+    if (handle(tx, typ, C.fg, now, step === 0)) busy = true;
+    for (const [id, x, y, col] of handles()) if (handle(pl.X(x), pl.Y(y), col, now, true)) busy = true;
+    tagsEnd();
+    return busy;
+  }
+  function tick(now) { raf = 0; if (draw(now)) raf = requestAnimationFrame(tick); }
+  function kick() { if (!raf) raf = requestAnimationFrame(tick); }
+
+  /* ---------------------------------------------------------- equation card */
+  /* One line of maths in the equation card; \hl{…} marks the parameter that changes. */
+  function line(src, cls = "line") {
+    const el = document.createElement("div"); el.className = cls;
+    tex(el, src);
+    return el;
+  }
+  function renderEq(swap) {
+    const box = $("eq"), p = cur(), fo = focus || DEMO[step].focus;
+    const H = (s, key) => (fo === key ? `\\hl{${s}}` : s);
+    box.textContent = "";
+    const k = document.createElement("span"); k.className = "k"; box.appendChild(k);
+    const vals = document.createElement("div"); vals.className = "vals";
+    if (fam === "trig") {
+      k.textContent = "Sine wave";
+      box.appendChild(line(`y = ${H("a", "a")}\\sin(${H("b", "b")}x + ${H("c", "c")}) + ${H("d", "d")}`));
+      const src = `y = ${H(num(p.a), "a")}\\sin(${H(num(p.b), "b")}x ${p.c < 0 ? "-" : "+"} ${H(piFrac(Math.abs(p.c))[0], "c")}) ${p.d < 0 ? "-" : "+"} ${H(num(Math.abs(p.d)), "d")}`;
+      box.appendChild(line(src, "line sm"));
+      rich(vals, [
+        `amplitude $${H(num(Math.abs(p.a)), "a")}$`,
+        `period $${H(piFrac((2 * PI) / p.b)[0], "b")}$`,
+        `shift $${H(piFrac(-p.c / p.b)[0], "c")}$`,
+        `midline $y = ${H(num(p.d), "d")}$`,
+      ].join(" · "));
+    } else {
+      k.textContent = "Quadratic";
+      box.appendChild(line(`y = ${H("a", "a")}x^2 + ${H("b", "b")}x + ${H("c", "c")}`));
+      const src = `y = ${H(coef(p.a) || "1", "a").replace(/^1$/, "")}x^2 ${p.b < 0 ? "-" : "+"} ${H(num(Math.abs(p.b)), "b")}x ${p.c < 0 ? "-" : "+"} ${H(num(Math.abs(p.c)), "c")}`;
+      box.appendChild(line(src, "line sm"));
+      const D = p.b * p.b - 4 * p.a * p.c;
+      rich(vals, `$\\Delta = b^2 - 4ac = \\hl{${num(D)}}$ · ${D > 1e-9 ? "two roots" : Math.abs(D) <= 1e-9 ? "one root" : "no real roots"}`);
+    }
+    box.appendChild(vals);
+    if (swap) { box.classList.remove("swap"); void box.offsetWidth; box.classList.add("swap"); }
+  }
+
+  /* ---------------------------------------------------------- dock */
+  function buildControls() {
+    const box = $("ctls"); box.textContent = "";
+    for (const key of Object.keys(SPEC[fam])) {
+      const [lo, hi, st] = SPEC[fam][key];
+      const lab = document.createElement("label"); lab.className = "ctl"; lab.dataset.key = key;
+      lab.innerHTML = `<span class="name" data-tex="${key}">${key}</span><span class="val"></span><input type="range" min="${lo}" max="${hi}" step="${st}" aria-label="${key}">`;
+      const inp = lab.querySelector("input");
+      inp.addEventListener("input", () => { tween = null; P[fam][key] = +inp.value; setFocus(key); syncControls(); renderEq(false); kick(); });
+      inp.addEventListener("change", persist);
+      inp.addEventListener("pointerup", () => setTimeout(() => inp.blur(), 0));
+      box.appendChild(lab);
+    }
+    syncControls();
+  }
+  function syncControls() {
+    const p = cur(), fo = focus || DEMO[step].focus;
+    document.querySelectorAll(".ctl").forEach((l) => {
+      const key = l.dataset.key, inp = l.querySelector("input");
+      inp.value = p[key];
+      tex(l.querySelector(".val"), fam === "trig" && key === "c" ? piFrac(p[key])[0] : num(p[key]));
+      l.classList.toggle("focus", fo === key);
+    });
+    for (const [id, on] of [["f-trig", fam === "trig"], ["f-quad", fam === "quad"]]) { $(id).classList.toggle("on", on); $(id).setAttribute("aria-pressed", String(on)); }
+  }
+  function setFocus(k) { focus = k; clearTimeout(focusTimer); focusTimer = setTimeout(() => { focus = null; syncControls(); renderEq(false); }, 1500); }
+  function persist() { rupok.state.save({ fam, trig: P.trig, quad: P.quad }); }
+  function setFam(f2) { if (fam === f2) return; fam = f2; tween = null; tracerX = f2 === "trig" ? 1.2 : 2; buildControls(); renderEq(true); persist(); kick(); }
+  $("f-trig").addEventListener("click", () => setFam("trig"));
+  $("f-quad").addEventListener("click", () => setFam("quad"));
+
+  /* ---------------------------------------------------------- drag handles */
+  cv.addEventListener("pointerdown", (e) => {
+    const pl = plane(), x = e.clientX, y = e.clientY;
+    let best = null, bd = 2.4 * R;
+    for (const [id, hx, hy] of handles()) { const d = Math.hypot(x - pl.X(hx), y - pl.Y(hy)); if (d < bd) { bd = d; best = id; } }
+    const tdist = Math.hypot(x - pl.X(tracerX), y - pl.Y(f(tracerX)));
+    if (!best && (tdist < 2.4 * R || Math.abs(y - pl.Y(f(pl.IX(x)))) < 2 * R)) best = "tracer";
+    if (!best) return;
+    drag = best; tween = null; cv.setPointerCapture(e.pointerId); onDrag(e);
+  });
+  function snap(v, [lo, hi, st]) { return Math.max(lo, Math.min(hi, Math.round(v / st) * st)); }
+  function onDrag(e) {
+    if (!drag) return;
+    const pl = plane(), x = pl.IX(e.clientX), y = pl.IY(e.clientY), p = cur(), S = SPEC[fam];
+    if (drag === "tracer") tracerX = x;
+    else if (drag === "peak" && step === 1) { p.a = snap(Math.max(0.1, y - p.d), S.a); setFocus("a"); }
+    else if (drag === "peak") { p.c = snap(PI / 2 - p.b * x, S.c); setFocus("c"); }
+    else if (drag === "period") {
+      /* the handle sits on the next peak: x = (5pi/2 - c [+ pi if a < 0]) / b */
+      const k = 2.5 * PI - p.c + (p.a < 0 ? PI : 0);
+      if (x > 0.2 && k > 0) p.b = snap(k / x, S.b);
+      setFocus("b");
+    }
+    else if (drag === "mid") { p.d = snap(y, S.d); setFocus("d"); }
+    else if (drag === "vertex") { const a = p.a || 1; p.b = snap(-2 * a * x, S.b); const h = -p.b / (2 * a); p.c = snap(y - (a * h * h + p.b * h), S.c); setFocus(null); }
+    syncControls(); renderEq(false); kick();
+  }
+  cv.addEventListener("pointermove", onDrag);
+  const end = () => { if (drag) { drag = null; persist(); kick(); } };
+  cv.addEventListener("pointerup", end);
+  cv.addEventListener("pointercancel", end);
+
+  /* ---------------------------------------------------------- steps */
+  function renderStep(s, info) {
+    const animate = !info || info.source !== "init";
+    step = s;
+    const demo = DEMO[s];
+    if (fam !== demo.fam) { fam = demo.fam; tracerX = fam === "trig" ? 1.2 : 2; buildControls(); }
+    if (animate) { tween = { fam, from: { ...P[fam] }, to: { ...demo.p }, t0: performance.now() }; persistSoon(); }
+    focus = null;
+    rich($("caption"), CAPTIONS[s]);
+    document.querySelectorAll("#dots i").forEach((d, i) => { d.classList.toggle("on", i <= s); d.classList.toggle("now", i === s); });
+    syncControls(); renderEq(animate); kick();
+  }
+  let persistTimer = 0;
+  function persistSoon() { clearTimeout(persistTimer); persistTimer = setTimeout(persist, 800); }
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    R = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    kick();
+  }
+
+  for (let i = 0; i <= STEPS; i++) $("dots").appendChild(document.createElement("i"));
+  readTheme(); buildControls(); renderEq(false);
+  new ResizeObserver(resize).observe(document.documentElement);
+  rupok.theme.onChange(() => { readTheme(); kick(); });
+  rupok.steps.setCount(STEPS);
+  rupok.ready.then(() => {
+    const saved = rupok.state.load();
+    if (saved && typeof saved === "object") {
+      const ok = (o, spec) => o && typeof o === "object" && Object.keys(spec).every((k) => Number.isFinite(o[k]));
+      if (ok(saved.trig, SPEC.trig)) for (const k of Object.keys(SPEC.trig)) P.trig[k] = snap(saved.trig[k], SPEC.trig[k]);
+      if (ok(saved.quad, SPEC.quad)) for (const k of Object.keys(SPEC.quad)) P.quad[k] = snap(saved.quad[k], SPEC.quad[k]);
+      if (saved.fam === "trig" || saved.fam === "quad") fam = saved.fam;
+      buildControls(); renderEq(false);
+    }
+    rupok.steps.onChange(renderStep);
+  });
+</script>
+</body>
+</html>

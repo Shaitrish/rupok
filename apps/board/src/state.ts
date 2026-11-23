@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { APP_SLUG } from "./brand";
+import { type Mode, type ModeConfig, type ModesConfig, resolveMode, sanitizeModes } from "./modes";
 
 export type Tool =
   | "pen" | "highlighter" | "eraser" | "lasso" | "hand" | "laser" | "interact" | "text"
@@ -38,6 +39,25 @@ export const [pages, setPages] = createSignal<PageInfo[]>([]);
 export const [pageIndex, setPageIndex] = createSignal(0);
 export const [items, setItems] = createStore<DomItem[]>([]);
 export const [selection, setSelection] = createSignal<number[] | null>(null); // world bounds
+/** Ids of the selected items (strokes and box items). */
+export const [selectionIds, setSelectionIds] = createSignal<string[]>([], {
+  equals: (a, b) => a.length === b.length && a.every((x, i) => x === b[i]),
+});
+/** What the selection holds (from the engine), for the selection toolbar. */
+export const [selectionMeta, setSelectionMeta] = createSignal<{
+  count: number; strokes: number; boxes: number; groups: number; grouped: boolean;
+  /** One resizable shape stroke: its geometric bounds [x0, y0, x1, y1] (world) and name. */
+  shape?: number[] | null; shapeName?: string | null;
+}>({ count: 0, strokes: 0, boxes: 0, groups: 0, grouped: false });
+/** Opened as the student viewer (`/board/?view`): starts in the Student
+ * mode and never touches the teacher's autosave. */
+export const studentEntry = typeof location !== "undefined" && new URLSearchParams(location.search).has("view");
+/** The board mode: Prepare, Teach or Student view (see modes.ts). */
+export const [mode, setModeSignal] = createSignal<Mode>(studentEntry ? "view" : "prepare");
+/** Student view: read-only. */
+export const isView = () => mode() === "view";
+/** Student entry: true once a lesson file has been opened. */
+export const [lessonOpened, setLessonOpened] = createSignal(false);
 export const [canUndo, setCanUndo] = createSignal(false);
 export const [canRedo, setCanRedo] = createSignal(false);
 export const [title, setTitle] = createSignal("Untitled lesson");
@@ -57,7 +77,8 @@ export function showToast(msg: string, ms = 2600) {
 }
 
 const PREF_KEY = `${APP_SLUG}.prefs`;
-export type Accent = "iris" | "teal" | "blue" | "violet" | "grass" | "ruby" | "amber";
+export type Accent = "mint" | "graphite" | "blue" | "grass" | "coral" | "sun";
+export type SmartShapes = "off" | "auto" | "hold";
 export interface Prefs {
   theme: "light" | "dark" | "system";
   accent: Accent;
@@ -70,21 +91,41 @@ export interface Prefs {
   showStats: boolean;
   forceWebgl: boolean;
   showPages: boolean;
+  /** Smart Ink shapes (pen only): off, snap on pen-up, or hold still to snap. */
+  smartShapes: SmartShapes;
+  /** The on-mode the toolbar toggle switches back to. */
+  smartLast: Exclude<SmartShapes, "off">;
+  /** Scratch out ink to erase it (while smart shapes are on). */
+  scratchOut: boolean;
+  /** Per-mode chrome and toolbar (docs/ui-config.md); missing modes use the defaults. */
+  modes?: Partial<ModesConfig>;
+  /** Writing hand: dock popovers open away from it, so the arm never covers them. */
+  hand: "right" | "left";
 }
 // WebGL2 is the default until WebGPU presentation is verified on real boards (see ROADMAP).
 const defaults: Prefs = {
-  theme: "system", accent: "iris", iconStyle: "linear", toolbar: "bottom", density: "comfortable",
+  theme: "system", accent: "mint", iconStyle: "linear", toolbar: "bottom", density: "comfortable",
   touchMode: "auto", smoothing: 0.5, pressure: 0.8, showStats: false, forceWebgl: true, showPages: true,
+  smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right",
 };
 
 function loadPrefs(): Prefs {
   try {
-    return { ...defaults, ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") };
+    const saved = { ...defaults, ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") };
+    const known = ["mint", "graphite", "blue", "grass", "coral", "sun"];
+    if (!known.includes(saved.accent)) saved.accent = "mint";
+    if (!["off", "auto", "hold"].includes(saved.smartShapes)) saved.smartShapes = "off";
+    if (!["auto", "hold"].includes(saved.smartLast)) saved.smartLast = "auto";
+    if (saved.hand !== "left") saved.hand = "right";
+    saved.modes = sanitizeModes(saved.modes);
+    return saved;
   } catch {
     return defaults;
   }
 }
 export const [prefs, setPrefsSignal] = createSignal<Prefs>(loadPrefs());
+/** The effective configuration of a mode (stored, else default). */
+export const modeConfig = (m: Mode = mode()): ModeConfig => resolveMode(prefs().modes, m);
 export function setPrefs(p: Partial<Prefs>) {
   const next = { ...prefs(), ...p };
   setPrefsSignal(next);
@@ -94,13 +135,12 @@ export function setPrefs(p: Partial<Prefs>) {
 }
 
 export const ACCENTS: { id: Accent; label: string; color: string }[] = [
-  { id: "iris", label: "Iris", color: "#5b5bd6" },
-  { id: "teal", label: "Teal", color: "#12a594" },
-  { id: "blue", label: "Blue", color: "#0090ff" },
-  { id: "violet", label: "Violet", color: "#6e56cf" },
-  { id: "grass", label: "Grass", color: "#46a758" },
-  { id: "ruby", label: "Ruby", color: "#e54666" },
-  { id: "amber", label: "Amber", color: "#ffc53d" },
+  { id: "mint", label: "Mint", color: "#20c997" },
+  { id: "graphite", label: "Graphite", color: "#111418" },
+  { id: "blue", label: "Blue", color: "#1c7ed6" },
+  { id: "grass", label: "Grass", color: "#37b24d" },
+  { id: "coral", label: "Coral", color: "#ff6b57" },
+  { id: "sun", label: "Sun", color: "#fcc419" },
 ];
 
 /** Page (board surface) colours. Ink defaults adapt to dark boards. */

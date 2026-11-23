@@ -219,15 +219,49 @@ gets `z = (max z on the page) + 1`; "bring to front" assigns a new top `z`.
 | `opacity` | `f64` | yes | `1.0` | Extra opacity in `[0, 1]`, multiplied into the colour's alpha. |
 | `pts` | `Binary` | yes | empty stroke | Points in the [stroke point codec](#stroke-points). |
 | `ox`, `oy` | `f64` | no | `0` | Translation applied at render time. |
-| `shape` | `String` | no | absent | Set when a shape tool made the stroke: `rect`, `ellipse`, `line` or `arrow`. |
+| `shape` | `String` | no | absent | Set when a shape tool or Smart Ink made the stroke: `rect`, `ellipse`, `line`, `arrow`, and from Smart Ink also `circle`, `square`, `triangle`, `diamond`, `pentagon`, `hexagon` or `star`. Readers MUST accept other values. |
+| `geom` | `Map` | no | absent | Editable geometry of a shape stroke (see [Shape geometry](#shape-geometry)). |
 
 - Moving a stroke changes `ox`/`oy` and never rewrites `pts`. This keeps moves
   cheap and the recorded timing intact. Writers MAY omit `ox`/`oy` when both
   are zero.
 - `shape` is a hint for editing tools. The geometry is always `pts`;
-  renderers MUST draw `pts` and MAY ignore `shape`.
+  renderers MUST draw `pts` and MAY ignore `shape` and `geom`.
 - A highlighter stroke is written with pressure `1.0` at every point, so it
   has constant width.
+
+##### Shape geometry
+
+`geom` lets an editor resize a shape stroke without stretching its line:
+it transforms the geometry and regenerates `pts` from it at the same
+`width`. It is in the same coordinate frame as `pts` (the drawn shape is
+moved by `ox`/`oy` like the points), and is an optional, additive key:
+readers that don't know it just draw `pts`.
+
+| Key | Type | Req. | Default | Meaning |
+|---|---|---|---|---|
+| `kind` | `String` | yes | none | `rect`, `ellipse`, `line`, `arrow` or `poly`. |
+| `x`, `y` | `f64` | yes | none | See below. |
+| `w`, `h` | `f64` | yes | none | See below. |
+| `rot` | `f64` | no | `0` | Rotation in radians about the box centre, clockwise on screen. |
+| `v` | `List<f64>` | for `poly` | empty | Vertices `[x0, y0, x1, y1, …]` normalised to the box (0..1). |
+
+- `rect`, `ellipse`, `poly`: `x`, `y` is the top-left corner of the
+  unrotated box and `w`, `h` (≥ 0) its size. An ellipse is inscribed in
+  the box; a `poly` is the closed polyline through its vertices in order (a
+  pentagram lists its five tips in star order), at least 3 vertices, at
+  most 64.
+- `line`, `arrow`: the segment from (`x`, `y`) to (`x + w`, `y + h`); `w`
+  and `h` may be negative. For `arrow` the second end is the tip.
+- A writer that changes `pts` other than by regenerating them from `geom`
+  MUST remove `geom`. Moving a stroke changes only `ox`/`oy`, so `geom`
+  stays valid. Resizing a shape stroke rewrites `pts` (and `geom`) in one
+  change and resets `ox`/`oy`; regenerated points keep the stroke's
+  pressure and spread its original duration over their arc length, so replay
+  timing is unchanged.
+- Readers MUST treat a malformed `geom` (missing or non-finite numbers,
+  an odd or oversized `v`, an unknown `kind`) as absent, and MUST ignore
+  unknown keys inside it.
 
 #### `kind: "text"`
 

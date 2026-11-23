@@ -1,9 +1,11 @@
 // The world layer: page frame (slide), and DOM-rendered items (Smart Objects,
 // images, text). Positioned in world units; the parent applies the camera.
+// The selection frame and handles live in screen space (Selection.tsx) so
+// they stay crisp and constant-size at any zoom.
 
 import { For, Match, Show, Switch, createEffect, onCleanup, onMount } from "solid-js";
 import { controller } from "../controller";
-import { BOARD_COLORS, type DomItem, editingText, items, pageIndex, pages, selection, setEditingText, tool } from "../state";
+import { BOARD_COLORS, type DomItem, editingText, items, pageIndex, pages, setEditingText, tool } from "../state";
 
 function ObjectItem(props: { item: DomItem }) {
   let iframe!: HTMLIFrameElement;
@@ -54,7 +56,7 @@ function TextItem(props: { item: DomItem }) {
     <div
       ref={el}
       class="item text"
-      classList={{ selected: props.item.selected }}
+      data-item={props.item.id}
       contentEditable={editing()}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -98,7 +100,7 @@ export default function World(props: { ref: (el: HTMLDivElement) => void }) {
             <Match when={item.kind === "object"}>
               <div
                 class="item object"
-                classList={{ selected: item.selected }}
+                data-item={item.id}
                 style={{
                   left: `${item.x}px`,
                   top: `${item.y}px`,
@@ -114,7 +116,7 @@ export default function World(props: { ref: (el: HTMLDivElement) => void }) {
             <Match when={item.kind === "image"}>
               <div
                 class="item image"
-                classList={{ selected: item.selected }}
+                data-item={item.id}
                 style={{ left: `${item.x}px`, top: `${item.y}px`, width: `${item.w}px`, height: `${item.h}px` }}
               >
                 <img src={controller.assetUrl(item.asset!)} alt="" draggable={false} />
@@ -126,19 +128,6 @@ export default function World(props: { ref: (el: HTMLDivElement) => void }) {
           </Switch>
         )}
       </For>
-      <Show when={selection()}>
-        {(b) => (
-          <div
-            class="selection-box"
-            style={{
-              left: `${b()[0] - 6}px`,
-              top: `${b()[1] - 6}px`,
-              width: `${b()[2] - b()[0] + 12}px`,
-              height: `${b()[3] - b()[1] + 12}px`,
-            }}
-          />
-        )}
-      </Show>
     </div>
   );
 }

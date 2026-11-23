@@ -1,6 +1,17 @@
 # Desktop app (Tauri 2) for Windows and Linux
 
-`Status: 📋 planned · Phase 1 · Difficulty: intermediate`
+`Status: 🚧 in progress · Phase 1 · Difficulty: intermediate`
+
+> **Status (2026-11):** `apps/desktop` exists (Tauri 2.12). Done: tasks 1, 2,
+> 3 (Open/Save/Save As through `apps/board/src/platform.ts`; atomic save with
+> `Package::read` validation in `src/files.rs`), 5 (file association, argv,
+> single instance) and 11 (`.github/workflows/desktop.yml`: NSIS, MSI, deb,
+> AppImage; draft release on `v*`). Open: 4, 6–10, 12. Differences from this
+> plan: the crate lives directly in `apps/desktop` (no `src-tauri/`) and is a
+> workspace member whose Tauri code sits behind the `app` feature, so the
+> workspace builds without WebKitGTK; the release workflow is `desktop.yml`;
+> bytes cross the IPC as raw bodies, and the board opens `/board/`
+> (`url: "/board/"`), because `/` is the website. See `apps/desktop/README.md`.
 
 Wrap the browser board in a Tauri 2 shell so teachers get an installable, offline app that opens `.rpk` files, saves to disk safely and hosts Smart Objects securely.
 

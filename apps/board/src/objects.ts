@@ -4,22 +4,67 @@
 
 import sdkSource from "../../../packages/object-sdk/sdk.js?raw";
 import type { Controller } from "./controller";
-import { type DomItem, setActiveObject, showToast, setTool } from "./state";
+import { objectFontStyle } from "./objectFonts";
+import { type DomItem, pageIndex, pages, setActiveObject, showToast, setTool } from "./state";
 
-/** Theme for objects, read from the app's live design tokens so objects follow
- * the teacher's accent and stay consistent with the UI. */
-function theme(): Record<string, string> {
-  const css = getComputedStyle(document.documentElement);
-  const v = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
-  const font = 'Figtree Variable, system-ui, "Segoe UI", Roboto, "Noto Sans Bengali Variable", sans-serif';
+/** Theme for objects. Objects sit on the slide, so they follow the *page*
+ * colour: a white page gets a light object, a chalkboard or blackboard page a
+ * dark one. The accent follows the teacher's chosen accent. */
+function pageColor(): string {
+  const p = pages()[pageIndex()];
+  return "#" + ((p?.bg_color ?? 0xffffffff) >>> 8).toString(16).padStart(6, "0");
+}
+
+function isDark(hex: string): boolean {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.25;
+}
+
+/** Accent colours for objects, chosen by the *object's* scheme (the page),
+ * not the app UI theme — a white page under a dark UI must still get the
+ * light-scheme accent, or bright mint lands on white. Values mirror
+ * styles.css. accent: fills/strokes (≥3:1 on the page); text: accent-coloured
+ * text (≥4.5:1); on: text on an accent fill; soft: highlight background. */
+type AccentSet = { accent: string; text: string; on: string; soft: string };
+const ACCENTS: Record<string, { light: AccentSet; dark: AccentSet }> = {
+  mint: { light: { accent: "#0ca678", text: "#087f5b", on: "#04241b", soft: "#e6fcf5" }, dark: { accent: "#3ee6b0", text: "#63e6be", on: "#04241b", soft: "#0b2b23" } },
+  graphite: { light: { accent: "#111418", text: "#111418", on: "#ffffff", soft: "#f1f3f5" }, dark: { accent: "#eef0f2", text: "#eef0f2", on: "#111418", soft: "#25282d" } },
+  blue: { light: { accent: "#1c7ed6", text: "#1864ab", on: "#ffffff", soft: "#e7f5ff" }, dark: { accent: "#4dabf7", text: "#74c0fc", on: "#061a2e", soft: "#0c2440" } },
+  grass: { light: { accent: "#2f9e44", text: "#2b8a3e", on: "#ffffff", soft: "#ebfbee" }, dark: { accent: "#51cf66", text: "#69db7c", on: "#0a1f0f", soft: "#102a17" } },
+  coral: { light: { accent: "#fa5a45", text: "#c92a2a", on: "#2b0b06", soft: "#fff4e6" }, dark: { accent: "#ff8a78", text: "#ffa294", on: "#2b0b06", soft: "#33150f" } },
+  sun: { light: { accent: "#fab005", text: "#a06800", on: "#2b2200", soft: "#fff9db" }, dark: { accent: "#ffd43b", text: "#ffe066", on: "#2b2200", soft: "#2d2508" } },
+};
+
+function accentFor(dark: boolean): AccentSet {
+  const name = document.documentElement.dataset.accent ?? "mint";
+  const set = ACCENTS[name] ?? ACCENTS.mint;
+  return dark ? set.dark : set.light;
+}
+
+/** The theme for objects on a page of colour `bg` (`#rrggbb`); the current
+ * page by default. PDF export passes the exported page's colour. */
+export function theme(bg: string = pageColor()): Record<string, string> {
+  const dark = isDark(bg);
+  const accent = accentFor(dark);
+  const font = '"Inter Variable", Inter, "Hind Siliguri", system-ui, "Segoe UI", Roboto, sans-serif';
   return {
-    "color.bg": "#ffffff",
-    "color.fg": "#1c2024",
-    "color.accent": v("--accent-9", "#3e63dd"),
-    "color.accent2": v("--accent-11", "#3a5bc7"),
-    "color.muted": "#60646c",
-    "color.success": "#30a46c",
-    "color.danger": "#e5484d",
+    scheme: dark ? "dark" : "light",
+    "color.bg": bg,
+    "color.surface": dark ? "rgba(255, 255, 255, 0.06)" : "rgba(17, 20, 24, 0.04)",
+    "color.line": dark ? "rgba(255, 255, 255, 0.14)" : "rgba(17, 20, 24, 0.12)",
+    "color.fg": dark ? "#eef0f2" : "#111418",
+    "color.muted": dark ? "#a6adb7" : "#5f6670",
+    "color.accent": accent.accent,
+    "color.accent-text": accent.text,
+    "color.on-accent": accent.on,
+    "color.accent-soft": accent.soft,
+    "color.accent2": dark ? "#74c0fc" : "#1c7ed6",
+    "color.success": dark ? "#69db7c" : "#2b8a3e",
+    "color.danger": dark ? "#ff8787" : "#e03131",
     "font.body": font,
     "font.heading": font,
     "font.mono": 'ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace',
@@ -69,6 +114,10 @@ export class ObjectHost {
     const head =
       `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}">` +
       `<meta name="viewport" content="width=device-width, initial-scale=1">` +
+      // Theme fonts: the frame can't see the app's @fontsource fonts.
+      objectFontStyle(lib) +
+      // Tells the SDK where rupoklib is, so built-in LaTeX can load KaTeX.
+      `<meta name="rupok-lib" content="${lib}">` +
       `<script>${sdkSource.replaceAll("</script", "<\\/script")}</script>`;
     // Put our head first so the CSP and SDK apply before any author code.
     const doc = /<head[^>]*>/i.test(body)
@@ -88,7 +137,16 @@ export class ObjectHost {
     this.frames.delete(id);
   }
 
+  private lastPageBg = "";
+
   syncItems(list: DomItem[]) {
+    // Objects follow the page colour; re-theme them when it changes.
+    const bg = pageColor();
+    if (bg !== this.lastPageBg) {
+      this.lastPageBg = bg;
+      document.documentElement.style.setProperty("--page-bg", bg);
+      this.broadcastTheme();
+    }
     for (const it of list) {
       const f = this.frames.get(it.id);
       if (!f) continue;

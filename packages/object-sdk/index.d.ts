@@ -18,7 +18,16 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 export type ThemeToken =
   | "color.bg"
   | "color.fg"
+  | "scheme"
+  | "color.surface"
+  | "color.line"
   | "color.accent"
+  /** Accent-coloured text: at least 4.5:1 on the page. Never write text in `color.accent`. */
+  | "color.accent-text"
+  /** Text and icons on an accent fill (buttons). */
+  | "color.on-accent"
+  /** Highlight background; put `color.accent-text` on it. */
+  | "color.accent-soft"
   | "color.accent2"
   | "color.muted"
   | "color.success"
@@ -28,7 +37,7 @@ export type ThemeToken =
   | "font.mono"
   | "radius";
 
-/** Theme token to CSS value, e.g. `{ "color.accent": "#2563eb" }`. */
+/** Theme token to CSS value, e.g. `{ "color.accent": "#0ca678" }`. */
 export type Theme = { [token: string]: string };
 
 /** What `rupok.ready` resolves with. */
@@ -111,6 +120,19 @@ export interface QuizPayload {
   score?: number;
 }
 
+export interface TexOptions {
+  /** Display (block) style, like `$$…$$`. Default `false` (inline). */
+  display?: boolean;
+}
+
+/** Built-in LaTeX: KaTeX vendored by the host, loaded lazily. */
+export interface MathApi {
+  /** Typeset `$…$`, `$$…$$`, `\(…\)`, `\[…\]` and `[data-tex]` under `root` (default: the body). Resolves to the number of formulas rendered. */
+  render(root?: Element | Document | null): Promise<number>;
+  /** Load KaTeX now. Resolves to whether maths can be rendered. */
+  load(): Promise<boolean>;
+}
+
 export interface Note37 {
   /** SDK and protocol version: `"1"`. */
   readonly version: "1";
@@ -128,6 +150,14 @@ export interface Note37 {
   resize(w: number, h: number): void;
   /** Log to the console and to the host. */
   log(level: LogLevel, ...args: unknown[]): void;
+  /**
+   * Typeset `latex` into `el` with KaTeX (replacing its content). `\hl{…}`
+   * highlights a term in the theme accent. Re-rendering the same formula is a
+   * no-op, so it is cheap to call on every change. Until KaTeX has loaded, `el`
+   * keeps its current content. Resolves to `true` once rendered.
+   */
+  tex(el: Element, latex: string, options?: TexOptions): Promise<boolean>;
+  readonly math: MathApi;
 }
 
 /* ------------------------------------------------- bridge protocol v1 */
@@ -139,13 +169,19 @@ export type ObjectToHostMessage =
   | { rupok: 1; type: "steps"; count: number }
   | { rupok: 1; type: "resize"; w: number; h: number }
   | { rupok: 1; type: "quiz"; payload: QuizPayload }
-  | { rupok: 1; type: "log"; level: LogLevel; message: string };
+  | { rupok: 1; type: "log"; level: LogLevel; message: string }
+  | { rupok: 1; type: "key"; key: "PageDown" | "PageUp" | "ArrowRight" | "ArrowLeft" | "ArrowDown" | "ArrowUp" | "Escape" }
+  /** Reply to a host `snapshot` request (sent by the SDK automatically). */
+  | { rupok: 1; type: "snapshot"; id: string | number; dataUrl: string }
+  | { rupok: 1; type: "snapshot"; id: string | number; error: string };
 
 export type HostToObjectMessage =
   | { rupok: 1; type: "init"; id: string; step: number; steps: number; state: Json; theme: Theme; mode: Mode }
   | { rupok: 1; type: "step"; step: number }
   | { rupok: 1; type: "theme"; theme: Theme }
-  | { rupok: 1; type: "mode"; mode: Mode };
+  | { rupok: 1; type: "mode"; mode: Mode }
+  /** Ask for a PNG of the object's viewport; `scale` defaults to 2, clamped to [0.25, 4]. */
+  | { rupok: 1; type: "snapshot"; id: string | number; scale?: number };
 
 declare global {
   interface Window {

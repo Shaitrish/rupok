@@ -5,26 +5,39 @@
 //! in tests); DOM-rendered items (objects, text, images) are exposed as JSON
 //! for the UI layer, which re-reads them whenever [`Engine::revision`] changes.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use rupok_core::{
-    BoxGeom, Frame, ImageData, Item, ItemData, ItemId, Lesson, ObjectData, PageId, PageSpec,
-    Pattern, Scene, StrokeData, TextData,
+    BoxGeom, Frame, ImageData, Item, ItemData, ItemId, Lesson, NewItem, ObjectData, PageId,
+    PageSpec, Pattern, Scene, ShapeGeom, StrokeData, TextData,
 };
-use rupok_format::{ObjectBundle, Package};
+use rupok_format::{ObjectBundle, ObjectManifest, Package};
 use rupok_ink::filter::OneEuroParams;
 use rupok_ink::pressure::PressureCurve;
 use rupok_ink::{BuilderConfig, InputPoint, StrokeBuilder, StrokePoint, StrokeStyle, Tool};
 use rupok_render::Camera;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
+use crate::b64;
 use crate::replay::Replay;
 use crate::shapes::{ShapeKind, shape_points};
+
+mod smart;
+pub use smart::{SmartInk, SmartMode};
 
 pub const GENERATOR: &str = concat!("rupok/", env!("CARGO_PKG_VERSION"));
 const MIN_ZOOM: f32 = 0.05;
 const MAX_ZOOM: f32 = 40.0;
 const LASER_LIFETIME_MS: f64 = 1400.0;
+const DEFAULT_FIT_MARGIN: f32 = 0.03;
+/// Clipboard format marker, the first key of every clipboard JSON.
+pub const CLIP_MARKER: &str = "clipboard/v1";
+/// Clipboard JSON comes from other tabs and the system clipboard: bound it.
+const MAX_CLIP_BYTES: usize = 192 << 20;
+const MAX_CLIP_ITEMS: usize = 20_000;
+/// Smart Object state limit (spec/smart-object.md).
+const MAX_STATE_BYTES: usize = 256 * 1024;
+const READ_ONLY: &str = "this lesson is open read-only";
 
 /// Where visual ink goes. Implemented by the GPU renderer.
 pub trait InkSink {
@@ -133,6 +146,10 @@ enum Gesture {
     Ink {
         builder: StrokeBuilder,
         predicted: Vec<StrokePoint>,
+        /// Wall-clock time of pen-down: the stroke's `created`.
+        started: f64,
+        /// Smart Ink hold-to-snap state.
+        hold: smart::Hold,
     },
     Erase {
         last: [f32; 2],
@@ -151,6 +168,7 @@ enum Gesture {
         kind: ShapeKind,
         start: [f32; 2],
         end: [f32; 2],
+        started: f64,
     },
     Pan {
         last: [f32; 2],
@@ -211,6 +229,8 @@ pub struct Engine<S: InkSink> {
     view: [f32; 2],
     /// Screen area covered by floating UI chrome: [top, right, bottom, left].
     insets: [f32; 4],
+    /// Margin `fit_page` leaves around the page (fraction of its size).
+    fit_margin: f32,
     tool: ToolKind,
     pen: StrokeStyle,
     highlighter: StrokeStyle,
@@ -222,6 +242,9 @@ pub struct Engine<S: InkSink> {
     pen_seen: bool,
     gestures: HashMap<i32, Gesture>,
     touches: HashMap<i32, [f32; 2]>,
+    /// The finger driving a tool gesture and its last screen position: a
+    /// second finger turns both into a pinch.
+    touch_gesture: Option<(i32, [f32; 2])>,
     pinch: Option<Pinch>,
     selection: Vec<ItemId>,
     drag_offset: [f32; 2],
@@ -229,10 +252,284 @@ pub struct Engine<S: InkSink> {
     replay: Option<Replay>,
     revision: u64,
     dirty: bool,
+    /// Student view: every document edit is rejected.
+    read_only: bool,
+    /// Smart Ink settings, the last pen stroke and scratch-out flashes.
+    smart: SmartInk,
+    last_ink: Option<smart::LastInk>,
+    flashes: Vec<smart::Flash>,
 }
 
 fn css_color(rgba: u32) -> String {
     format!("#{:08x}", rgba)
+}
+
+/// Lowercase ASCII slug (`[a-z0-9-]`, at most 40 chars) for bundle ids.
+fn slug(s: &str, fallback: &str) -> String {
+    let mut out = s
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    out.truncate(40);
+    if out.is_empty() { fallback.into() } else { out }
+}
+
+#[derive(Serialize)]
+struct Preview<'a> {
+    frame: Option<Frame>,
+    bg: u32,
+    pattern: &'static str,
+    /// Union bounds of all items (for infinite boards), world units.
+    bounds: Option<[f32; 4]>,
+    items: Vec<PreviewItem<'a>>,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+enum PreviewItem<'a> {
+    Stroke {
+        color: String,
+        width: f32,
+        opacity: f32,
+        /// Flat `[x0, y0, x1, y1, …]`.
+        pts: Vec<f64>,
+    },
+    Text {
+        rect: [f64; 4],
+        text: &'a str,
+        size: f64,
+        color: String,
+    },
+    Image {
+        rect: [f64; 4],
+        asset: &'a str,
+    },
+    Object {
+        rect: [f64; 4],
+        title: &'a str,
+    },
+}
+
+/// Copied items with everything they need to be pasted elsewhere.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Clip {
+    /// Item data and group in stacking order (bottom first).
+    pub items: Vec<(ItemData, Option<String>)>,
+    pub bundles: BTreeMap<String, ObjectBundle>,
+    pub assets: BTreeMap<String, Vec<u8>>,
+    /// World bounds of the copied items where they were copied from.
+    pub bounds: Option<[f32; 4]>,
+}
+
+/// Clipboard JSON. `rupok` is the marker and comes first, so the UI can
+/// recognise a Rupok clipboard in `text/plain` without parsing it.
+#[derive(Serialize, Deserialize)]
+struct ClipJson {
+    rupok: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bounds: Option<[f32; 4]>,
+    items: Vec<ClipEntryJson>,
+    #[serde(default)]
+    bundles: BTreeMap<String, ClipBundleJson>,
+    /// Asset name → base64 bytes.
+    #[serde(default)]
+    assets: BTreeMap<String, String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ClipEntryJson {
+    #[serde(flatten)]
+    item: ClipItemJson,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    group: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+enum ClipItemJson {
+    Stroke(ClipStrokeJson),
+    Text(TextData),
+    Image(ImageData),
+    Object(ObjectData),
+}
+
+#[derive(Serialize, Deserialize)]
+struct ClipStrokeJson {
+    tool: String,
+    color: u32,
+    width: f32,
+    opacity: f32,
+    /// Point codec v1 bytes, base64.
+    pts: String,
+    #[serde(default)]
+    ox: f32,
+    #[serde(default)]
+    oy: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    shape: Option<String>,
+    /// Editable shape geometry (`geom`), so pasted shapes stay resizable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    geom: Option<ShapeGeom>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ClipBundleJson {
+    manifest: ObjectManifest,
+    /// Relative path → base64 bytes.
+    files: BTreeMap<String, String>,
+}
+
+fn finite_geom(g: &BoxGeom) -> bool {
+    [g.x, g.y, g.w, g.h, g.rot].iter().all(|v| v.is_finite()) && g.w >= 0.0 && g.h >= 0.0
+}
+
+impl Clip {
+    pub fn to_json(&self) -> String {
+        let items = self
+            .items
+            .iter()
+            .map(|(d, group)| ClipEntryJson {
+                group: group.clone(),
+                item: match d {
+                    ItemData::Stroke(s) => ClipItemJson::Stroke(ClipStrokeJson {
+                        tool: s.tool.clone(),
+                        color: s.color,
+                        width: s.width,
+                        opacity: s.opacity,
+                        pts: b64::encode(&rupok_ink::encode_points(&s.points)),
+                        ox: s.offset[0],
+                        oy: s.offset[1],
+                        shape: s.shape.clone(),
+                        geom: s.geom.clone(),
+                    }),
+                    ItemData::Text(t) => ClipItemJson::Text(t.clone()),
+                    ItemData::Image(i) => ClipItemJson::Image(i.clone()),
+                    ItemData::Object(o) => ClipItemJson::Object(o.clone()),
+                },
+            })
+            .collect();
+        let doc = ClipJson {
+            rupok: CLIP_MARKER.into(),
+            bounds: self.bounds,
+            items,
+            bundles: self
+                .bundles
+                .iter()
+                .map(|(k, b)| {
+                    (
+                        k.clone(),
+                        ClipBundleJson {
+                            manifest: b.manifest.clone(),
+                            files: b
+                                .files
+                                .iter()
+                                .map(|(p, bytes)| (p.clone(), b64::encode(bytes)))
+                                .collect(),
+                        },
+                    )
+                })
+                .collect(),
+            assets: self
+                .assets
+                .iter()
+                .map(|(k, v)| (k.clone(), b64::encode(v)))
+                .collect(),
+        };
+        serde_json::to_string(&doc).unwrap_or_default()
+    }
+
+    /// Parse and validate clipboard JSON. Never panics on bad input.
+    pub fn from_json(json: &str) -> Result<Self, String> {
+        if json.len() > MAX_CLIP_BYTES {
+            return Err("clipboard data is too large".into());
+        }
+        let doc: ClipJson =
+            serde_json::from_str(json).map_err(|e| format!("not a Rupok clipboard: {e}"))?;
+        if doc.rupok != CLIP_MARKER {
+            return Err(format!("unsupported clipboard format {:?}", doc.rupok));
+        }
+        if doc.items.len() > MAX_CLIP_ITEMS {
+            return Err("too many items on the clipboard".into());
+        }
+        let mut clip = Clip {
+            bounds: doc.bounds,
+            ..Default::default()
+        };
+        for entry in doc.items {
+            let group = entry.group.filter(|g| !g.is_empty() && g.len() <= 256);
+            clip.items.push((
+                match entry.item {
+                    ClipItemJson::Stroke(s) => {
+                        let bytes = b64::decode(&s.pts)?;
+                        let points = rupok_ink::decode_points(&bytes).map_err(|e| e.to_string())?;
+                        if points.is_empty() {
+                            continue;
+                        }
+                        if !(s.width.is_finite() && s.opacity.is_finite())
+                            || !(s.ox.is_finite() && s.oy.is_finite())
+                        {
+                            return Err("invalid stroke".into());
+                        }
+                        ItemData::Stroke(StrokeData {
+                            tool: s.tool,
+                            color: s.color,
+                            width: s.width.clamp(0.1, 1000.0),
+                            opacity: s.opacity.clamp(0.0, 1.0),
+                            points,
+                            offset: [s.ox, s.oy],
+                            shape: s.shape,
+                            geom: s.geom.filter(ShapeGeom::is_valid),
+                        })
+                    }
+                    ClipItemJson::Text(t) if finite_geom(&t.geom) && t.size.is_finite() => {
+                        ItemData::Text(t)
+                    }
+                    ClipItemJson::Image(i) if finite_geom(&i.geom) => ItemData::Image(i),
+                    ClipItemJson::Object(mut o) if finite_geom(&o.geom) => {
+                        if o.state
+                            .as_ref()
+                            .is_some_and(|st| st.len() > MAX_STATE_BYTES)
+                        {
+                            o.state = None;
+                        }
+                        ItemData::Object(o)
+                    }
+                    _ => return Err("invalid item geometry".into()),
+                },
+                group,
+            ));
+        }
+        for (id, b) in doc.bundles {
+            let mut files = BTreeMap::new();
+            for (path, data) in b.files {
+                if !rupok_format::safe_path(&path) {
+                    return Err(format!("unsafe path in object bundle: {path}"));
+                }
+                files.insert(path, b64::decode(&data)?);
+            }
+            clip.bundles.insert(
+                id,
+                ObjectBundle {
+                    manifest: b.manifest,
+                    files,
+                },
+            );
+        }
+        for (name, data) in doc.assets {
+            clip.assets.insert(name, b64::decode(&data)?);
+        }
+        Ok(clip)
+    }
 }
 
 impl<S: InkSink> Engine<S> {
@@ -249,6 +546,7 @@ impl<S: InkSink> Engine<S> {
             camera: Camera::default(),
             view: [1280.0, 720.0],
             insets: [0.0; 4],
+            fit_margin: DEFAULT_FIT_MARGIN,
             tool: ToolKind::Pen,
             pen: StrokeStyle {
                 tool: Tool::Pen,
@@ -275,6 +573,7 @@ impl<S: InkSink> Engine<S> {
             pen_seen: false,
             gestures: HashMap::new(),
             touches: HashMap::new(),
+            touch_gesture: None,
             pinch: None,
             selection: Vec::new(),
             drag_offset: [0.0, 0.0],
@@ -282,6 +581,10 @@ impl<S: InkSink> Engine<S> {
             replay: None,
             revision: 1,
             dirty: true,
+            read_only: false,
+            smart: SmartInk::default(),
+            last_ink: None,
+            flashes: Vec::new(),
         };
         e.load_page();
         e
@@ -291,6 +594,23 @@ impl<S: InkSink> Engine<S> {
 
     pub fn revision(&self) -> u64 {
         self.revision
+    }
+
+    /// Student view: reject every document edit (drawing, erasing, moving,
+    /// adding, deleting, page changes, undo). Navigation, zoom, replay and
+    /// opening a lesson still work.
+    pub fn set_read_only(&mut self, read_only: bool) {
+        self.read_only = read_only;
+        if read_only {
+            self.gestures.clear();
+            self.selection.clear();
+            self.sink.set_wet(&[]);
+            self.bump();
+        }
+    }
+
+    pub fn read_only(&self) -> bool {
+        self.read_only
     }
 
     fn bump(&mut self) {
@@ -304,7 +624,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn has_animation(&self) -> bool {
-        !self.lasers.is_empty() || self.replay.as_ref().is_some_and(|r| r.playing)
+        !self.lasers.is_empty()
+            || !self.flashes.is_empty()
+            || self.replay.as_ref().is_some_and(|r| r.playing)
     }
 
     pub fn set_view(&mut self, w: f32, h: f32) {
@@ -455,6 +777,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn add_page(&mut self, after_current: bool, pattern: Pattern) -> usize {
+        if self.read_only {
+            return self.page_index();
+        }
         let idx = if after_current {
             Some(self.page_index() + 1)
         } else {
@@ -476,6 +801,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn delete_page(&mut self) {
+        if self.read_only {
+            return;
+        }
         if self.lesson.page_count() <= 1 {
             return;
         }
@@ -485,19 +813,50 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn move_page(&mut self, from: usize, to: usize) {
+        if self.read_only {
+            return;
+        }
         if self.lesson.move_page(from, to).is_ok() {
             self.bump();
         }
     }
 
     pub fn set_background(&mut self, pattern: Pattern, color: u32) {
+        if self.read_only {
+            return;
+        }
         let _ = self
             .lesson
             .set_page_background(&self.page.clone(), pattern, color);
         self.bump();
     }
 
+    /// Fit the page into the visible area with the current fit margin
+    /// (3% by default; Teach mode sets 0). Page changes and loads use it too.
     pub fn fit_page(&mut self) {
+        self.fit_page_margin(self.fit_margin);
+    }
+
+    /// The margin [`Engine::fit_page`] leaves around the page, as a fraction
+    /// of its size: 0.03 by default, 0 for a slide that touches the screen.
+    pub fn set_fit_margin(&mut self, margin: f32) {
+        self.fit_margin = if margin.is_finite() {
+            margin.clamp(0.0, 1.0)
+        } else {
+            DEFAULT_FIT_MARGIN
+        };
+    }
+
+    /// Fit the page into the visible area leaving `margin` (a fraction of the
+    /// page size) around it. With 0 the page touches both edges of the
+    /// limiting axis and is centred on the other.
+    pub fn fit_page_margin(&mut self, margin: f32) {
+        let m = 1.0
+            + if margin.is_finite() {
+                margin.clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
         let frame = self
             .lesson
             .page(&self.page)
@@ -506,8 +865,8 @@ impl<S: InkSink> Engine<S> {
             .unwrap_or(Frame::SLIDE_16_9);
         let (fw, fh) = (frame.w as f32, frame.h as f32);
         let (c, size) = self.visible_area();
-        let zoom = (size[0] / (fw * 1.03))
-            .min(size[1] / (fh * 1.03))
+        let zoom = (size[0] / (fw * m))
+            .min(size[1] / (fh * m))
             .clamp(MIN_ZOOM, MAX_ZOOM);
         self.camera = Camera {
             x: fw / 2.0 - c[0] / zoom,
@@ -574,8 +933,26 @@ impl<S: InkSink> Engine<S> {
             self.gestures.insert(id, Gesture::Pan { last: [x, y] });
             return;
         }
+        // A second finger while one finger drives a tool gesture: cancel that
+        // gesture (an unfinished stroke is dropped) and pinch with both.
         if kind == PointerKind::Touch
-            && (!self.touch_draws() || !self.touches.is_empty() || self.tool == ToolKind::Hand)
+            && let Some((fid, pos)) = self.touch_gesture.take()
+            && fid != id
+        {
+            match self.gestures.remove(&fid) {
+                Some(Gesture::Erase { hits, .. }) => self.commit_erase(hits),
+                Some(Gesture::MoveSelection { .. }) => self.preview_move([0.0, 0.0]),
+                _ => {}
+            }
+            self.touches.insert(fid, pos);
+        }
+        // Fingers navigate when palm rejection says so, except in Select,
+        // where one finger selects and moves (two still pinch).
+        if kind == PointerKind::Touch
+            && (self.read_only
+                || (!self.touch_draws() && self.tool != ToolKind::Lasso)
+                || !self.touches.is_empty()
+                || self.tool == ToolKind::Hand)
         {
             self.touches.insert(id, [x, y]);
             // A second finger cancels any stroke a finger started: it is a pinch.
@@ -590,6 +967,15 @@ impl<S: InkSink> Engine<S> {
             self.update_wet(now_ms);
             self.pinch = None;
             return;
+        }
+        if self.read_only {
+            self.gestures.insert(id, Gesture::Pan { last: [x, y] });
+            return;
+        }
+        if !matches!(self.tool, ToolKind::Lasso | ToolKind::Hand) && !self.selection.is_empty() {
+            // Starting to draw dismisses a selection left over from placing an item.
+            self.selection.clear();
+            self.bump();
         }
         let w = self.world(x, y);
         let g = match self.tool {
@@ -613,6 +999,8 @@ impl<S: InkSink> Engine<S> {
                         kind == PointerKind::Pen,
                     ),
                     predicted: Vec::new(),
+                    started: now_ms,
+                    hold: smart::Hold::new(w, now_ms),
                 }
             }
             ToolKind::Eraser => {
@@ -622,6 +1010,15 @@ impl<S: InkSink> Engine<S> {
             }
             ToolKind::Lasso => {
                 if self.inside_selection(w) {
+                    Gesture::MoveSelection {
+                        last: w,
+                        total: [0.0, 0.0],
+                    }
+                } else if let Some(hit) = self.press_target(w) {
+                    // One gesture: press on an item selects it (with its
+                    // group) and dragging moves it right away.
+                    self.selection = self.expand_groups(&[hit]);
+                    self.bump();
                     Gesture::MoveSelection {
                         last: w,
                         total: [0.0, 0.0],
@@ -650,10 +1047,57 @@ impl<S: InkSink> Engine<S> {
                 kind,
                 start: w,
                 end: w,
+                started: now_ms,
             },
         };
+        if kind == PointerKind::Touch {
+            self.touch_gesture = Some((id, [x, y]));
+        }
         self.gestures.insert(id, g);
         self.update_wet(now_ms);
+    }
+
+    /// The item a press in Select grabs: the topmost item under the pointer,
+    /// unless it is a page-sized box (an imported PDF slide, a full-slide
+    /// object). Those would swallow every lasso drawn over them, so a drag
+    /// there lassos and a plain click still selects them.
+    fn press_target(&self, w: [f32; 2]) -> Option<ItemId> {
+        let it = self.scene.hit_test(w[0], w[1], 6.0 / self.camera.zoom)?;
+        if !matches!(it.data, ItemData::Stroke(_))
+            && let Some(f) = self.lesson.page(&self.page).ok().and_then(|p| p.frame)
+        {
+            let b = it.data.aabb();
+            let area = f64::from((b[2] - b[0]).max(0.0)) * f64::from((b[3] - b[1]).max(0.0));
+            if area >= 0.85 * f.w * f.h {
+                return None;
+            }
+        }
+        Some(it.id.clone())
+    }
+
+    /// Grow a set of items to whole groups, keeping order and without repeats.
+    fn expand_groups(&self, ids: &[ItemId]) -> Vec<ItemId> {
+        let groups: HashSet<&str> = ids
+            .iter()
+            .filter_map(|id| self.scene.get(id)?.group.as_deref())
+            .collect();
+        let mut seen: HashSet<&str> = HashSet::new();
+        let mut out: Vec<ItemId> = Vec::with_capacity(ids.len());
+        for id in ids {
+            if self.scene.get(id).is_some() && seen.insert(id.as_str()) {
+                out.push(id.clone());
+            }
+        }
+        if !groups.is_empty() {
+            for it in self.scene.ordered() {
+                if it.group.as_deref().is_some_and(|g| groups.contains(g))
+                    && seen.insert(it.id.as_str())
+                {
+                    out.push(it.id.clone());
+                }
+            }
+        }
+        out
     }
 
     /// Coalesced samples as flat `[x, y, pressure, t, ...]`; `predicted` likewise.
@@ -666,8 +1110,15 @@ impl<S: InkSink> Engine<S> {
             }
             return;
         }
+        if let Some((fid, pos)) = &mut self.touch_gesture
+            && *fid == id
+            && let Some(last) = samples.as_chunks::<4>().0.iter().last()
+        {
+            *pos = [last[0] as f32, last[1] as f32];
+        }
         let zoom = self.camera.zoom;
         let cam = self.camera;
+        let hold_mode = self.smart.mode == SmartMode::Hold;
         let Some(g) = self.gestures.get_mut(&id) else {
             return;
         };
@@ -681,6 +1132,8 @@ impl<S: InkSink> Engine<S> {
             Gesture::Ink {
                 builder,
                 predicted: pred,
+                hold,
+                ..
             } => {
                 for s in samples.as_chunks::<4>().0 {
                     let w = to_world(s[0], s[1]);
@@ -690,6 +1143,9 @@ impl<S: InkSink> Engine<S> {
                         pressure: s[2] as f32,
                         t_ms: s[3],
                     });
+                    if hold_mode {
+                        Self::hold_move(hold, w, now_ms, zoom);
+                    }
                 }
                 pred.clear();
                 let last_p = builder.points().last().map(|p| p.p).unwrap_or(0.5);
@@ -786,6 +1242,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn pointer_up(&mut self, id: i32, now_ms: f64) {
+        if self.touch_gesture.is_some_and(|(fid, _)| fid == id) {
+            self.touch_gesture = None;
+        }
         if self.touches.remove(&id).is_some() {
             self.pinch = None;
             return;
@@ -794,11 +1253,16 @@ impl<S: InkSink> Engine<S> {
             return;
         };
         match g {
-            Gesture::Ink { builder, .. } => {
+            Gesture::Ink {
+                builder,
+                started,
+                hold,
+                ..
+            } => {
                 let style = builder.style;
                 let pts = builder.finish();
                 if !pts.is_empty() {
-                    self.commit_stroke(
+                    self.finish_ink(
                         StrokeData {
                             tool: style.tool.as_str().into(),
                             color: style.color,
@@ -807,7 +1271,10 @@ impl<S: InkSink> Engine<S> {
                             points: pts,
                             offset: [0.0, 0.0],
                             shape: None,
+                            geom: None,
                         },
+                        started,
+                        hold.snapped,
                         now_ms,
                     );
                 }
@@ -818,16 +1285,16 @@ impl<S: InkSink> Engine<S> {
                 start_screen,
                 moved,
             } => {
-                if moved && poly.len() >= 3 {
-                    self.selection = self.scene.lasso(&poly);
+                let picked = if moved && poly.len() >= 3 {
+                    self.scene.lasso(&poly)
                 } else {
                     let w = self.world(start_screen[0], start_screen[1]);
-                    self.selection = self
-                        .scene
+                    self.scene
                         .hit_test(w[0], w[1], 6.0 / self.camera.zoom)
                         .map(|i| vec![i.id.clone()])
-                        .unwrap_or_default();
-                }
+                        .unwrap_or_default()
+                };
+                self.selection = self.expand_groups(&picked);
                 self.bump();
             }
             Gesture::MoveSelection { total, .. } => {
@@ -845,7 +1312,12 @@ impl<S: InkSink> Engine<S> {
                     self.bump();
                 }
             }
-            Gesture::Shape { kind, start, end } => {
+            Gesture::Shape {
+                kind,
+                start,
+                end,
+                started,
+            } => {
                 let d = ((end[0] - start[0]).powi(2) + (end[1] - start[1]).powi(2)).sqrt();
                 if d * self.camera.zoom > 3.0 {
                     let st = self.shape_style;
@@ -858,8 +1330,9 @@ impl<S: InkSink> Engine<S> {
                             points: shape_points(kind, start, end, st.width),
                             offset: [0.0, 0.0],
                             shape: Some(kind.as_str().into()),
+                            geom: Some(crate::shapes::shape_geom(kind, start, end)),
                         },
-                        now_ms,
+                        started,
                     );
                 }
             }
@@ -870,6 +1343,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn pointer_cancel(&mut self, id: i32, now_ms: f64) {
+        if self.touch_gesture.is_some_and(|(fid, _)| fid == id) {
+            self.touch_gesture = None;
+        }
         self.touches.remove(&id);
         self.pinch = None;
         if let Some(Gesture::Erase { hits, .. }) = self.gestures.remove(&id) {
@@ -924,28 +1400,45 @@ impl<S: InkSink> Engine<S> {
 
     // ----------------------------------------------------------- edits
 
-    fn commit_stroke(&mut self, s: StrokeData, now_ms: f64) {
+    /// `created` is the pen-down wall-clock time (spec § Replay).
+    fn commit_stroke(&mut self, s: StrokeData, created: f64) -> Option<ItemId> {
         let page = self.page.clone();
         let data = ItemData::Stroke(s);
-        if let Ok(id) = self.lesson.add_item(&page, &data, now_ms) {
-            if let ItemData::Stroke(s) = &data {
-                self.sink.add_stroke(&id, s);
-            }
-            let z = self.lesson.item(&page, &id).map(|i| i.z).unwrap_or(0.0);
-            self.scene.insert(Item {
-                id,
-                z,
-                created: now_ms,
-                data,
-            });
-            self.revision += 1;
+        let id = self.lesson.add_item(&page, &data, created).ok()?;
+        if let ItemData::Stroke(s) = &data {
+            self.sink.add_stroke(&id, s);
         }
+        let z = self.lesson.item(&page, &id).map(|i| i.z).unwrap_or(0.0);
+        self.scene.insert(Item {
+            id: id.clone(),
+            z,
+            created,
+            group: None,
+            data,
+        });
+        self.revision += 1;
+        Some(id)
     }
 
     /// Visually erase immediately; the document change is committed once per
     /// eraser gesture so a whole scrub is a single undo step.
     fn erase_at(&mut self, a: [f32; 2], b: [f32; 2], r: f32) -> Vec<ItemId> {
-        let hits = self.scene.erase_hits(a, b, r);
+        let mut hits = self.scene.erase_hits(a, b, r);
+        // Grouped (merged) strokes erase as one; box items in the group stay.
+        if hits
+            .iter()
+            .any(|h| self.scene.get(h).is_some_and(|i| i.group.is_some()))
+        {
+            hits = self
+                .expand_groups(&hits)
+                .into_iter()
+                .filter(|id| {
+                    self.scene
+                        .get(id)
+                        .is_some_and(|i| matches!(i.data, ItemData::Stroke(_)))
+                })
+                .collect();
+        }
         for id in &hits {
             self.scene.remove(id);
             self.sink.remove_stroke(id);
@@ -957,6 +1450,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     fn commit_erase(&mut self, hits: Vec<ItemId>) {
+        if self.read_only {
+            return;
+        }
         if hits.is_empty() {
             return;
         }
@@ -982,11 +1478,92 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn select(&mut self, ids: Vec<ItemId>) {
-        self.selection = ids
-            .into_iter()
-            .filter(|id| self.scene.get(id).is_some())
-            .collect();
+        self.selection = self.expand_groups(&ids);
         self.bump();
+    }
+
+    // ------------------------------------------------------------ groups
+
+    /// Group the selection (two or more items) into one new group; nested
+    /// groups are flattened. Returns the group id.
+    pub fn group_selection(&mut self) -> Option<String> {
+        if self.read_only || self.selection.len() < 2 {
+            return None;
+        }
+        let sel = self.selection.clone();
+        let g = self.lesson.group_items(&self.page.clone(), &sel).ok()?;
+        self.resync();
+        Some(g)
+    }
+
+    /// Dissolve every group in the selection; the items stay selected.
+    /// Returns how many groups were dissolved.
+    pub fn ungroup_selection(&mut self) -> usize {
+        if self.read_only {
+            return 0;
+        }
+        let groups: Vec<String> = self
+            .selection
+            .iter()
+            .filter_map(|id| self.scene.get(id)?.group.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let page = self.page.clone();
+        for g in &groups {
+            let _ = self.lesson.ungroup(&page, g);
+        }
+        if !groups.is_empty() {
+            self.resync();
+        }
+        groups.len()
+    }
+
+    /// Merge the selected ink into one unit that selects, moves, copies and
+    /// erases as one. A selection with box items is grouped instead.
+    /// Returns `"merged"`, `"grouped"` or `"none"`.
+    pub fn merge_selection(&mut self) -> &'static str {
+        let strokes_only = self.selection.iter().all(|id| {
+            self.scene
+                .get(id)
+                .is_some_and(|i| matches!(i.data, ItemData::Stroke(_)))
+        });
+        match self.group_selection() {
+            Some(_) if strokes_only => "merged",
+            Some(_) => "grouped",
+            None => "none",
+        }
+    }
+
+    /// What the selection holds, for the selection toolbar:
+    /// `{count, strokes, boxes, groups, grouped}` where `grouped` is true
+    /// when the whole selection is exactly one group.
+    pub fn selection_meta_json(&self) -> String {
+        let items: Vec<&Item> = self
+            .selection
+            .iter()
+            .filter_map(|id| self.scene.get(id))
+            .collect();
+        let strokes = items
+            .iter()
+            .filter(|i| matches!(i.data, ItemData::Stroke(_)))
+            .count();
+        let groups: HashSet<&str> = items.iter().filter_map(|i| i.group.as_deref()).collect();
+        let grouped = groups.len() == 1 && items.iter().all(|i| i.group.is_some());
+        serde_json::json!({
+            "count": items.len(),
+            "strokes": strokes,
+            "boxes": items.len() - strokes,
+            "groups": groups.len(),
+            "grouped": grouped,
+            // A single resizable shape stroke: its geometric bounds and name.
+            "shape": self.selected_shape().map(|(_, b)| b),
+            "shapeName": self.selected_shape().and_then(|(id, _)| match &self.scene.get(&id)?.data {
+                ItemData::Stroke(s) => s.shape.clone(),
+                _ => None,
+            }),
+        })
+        .to_string()
     }
 
     pub fn select_all(&mut self) {
@@ -995,6 +1572,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn delete_selection(&mut self) {
+        if self.read_only {
+            return;
+        }
         let sel = std::mem::take(&mut self.selection);
         if sel.is_empty() {
             return;
@@ -1004,6 +1584,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn delete_item(&mut self, id: &str) {
+        if self.read_only {
+            return;
+        }
         let _ = self
             .lesson
             .remove_items(&self.page.clone(), &[id.to_string()]);
@@ -1011,24 +1594,252 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn move_items(&mut self, ids: &[ItemId], dx: f64, dy: f64) {
+        if self.read_only {
+            return;
+        }
         let _ = self.lesson.translate_items(&self.page.clone(), ids, dx, dy);
         self.resync();
     }
 
     pub fn set_geom(&mut self, id: &str, g: BoxGeom) {
+        if self.read_only {
+            return;
+        }
         let _ = self.lesson.set_geom(&self.page.clone(), id, g);
         self.resync();
     }
 
     pub fn bring_to_front(&mut self, id: &str) {
+        if self.read_only {
+            return;
+        }
         let _ = self.lesson.bring_to_front(&self.page.clone(), id);
         self.resync();
     }
 
     pub fn clear_page(&mut self) {
+        if self.read_only {
+            return;
+        }
         let ids: Vec<ItemId> = self.scene.ordered().iter().map(|i| i.id.clone()).collect();
         let _ = self.lesson.remove_items(&self.page.clone(), &ids);
         self.resync();
+    }
+
+    /// Raise several items above everything else, keeping their relative
+    /// order; one undo step.
+    pub fn bring_to_front_many(&mut self, ids: &[ItemId]) {
+        if self.read_only || ids.is_empty() {
+            return;
+        }
+        let _ = self.lesson.bring_items_to_front(&self.page.clone(), ids);
+        self.resync();
+    }
+
+    /// Resize a text item: box and font size together (one undo step).
+    pub fn resize_text(&mut self, id: &str, g: BoxGeom, size: f64) {
+        if self.read_only || !(size.is_finite() && size > 0.0) {
+            return;
+        }
+        let _ = self
+            .lesson
+            .resize_text(&self.page.clone(), id, g, size.clamp(4.0, 2000.0));
+        self.resync();
+    }
+
+    pub fn set_title(&mut self, title: &str) {
+        if self.read_only {
+            return;
+        }
+        self.lesson.set_title(title);
+        self.bump();
+    }
+
+    /// Copy the page at `index` (with all items and their bundle/asset
+    /// references) right after it and show the copy. Returns its index.
+    pub fn duplicate_page(&mut self, index: usize) -> Option<usize> {
+        if self.read_only {
+            return None;
+        }
+        let src = self.lesson.page_id_at(index).ok()?;
+        let id = self.lesson.duplicate_page(&src).ok()?;
+        let i = self.lesson.pages().iter().position(|p| p.id == id)?;
+        self.goto_page(i);
+        Some(i)
+    }
+
+    // --------------------------------------------------------- clipboard
+
+    /// Self-contained copy of items on the current page: item data plus the
+    /// Smart Object bundles and image assets they reference.
+    pub fn export_items(&self, ids: &[ItemId]) -> Clip {
+        let want: HashSet<&str> = ids.iter().map(String::as_str).collect();
+        let mut clip = Clip::default();
+        for it in self.scene.ordered() {
+            if !want.contains(it.id.as_str()) {
+                continue;
+            }
+            match &it.data {
+                ItemData::Object(o) => {
+                    if let Some(b) = self.pkg.objects.get(&o.bundle) {
+                        clip.bundles.insert(o.bundle.clone(), b.clone());
+                    }
+                }
+                ItemData::Image(i) => {
+                    if let Some(a) = self.pkg.assets.get(&i.asset) {
+                        clip.assets.insert(i.asset.clone(), a.clone());
+                    }
+                }
+                _ => {}
+            }
+            clip.items.push((it.data.clone(), it.group.clone()));
+        }
+        clip.bounds = self.scene.bounds_of(ids);
+        clip
+    }
+
+    /// [`Engine::export_items`] as clipboard JSON (bundle files and assets
+    /// base64-encoded), so a paste works in another lesson or tab.
+    pub fn export_items_json(&self, ids: &[ItemId]) -> String {
+        self.export_items(ids).to_json()
+    }
+
+    /// Add a clip's items to the current page, moved by `(dx, dy)`, as one
+    /// undo step. Bundles and assets are merged into the package (equal
+    /// bundles are shared, clashing ids renamed). The new items become the
+    /// selection; returns their ids.
+    pub fn import_items(
+        &mut self,
+        clip: Clip,
+        dx: f64,
+        dy: f64,
+        now_ms: f64,
+    ) -> Result<Vec<ItemId>, String> {
+        if self.read_only {
+            return Err(READ_ONLY.into());
+        }
+        if !(dx.is_finite() && dy.is_finite()) {
+            return Err("invalid offset".into());
+        }
+        let mut bundle_ids: HashMap<String, String> = HashMap::new();
+        for (id, bundle) in clip.bundles {
+            let errors: Vec<String> = bundle
+                .validate()
+                .into_iter()
+                .filter(|d| d.severity == rupok_format::Severity::Error)
+                .map(|d| d.message)
+                .collect();
+            if !errors.is_empty() {
+                return Err(errors.join("\n"));
+            }
+            let target = if self.pkg.objects.get(&id) == Some(&bundle) {
+                id.clone()
+            } else if let Some((k, _)) = self.pkg.objects.iter().find(|(_, b)| **b == bundle) {
+                k.clone()
+            } else {
+                let base = slug(&id, "object");
+                let mut k = base.clone();
+                let mut n = 2;
+                while self.pkg.objects.contains_key(&k) {
+                    k = format!("{base}-{n}");
+                    n += 1;
+                }
+                self.pkg.objects.insert(k.clone(), bundle);
+                k
+            };
+            bundle_ids.insert(id, target);
+        }
+        let mut asset_names: HashMap<String, String> = HashMap::new();
+        for (name, bytes) in clip.assets {
+            let ext = name.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
+            asset_names.insert(name.clone(), self.pkg.add_asset(bytes, ext));
+        }
+        // Copies form their own groups, apart from the originals.
+        let mut groups: HashMap<String, String> = HashMap::new();
+        let mut list: Vec<NewItem> = Vec::with_capacity(clip.items.len());
+        for (i, (mut data, group)) in clip.items.into_iter().enumerate() {
+            let keep = match &mut data {
+                ItemData::Stroke(s) => {
+                    s.offset = [s.offset[0] + dx as f32, s.offset[1] + dy as f32];
+                    true
+                }
+                ItemData::Text(t) => {
+                    t.geom.x += dx;
+                    t.geom.y += dy;
+                    true
+                }
+                ItemData::Image(img) => {
+                    img.geom.x += dx;
+                    img.geom.y += dy;
+                    if let Some(n) = asset_names.get(&img.asset) {
+                        img.asset = n.clone();
+                    }
+                    self.pkg.assets.contains_key(&img.asset)
+                }
+                ItemData::Object(o) => {
+                    o.geom.x += dx;
+                    o.geom.y += dy;
+                    if let Some(b) = bundle_ids.get(&o.bundle) {
+                        o.bundle = b.clone();
+                    }
+                    self.pkg.objects.contains_key(&o.bundle)
+                }
+            };
+            if keep {
+                let group = group.map(|g| {
+                    groups
+                        .entry(g)
+                        .or_insert_with(|| self.lesson.new_group_id())
+                        .clone()
+                });
+                // 1 ms apart keeps the clip's order in the replay timeline.
+                list.push(NewItem {
+                    data,
+                    created: now_ms + i as f64,
+                    group,
+                });
+            }
+        }
+        let ids = self
+            .lesson
+            .add_items(&self.page.clone(), &list)
+            .map_err(|e| e.to_string())?;
+        self.resync();
+        self.selection = ids.clone();
+        self.bump();
+        Ok(ids)
+    }
+
+    /// Parse clipboard JSON (untrusted: from the system clipboard or another
+    /// tab) and [`Engine::import_items`] it.
+    pub fn import_items_json(
+        &mut self,
+        json: &str,
+        dx: f64,
+        dy: f64,
+        now_ms: f64,
+    ) -> Result<Vec<ItemId>, String> {
+        if self.read_only {
+            return Err(READ_ONLY.into());
+        }
+        let clip = Clip::from_json(json)?;
+        self.import_items(clip, dx, dy, now_ms)
+    }
+
+    /// Copy items in place, offset by `(dx, dy)`; the copies become the
+    /// selection. One undo step.
+    pub fn duplicate_items(
+        &mut self,
+        ids: &[ItemId],
+        dx: f64,
+        dy: f64,
+        now_ms: f64,
+    ) -> Vec<ItemId> {
+        let clip = self.export_items(ids);
+        if clip.items.is_empty() {
+            return Vec::new();
+        }
+        self.import_items(clip, dx, dy, now_ms).unwrap_or_default()
     }
 
     /// Place a Smart Object (single-file HTML). Returns the item id, or the
@@ -1042,6 +1853,9 @@ impl<S: InkSink> Engine<S> {
         steps: u32,
         now_ms: f64,
     ) -> Result<ItemId, String> {
+        if self.read_only {
+            return Err(READ_ONLY.into());
+        }
         let bundle = ObjectBundle::from_single_html(html, title, w, h, steps);
         let errors: Vec<String> = bundle
             .validate()
@@ -1052,24 +1866,7 @@ impl<S: InkSink> Engine<S> {
         if !errors.is_empty() {
             return Err(errors.join("\n"));
         }
-        let mut slug: String = title
-            .chars()
-            .map(|c| {
-                if c.is_ascii_alphanumeric() {
-                    c.to_ascii_lowercase()
-                } else {
-                    '-'
-                }
-            })
-            .collect::<String>()
-            .split('-')
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<_>>()
-            .join("-");
-        slug.truncate(40);
-        if slug.is_empty() {
-            slug = "object".into();
-        }
+        let slug = slug(title, "object");
         let mut bundle_id = slug.clone();
         let mut n = 2;
         while self.pkg.objects.contains_key(&bundle_id) {
@@ -1100,7 +1897,14 @@ impl<S: InkSink> Engine<S> {
         }
     }
 
-    fn add_box_item(&mut self, data: ItemData, now_ms: f64) -> Result<ItemId, rupok_core::CoreError> {
+    fn add_box_item(
+        &mut self,
+        data: ItemData,
+        now_ms: f64,
+    ) -> Result<ItemId, rupok_core::CoreError> {
+        if self.read_only {
+            return Err(rupok_core::CoreError::Corrupt(READ_ONLY.into()));
+        }
         let id = self.lesson.add_item(&self.page.clone(), &data, now_ms)?;
         self.resync();
         self.selection = vec![id.clone()];
@@ -1132,6 +1936,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn set_text(&mut self, id: &str, text: &str, h: Option<f64>) {
+        if self.read_only {
+            return;
+        }
         let page = self.page.clone();
         if text.trim().is_empty() {
             let _ = self.lesson.remove_items(&page, &[id.to_string()]);
@@ -1159,6 +1966,9 @@ impl<S: InkSink> Engine<S> {
         h: f64,
         now_ms: f64,
     ) -> Option<ItemId> {
+        if self.read_only {
+            return None;
+        }
         let asset = self.pkg.add_asset(bytes, ext);
         let geom = self.centered_geom(w, h);
         self.add_box_item(ItemData::Image(ImageData { geom, asset }), now_ms)
@@ -1166,11 +1976,17 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn set_object_step(&mut self, id: &str, step: u32) {
+        if self.read_only {
+            return;
+        }
         let _ = self.lesson.set_object_step(&self.page.clone(), id, step);
         self.resync();
     }
 
     pub fn set_object_state(&mut self, id: &str, state: &str) {
+        if self.read_only {
+            return;
+        }
         // State saves are frequent and not user actions; no revision bump needed
         // beyond the scene refresh.
         let _ = self.lesson.set_object_state(&self.page.clone(), id, state);
@@ -1180,6 +1996,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn undo(&mut self) -> bool {
+        if self.read_only {
+            return false;
+        }
         let ok = self.lesson.undo().unwrap_or(false);
         if ok {
             self.resync();
@@ -1188,6 +2007,9 @@ impl<S: InkSink> Engine<S> {
     }
 
     pub fn redo(&mut self) -> bool {
+        if self.read_only {
+            return false;
+        }
         let ok = self.lesson.redo().unwrap_or(false);
         if ok {
             self.resync();
@@ -1309,6 +2131,81 @@ impl<S: InkSink> Engine<S> {
         serde_json::to_string(&self.lesson.pages()).unwrap_or_else(|_| "[]".into())
     }
 
+    /// A light drawing list for the page thumbnail at `index`: stroke
+    /// polylines decimated to at most `max_points` points (offset applied),
+    /// plus box item rects, in stacking order. `"null"` for a bad index.
+    pub fn page_preview_json(&self, index: usize, max_points: usize) -> String {
+        let Ok(id) = self.lesson.page_id_at(index) else {
+            return "null".into();
+        };
+        let Ok(info) = self.lesson.page(&id) else {
+            return "null".into();
+        };
+        let items = self.lesson.items(&id).unwrap_or_default();
+        let max_points = max_points.max(2);
+        let r1 = |v: f64| (v * 10.0).round() / 10.0;
+        let mut bounds: Option<[f32; 4]> = None;
+        let mut out = Vec::with_capacity(items.len());
+        for it in &items {
+            let b = it.data.aabb();
+            bounds = Some(match bounds {
+                None => b,
+                Some(a) => [
+                    a[0].min(b[0]),
+                    a[1].min(b[1]),
+                    a[2].max(b[2]),
+                    a[3].max(b[3]),
+                ],
+            });
+            let rect = |g: &BoxGeom| [r1(g.x), r1(g.y), r1(g.w), r1(g.h)];
+            out.push(match &it.data {
+                ItemData::Stroke(s) => {
+                    let n = s.points.len();
+                    let step = n.div_ceil(max_points).max(1);
+                    let mut pts = Vec::with_capacity((n / step + 2) * 2);
+                    let mut push = |p: &StrokePoint| {
+                        pts.push(r1(f64::from(p.x + s.offset[0])));
+                        pts.push(r1(f64::from(p.y + s.offset[1])));
+                    };
+                    for p in s.points.iter().step_by(step) {
+                        push(p);
+                    }
+                    if n > 1 && (n - 1) % step != 0 {
+                        push(&s.points[n - 1]);
+                    }
+                    PreviewItem::Stroke {
+                        color: css_color(s.color),
+                        width: s.width,
+                        opacity: s.opacity,
+                        pts,
+                    }
+                }
+                ItemData::Text(t) => PreviewItem::Text {
+                    rect: rect(&t.geom),
+                    text: &t.text,
+                    size: t.size,
+                    color: css_color(t.color),
+                },
+                ItemData::Image(i) => PreviewItem::Image {
+                    rect: rect(&i.geom),
+                    asset: &i.asset,
+                },
+                ItemData::Object(o) => PreviewItem::Object {
+                    rect: rect(&o.geom),
+                    title: &o.title,
+                },
+            });
+        }
+        serde_json::to_string(&Preview {
+            frame: info.frame,
+            bg: info.bg_color,
+            pattern: info.pattern.as_str(),
+            bounds,
+            items: out,
+        })
+        .unwrap_or_else(|_| "null".into())
+    }
+
     /// World-space bounds of the selection (with live drag offset), or None.
     pub fn selection_bounds(&self) -> Option<[f32; 4]> {
         self.scene.bounds_of(&self.selection).map(|b| {
@@ -1341,7 +2238,17 @@ impl<S: InkSink> Engine<S> {
         let zoom = self.camera.zoom;
         for g in self.gestures.values() {
             match g {
-                Gesture::Ink { builder, predicted } => {
+                Gesture::Ink {
+                    builder,
+                    hold:
+                        smart::Hold {
+                            snapped: Some(h), ..
+                        },
+                    ..
+                } => wet.extend(Self::held_wet(builder, h)),
+                Gesture::Ink {
+                    builder, predicted, ..
+                } => {
                     let mut pts = builder.points().to_vec();
                     pts.extend_from_slice(predicted);
                     let st = builder.style;
@@ -1370,7 +2277,9 @@ impl<S: InkSink> Engine<S> {
                         opacity: 0.9,
                     });
                 }
-                Gesture::Shape { kind, start, end } => {
+                Gesture::Shape {
+                    kind, start, end, ..
+                } => {
                     let st = self.shape_style;
                     wet.push(WetStroke {
                         points: shape_points(*kind, *start, *end, st.width),
@@ -1391,6 +2300,7 @@ impl<S: InkSink> Engine<S> {
         for l in &self.lasers {
             wet.push(laser_wet(&l.points, now_ms, zoom));
         }
+        self.flash_wet(now_ms, &mut wet);
         if let Some(r) = &self.replay
             && let Some(w) = r.partial()
         {
@@ -1415,7 +2325,10 @@ impl<S: InkSink> Engine<S> {
                 r.playing = false;
             }
         }
-        if !self.lasers.is_empty()
+        let snapped = self.hold_tick(now_ms);
+        if snapped
+            || !self.lasers.is_empty()
+            || !self.flashes.is_empty()
             || self
                 .gestures
                 .values()
@@ -1516,6 +2429,12 @@ pub(crate) mod tests {
         }
         fn finish_load(&mut self) {
             self.loads += 1;
+        }
+    }
+
+    impl Engine<MockSink> {
+        fn can_undo_for_tests(&self) -> bool {
+            self.lesson.can_undo()
         }
     }
 
@@ -1690,6 +2609,691 @@ pub(crate) mod tests {
         assert_eq!(e2.object_html("hello-world").unwrap(), "<h1>Hello</h1>");
         let dom: serde_json::Value = serde_json::from_str(&e2.dom_items_json()).unwrap();
         assert_eq!(dom[0]["step"], 2);
+    }
+
+    fn select_rect(e: &mut Engine<MockSink>, a: [f32; 2], b: [f32; 2]) {
+        e.set_tool(ToolKind::Lasso);
+        e.pointer_down(9, a[0], a[1], 0.5, 0.0, PointerKind::Mouse, 0, 0.0);
+        e.pointer_move(
+            9,
+            &[
+                f64::from(b[0]),
+                f64::from(a[1]),
+                0.5,
+                1.0,
+                f64::from(b[0]),
+                f64::from(b[1]),
+                0.5,
+                2.0,
+                f64::from(a[0]),
+                f64::from(b[1]),
+                0.5,
+                3.0,
+            ],
+            &[],
+            0.0,
+        );
+        e.pointer_up(9, 0.0);
+    }
+
+    const PNG: &[u8] = b"\x89PNG\r\n\x1a\nnot-really-an-image";
+
+    #[test]
+    fn stroke_created_is_pen_down_time() {
+        let mut e = engine();
+        e.pointer_down(1, 100.0, 100.0, 0.5, 0.0, PointerKind::Pen, 0, 1_000.0);
+        e.pointer_move(1, &[200.0, 120.0, 0.5, 400.0], &[], 1_400.0);
+        e.pointer_up(1, 3_000.0);
+        e.set_tool(ToolKind::Shape(ShapeKind::Rect));
+        e.pointer_down(2, 100.0, 300.0, 0.5, 0.0, PointerKind::Mouse, 0, 5_000.0);
+        e.pointer_move(2, &[300.0, 400.0, 0.5, 10.0], &[], 5_500.0);
+        e.pointer_up(2, 6_000.0);
+        let items = e.lesson.items(&e.page.clone()).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].created, 1_000.0, "pen-down, not pen-up");
+        assert_eq!(items[1].created, 5_000.0, "shapes too");
+        assert_eq!(e.scene.get(&items[0].id).unwrap().created, 1_000.0);
+    }
+
+    #[test]
+    fn drawing_dismisses_a_leftover_selection() {
+        let mut e = engine();
+        e.add_image(PNG.to_vec(), "png", 200.0, 100.0, 1.0).unwrap();
+        assert_eq!(e.selection().len(), 1, "a placed item is selected");
+        draw(&mut e, 1, PointerKind::Pen, [10.0, 10.0], [60.0, 10.0]);
+        assert!(e.selection().is_empty());
+    }
+
+    #[test]
+    fn copy_paste_round_trips_into_another_lesson() {
+        let mut a = engine();
+        draw(
+            &mut a,
+            1,
+            PointerKind::Mouse,
+            [100.0, 100.0],
+            [300.0, 140.0],
+        );
+        let obj = a
+            .add_object_html("<h1>Quiz</h1>", "Quiz", 400.0, 300.0, 3, 5.0)
+            .unwrap();
+        a.set_object_step(&obj, 2);
+        let img = a.add_image(PNG.to_vec(), "png", 200.0, 100.0, 6.0).unwrap();
+        a.select_all();
+        let ids = a.selection().to_vec();
+        assert_eq!(ids.len(), 3);
+        let json = a.export_items_json(&ids);
+        assert!(json.starts_with(r#"{"rupok":"clipboard/v1""#));
+
+        let mut b = engine();
+        let pasted = b.import_items_json(&json, 24.0, 24.0, 100.0).unwrap();
+        assert_eq!(pasted.len(), 3);
+        assert_eq!(
+            b.selection(),
+            pasted.as_slice(),
+            "pasted items are selected"
+        );
+        assert_eq!(b.sink.strokes.len(), 1);
+        let src = a.lesson.items(&a.page.clone()).unwrap();
+        let dst = b.lesson.items(&b.page.clone()).unwrap();
+        assert_eq!(dst.len(), 3);
+        for (s, d) in src.iter().zip(&dst) {
+            let (sb, db) = (s.data.aabb(), d.data.aabb());
+            assert!((db[0] - sb[0] - 24.0).abs() < 1e-3 && (db[1] - sb[1] - 24.0).abs() < 1e-3);
+            assert_eq!(s.data.kind(), d.data.kind(), "stacking order kept");
+        }
+        match (&src[0].data, &dst[0].data) {
+            (ItemData::Stroke(x), ItemData::Stroke(y)) => assert_eq!(x.points, y.points),
+            _ => panic!("stroke first"),
+        }
+        let ItemData::Object(o) = &dst[1].data else {
+            panic!()
+        };
+        assert_eq!(o.step, 2);
+        assert_eq!(b.object_html(&o.bundle).unwrap(), "<h1>Quiz</h1>");
+        let ItemData::Image(i) = &dst[2].data else {
+            panic!()
+        };
+        assert_eq!(b.asset(&i.asset).unwrap(), PNG);
+        assert!(dst.windows(2).all(|w| w[0].created < w[1].created));
+        // One undo step removes the whole paste.
+        assert!(b.undo());
+        assert!(b.lesson.items(&b.page.clone()).unwrap().is_empty());
+        // The pasted lesson saves and reloads with its bundle and asset.
+        assert!(b.redo());
+        let mut c = engine();
+        c.load(&b.save(200.0).unwrap()).unwrap();
+        assert_eq!(c.lesson.items(&c.page.clone()).unwrap().len(), 3);
+        assert!(c.asset(&i.asset).is_some());
+        let _ = img;
+    }
+
+    #[test]
+    fn paste_shares_equal_bundles_and_renames_clashes() {
+        let mut a = engine();
+        let id = a
+            .add_object_html("<p>one</p>", "Widget", 400.0, 300.0, 0, 1.0)
+            .unwrap();
+        let json = a.export_items_json(std::slice::from_ref(&id));
+        // Same lesson: the equal bundle is reused.
+        a.import_items_json(&json, 24.0, 24.0, 2.0).unwrap();
+        assert_eq!(a.pkg.objects.len(), 1);
+        // Another lesson already has a different "widget" bundle.
+        let mut b = engine();
+        b.add_object_html("<p>two</p>", "Widget", 400.0, 300.0, 0, 1.0)
+            .unwrap();
+        let ids = b.import_items_json(&json, 0.0, 0.0, 2.0).unwrap();
+        assert_eq!(b.pkg.objects.len(), 2);
+        let ItemData::Object(o) = b.lesson.item(&b.page.clone(), &ids[0]).unwrap().data else {
+            panic!()
+        };
+        assert_eq!(o.bundle, "widget-2");
+        assert_eq!(b.object_html("widget-2").unwrap(), "<p>one</p>");
+        assert_eq!(b.object_html("widget").unwrap(), "<p>two</p>");
+    }
+
+    #[test]
+    fn paste_rejects_bad_clipboards_without_panicking() {
+        let mut e = engine();
+        for bad in [
+            "",
+            "not json",
+            "{}",
+            r#"{"rupok":"clipboard/v9","items":[]}"#,
+            r#"{"rupok":"clipboard/v1","items":[{"kind":"stroke","tool":"pen","color":1,"width":2,"opacity":1,"pts":"!!"}]}"#,
+            r#"{"rupok":"clipboard/v1","items":[{"kind":"stroke","tool":"pen","color":1,"width":2,"opacity":1,"pts":"YWJj"}]}"#,
+            r#"{"rupok":"clipboard/v1","items":[{"kind":"teleporter"}]}"#,
+            r#"{"rupok":"clipboard/v1","items":[],"bundles":{"x":{"manifest":{"schema":1,"title":"x","size":{"w":1,"h":1}},"files":{"../evil":"YQ=="}}}}"#,
+        ] {
+            assert!(e.import_items_json(bad, 0.0, 0.0, 1.0).is_err(), "{bad}");
+        }
+        // A bundle that fails validation (remote script) is refused.
+        let mut a = engine();
+        let id = a
+            .add_object_html("<p>ok</p>", "Ok", 400.0, 300.0, 0, 1.0)
+            .unwrap();
+        let json = a.export_items_json(&[id]).replace(
+            &b64::encode(b"<p>ok</p>"),
+            &b64::encode(br#"<script src="https://cdn.example.com/x.js"></script>"#),
+        );
+        assert!(e.import_items_json(&json, 0.0, 0.0, 1.0).is_err());
+        assert!(e.lesson.items(&e.page.clone()).unwrap().is_empty());
+        assert!(!e.can_undo_for_tests());
+    }
+
+    #[test]
+    fn duplicate_items_offsets_and_selects_the_copies() {
+        let mut e = engine();
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 100.0],
+            [300.0, 100.0],
+        );
+        let obj = e
+            .add_object_html("<p>x</p>", "X", 400.0, 300.0, 0, 1.0)
+            .unwrap();
+        let sel = vec![obj.clone()];
+        let copies = e.duplicate_items(&sel, 24.0, 24.0, 10.0);
+        assert_eq!(copies.len(), 1);
+        assert_eq!(e.selection(), copies.as_slice());
+        let (ItemData::Object(a), ItemData::Object(b)) = (
+            e.lesson.item(&e.page.clone(), &obj).unwrap().data,
+            e.lesson.item(&e.page.clone(), &copies[0]).unwrap().data,
+        ) else {
+            panic!()
+        };
+        assert_eq!((b.geom.x - a.geom.x, b.geom.y - a.geom.y), (24.0, 24.0));
+        assert_eq!(a.bundle, b.bundle, "bundle shared, not copied");
+        assert_eq!(e.pkg.objects.len(), 1);
+        assert!(
+            e.duplicate_items(&["missing".into()], 24.0, 24.0, 11.0)
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn page_preview_decimates_strokes_and_lists_boxes() {
+        let mut e = engine();
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 100.0],
+            [600.0, 300.0],
+        );
+        e.add_image(PNG.to_vec(), "png", 200.0, 100.0, 1.0).unwrap();
+        e.add_object_html("<p>x</p>", "Lab", 400.0, 300.0, 0, 2.0)
+            .unwrap();
+        let sid = e.lesson.items(&e.page.clone()).unwrap()[0].id.clone();
+        e.move_items(&[sid], 10.0, 0.0);
+        let v: serde_json::Value = serde_json::from_str(&e.page_preview_json(0, 4)).unwrap();
+        assert_eq!(v["frame"]["w"], 1920.0);
+        assert_eq!(v["bg"], 0xffffffffu32);
+        let items = v["items"].as_array().unwrap();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0]["kind"], "stroke");
+        let pts = items[0]["pts"].as_array().unwrap();
+        assert!(
+            pts.len() >= 4 && pts.len() <= 10,
+            "decimated: {}",
+            pts.len()
+        );
+        let ItemData::Stroke(s) = &e.lesson.items(&e.page.clone()).unwrap()[0].data else {
+            panic!()
+        };
+        let first = s.points[0].x + s.offset[0];
+        assert!(
+            (pts[0].as_f64().unwrap() - f64::from(first)).abs() < 0.06,
+            "offset applied"
+        );
+        let last = s.points.last().unwrap();
+        let n = pts.len();
+        assert!((pts[n - 2].as_f64().unwrap() - f64::from(last.x + s.offset[0])).abs() < 0.06);
+        assert_eq!(items[1]["kind"], "image");
+        assert!(items[1]["asset"].as_str().unwrap().ends_with(".png"));
+        assert_eq!(items[1]["rect"][2], 200.0);
+        assert_eq!(items[2]["kind"], "object");
+        assert_eq!(items[2]["title"], "Lab");
+        assert!(v["bounds"].is_array());
+        assert_eq!(e.page_preview_json(7, 4), "null");
+    }
+
+    #[test]
+    fn duplicate_page_copies_items_and_keeps_bundles() {
+        let mut e = engine();
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 100.0],
+            [300.0, 100.0],
+        );
+        e.add_object_html("<p>x</p>", "X", 400.0, 300.0, 0, 1.0)
+            .unwrap();
+        e.add_image(PNG.to_vec(), "png", 200.0, 100.0, 2.0).unwrap();
+        e.add_page(true, Pattern::Plain);
+        assert_eq!(e.duplicate_page(0), Some(1));
+        assert_eq!(e.page_index(), 1, "shows the copy");
+        assert_eq!(e.lesson.page_count(), 3);
+        assert_eq!(e.stroke_count(), 3);
+        assert_eq!(e.sink.strokes.len(), 1);
+        let dom: serde_json::Value = serde_json::from_str(&e.dom_items_json()).unwrap();
+        assert_eq!(dom[0]["bundle"], "x");
+        // Delete the original page: the copy still saves with its bundle and asset.
+        e.goto_page(0);
+        e.delete_page();
+        let mut f = engine();
+        f.load(&e.save(10.0).unwrap()).unwrap();
+        assert_eq!(f.stroke_count(), 3);
+        assert_eq!(f.object_html("x").unwrap(), "<p>x</p>");
+        assert_eq!(f.pkg.assets.len(), 1);
+        assert_eq!(e.duplicate_page(9), None);
+    }
+
+    #[test]
+    fn read_only_rejects_every_edit_but_allows_viewing() {
+        let mut e = engine();
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 100.0],
+            [300.0, 100.0],
+        );
+        let obj = e
+            .add_object_html("<p>x</p>", "X", 400.0, 300.0, 2, 1.0)
+            .unwrap();
+        e.add_page(true, Pattern::Plain);
+        e.goto_page(0);
+        let bytes = e.save(5.0).unwrap();
+        let mut v = engine();
+        v.set_read_only(true);
+        assert!(v.read_only());
+        v.load(&bytes).unwrap();
+        let rev = v.lesson.version();
+        let cam = v.camera;
+        for tool in [
+            ToolKind::Pen,
+            ToolKind::Eraser,
+            ToolKind::Shape(ShapeKind::Rect),
+        ] {
+            v.set_tool(tool);
+            draw(
+                &mut v,
+                1,
+                PointerKind::Mouse,
+                [100.0, 100.0],
+                [300.0, 100.0],
+            );
+        }
+        assert_ne!(v.camera, cam, "dragging pans instead of drawing");
+        assert_eq!(v.stroke_count(), 2);
+        let all: Vec<ItemId> = v.scene.ordered().iter().map(|i| i.id.clone()).collect();
+        v.select(all.clone());
+        v.delete_selection();
+        v.move_items(&all, 5.0, 5.0);
+        v.bring_to_front_many(&all);
+        v.set_object_step(&obj, 1);
+        v.set_object_state(&obj, "{}");
+        v.set_geom(&obj, BoxGeom::default());
+        v.clear_page();
+        v.set_background(Pattern::Grid, 0);
+        v.set_title("hacked");
+        v.add_page(true, Pattern::Plain);
+        v.move_page(0, 1);
+        v.delete_page();
+        assert!(v.duplicate_page(0).is_none());
+        assert!(v.add_text(10.0, 10.0, "x", 40.0, 1.0).is_none());
+        assert!(v.add_image(PNG.to_vec(), "png", 10.0, 10.0, 1.0).is_none());
+        assert!(
+            v.add_object_html("<p>y</p>", "Y", 10.0, 10.0, 0, 1.0)
+                .is_err()
+        );
+        let json = e.export_items_json(&all);
+        assert!(v.import_items_json(&json, 0.0, 0.0, 1.0).is_err());
+        assert!(v.duplicate_items(&all, 1.0, 1.0, 1.0).is_empty());
+        assert!(!v.undo() && !v.redo());
+        assert_eq!(v.lesson.version(), rev, "the document is untouched");
+        assert_eq!(v.lesson.page_count(), 2);
+        // Viewing still works.
+        assert!(v.goto_page(1));
+        assert!(v.goto_page(0));
+        let d = v.replay_start();
+        assert!(d >= 0.0);
+        v.replay_seek(d, 0.0);
+        assert_eq!(v.sink.strokes.len(), 1);
+        v.replay_stop();
+        v.set_read_only(false);
+        draw(
+            &mut v,
+            1,
+            PointerKind::Mouse,
+            [100.0, 300.0],
+            [300.0, 300.0],
+        );
+        assert_eq!(v.stroke_count(), 3);
+    }
+
+    #[test]
+    fn bring_to_front_many_and_resize_text() {
+        let mut e = engine();
+        let t = e.add_text(10.0, 10.0, "Hi", 40.0, 1.0).unwrap();
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 100.0],
+            [300.0, 100.0],
+        );
+        e.bring_to_front_many(std::slice::from_ref(&t));
+        let top = e.scene.ordered().last().unwrap().id.clone();
+        assert_eq!(top, t);
+        e.resize_text(
+            &t,
+            BoxGeom {
+                x: 1.0,
+                y: 2.0,
+                w: 900.0,
+                h: 90.0,
+                rot: 0.0,
+            },
+            60.0,
+        );
+        let dom: serde_json::Value = serde_json::from_str(&e.dom_items_json()).unwrap();
+        assert_eq!(dom[0]["size"], 60.0);
+        assert_eq!(dom[0]["w"], 900.0);
+        e.resize_text(&t, BoxGeom::default(), f64::NAN);
+        let dom: serde_json::Value = serde_json::from_str(&e.dom_items_json()).unwrap();
+        assert_eq!(dom[0]["size"], 60.0, "invalid size ignored");
+    }
+
+    #[test]
+    fn lasso_selection_exports_strokes_only_once() {
+        let mut e = engine();
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 100.0],
+            [200.0, 100.0],
+        );
+        select_rect(&mut e, [50.0, 50.0], [250.0, 150.0]);
+        let mut ids = e.selection().to_vec();
+        ids.push(ids[0].clone());
+        let clip = e.export_items(&ids);
+        assert_eq!(clip.items.len(), 1);
+        // The point codec quantises once; after that the JSON is stable.
+        let once = Clip::from_json(&clip.to_json()).unwrap();
+        assert_eq!(Clip::from_json(&once.to_json()).unwrap(), once);
+        assert_eq!(once.bounds, clip.bounds);
+    }
+
+    fn item_geom(e: &Engine<MockSink>, id: &str) -> BoxGeom {
+        match e.lesson.item(&e.page.clone(), id).unwrap().data {
+            ItemData::Object(o) => o.geom,
+            ItemData::Image(i) => i.geom,
+            ItemData::Text(t) => t.geom,
+            ItemData::Stroke(_) => panic!("not a box"),
+        }
+    }
+
+    fn screen_of(e: &Engine<MockSink>, g: &BoxGeom, fx: f64, fy: f64) -> [f32; 2] {
+        let (x, y) = e
+            .camera
+            .world_to_screen((g.x + g.w * fx) as f32, (g.y + g.h * fy) as f32);
+        [x, y]
+    }
+
+    #[test]
+    fn press_and_drag_selects_and_moves_a_box_in_one_gesture() {
+        for kind in [PointerKind::Mouse, PointerKind::Pen, PointerKind::Touch] {
+            let mut e = engine();
+            // A pen was used before: palm rejection must not stop a finger in Select.
+            draw(&mut e, 1, PointerKind::Pen, [20.0, 20.0], [60.0, 20.0]);
+            let id = e
+                .add_object_html("<p>x</p>", "X", 400.0, 300.0, 0, 1.0)
+                .unwrap();
+            e.select(vec![]);
+            e.set_tool(ToolKind::Lasso);
+            let g0 = item_geom(&e, &id);
+            let p = screen_of(&e, &g0, 0.5, 0.5);
+            draw(&mut e, 2, kind, p, [p[0] + 100.0, p[1] + 40.0]);
+            assert_eq!(
+                e.selection(),
+                std::slice::from_ref(&id),
+                "{kind:?}: selected"
+            );
+            let g1 = item_geom(&e, &id);
+            let z = f64::from(e.camera.zoom);
+            assert!((g1.x - g0.x - 100.0 / z).abs() < 0.5, "{kind:?}: moved");
+            assert!((g1.y - g0.y - 40.0 / z).abs() < 0.5);
+            assert!(e.undo(), "one move is one undo step");
+            assert_eq!(item_geom(&e, &id), g0);
+            // A plain click selects too.
+            e.select(vec![]);
+            e.pointer_down(3, p[0], p[1], 0.5, 0.0, kind, 0, 0.0);
+            e.pointer_up(3, 0.0);
+            assert_eq!(e.selection(), std::slice::from_ref(&id));
+            assert_eq!(item_geom(&e, &id), g0, "a click does not move");
+        }
+    }
+
+    #[test]
+    fn page_sized_boxes_still_let_a_lasso_start_on_them() {
+        let mut e = engine();
+        let bg = e
+            .add_image(PNG.to_vec(), "png", 1920.0, 1080.0, 1.0)
+            .unwrap();
+        e.move_items(
+            std::slice::from_ref(&bg),
+            -item_geom(&e, &bg).x,
+            -item_geom(&e, &bg).y,
+        );
+        let s = {
+            draw(
+                &mut e,
+                1,
+                PointerKind::Mouse,
+                [500.0, 300.0],
+                [600.0, 300.0],
+            );
+            e.lesson.items(&e.page.clone()).unwrap()[1].id.clone()
+        };
+        e.select(vec![]);
+        select_rect(&mut e, [450.0, 250.0], [650.0, 350.0]);
+        assert_eq!(
+            e.selection(),
+            std::slice::from_ref(&s),
+            "lasso over a PDF slide"
+        );
+        assert_eq!(item_geom(&e, &bg).x, 0.0, "the slide did not move");
+        e.select(vec![]);
+        e.pointer_down(1, 300.0, 600.0, 0.5, 0.0, PointerKind::Mouse, 0, 0.0);
+        e.pointer_up(1, 0.0);
+        assert_eq!(
+            e.selection(),
+            std::slice::from_ref(&bg),
+            "a click selects the slide"
+        );
+    }
+
+    #[test]
+    fn a_second_finger_turns_a_gesture_into_a_pinch() {
+        let mut e = engine();
+        e.pointer_down(1, 300.0, 300.0, 0.5, 0.0, PointerKind::Touch, 0, 0.0);
+        e.pointer_move(1, &[320.0, 300.0, 0.5, 1.0], &[], 0.0);
+        e.pointer_down(2, 600.0, 300.0, 0.5, 0.0, PointerKind::Touch, 0, 0.0);
+        let z0 = e.camera.zoom;
+        e.pointer_move(2, &[700.0, 300.0, 0.5, 2.0], &[], 0.0);
+        e.pointer_move(2, &[800.0, 300.0, 0.5, 3.0], &[], 0.0);
+        e.pointer_up(1, 0.0);
+        e.pointer_up(2, 0.0);
+        assert!(e.camera.zoom > z0, "pinch zooms");
+        assert_eq!(e.stroke_count(), 0, "the half-drawn stroke is dropped");
+        assert!(e.sink.wet.is_empty());
+    }
+
+    #[test]
+    fn groups_select_move_delete_and_ungroup_together() {
+        let mut e = engine();
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 100.0],
+            [200.0, 100.0],
+        );
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 400.0],
+            [200.0, 400.0],
+        );
+        let obj = e
+            .add_object_html("<p>x</p>", "X", 200.0, 100.0, 0, 1.0)
+            .unwrap();
+        let all: Vec<ItemId> = e.scene.ordered().iter().map(|i| i.id.clone()).collect();
+        // Group the first stroke and the object.
+        e.select(vec![all[0].clone(), obj.clone()]);
+        let g = e.group_selection().unwrap();
+        let meta: serde_json::Value = serde_json::from_str(&e.selection_meta_json()).unwrap();
+        assert_eq!(meta["grouped"], true);
+        assert_eq!(
+            (meta["strokes"].as_u64(), meta["boxes"].as_u64()),
+            (Some(1), Some(1))
+        );
+        // A click on one member selects the whole group.
+        e.select(vec![]);
+        e.set_tool(ToolKind::Lasso);
+        e.pointer_down(1, 150.0, 100.0, 0.5, 0.0, PointerKind::Mouse, 0, 0.0);
+        e.pointer_up(1, 0.0);
+        let mut sel = e.selection().to_vec();
+        sel.sort();
+        let mut want = vec![all[0].clone(), obj.clone()];
+        want.sort();
+        assert_eq!(sel, want);
+        // Dragging a member moves the group.
+        let g0 = item_geom(&e, &obj);
+        draw(
+            &mut e,
+            2,
+            PointerKind::Mouse,
+            [150.0, 100.0],
+            [250.0, 100.0],
+        );
+        assert!(
+            item_geom(&e, &obj).x > g0.x,
+            "the object moved with the stroke"
+        );
+        // A lasso around part of a group takes the whole group.
+        e.select(vec![]);
+        select_rect(&mut e, [180.0, 80.0], [320.0, 130.0]);
+        assert_eq!(
+            e.selection().len(),
+            2,
+            "the stroke (moved +100) pulls in the object"
+        );
+        // Copies form a new group of their own.
+        let sel = e.selection().to_vec();
+        let copies = e.duplicate_items(&sel, 24.0, 24.0, 5.0);
+        let cg = e.scene.get(&copies[0]).unwrap().group.clone().unwrap();
+        assert_ne!(cg, g);
+        assert!(
+            copies
+                .iter()
+                .all(|c| e.scene.get(c).unwrap().group.as_deref() == Some(&cg))
+        );
+        // Ungroup: members select alone again.
+        e.select(vec![obj.clone()]);
+        assert_eq!(e.selection().len(), 2);
+        assert_eq!(e.ungroup_selection(), 1);
+        e.select(vec![obj.clone()]);
+        assert_eq!(e.selection(), std::slice::from_ref(&obj));
+        // Delete takes a whole group.
+        e.select(vec![copies[0].clone()]);
+        e.delete_selection();
+        assert!(copies.iter().all(|c| e.scene.get(c).is_none()));
+        assert!(e.group_selection().is_none(), "needs two or more items");
+    }
+
+    #[test]
+    fn merge_strokes_moves_and_erases_as_one_and_mixed_merge_groups() {
+        let mut e = engine();
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 100.0],
+            [300.0, 100.0],
+        );
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 200.0],
+            [300.0, 200.0],
+        );
+        draw(
+            &mut e,
+            1,
+            PointerKind::Mouse,
+            [100.0, 500.0],
+            [300.0, 500.0],
+        );
+        select_rect(&mut e, [50.0, 50.0], [350.0, 250.0]);
+        assert_eq!(e.selection().len(), 2);
+        assert_eq!(e.merge_selection(), "merged");
+        e.set_tool(ToolKind::Eraser);
+        draw(&mut e, 2, PointerKind::Mouse, [200.0, 80.0], [200.0, 120.0]);
+        assert_eq!(e.stroke_count(), 1, "erasing one merged stroke erases both");
+        assert!(e.undo());
+        assert_eq!(e.stroke_count(), 3);
+        // Mixed selection: grouped instead.
+        e.add_object_html("<p>x</p>", "X", 200.0, 100.0, 0, 1.0)
+            .unwrap();
+        e.select_all();
+        assert_eq!(e.merge_selection(), "grouped");
+        e.select(vec![]);
+        assert_eq!(e.merge_selection(), "none");
+    }
+
+    #[test]
+    fn fit_margin_zero_makes_the_slide_touch_the_screen() {
+        let mut e = engine();
+        e.set_view(1920.0, 1080.0);
+        e.fit_page();
+        assert!(e.camera.zoom < 0.98, "default fit keeps a margin");
+        e.set_fit_margin(0.0);
+        e.fit_page();
+        let c = e.camera;
+        assert!((c.zoom - 1.0).abs() < 1e-6 && c.x.abs() < 1e-3 && c.y.abs() < 1e-3);
+        // A 16:10 window: the width limits, the page is centred vertically.
+        e.set_view(1280.0, 800.0);
+        e.fit_page();
+        let (l, t) = e.camera.world_to_screen(0.0, 0.0);
+        let (r, b) = e.camera.world_to_screen(1920.0, 1080.0);
+        assert!(
+            l.abs() < 0.01 && (r - 1280.0).abs() < 0.01,
+            "touches left and right"
+        );
+        assert!(
+            (t - 40.0).abs() < 0.01 && (800.0 - b - 40.0).abs() < 0.01,
+            "even letterbox"
+        );
+        // Page changes keep the margin; the explicit form ignores it.
+        e.add_page(true, Pattern::Plain);
+        assert!((e.camera.world_to_screen(1920.0, 0.0).0 - 1280.0).abs() < 0.01);
+        e.fit_page_margin(0.03);
+        assert!(e.camera.world_to_screen(0.0, 0.0).0 > 10.0);
+        e.set_fit_margin(f32::NAN);
+        e.fit_page();
+        assert!(
+            e.camera.world_to_screen(0.0, 0.0).0 > 10.0,
+            "NaN falls back to the default"
+        );
     }
 
     #[test]

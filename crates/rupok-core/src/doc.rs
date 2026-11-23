@@ -288,6 +288,57 @@ impl Lesson {
         Ok(())
     }
 
+    /// Copy a page with all of its items right after it, as one change.
+    /// Returns the new page id.
+    ///
+    /// The copy is made at the document level, so it keeps every key and
+    /// item, including ones this build does not understand (spec §
+    /// Versioning, rule 3). Items get fresh ids but keep their `z`,
+    /// `created` and their references (`bundle`, `asset`), so a copied
+    /// page replays like the original.
+    pub fn duplicate_page(&mut self, page_id: &str) -> Result<PageId> {
+        let idx = self.page_index(page_id)?;
+        let src = self.page_map(page_id)?;
+        let src_items = self.items_map(page_id)?;
+        let mut keys: Vec<(String, LoroValue)> = Vec::new();
+        if let LoroValue::Map(all) = src.get_deep_value() {
+            for (k, v) in all.iter() {
+                if k != "id" && k != "items" {
+                    keys.push((k.clone(), v.clone()));
+                }
+            }
+        }
+        let mut entries: Vec<(LoroValue, bool)> = Vec::new();
+        src_items.for_each(|_, v| {
+            let container = matches!(v, ValueOrContainer::Container(_));
+            entries.push((v.get_deep_value(), container));
+        });
+        let id = self.new_id();
+        let page = self
+            .pages_list()
+            .insert_container(idx + 1, LoroMap::new())?;
+        page.insert("id", id.as_str())?;
+        for (k, v) in keys {
+            page.insert(&k, v)?;
+        }
+        let items = page.insert_container("items", LoroMap::new())?;
+        for (v, container) in entries {
+            let item_id = self.new_id();
+            if container {
+                let m = items.insert_container(&item_id, LoroMap::new())?;
+                if let LoroValue::Map(fields) = v {
+                    for (k, fv) in fields.iter() {
+                        m.insert(k, fv.clone())?;
+                    }
+                }
+            } else {
+                items.insert(&item_id, v)?;
+            }
+        }
+        self.doc.commit();
+        Ok(id)
+    }
+
     // --------------------------------------------------------------- items
 
     fn next_z(&mut self, page_id: &str, items: &LoroMap) -> f64 {
@@ -318,14 +369,52 @@ impl Lesson {
     /// independently.
     pub fn add_item(&mut self, page_id: &str, data: &ItemData, now_ms: f64) -> Result<ItemId> {
         let items = self.items_map(page_id)?;
+        let id = self.insert_item(page_id, &items, data, now_ms, None)?;
+        self.doc.commit();
+        Ok(id)
+    }
+
+    /// Add several items on top of the page, in order (the first ends up
+    /// lowest), as **one** change: a paste or duplicate is one undo step.
+    /// Each entry carries its own `created` time and optional group.
+    pub fn add_items(&mut self, page_id: &str, list: &[NewItem]) -> Result<Vec<ItemId>> {
+        let items = self.items_map(page_id)?;
+        let mut ids = Vec::with_capacity(list.len());
+        for it in list {
+            ids.push(self.insert_item(
+                page_id,
+                &items,
+                &it.data,
+                it.created,
+                it.group.as_deref(),
+            )?);
+        }
+        if !ids.is_empty() {
+            self.doc.commit();
+        }
+        Ok(ids)
+    }
+
+    /// Write one item without committing.
+    fn insert_item(
+        &mut self,
+        page_id: &str,
+        items: &LoroMap,
+        data: &ItemData,
+        created: f64,
+        group: Option<&str>,
+    ) -> Result<ItemId> {
         let id = self.new_id();
-        let z = self.next_z(page_id, &items);
+        let z = self.next_z(page_id, items);
         match data {
             ItemData::Stroke(_) => {
                 let mut f = ValueFields::default();
                 f.set("kind", data.kind());
                 f.set("z", z);
-                f.set("created", now_ms);
+                f.set("created", created);
+                if let Some(g) = group {
+                    f.set("group", g);
+                }
                 write_item_data(&mut f, data)?;
                 items.insert(&id, f.into_value())?;
             }
@@ -333,12 +422,70 @@ impl Lesson {
                 let m = items.insert_container(&id, LoroMap::new())?;
                 m.insert("kind", data.kind())?;
                 m.insert("z", z)?;
-                m.insert("created", now_ms)?;
+                m.insert("created", created)?;
+                if let Some(g) = group {
+                    m.insert("group", g)?;
+                }
                 write_item_data(&mut MapFields(&m), data)?;
             }
         }
-        self.doc.commit();
         Ok(id)
+    }
+
+    /// A fresh group id (unique in the document).
+    pub fn new_group_id(&mut self) -> String {
+        format!("g{}", self.new_id())
+    }
+
+    /// Put items in one new group (replacing any group they were in), as
+    /// one change. Returns the group id.
+    pub fn group_items(&mut self, page_id: &str, ids: &[ItemId]) -> Result<String> {
+        let g = self.new_group_id();
+        self.set_group(page_id, ids, Some(&g))?;
+        Ok(g)
+    }
+
+    /// Dissolve a group: its items stay, ungrouped. One change; returns how
+    /// many items were in the group.
+    pub fn ungroup(&mut self, page_id: &str, group: &str) -> Result<usize> {
+        let ids: Vec<ItemId> = self
+            .items(page_id)?
+            .into_iter()
+            .filter(|i| i.group.as_deref() == Some(group))
+            .map(|i| i.id)
+            .collect();
+        if !ids.is_empty() {
+            self.set_group(page_id, &ids, None)?;
+        }
+        Ok(ids.len())
+    }
+
+    /// Set or clear the `group` key on items, as one change.
+    pub fn set_group(&mut self, page_id: &str, ids: &[ItemId], group: Option<&str>) -> Result<()> {
+        let items = self.items_map(page_id)?;
+        for id in ids {
+            match items.get(id) {
+                Some(ValueOrContainer::Value(LoroValue::Map(v))) => {
+                    let mut f = ValueFields::from(&v);
+                    match group {
+                        Some(g) => f.set("group", g),
+                        None => f.remove("group"),
+                    }
+                    items.insert(id, f.into_value())?;
+                }
+                Some(ValueOrContainer::Container(Container::Map(m))) => match group {
+                    Some(g) => m.insert("group", g)?,
+                    None => {
+                        if m.get("group").is_some() {
+                            m.delete("group")?;
+                        }
+                    }
+                },
+                _ => return Err(CoreError::ItemNotFound(id.clone())),
+            }
+        }
+        self.doc.commit();
+        Ok(())
     }
 
     pub fn remove_items(&mut self, page_id: &str, ids: &[ItemId]) -> Result<usize> {
@@ -393,19 +540,107 @@ impl Lesson {
     }
 
     pub fn bring_to_front(&mut self, page_id: &str, id: &str) -> Result<()> {
+        self.bring_items_to_front(page_id, &[id.to_string()])
+    }
+
+    /// Raise several items above everything else on the page, keeping their
+    /// order relative to each other, as one change.
+    pub fn bring_items_to_front(&mut self, page_id: &str, ids: &[ItemId]) -> Result<()> {
         let items = self.items_map(page_id)?;
-        let z = self.next_z(page_id, &items);
-        match items.get(id) {
-            Some(ValueOrContainer::Value(LoroValue::Map(v))) => {
-                let mut f = ValueFields::from(&v);
-                f.set("z", z);
-                items.insert(id, f.into_value())?;
+        let mut order: Vec<(f64, &ItemId)> = Vec::with_capacity(ids.len());
+        for id in ids {
+            let z = match items.get(id) {
+                Some(ValueOrContainer::Value(LoroValue::Map(v))) => f64_of(&v, "z"),
+                Some(ValueOrContainer::Container(Container::Map(m))) => f64_of(&m, "z"),
+                _ => return Err(CoreError::ItemNotFound(id.clone())),
+            };
+            order.push((z.unwrap_or(0.0), id));
+        }
+        order.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(b.1)));
+        order.dedup_by(|a, b| a.1 == b.1);
+        for (_, id) in order {
+            let z = self.next_z(page_id, &items);
+            match items.get(id) {
+                Some(ValueOrContainer::Value(LoroValue::Map(v))) => {
+                    let mut f = ValueFields::from(&v);
+                    f.set("z", z);
+                    items.insert(id, f.into_value())?;
+                }
+                Some(ValueOrContainer::Container(Container::Map(m))) => m.insert("z", z)?,
+                _ => return Err(CoreError::ItemNotFound(id.clone())),
             }
-            Some(ValueOrContainer::Container(Container::Map(m))) => m.insert("z", z)?,
-            _ => return Err(CoreError::ItemNotFound(id.to_string())),
         }
         self.doc.commit();
         Ok(())
+    }
+
+    /// Resize a text item: new box and font size in one change.
+    pub fn resize_text(&mut self, page_id: &str, id: &str, g: BoxGeom, size: f64) -> Result<()> {
+        let m = item_map(&self.items_map(page_id)?, id)?;
+        if str_of(&m, "kind").as_deref() != Some("text") {
+            return Err(CoreError::ItemNotFound(id.to_string()));
+        }
+        write_geom(&m, &g)?;
+        m.insert("size", size)?;
+        self.doc.commit();
+        Ok(())
+    }
+
+    /// Rewrite strokes in place (points, style, `shape`, `geom`, offset) and
+    /// remove items, as **one** change: a Smart Ink snap or a shape resize is
+    /// one undo step, and undo brings the previous strokes back. A rewritten
+    /// stroke keeps its id, `z`, `created`, `group` and any keys this build
+    /// does not know.
+    pub fn edit_strokes(
+        &mut self,
+        page_id: &str,
+        replace: &[(ItemId, StrokeData)],
+        remove: &[ItemId],
+    ) -> Result<()> {
+        let items = self.items_map(page_id)?;
+        for (id, data) in replace {
+            let Some(ValueOrContainer::Value(LoroValue::Map(v))) = items.get(id) else {
+                return Err(CoreError::ItemNotFound(id.clone()));
+            };
+            if v.get("kind") != Some(&LoroValue::from("stroke")) {
+                return Err(CoreError::ItemNotFound(id.clone()));
+            }
+            let mut f = ValueFields::from(&v);
+            for key in ["ox", "oy", "shape", "geom"] {
+                f.remove(key);
+            }
+            write_item_data(&mut f, &ItemData::Stroke(data.clone()))?;
+            items.insert(id, f.into_value())?;
+        }
+        for id in remove {
+            if items.get(id).is_some() {
+                items.delete(id)?;
+            }
+        }
+        if !replace.is_empty() || !remove.is_empty() {
+            self.doc.commit();
+        }
+        Ok(())
+    }
+
+    /// Remove items and add one new item on top, as **one** change (ink
+    /// converted to text: one undo brings the ink back). Returns the new id.
+    pub fn replace_items(
+        &mut self,
+        page_id: &str,
+        remove: &[ItemId],
+        add: &ItemData,
+        created: f64,
+    ) -> Result<ItemId> {
+        let items = self.items_map(page_id)?;
+        for id in remove {
+            if items.get(id).is_some() {
+                items.delete(id)?;
+            }
+        }
+        let id = self.insert_item(page_id, &items, add, created, None)?;
+        self.doc.commit();
+        Ok(id)
     }
 
     pub fn set_text(&mut self, page_id: &str, id: &str, text: &str) -> Result<()> {
@@ -445,8 +680,13 @@ impl Lesson {
         };
         let mut out = Vec::with_capacity(all.len());
         for (k, v) in all.iter() {
-            if let LoroValue::Map(fields) = v {
-                out.push(read_item(k, fields)?);
+            // Forward compatibility (spec § Versioning): an item this build
+            // cannot read (unknown kind, undecodable points) is skipped, not
+            // fatal. It stays in the document untouched.
+            if let LoroValue::Map(fields) = v
+                && let Ok(item) = read_item(k, fields)
+            {
+                out.push(item);
             }
         }
         out.sort_by(|a, b| a.z.total_cmp(&b.z).then_with(|| a.id.cmp(&b.id)));
@@ -599,6 +839,9 @@ impl ValueFields {
     fn set(&mut self, key: &str, v: impl Into<LoroValue>) {
         self.0.insert(key.to_string(), v.into());
     }
+    fn remove(&mut self, key: &str) {
+        self.0.remove(key);
+    }
     fn into_value(self) -> LoroValue {
         LoroValue::from(self.0)
     }
@@ -649,6 +892,9 @@ fn write_item_data(m: &mut impl FieldsMut, data: &ItemData) -> loro::LoroResult<
             if let Some(shape) = &s.shape {
                 m.insert("shape", shape.as_str())?;
             }
+            if let Some(g) = s.geom.as_ref().filter(|g| g.is_valid()) {
+                m.insert("geom", shape_geom_value(g))?;
+            }
         }
         ItemData::Text(t) => {
             write_geom_to(m, &t.geom)?;
@@ -673,6 +919,59 @@ fn write_item_data(m: &mut impl FieldsMut, data: &ItemData) -> loro::LoroResult<
     Ok(())
 }
 
+/// The `geom` map of a shape stroke.
+fn shape_geom_value(g: &ShapeGeom) -> LoroValue {
+    let mut f = ValueFields::default();
+    f.set("kind", g.kind.as_str());
+    f.set("x", g.x);
+    f.set("y", g.y);
+    f.set("w", g.w);
+    f.set("h", g.h);
+    if g.rot != 0.0 {
+        f.set("rot", g.rot);
+    }
+    if !g.v.is_empty() {
+        f.set(
+            "v",
+            LoroValue::from(
+                g.v.iter()
+                    .map(|&x| LoroValue::Double(x))
+                    .collect::<Vec<_>>(),
+            ),
+        );
+    }
+    f.into_value()
+}
+
+/// Read `geom`; anything malformed reads as absent (the points still draw).
+fn read_shape_geom(m: &impl Fields) -> Option<ShapeGeom> {
+    let LoroValue::Map(g) = value_of(m, "geom")? else {
+        return None;
+    };
+    let v = match g.get("v") {
+        Some(LoroValue::List(l)) if l.len() <= 2 * ShapeGeom::MAX_VERTICES => l
+            .iter()
+            .map(|x| match x {
+                LoroValue::Double(d) => Some(*d),
+                LoroValue::I64(i) => Some(*i as f64),
+                _ => None,
+            })
+            .collect::<Option<Vec<f64>>>()?,
+        Some(_) => return None,
+        None => Vec::new(),
+    };
+    let geom = ShapeGeom {
+        kind: str_of(&g, "kind")?,
+        x: f64_of(&g, "x")?,
+        y: f64_of(&g, "y")?,
+        w: f64_of(&g, "w")?,
+        h: f64_of(&g, "h")?,
+        rot: f64_of(&g, "rot").unwrap_or(0.0),
+        v,
+    };
+    geom.is_valid().then_some(geom)
+}
+
 fn read_item(id: &str, m: &impl Fields) -> Result<Item> {
     let kind =
         str_of(m, "kind").ok_or_else(|| CoreError::Corrupt(format!("item {id} has no kind")))?;
@@ -695,6 +994,7 @@ fn read_item(id: &str, m: &impl Fields) -> Result<Item> {
                     f64_of(m, "oy").unwrap_or(0.0) as f32,
                 ],
                 shape: str_of(m, "shape"),
+                geom: read_shape_geom(m),
             })
         }
         "text" => ItemData::Text(TextData {
@@ -724,6 +1024,7 @@ fn read_item(id: &str, m: &impl Fields) -> Result<Item> {
         id: id.to_string(),
         z: f64_of(m, "z").unwrap_or(0.0),
         created: f64_of(m, "created").unwrap_or(0.0),
+        group: str_of(m, "group").filter(|g| !g.is_empty()),
         data,
     })
 }
@@ -749,6 +1050,7 @@ mod tests {
                 .collect(),
             offset: [0.0, 0.0],
             shape: None,
+            geom: None,
         })
     }
 
@@ -804,6 +1106,100 @@ mod tests {
         assert_eq!(l.items(&p).unwrap().len(), 1);
         assert!(l.redo().unwrap());
         assert_eq!(l.items(&p).unwrap().len(), 2);
+    }
+
+    fn shape_stroke() -> StrokeData {
+        let ItemData::Stroke(mut s) = stroke(100.0) else {
+            unreachable!()
+        };
+        // Exact under the codec's pressure quantisation.
+        s.points.iter_mut().for_each(|q| q.p = 1.0);
+        s.shape = Some("triangle".into());
+        s.geom = Some(ShapeGeom {
+            kind: "poly".into(),
+            x: 100.0,
+            y: 0.0,
+            w: 40.0,
+            h: 30.0,
+            rot: 0.25,
+            v: vec![0.5, 0.0, 1.0, 1.0, 0.0, 1.0],
+        });
+        s
+    }
+
+    #[test]
+    fn shape_geom_round_trips_and_bad_geom_reads_as_absent() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let s = shape_stroke();
+        let id = l.add_item(&p, &ItemData::Stroke(s.clone()), 1.0).unwrap();
+        let back = Lesson::load(&l.save()).unwrap().item(&p, &id).unwrap();
+        assert_eq!(back.data, ItemData::Stroke(s.clone()));
+        // A move keeps geom (it lives in the points' frame).
+        l.translate_items(&p, std::slice::from_ref(&id), 5.0, 0.0)
+            .unwrap();
+        let ItemData::Stroke(moved) = l.item(&p, &id).unwrap().data else {
+            panic!()
+        };
+        assert_eq!(moved.geom, s.geom);
+        // Invalid geom is never written, and reads as None.
+        let mut bad = s.clone();
+        bad.geom.as_mut().unwrap().w = f64::NAN;
+        let id2 = l.add_item(&p, &ItemData::Stroke(bad), 2.0).unwrap();
+        let ItemData::Stroke(b) = l.item(&p, &id2).unwrap().data else {
+            panic!()
+        };
+        assert_eq!(b.geom, None);
+        assert_eq!(b.shape.as_deref(), Some("triangle"));
+    }
+
+    #[test]
+    fn edit_strokes_is_one_undo_step_and_keeps_identity() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let raw = l.add_item(&p, &stroke(0.0), 10.0).unwrap();
+        let other = l.add_item(&p, &stroke(50.0), 20.0).unwrap();
+        l.set_group(&p, std::slice::from_ref(&raw), Some("g1"))
+            .unwrap();
+        let before = l.item(&p, &raw).unwrap();
+        let shape = shape_stroke();
+        l.edit_strokes(
+            &p,
+            &[(raw.clone(), shape.clone())],
+            std::slice::from_ref(&other),
+        )
+        .unwrap();
+        let after = l.item(&p, &raw).unwrap();
+        assert_eq!(after.data, ItemData::Stroke(shape));
+        assert_eq!(
+            (after.z, after.created, after.group.as_deref()),
+            (before.z, 10.0, Some("g1"))
+        );
+        assert!(l.item(&p, &other).is_err());
+        // One undo restores the hand-drawn stroke and the removed one.
+        assert!(l.undo().unwrap());
+        assert_eq!(l.item(&p, &raw).unwrap().data, before.data);
+        assert!(l.item(&p, &other).is_ok());
+        // Box items cannot be rewritten as strokes.
+        let t = l.add_item(&p, &text_item(0.0), 30.0).unwrap();
+        assert!(l.edit_strokes(&p, &[(t, shape_stroke())], &[]).is_err());
+    }
+
+    #[test]
+    fn replace_items_swaps_ink_for_text_in_one_step() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let a = l.add_item(&p, &stroke(0.0), 1.0).unwrap();
+        let b = l.add_item(&p, &stroke(30.0), 2.0).unwrap();
+        let t = l
+            .replace_items(&p, &[a.clone(), b.clone()], &text_item(0.0), 3.0)
+            .unwrap();
+        let items = l.items(&p).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, t);
+        assert!(l.undo().unwrap());
+        let ids: Vec<String> = l.items(&p).unwrap().into_iter().map(|i| i.id).collect();
+        assert_eq!(ids, vec![a, b]);
     }
 
     #[test]
@@ -882,6 +1278,233 @@ mod tests {
         l.remove_page(&p1).unwrap();
         assert_eq!(l.page_count(), 1);
         assert_eq!(l.pages()[0].title, "two");
+    }
+
+    fn text_item(x: f64) -> ItemData {
+        ItemData::Text(TextData {
+            geom: BoxGeom {
+                x,
+                y: 10.0,
+                w: 300.0,
+                h: 60.0,
+                rot: 0.0,
+            },
+            text: "Hello".into(),
+            size: 40.0,
+            color: 0x112233ff,
+        })
+    }
+
+    #[test]
+    fn unknown_kinds_and_bad_points_are_skipped_not_fatal() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let good = l.add_item(&p, &stroke(0.0), 1.0).unwrap();
+        let items = l.items_map(&p).unwrap();
+        // A future item kind stored as a value…
+        let mut future = ValueFields::default();
+        future.set("kind", "hologram");
+        future.set("z", 5.0);
+        future.set("created", 2.0);
+        items.insert("future-1", future.into_value()).unwrap();
+        // …a future kind stored as a container…
+        let c = items.insert_container("future-2", LoroMap::new()).unwrap();
+        c.insert("kind", "sticker").unwrap();
+        c.insert("z", 6.0).unwrap();
+        // …an item without a kind…
+        let mut nokind = ValueFields::default();
+        nokind.set("z", 7.0);
+        items.insert("nokind", nokind.into_value()).unwrap();
+        // …and a stroke whose points use an unknown codec version.
+        let mut bad = ValueFields::default();
+        bad.set("kind", "stroke");
+        bad.set("z", 8.0);
+        bad.set("pts", LoroValue::Binary(vec![99u8, 1, 2, 3].into()));
+        items.insert("badpts", bad.into_value()).unwrap();
+        l.doc.commit();
+
+        let read = l.items(&p).unwrap();
+        assert_eq!(read.len(), 1, "only the readable item is returned");
+        assert_eq!(read[0].id, good);
+        assert_eq!(l.timeline(&p).unwrap().len(), 1);
+        // Unknown data survives a save/load round trip untouched.
+        let l2 = Lesson::load(&l.save()).unwrap();
+        assert_eq!(l2.items(&p).unwrap().len(), 1);
+        assert_eq!(l2.page(&p).unwrap().item_count, 5);
+        assert!(l2.item(&p, "future-1").is_err());
+    }
+
+    #[test]
+    fn add_items_is_one_undo_step_in_order() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        l.add_item(&p, &stroke(0.0), 1.0).unwrap();
+        let new = |data, created| NewItem {
+            data,
+            created,
+            group: None,
+        };
+        let ids = l
+            .add_items(&p, &[new(stroke(10.0), 5.0), new(text_item(0.0), 6.0)])
+            .unwrap();
+        assert_eq!(ids.len(), 2);
+        let items = l.items(&p).unwrap();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[1].id, ids[0]);
+        assert_eq!(items[2].id, ids[1]);
+        assert_eq!(items[2].created, 6.0);
+        assert!(l.undo().unwrap());
+        assert_eq!(l.items(&p).unwrap().len(), 1, "one undo removes the batch");
+        assert!(l.add_items(&p, &[]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn duplicate_page_copies_everything_after_the_source() {
+        let mut l = Lesson::new("t", 0.0);
+        let p1 = l.page_id_at(0).unwrap();
+        l.add_page(None, PageSpec::default()).unwrap();
+        l.set_page_title(&p1, "Intro").unwrap();
+        l.set_page_background(&p1, Pattern::Grid, 0x1f3b30ff)
+            .unwrap();
+        l.add_item(&p1, &stroke(0.0), 10.0).unwrap();
+        let obj = ItemData::Object(ObjectData {
+            geom: BoxGeom {
+                x: 1.0,
+                y: 2.0,
+                w: 3.0,
+                h: 4.0,
+                rot: 0.0,
+            },
+            bundle: "quiz".into(),
+            title: "Quiz".into(),
+            step: 2,
+            state: Some("{\"a\":1}".into()),
+        });
+        l.add_item(&p1, &obj, 20.0).unwrap();
+        let mut future = ValueFields::default();
+        future.set("kind", "hologram");
+        l.items_map(&p1)
+            .unwrap()
+            .insert("future", future.into_value())
+            .unwrap();
+        l.doc.commit();
+
+        let copy = l.duplicate_page(&p1).unwrap();
+        assert_eq!(l.page_count(), 3);
+        assert_eq!(l.page_id_at(1).unwrap(), copy, "inserted right after");
+        let info = l.page(&copy).unwrap();
+        assert_eq!(info.title, "Intro");
+        assert_eq!(info.pattern, Pattern::Grid);
+        assert_eq!(info.bg_color, 0x1f3b30ff);
+        assert_eq!(info.frame, Some(Frame::SLIDE_16_9));
+        assert_eq!(info.item_count, 3, "unknown items are copied too");
+        let a = l.items(&p1).unwrap();
+        let b = l.items(&copy).unwrap();
+        assert_eq!(b.len(), 2);
+        for (x, y) in a.iter().zip(&b) {
+            assert_ne!(x.id, y.id, "fresh ids");
+            assert_eq!(x.data, y.data);
+            assert_eq!(x.z, y.z);
+            assert_eq!(x.created, y.created);
+        }
+        // Box items stay editable containers in the copy.
+        l.set_object_step(&copy, &b[1].id, 3).unwrap();
+        assert!(matches!(&l.item(&p1, &a[1].id).unwrap().data, ItemData::Object(o) if o.step == 2));
+        assert!(l.undo().unwrap());
+        assert!(l.undo().unwrap());
+        assert_eq!(l.page_count(), 2, "duplicating is one undo step");
+    }
+
+    #[test]
+    fn bring_items_to_front_keeps_relative_order() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let a = l.add_item(&p, &stroke(0.0), 1.0).unwrap();
+        let b = l.add_item(&p, &text_item(0.0), 2.0).unwrap();
+        let c = l.add_item(&p, &stroke(5.0), 3.0).unwrap();
+        l.bring_items_to_front(&p, &[c.clone(), a.clone(), a.clone()])
+            .unwrap();
+        let order: Vec<_> = l.items(&p).unwrap().into_iter().map(|i| i.id).collect();
+        assert_eq!(order, vec![b, a, c]);
+        assert!(l.bring_items_to_front(&p, &["nope".into()]).is_err());
+    }
+
+    #[test]
+    fn resize_text_sets_box_and_size_in_one_change() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let t = l.add_item(&p, &text_item(0.0), 1.0).unwrap();
+        let g = BoxGeom {
+            x: 5.0,
+            y: 6.0,
+            w: 600.0,
+            h: 120.0,
+            rot: 0.0,
+        };
+        l.resize_text(&p, &t, g, 80.0).unwrap();
+        match l.item(&p, &t).unwrap().data {
+            ItemData::Text(td) => {
+                assert_eq!(td.geom, g);
+                assert_eq!(td.size, 80.0);
+            }
+            _ => panic!(),
+        }
+        assert!(l.undo().unwrap());
+        assert!(matches!(l.item(&p, &t).unwrap().data, ItemData::Text(td) if td.size == 40.0));
+        let s = l
+            .add_item(
+                &p,
+                &ItemData::Object(ObjectData {
+                    geom: g,
+                    bundle: "b".into(),
+                    title: String::new(),
+                    step: 0,
+                    state: None,
+                }),
+                2.0,
+            )
+            .unwrap();
+        assert!(l.resize_text(&p, &s, g, 10.0).is_err(), "only text items");
+    }
+
+    #[test]
+    fn groups_are_stored_on_items_and_dissolve_in_one_step() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let a = l.add_item(&p, &stroke(0.0), 1.0).unwrap();
+        let b = l.add_item(&p, &text_item(0.0), 2.0).unwrap();
+        let c = l.add_item(&p, &stroke(9.0), 3.0).unwrap();
+        let a_data = l.item(&p, &a).unwrap().data;
+        let g = l.group_items(&p, &[a.clone(), b.clone()]).unwrap();
+        let read = |l: &Lesson| -> Vec<Option<String>> {
+            l.items(&p).unwrap().into_iter().map(|i| i.group).collect()
+        };
+        assert_eq!(read(&l), vec![Some(g.clone()), Some(g.clone()), None]);
+        // Survives save/load; the stroke's points are untouched.
+        let l2 = Lesson::load(&l.save()).unwrap();
+        assert_eq!(read(&l2), read(&l));
+        assert_eq!(l2.item(&p, &a).unwrap().data, a_data);
+        // Regrouping moves items to a new group; ungroup dissolves it.
+        let g2 = l.group_items(&p, &[b.clone(), c.clone()]).unwrap();
+        assert_ne!(g, g2);
+        assert_eq!(l.ungroup(&p, &g2).unwrap(), 2);
+        assert_eq!(read(&l), vec![Some(g.clone()), None, None]);
+        assert!(l.undo().unwrap());
+        assert_eq!(read(&l), vec![Some(g), Some(g2.clone()), Some(g2)]);
+        assert_eq!(l.ungroup(&p, "nope").unwrap(), 0);
+        assert!(l.group_items(&p, &["missing".into()]).is_err());
+        // Batch adds can carry a group.
+        let ids = l
+            .add_items(
+                &p,
+                &[NewItem {
+                    data: stroke(1.0),
+                    created: 9.0,
+                    group: Some("gx".into()),
+                }],
+            )
+            .unwrap();
+        assert_eq!(l.item(&p, &ids[0]).unwrap().group.as_deref(), Some("gx"));
     }
 
     #[test]

@@ -1,8 +1,48 @@
 # Handwriting recognition (ink to text and math)
 
-`Status: 📋 planned · Phase 3 · Difficulty: advanced`
+`Status: 🚧 first version shipped (Smart Ink) · Phase 3 · Difficulty: advanced`
 
 Select handwritten ink and convert it to clean text or typeset maths, on-device where possible, with the teacher's AI agent as a fallback.
+
+## What shipped (Smart Ink, November 2026)
+
+- **To text** in the floating selection toolbar whenever the selection has
+  ink. The ink becomes a text item at the selection's position, with a font
+  size matched to the handwriting's line height and the ink's colour, as
+  **one undo step** (`Lesson::replace_items`; undo brings the strokes back with
+  their ids, points and `created`).
+- **Provider interface** in `apps/board/src/handwriting.ts`
+  (`HandwritingProvider { id, label, reads, available(), recognize(ink) }`):
+  - `chrome`: Chrome's built-in recognizer (`navigator.createHandwritingRecognizer`),
+    feature-detected, offline, ChromeOS only, English text, fed the strokes
+    with their timing.
+  - `claude`: Claude Opus 5.5 (`claude-opus-5-5`) with the teacher's own API key
+    (Settings → AI). The selection is rendered to a PNG (dark ink on white)
+    and sent browser-direct with the official SDK
+    (`@anthropic-ai/sdk`, `dangerouslyAllowBrowser`) using structured
+    output `{kind: "text" | "math", text, latex}` at low effort, with
+    server-side refusal fallbacks. Reads English, Bangla and maths. The key
+    is stored only in this browser's localStorage under its own entry,
+    never in prefs, the exported UI config, autosave or lesson files, and is
+    sent only to api.anthropic.com.
+  - `cloud`: a clearly marked stub for a future Rupok Cloud recognizer
+    (`available()` is false).
+  - With no provider available the button opens a short popover explaining
+    how to turn conversion on (add a key, or use a Chromebook) instead of
+    failing.
+- **Maths** becomes Unicode text (`x² + 3x − 4 = 0`): text items are plain
+  text and cannot render KaTeX. The LaTeX is returned by the Claude provider
+  for the math-object step below.
+- Engine API: `Board.selection_ink_json()` (strokes in writing order with
+  absolute point times) and `Board.replace_selection_with_text(text, x, y,
+  w, size)`.
+- Stroke `created` is the pen-down time, so the open question below about
+  pen-up times is settled.
+
+Not yet: the on-device ONNX models, the KaTeX math Smart Object
+(`replace_selection_with_object`), Windows Ink and Android backends, a
+candidate picker, and the MCP fallback tool. Shape recognition (Smart
+shapes, scratch-out) shipped alongside; see `crates/rupok-ink/src/recognize.rs`.
 
 ## Goal
 

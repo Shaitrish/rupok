@@ -62,28 +62,24 @@ node --test "packages/object-sdk/test/*.test.mjs"
 6. If the change touches the file format, the Smart Object protocol or the
    SDK API, update `spec/` in the same PR. A non-editorial spec change needs
    an accepted RFC.
-7. Sign off every commit (DCO, below) and open the PR. CI must be green.
+7. Open the PR. On your first PR, sign the Contributor License Agreement
+   (CLA, below); a bot will ask. CI must be green.
 
 Commit messages: an imperative subject of 72 characters or fewer, with an area
 prefix when it helps (`core: skip items with unknown kinds`), and a body that
 says why.
 
-## Developer Certificate of Origin (DCO)
+## Contributor License Agreement (CLA)
 
-Rupok does not use a CLA. Instead, every commit must be signed off to
-certify the [Developer Certificate of Origin 1.1](https://developercertificate.org/):
-that you wrote the change or have the right to submit it under the project's
-licenses.
+Before your first contribution can be merged, you sign the
+[Rupok Contributor License Agreement](CLA.md) once (individuals, or your
+employer for work done on its behalf). You keep the copyright in your work.
+The CLA lets Shaitrish distribute your contribution under the project's open
+source licenses and, if needed, under other licenses too. That is what lets
+Rupok stay free and open source while the hosted Rupok Cloud pays for its
+development.
 
-```sh
-git commit -s -m "render: cull empty chunks"
-```
-
-This adds a `Signed-off-by: Your Name <you@example.com>` line, using your real
-name. To sign off earlier commits: `git rebase --signoff main`. Pull requests
-with unsigned commits cannot be merged.
-
-Contributions are licensed under the license of the part they change (see
+Your contribution is published under the license of the part it changes (see
 [COPYING.md](COPYING.md)).
 
 ## RFCs

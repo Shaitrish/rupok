@@ -47,18 +47,27 @@ Use this package to:
 | `rupok.steps.setCount(n)` | Declare the step count at run time (0–500). |
 | `rupok.state.load()` | Saved JSON state, or `undefined`. |
 | `rupok.state.save(value)` | Persist a JSON value. Debounced 200 ms; over 256 KiB is dropped with a warning; ignored before `ready`. |
-| `rupok.theme.get(token, fallback)` | e.g. `get("color.accent", "#2563eb")` |
+| `rupok.theme.get(token, fallback)` | e.g. `get("color.accent", "#0ca678")` |
 | `rupok.theme.all()` / `.onChange(cb)` | Whole theme; change notifications. |
 | `rupok.quiz.submit({ questionId, answer, correct?, score? })` | Record an answer with the host. |
 | `rupok.resize(w, h)` | Ask for a new size (usually honoured only in edit mode). |
 | `rupok.log(level, ...args)` | Console plus host log. |
+| `rupok.tex(el, latex, { display })` | Typeset LaTeX into `el` with KaTeX. `\hl{…}` highlights a term. Re-rendering the same formula is free. |
+| `rupok.math.render(root)` / `.load()` | Typeset `$…$`, `$$…$$`, `\(…\)`, `\[…\]` and `[data-tex]` under `root`; load KaTeX now. |
+
+**Maths is built in.** Write `$E = mc^2$` (inline) or `$$\frac{a}{b}$$` (display)
+in your HTML and the SDK typesets it with the KaTeX the host ships, loading it
+only when the page has maths. Text in `<code>`, `<pre>` and `[data-no-math]` is left
+alone; `$5 and $10` stays text. Opt out with `<meta name="rupok-math" content="off">`.
 
 Theme tokens are also CSS variables on `:root`: `color.accent` becomes
 `--rupok-color-accent`, and so on. Defaults apply before `init`. Always give a
 fallback so the file renders without the SDK:
 
 ```css
-button { background: var(--rupok-color-accent, #2563eb); }
+button { background: var(--rupok-color-accent, #0ca678); color: var(--rupok-color-on-accent, #04241b); }
+.note { color: var(--rupok-color-accent-text, #087f5b); }   /* accent text: never color.accent */
+mark { background: var(--rupok-color-accent-soft, #e6fcf5); color: var(--rupok-color-accent-text, #087f5b); }
 ```
 
 ## Patterns

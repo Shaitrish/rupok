@@ -1,0 +1,51 @@
+/* Presets gallery in the Smart Object dialog (PresetGallery.tsx).
+ * Flat cards on the dialog surface: radius 14 with 8px padding, so the
+ * thumbnail's radius is 6 (concentric). Tokens come from styles.css. */
+
+.object-tabs { margin-bottom: var(--s4); }
+
+.preset-chips { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s3); }
+.preset-chip {
+  position: relative; height: 32px; padding: 0 var(--s3); border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--gray-a3); color: var(--text-2); font: 550 13px/16px var(--font);
+}
+.preset-chip::before { content: ""; position: absolute; inset: -4px 0; } /* 40px hit target */
+.preset-chip:hover { background: var(--gray-a4); color: var(--text); }
+.preset-chip[aria-pressed="true"] { background: var(--accent-3); color: var(--accent-11); }
+.preset-chip[aria-pressed="true"]:hover { background: var(--accent-4); }
+
+/* The cards' padding hangs into the dialog padding so thumbnails align with
+ * the chips and the header. */
+.preset-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s1);
+  margin: 0 calc(-1 * var(--s2));
+}
+.preset-card {
+  display: flex; flex-direction: column; min-width: 0; padding: var(--s2); border: 0; border-radius: 14px;
+  background: transparent; color: inherit; text-align: left; cursor: pointer;
+}
+.preset-card:hover { background: var(--hover); }
+.preset-card:active { background: var(--pressed); }
+.preset-card:disabled { cursor: progress; }
+
+.preset-thumb { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: var(--gray-a3); }
+.preset-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.preset-thumb::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.preset-card:hover .preset-thumb::after { box-shadow: inset 0 0 0 2px var(--accent-9); }
+
+.preset-title, .preset-summary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preset-title { margin-top: var(--s2); font: 600 14px/20px var(--font); color: var(--text); }
+.preset-summary { font: 450 13px/18px var(--font); color: var(--text-2); }
+.preset-meta { margin-top: var(--s1); font: 500 12px/16px var(--font); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* Dialog tab panels (Dialogs.tsx ObjectDialog): stacked in one cell, the
+ * hidden one keeps its layout so the dialog height never jumps. */
+.object-panels { display: grid; }
+.object-panel { grid-area: 1 / 1; min-width: 0; }
+.object-panel.off { visibility: hidden; }
+.object-panel.form { display: flex; flex-direction: column; }
+.object-panel.form .field.fill { flex: 1; }
+.object-panel.form .field.fill textarea { flex: 1; height: auto; min-height: 240px; }

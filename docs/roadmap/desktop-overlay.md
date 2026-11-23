@@ -1,6 +1,19 @@
 # Desktop overlay annotation
 
-`Status: 📋 planned · Phase 1 · Difficulty: advanced`
+`Status: 🚧 in progress · Phase 1 · Difficulty: advanced`
+
+> **Status (2026-11):** a first version ships in `apps/desktop`
+> (`src/overlay.rs`, `src/capture.rs`) and `apps/board/src/overlay/`. Done:
+> tasks 1–4 (transparent always-on-top ink window loading `/board/?overlay`,
+> pinned camera, draw / click-through modes, a separate toolbar window owned by
+> the ink window), the Ctrl+Shift+D toggle and Esc (part of 6), the screenshot
+> (part of 7) and Save to lesson (9). Differences from this plan: no
+> `overlay.html` entry, the board renders the overlay for `?overlay`; Save to
+> lesson composites screenshot + ink into one image in the webview and adds it
+> as a new page (no `Engine::add_page_from` yet, so strokes are not copied as
+> vectors); Linux capture uses a pure-Rust X11 `GetImage` (no PipeWire), and
+> on Wayland the app runs under XWayland and saves the ink only. Open: 5, 6
+> (editor, more shortcuts), 7 (freeze), 8, 10. See `apps/desktop/README.md`.
 
 Draw with the Rupok pen on top of anything on screen (PowerPoint, a browser, a video, a simulator), then click through to the app underneath or save the annotated screen as a slide.
 

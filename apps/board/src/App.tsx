@@ -7,8 +7,17 @@ import { ObjectDialog, SettingsDialog } from "./components/Dialogs";
 import { prefs, replay, toast, tool } from "./state";
 import { Icon, Mark } from "./components/Icon";
 import { APP_NAME, FILE_EXT, TAGLINE, WORDMARK } from "./brand";
+import { Suspense, lazy } from "solid-js";
+import { attachDesktopBridge } from "./platform";
+import { onLaunchFiles, takePendingLesson } from "./pending";
+import { overlayRole } from "./overlay/role";
+import { registerSettingsOpener } from "./components/ToText";
+
+const OverlayApp = lazy(() => import("./overlay/OverlayApp"));
 
 export default function App() {
+  // "Draw over any app": the desktop overlay windows, or /board/?overlay in a browser.
+  if (overlayRole) return <Suspense><OverlayApp role={overlayRole} /></Suspense>;
   let root!: HTMLDivElement;
   let canvas!: HTMLCanvasElement;
   let world!: HTMLDivElement;
@@ -18,6 +27,11 @@ export default function App() {
   const [error, setError] = createSignal<string | null>(null);
   const [objectDialog, setObjectDialog] = createSignal(false);
   const [settings, setSettings] = createSignal(false);
+  // "Open Settings" from the handwriting popover, scrolled to a section.
+  registerSettingsOpener((section) => {
+    setSettings(true);
+    if (section) requestAnimationFrame(() => document.getElementById(`settings-${section}`)?.scrollIntoView({ block: "start" }));
+  });
   const [dragging, setDragging] = createSignal(false);
 
   // Theme, accent and density are attributes on <html>; CSS tokens do the rest.
@@ -50,6 +64,9 @@ export default function App() {
         eraser.style.top = `${y}px`;
       };
       setReady(true);
+      attachDesktopBridge(controller); // desktop: files opened by the OS, overlay snapshots
+      onLaunchFiles((files) => void controller.importFiles(files)); // installed PWA: "Open with Rupok"
+      void takePendingLesson().then((f) => f && controller.importFiles([f])); // a file picked on /open/
     } catch (e: any) {
       console.error(e);
       setError(String(e?.message ?? e));

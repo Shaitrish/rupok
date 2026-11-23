@@ -37,14 +37,18 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 
 | Status | Item | Plan | Difficulty |
 |---|---|---|---|
-| 🚧 | Board UI in the browser (SolidJS): toolbar, pages, dialogs, design system | `apps/board`, [DESIGN.md](DESIGN.md) | |
+| ✅ | Board UI in the browser (SolidJS): toolbar, pages, dialogs, design system | `apps/board`, [DESIGN.md](DESIGN.md) | |
+| ✅ | Selection you can manipulate: frame, resize handles, one-gesture press-and-drag (mouse, pen, touch), floating toolbar | `apps/board/src/components/Selection.tsx` | |
+| ✅ | Copy, cut, paste, duplicate across lessons and tabs; group, ungroup, merge ink | `crates/rupok-wasm` (`export_items_json`, `import_items_json`, `group_selection`) | |
+| ✅ | Real page thumbnails; duplicate, reorder (drag) and delete pages | `crates/rupok-wasm` (`page_preview_json`, `duplicate_page`), `apps/board` | |
+| ✅ | Modes: Prepare, Teach (always-fitted slide, minimal chrome), Student view; per-mode chrome and toolbar, importable UI config | `apps/board/src/modes.ts`, [docs/ui-config.md](docs/ui-config.md) | |
 | 🚧 | PDF import in the browser: every PDF page becomes a slide you can write on (pdf.js) | `apps/board/src/pdf.ts` | |
 | 📋 | PDF import, native (CLI, MCP, desktop) | [pdf-import-native](docs/roadmap/pdf-import-native.md) | advanced |
 | 🚧 | Smart Object host: sandboxed iframes, CSP, SDK injection, bridge | `apps/board/src/objects.ts` | |
 | 🚧 | Save and open `.rpk`, autosave | `apps/board`, `crates/rupok-wasm` | |
 | 🚧 | Replay a page stroke by stroke (play, seek, speed) | `crates/rupok-wasm/src/replay.rs` | |
-| 📋 | Desktop app (Tauri 2) for Windows and Linux | [tauri-desktop](docs/roadmap/tauri-desktop.md) | intermediate |
-| 📋 | Desktop overlay: draw over any app on the screen | [desktop-overlay](docs/roadmap/desktop-overlay.md) | advanced |
+| 🚧 | Desktop app (Tauri 2) for Windows and Linux: shell, `.rpk` association, single instance, atomic save, installers in CI | [tauri-desktop](docs/roadmap/tauri-desktop.md), `apps/desktop` | intermediate |
+| 🚧 | Desktop overlay: draw over any app on the screen (ink, toolbar, click-through, save to lesson) | [desktop-overlay](docs/roadmap/desktop-overlay.md), `apps/desktop/src/overlay.rs` | advanced |
 | 🚧 | Touch and pen settings: palm rejection modes, smoothing, pressure curve | engine done; UI in `apps/board` | |
 | 🚧 | Themes: light/dark, accent colour, board colours | [DESIGN.md](DESIGN.md) | |
 
@@ -60,7 +64,7 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 | 📋 | Replay with audio | [replay-audio](docs/roadmap/replay-audio.md) | intermediate |
 | 📋 | Google Drive sync (Apache OpenDAL, `drive.file` scope, per-device Loro update logs) | [google-drive-sync](docs/roadmap/google-drive-sync.md) | advanced |
 | 📋 | LAN "send to board" from laptop or phone | [lan-send](docs/roadmap/lan-send.md) | intermediate |
-| 📋 | Web viewer (PWA): open any `.rpk` in a browser, offline | [web-viewer](docs/roadmap/web-viewer.md) | intermediate |
+| 🚧 | Web viewer (PWA): open any `.rpk` in a browser, offline. Read-only student view at `/board/?view` done; PWA and offline install to do | [web-viewer](docs/roadmap/web-viewer.md) | intermediate |
 | 📋 | Student annotation layers | [student-layers](docs/roadmap/student-layers.md) | advanced |
 | 📋 | Browser panel with clip-to-board | [browser-panel](docs/roadmap/browser-panel.md) | intermediate |
 | 📋 | Standalone HTML export: one file students can open anywhere | [standalone-html-export](docs/roadmap/standalone-html-export.md) | intermediate |
@@ -98,12 +102,12 @@ small and well-defined. The specs list them under "Conformance notes".
 | Issue | Where | Spec |
 |---|---|---|
 | `validate()` panics when a `//` follows non-ASCII text within 48 bytes (byte slicing in `remote_resources`). Use a char-boundary-safe window. | `crates/rupok-format/src/object.rs` | [smart-object § Conformance notes](spec/smart-object.md#conformance-notes) |
-| An item with an unknown `kind` (or undecodable `pts`) fails the whole page in `Lesson::items()`; it should be skipped. | `crates/rupok-core/src/doc.rs` | [rupok-format § Versioning](spec/rupok-format.md#versioning-and-forward-compatibility) |
+| ✅ Fixed: an item with an unknown `kind` (or undecodable `pts`) failed the whole page in `Lesson::items()`; it is now skipped. | `crates/rupok-core/src/doc.rs` | [rupok-format § Versioning](spec/rupok-format.md#versioning-and-forward-compatibility) |
 | `Package::read` accepts duplicate ZIP entry names (last wins); should reject. | `crates/rupok-format/src/package.rs` | [rupok-format § Size and count limits](spec/rupok-format.md#size-and-count-limits) |
 | `Package::read` does not check that `mimetype` is first or that `manifest.format == "rupok-lesson"`. | `crates/rupok-format/src/package.rs` | [rupok-format § Package layout](spec/rupok-format.md#package-layout) |
 | Unknown ZIP entries and manifest keys are dropped on rewrite; should be preserved. | `crates/rupok-format/src/package.rs` | [rupok-format § Versioning](spec/rupok-format.md#versioning-and-forward-compatibility) |
 | A bundle with a bad `manifest.json` fails the whole package; should be treated as missing. | `crates/rupok-format/src/package.rs` | [rupok-format § Smart Object bundles](spec/rupok-format.md#smart-object-bundles) |
-| A stroke's `created` is the pen-up time; the spec says pen-down. | `crates/rupok-wasm/src/engine.rs` | [rupok-format § Replay](spec/rupok-format.md#replay) |
+| ✅ Fixed: a stroke's `created` was the pen-up time; it is now pen-down, as the spec says. | `crates/rupok-wasm/src/engine.rs` | [rupok-format § Replay](spec/rupok-format.md#replay) |
 | Host: on `steps`, clamp the stored step and send `step`; ignore out-of-range `resize`; count state size in UTF-8 bytes; send `state: null` when empty. | `apps/board/src/objects.ts` | [smart-object § Host behaviour](spec/smart-object.md#host-behaviour) |
 
 ## Proposed format and protocol changes
@@ -118,7 +122,9 @@ Some overlap and must be reconciled in the RFCs.
 | `spec/library.md`: course, chapter and `kb/` layout | [course-library](docs/roadmap/course-library.md), [knowledge-base](docs/roadmap/knowledge-base.md) |
 | `layers/<peer>.loro` layout | [student-layers](docs/roadmap/student-layers.md) |
 | `locked` item key (background slides from PDFs) | [pdf-import-native](docs/roadmap/pdf-import-native.md) |
+| `group` item key (Group, Ungroup and Merge in the board). Implemented in `rupok-core` as an optional, forward-compatible key; `spec/rupok-format.md` still needs the row | board selection work |
 | `author` item key (who or which agent made an item) | [acp-agent-panel](docs/roadmap/acp-agent-panel.md) |
+| `geom` key on shape strokes (kind, box, rotation, normalised polygon vertices) so shapes resize at a constant line width, and new `shape` values (`circle`, `square`, `triangle`, `diamond`, `pentagon`, `hexagon`, `star`). Implemented in `rupok-core` as an optional, forward-compatible key and documented in `spec/rupok-format.md` (Shape geometry); needs the RFC | Smart Ink (board) |
 | `source_url` / `source_title` on images | [browser-panel](docs/roadmap/browser-panel.md) |
 | `recordings` root container (audio) | [replay-audio](docs/roadmap/replay-audio.md) |
 | `shape: "arc"` for compass strokes | [subject-tools](docs/roadmap/subject-tools.md) |

@@ -5,6 +5,9 @@ import { ACCENTS, prefs, setPrefs, type Prefs } from "../state";
 import { autosaveClear } from "../storage";
 import { downloadQuiz } from "./Chrome";
 import { Icon } from "./Icon";
+import { ModesSettings } from "./ModesSettings";
+import { SmartInkSettings } from "./SmartInkSettings";
+import { PresetGallery } from "./PresetGallery";
 import { APP_NAME, APP_SLUG } from "../brand";
 
 const SAMPLE = `<!doctype html>
@@ -78,6 +81,7 @@ function Dialog(props: { icon: any; title: string; sub: any; width?: number; onC
 }
 
 export function ObjectDialog(props: { onClose: () => void }) {
+  const [tab, setTab] = createSignal<"presets" | "html">("presets");
   const [html, setHtml] = createSignal("");
   const [title, setTitle] = createSignal("");
   const [steps, setSteps] = createSignal(0);
@@ -109,50 +113,63 @@ export function ObjectDialog(props: { onClose: () => void }) {
   return (
     <Dialog
       icon="object"
+      width={960}
       title="Add a Smart Object"
-      sub={<>Paste HTML your AI made — a diagram, simulation, quiz or game. It runs live on the board, offline and sandboxed, and you can write on top of it. Agents can also add objects for you through <code>{APP_SLUG} mcp</code>.</>}
+      sub={<>Start from a ready-made lesson, or paste HTML your AI made — a diagram, simulation, quiz or game. It runs live on the board, offline and sandboxed, and you can write on top of it. Agents can also add objects for you through <code>{APP_SLUG} mcp</code>.</>}
       onClose={props.onClose}
     >
-      <Show when={error()}>
-        <div class="error-box">{error()}</div>
-      </Show>
-      <div class="row">
-        <div class="field">
-          <label for="obj-title">Title</label>
-          <input id="obj-title" class="input" value={title()} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="e.g. TCP three-way handshake" />
-        </div>
-        <div class="field" style={{ flex: "0 0 120px" }}>
-          <label for="obj-steps">Steps</label>
-          <input id="obj-steps" class="input" type="number" min="0" max="500" value={steps()} onInput={(e) => setSteps(Number(e.currentTarget.value))} />
-        </div>
-        <div class="field" style={{ flex: "0 0 160px" }}>
-          <label for="obj-size">Size</label>
-          <select id="obj-size" value={size()} onChange={(e) => setSize(e.currentTarget.value)}>
-            <option value="1920x1080">Full slide</option>
-            <option value="1280x720">Large</option>
-            <option value="960x540">Medium</option>
-            <option value="640x480">Small</option>
-          </select>
-        </div>
+      <div class="object-tabs">
+        <Seg value={tab()} options={[["presets", "Presets"], ["html", "Your own HTML"]] as const} onChange={setTab} />
       </div>
-      <div class="field">
-        <label for="obj-html">HTML</label>
-        <textarea id="obj-html" value={html()} onInput={(e) => setHtml(e.currentTarget.value)} placeholder="<!doctype html> …" spellcheck={false} />
-      </div>
-      <div class="actions">
-        <button class="btn" onClick={() => { setHtml(SAMPLE); setTitle("Binary place values"); setSteps(8); setError(null); }}>
-          <Icon name="object" /><span class="label">Try a sample</span>
-        </button>
-        <button class="btn" onClick={loadFile}><Icon name="open" /><span class="label">Open .html</span></button>
-        <div class="grow" />
-        <button class="btn" onClick={props.onClose}>Cancel</button>
-        <button class="btn solid" disabled={!html().trim()} onClick={add}>Add to page</button>
+      {/* Both panels share one grid cell, so the dialog keeps its height
+          (and the HTML draft) when switching tabs. */}
+      <div class="object-panels">
+        <div class="object-panel" classList={{ off: tab() !== "presets" }}>
+          <PresetGallery onInserted={props.onClose} />
+        </div>
+        <div class="object-panel form" classList={{ off: tab() !== "html" }}>
+          <Show when={error()}>
+            <div class="error-box">{error()}</div>
+          </Show>
+          <div class="row">
+            <div class="field">
+              <label for="obj-title">Title</label>
+              <input id="obj-title" class="input" value={title()} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="e.g. TCP three-way handshake" />
+            </div>
+            <div class="field" style={{ flex: "0 0 120px" }}>
+              <label for="obj-steps">Steps</label>
+              <input id="obj-steps" class="input" type="number" min="0" max="500" value={steps()} onInput={(e) => setSteps(Number(e.currentTarget.value))} />
+            </div>
+            <div class="field" style={{ flex: "0 0 160px" }}>
+              <label for="obj-size">Size</label>
+              <select id="obj-size" value={size()} onChange={(e) => setSize(e.currentTarget.value)}>
+                <option value="1920x1080">Full slide</option>
+                <option value="1280x720">Large</option>
+                <option value="960x540">Medium</option>
+                <option value="640x480">Small</option>
+              </select>
+            </div>
+          </div>
+          <div class="field fill">
+            <label for="obj-html">HTML</label>
+            <textarea id="obj-html" value={html()} onInput={(e) => setHtml(e.currentTarget.value)} placeholder="<!doctype html> …" spellcheck={false} />
+          </div>
+          <div class="actions">
+            <button class="btn" onClick={() => { setHtml(SAMPLE); setTitle("Binary place values"); setSteps(8); setError(null); }}>
+              <Icon name="object" /><span class="label">Try a sample</span>
+            </button>
+            <button class="btn" onClick={loadFile}><Icon name="open" /><span class="label">Open .html</span></button>
+            <div class="grow" />
+            <button class="btn" onClick={props.onClose}>Cancel</button>
+            <button class="btn solid" disabled={!html().trim()} onClick={add}>Add to page</button>
+          </div>
+        </div>
       </div>
     </Dialog>
   );
 }
 
-function Seg<T extends string>(props: { value: T; options: readonly (readonly [T, string])[]; onChange: (v: T) => void }) {
+export function Seg<T extends string>(props: { value: T; options: readonly (readonly [T, string])[]; onChange: (v: T) => void }) {
   return (
     <div class="seg" role="radiogroup">
       <For each={props.options}>
@@ -246,9 +263,14 @@ export function SettingsDialog(props: { onClose: () => void }) {
         </div>
       </div>
 
+      <SmartInkSettings />
+
+      <div class="section-title">Modes</div>
+      <ModesSettings />
+
       <div class="section-title">Keyboard & clicker</div>
       <div class="kbd-grid">
-        <For each={[["Pen", "P"], ["Highlighter", "H"], ["Eraser", "E"], ["Select", "V"], ["Laser", "L"], ["Text", "T"], ["Shapes", "R O N A"], ["Use objects", "I"], ["Pan", "Space"], ["Next step / page", "→"], ["Previous", "←"], ["Fit page", "0"], ["Fullscreen", "F"], ["Undo / redo", "Ctrl Z / Y"], ["Save", "Ctrl S"]]}>
+        <For each={[["Pen", "P"], ["Highlighter", "H"], ["Eraser", "E"], ["Select", "V"], ["Laser", "L"], ["Text", "T"], ["Shapes", "R O N A"], ["Smart shapes", "M"], ["Use objects", "I"], ["Pan", "Space"], ["Next step / page", "→"], ["Previous", "←"], ["Fit page", "0"], ["Fullscreen", "F"], ["Undo / redo", "Ctrl Z / Y"], ["Save", "Ctrl S"], ["Copy / paste", "Ctrl C / V"], ["Duplicate", "Ctrl D"], ["Group / ungroup", "Ctrl G / ⇧G"], ["Merge ink", "Ctrl E"], ["Teach", "F5"], ["Modes", "Alt 1 2 3"]]}>
           {([label, key]) => <div><span>{label}</span><kbd>{key}</kbd></div>}
         </For>
       </div>
