@@ -24,7 +24,7 @@ clap.workspace = true
 tokio = { workspace = true, features = ["net", "sync", "time", "signal"] }
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake", "connect"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
-base64 = "0.22"
+base64 = "0.23"
 getrandom = "0.4"
 # Documents folder, for the default MCP workspace (the Rupok library).
 dirs = "7"
