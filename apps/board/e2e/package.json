@@ -1,0 +1,14 @@
+{
+  "name": "@rupok/board-e2e",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "description": "End-to-end flows of the board in Playwright WebKit (Safari, and the WKWebView of the macOS app). See playwright.config.ts.",
+  "scripts": {
+    "test": "playwright test",
+    "browsers": "playwright install --with-deps webkit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}
