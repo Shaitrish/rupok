@@ -1,4 +1,4 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { controller } from "../controller";
 import { Icon } from "./Icon";
 import { PresetGallery } from "./PresetGallery";
@@ -57,8 +57,14 @@ const SAMPLE = `<!doctype html>
 </html>`;
 
 function Dialog(props: { icon: any; title: string; sub: any; width?: number; onClose: () => void; children: any }) {
+  // Escape closes it wherever focus is (after a tap, focus is often on the board).
+  onMount(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && props.onClose();
+    window.addEventListener("keydown", key);
+    onCleanup(() => window.removeEventListener("keydown", key));
+  });
   return (
-    <div class="scrim" onClick={(e) => e.target === e.currentTarget && props.onClose()} onKeyDown={(e) => e.key === "Escape" && props.onClose()}>
+    <div class="scrim" onClick={(e) => e.target === e.currentTarget && props.onClose()}>
       <div class="dialog" role="dialog" aria-modal="true" aria-label={props.title} style={{ width: props.width ? `min(${props.width}px, 100%)` : undefined }}>
         <div class="dialog-head">
           <div class="badge"><Icon name={props.icon} size={24} active /></div>
