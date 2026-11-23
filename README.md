@@ -10,13 +10,15 @@ Write on slides with a pen. Drop in live, interactive lessons your AI made. Repl
 
 <p align="center"><a href="https://rupok.app"><b>rupok.app</b></a> · works in Chrome, Edge and Safari, installable as an app · desktop app for Windows, macOS and Linux</p>
 
-> **Status: early alpha (v0.1).** The board works in the browser today at
+> **Status: early alpha (v0.2).** The board works in the browser today at
 > [rupok.app](https://rupok.app): pen and highlighter, slides and PDFs,
-> Smart Objects with presets, Teach mode, replay and `.rpk` lesson files.
-> **Desktop app for Windows and Linux** is out: download it from
-> [Releases](https://github.com/Shaitrish/rupok/releases/latest). The macOS
-> app (universal `.dmg`, unsigned for now) is built by CI and comes with the
-> next release. Much more is in active
+> Smart Ink and maths, Smart Objects with presets, the Library, Teach mode,
+> replay, PDF export and `.rpk` lesson files, plus AI chat with your own
+> Claude, Codex or OpenCode. **Desktop apps for Windows, macOS and Linux**
+> are out (unsigned for now): download them from
+> [Releases](https://github.com/Shaitrish/rupok/releases/latest) or
+> [rupok.app/download](https://rupok.app/download/). What changed is in
+> [CHANGELOG.md](CHANGELOG.md). Much more is in active
 > development. See [ROADMAP.md](ROADMAP.md) for what is done, what is in
 > progress, and what you can help build.
 
@@ -63,9 +65,10 @@ online and classroom teaching.
 | ✅ | AI agents create lessons and Smart Objects through the Rupok MCP server |
 | ✅ | Smart Object SDK, examples and an AI skill pack |
 | 🚧 | Board in the browser: toolbar, PDF import, Smart Objects, save/open, replay |
-| ✅ | Desktop app for Windows and Linux ([download](https://github.com/Shaitrish/rupok/releases/latest)) |
-| 🚧 | Desktop app for macOS (universal `.dmg`, Apple silicon and Intel); draw over any app (overlay, beta) |
-| 📋 | Rupok Cloud sync and student share links, course library, agent panel inside the app |
+| ✅ | Desktop app for Windows, macOS (universal `.dmg`) and Linux ([download](https://rupok.app/download/)); draw over any app (overlay, beta) |
+| ✅ | Library, Smart Dock, Settings, gestures and palm eraser, PDF export with handouts (v0.2.0) |
+| ✅ | AI chat inside the app with your own Claude, Codex or OpenCode, and live AI editing of the open lesson (v0.2.0) |
+| 📋 | Rupok Cloud sync and student share links (coming soon), course library |
 | 📋 | Live broadcast to students, live quizzes, subject tools, Bangla |
 
 The full list, with a plan for every item, is in **[ROADMAP.md](ROADMAP.md)**.

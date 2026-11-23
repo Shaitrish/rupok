@@ -48,7 +48,7 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 | 🚧 | Save and open `.rpk`, autosave | `apps/board`, `crates/rupok-wasm` | |
 | 🚧 | Replay a page stroke by stroke (play, seek, speed) | `crates/rupok-wasm/src/replay.rs` | |
 | ✅ | Desktop app (Tauri 2) for Windows and Linux: shell, `.rpk` association, single instance, atomic save, installers in CI (v0.1.0, unsigned) |
-| 🚧 | Desktop app for macOS: universal `.dmg` built in CI, native menu, ⌘ shortcuts, `.rpk` document type, WebKit fixes; signing/notarisation wired, waiting for an Apple Developer account; first test on a real Mac to do | [tauri-desktop](docs/roadmap/tauri-desktop.md#macos), `apps/desktop` | intermediate |
+| ✅ | Desktop app for macOS (v0.2.0, beta): universal `.dmg` built in CI, native menu, ⌘ shortcuts, `.rpk` document type, WebKit fixes. Unsigned for now: signing/notarisation wired, waiting for an Apple Developer account; first test on a real Mac to do | [tauri-desktop](docs/roadmap/tauri-desktop.md#macos), `apps/desktop` | intermediate |
 | 🚧 | Desktop overlay (beta): draw over any app on the screen (ink, toolbar, click-through, save to lesson); on macOS untested on real hardware | [desktop-overlay](docs/roadmap/desktop-overlay.md), `apps/desktop/src/overlay.rs` | advanced |
 | ✅ | WebKit (Safari, the macOS app) checked in CI: the board's key flows in Playwright WebKit on macOS | `apps/board/e2e`, `.github/workflows/desktop.yml` | |
 | 🚧 | Touch and pen settings: palm rejection modes, smoothing, pressure curve | engine done; UI in `apps/board` | |
@@ -59,11 +59,11 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 
 | Status | Item | Plan | Difficulty |
 |---|---|---|---|
-| 📋 | Course library: Subject → Course → Chapter → Lesson | [course-library](docs/roadmap/course-library.md) | intermediate |
+| 🚧 | Course library: Subject → Course → Chapter → Lesson. The Library (folders, search, thumbnails, recent lessons) shipped in v0.2.0 ([docs/library.md](docs/library.md)) | [course-library](docs/roadmap/course-library.md) | intermediate |
 | 📋 | Chapter knowledge base: sources your agent can cite | [knowledge-base](docs/roadmap/knowledge-base.md) | advanced |
 | 💡 | Brand kit: school colours, fonts and logo as theme tokens for every object | | |
-| 📋 | Agent panel (ACP): chat with your own AI agent inside Rupok | [acp-agent-panel](docs/roadmap/acp-agent-panel.md) | advanced |
-| 📋 | Live agent edits during class, merged into the open lesson | [acp-agent-panel § Live edits](docs/roadmap/acp-agent-panel.md#live-edits) | advanced |
+| ✅ | Agent panel (ACP): chat with your own AI agent inside Rupok (v0.2.0: Claude, Codex, OpenCode through `rupok agent`) | [acp-agent-panel](docs/roadmap/acp-agent-panel.md) | advanced |
+| ✅ | Live agent edits during class, merged into the open lesson (v0.2.0, `rupok mcp --live`, [docs/ai-agents.md](docs/ai-agents.md)) | [acp-agent-panel § Live edits](docs/roadmap/acp-agent-panel.md#live-edits) | advanced |
 | 📋 | Replay with audio | [replay-audio](docs/roadmap/replay-audio.md) | intermediate |
 | 📋 | LAN "send to board" from laptop or phone | [lan-send](docs/roadmap/lan-send.md) | intermediate |
 | 🚧 | Web viewer (PWA): open any `.rpk` in a browser, offline. Read-only student view at `/board/?view` done; the `/open/` page hands a picked file to it; installed-PWA "Open with" (`launchQueue`) done; offline install to do | [web-viewer](docs/roadmap/web-viewer.md) | intermediate |
