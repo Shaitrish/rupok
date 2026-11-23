@@ -175,7 +175,7 @@ sup a:hover { color: var(--ink); }
 .art .mini-obj { position: absolute; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--sun); box-shadow: 0 0 0 1.5px var(--ink); font: 800 18px/1.1 var(--font); }
 .art .mini-obj em { font: 600 13px/1.2 var(--font); font-style: normal; }
 .art.board .stand { position: absolute; left: 44%; bottom: 52px; width: 12%; height: 26px; border-radius: 0 0 10px 10px; background: var(--ink); }
-.art.board .cursor { left: 60%; top: 66%; }
+.art.board .cursor { left: 38%; top: 60%; }
 
 .art.ai { display: flex; flex-direction: column; gap: 14px; padding: 8px 0; }
 .art.ai .bubble { align-self: flex-start; max-width: 86%; padding: 18px 20px; border-radius: 22px 22px 22px 6px; background: var(--bg); box-shadow: 0 0 0 1.5px var(--ink); }

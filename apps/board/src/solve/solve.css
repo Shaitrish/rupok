@@ -1,0 +1,105 @@
+/* Solve this: preview card, writing chip, calibration (solve/SolveUI.tsx).
+   Flat, Inter, mint accent; tokens from styles.css so light and dark work. */
+
+.solve-host { position: fixed; inset: 0; pointer-events: none; z-index: 60; font-family: var(--font); }
+.solve-host > * { pointer-events: none; }
+
+.solve-cards {
+  position: fixed; top: calc(var(--bar) + var(--inset) * 2); left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: var(--s3); width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - var(--bar) - 120px); overflow: auto;
+}
+.solve-card {
+  pointer-events: auto; border-radius: 16px; padding: var(--s4); background: var(--surface-solid);
+  box-shadow: var(--shadow-2); color: var(--text); display: flex; flex-direction: column; gap: var(--s3);
+}
+.solve-card-head { display: flex; align-items: flex-start; gap: var(--s3); }
+.solve-card-head > div { flex: 1; min-width: 0; }
+.solve-badge {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; flex: none;
+  background: var(--accent-3); color: var(--accent-11);
+}
+.solve-title { font-weight: 650; font-size: 15px; line-height: 20px; }
+.solve-sub { color: var(--text-2); font-size: 13px; line-height: 18px; }
+.solve-lines {
+  font-size: 16px; line-height: 1.5; padding: var(--s2) var(--s3); border-radius: 10px;
+  background: var(--gray-2); border: 1px solid var(--gray-a4); max-height: 220px; overflow: auto;
+}
+.solve-lines p { margin: 2px 0; }
+.solve-hand {
+  width: 100%; max-height: 240px; border-radius: 10px; background: var(--solve-paper, #fff);
+  border: 1px solid var(--gray-a4);
+}
+.solve-hand polyline { fill: none; stroke: var(--solve-pen, #1c2024); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.solve-actions { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.solve-actions .btn { height: 40px; border-radius: 10px; }
+.solve-write .label { display: inline !important; }
+.solve-actions .btn.solid.solve-write { width: auto; padding: 0 var(--s4) 0 var(--s3); gap: var(--s2); }
+.solve-hint { font-size: 13px; color: var(--accent-11); }
+
+.solve-chip {
+  position: fixed; left: 50%; bottom: calc(var(--tb) + var(--inset) * 3); transform: translateX(-50%);
+  pointer-events: auto; display: flex; align-items: center; gap: var(--s2); padding: 6px 6px 6px var(--s3);
+  border-radius: 14px; background: var(--surface-solid); box-shadow: var(--shadow-1); color: var(--text); font-size: 14px;
+}
+.solve-chip .btn { height: 36px; border-radius: 10px; }
+.solve-chip .solve-next { padding: 0 var(--s2) 0 var(--s3); gap: 4px; font-weight: 600; }
+.solve-chip .solve-next .label { display: inline !important; }
+.solve-chip-label { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.solve-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-9); animation: solve-pulse 1s ease-in-out infinite; }
+.solve-dot.waiting { animation: none; background: var(--accent-11); }
+@keyframes solve-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .solve-dot { animation: none; } }
+
+.solve-btn span { white-space: nowrap; }
+.solve-peek { gap: 6px; }
+
+/* Calibration */
+.solve-scrim { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; pointer-events: auto; padding: 16px; }
+.solve-cal {
+  width: min(880px, 100%); max-height: min(760px, calc(100vh - 32px)); display: flex; flex-direction: column;
+  border-radius: 16px; background: var(--surface-solid); box-shadow: var(--shadow-2); color: var(--text);
+  --solve-guide: var(--gray-7); --solve-ink: var(--gray-12); --solve-ghost: var(--gray-6);
+}
+.solve-cal-head, .solve-cal-foot { display: flex; align-items: flex-start; gap: var(--s3); padding: var(--s4) var(--s5); }
+.solve-cal-head > div { flex: 1; }
+.solve-cal-foot { align-items: center; border-top: 1px solid var(--gray-a4); }
+.solve-cal-foot .solve-sub { flex: 1; }
+.solve-cal-foot .btn.solid .label { display: inline !important; }
+.solve-cal-foot .btn.solid { width: auto; padding: 0 var(--s4); }
+.solve-cal-body { overflow: auto; padding: 0 var(--s5) var(--s4); }
+.solve-cal-group { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); margin: var(--s3) 0 var(--s2); }
+.solve-cal-grid { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.solve-cell {
+  position: relative; border-radius: 12px; border: 1px solid var(--gray-a5); background: var(--gray-1);
+  display: flex; flex-direction: column; align-items: center; overflow: hidden;
+}
+.solve-cell.done { border-color: var(--accent-9); }
+.solve-cell canvas { touch-action: none; cursor: crosshair; display: block; }
+.solve-cell-ch { position: absolute; top: 4px; left: 8px; font-size: 13px; font-weight: 650; color: var(--accent-11); }
+.solve-cell.taught::after { content: "✓"; position: absolute; top: 4px; right: 8px; font-size: 12px; color: var(--accent-11); }
+.solve-cell-clear {
+  width: 100%; border: 0; border-top: 1px solid var(--gray-a4); background: transparent; color: var(--text-2);
+  font: inherit; font-size: 12px; height: 28px; cursor: pointer;
+}
+.solve-cell-clear:hover { background: var(--hover); color: var(--text); }
+
+:root[data-theme="dark"] .solve-hand, .dark .solve-hand { --solve-paper: #1b1c1f; --solve-pen: #edeef0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .solve-hand { --solve-paper: #1b1c1f; --solve-pen: #edeef0; } }
+
+/* Teach: "Solve what I select" beside the tucked-away chat chip. */
+.solve-peek-row { position: absolute; right: var(--inset); bottom: var(--inset); z-index: 13; display: flex; gap: var(--s2); align-items: center; }
+.solve-peek-row .chat-peek { position: static; }
+.solve-peek {
+  height: 40px; padding: 0 14px; border-radius: 20px; border: 0; display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; color: var(--accent-11); font: 600 13px/1 var(--font); background: var(--surface-solid); box-shadow: var(--shadow-1);
+}
+.solve-peek:hover { background: var(--accent-3); }
+
+.solve-change { display: flex; gap: var(--s2); align-items: center; }
+.solve-change-input {
+  flex: 1; min-width: 0; height: 36px; border-radius: 10px; border: 1px solid var(--gray-a5); padding: 0 10px;
+  background: var(--surface-solid); color: var(--text); font: 14px var(--font);
+}
+.solve-change-input:focus { outline: 2px solid var(--accent-9); outline-offset: -1px; }
+.solve-change .btn { height: 36px; border-radius: 10px; }

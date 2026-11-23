@@ -1,6 +1,6 @@
 # Free smartboard software that works on any board
 
-> Rupok is free, open-source smartboard software for any interactive panel, smart board or projector. Write on PDF slides with fast ink, add AI-made activities, replay every class. No licence, no account.
+> Rupok is free, open-source smartboard software for any interactive panel, smart board or projector. Write on PDF slides, add AI-made activities, replay every class. No licence.
 
 Canonical: https://rupok.app/smartboard-software/ · Language: en · Updated: 2026-11-23
 

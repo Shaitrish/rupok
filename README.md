@@ -36,11 +36,16 @@ online and classroom teaching.
   your clicker steps through it like slide animations.
 - **Every class is recorded.** Every stroke is timestamped, so you can replay
   a lesson step by step for students who missed it.
-- **Works offline.** Lessons are single `.rpk` files. Smart Objects run without
+- **Works offline.** Lessons are single `.rpk` files (RPK: Rich Presentation
+  Kit). Smart Objects run without
   internet, and common libraries ship inside the app.
 - **Your files stay yours.** Lessons are plain `.rpk` files in a folder you
   choose. Back them up with any cloud drive app (Google Drive, OneDrive,
   Dropbox), export them any time, no lock-in.
+- **Readable by people and AI.** Every `.rpk` carries a plain Markdown and
+  JSON outline of the lesson, so ChatGPT, Claude or any script can read it.
+  See [the RPK format](https://rupok.app/rpk/) and the
+  [`read-rpk` skill](skills/read-rpk/SKILL.md).
 - **Rupok Cloud** *(coming soon)*. One-click sync between your laptop and the
   classroom board, and share links your students open with no account (live
   lessons, replay, make a copy). 500 MB free for every teacher.
@@ -138,7 +143,7 @@ too) and [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
 | `bench/` | Performance harness and budgets | AGPL-3.0-or-later |
 | `apps/board` | Board UI (Vite + SolidJS) | AGPL-3.0-or-later |
 | `packages/object-sdk` | Smart Object SDK (`@rupok/object-sdk`) | Apache-2.0 |
-| `spec/` | `.rpk` format and Smart Object specs | Apache-2.0 |
+| `spec/` | `.rpk` (Rich Presentation Kit) format and Smart Object specs | Apache-2.0 |
 | `skills/` | Skill pack and instructions for AI agents | Apache-2.0 |
 | `examples/objects/` | Example Smart Objects (validated in CI) | AGPL-3.0-or-later |
 | `docs/roadmap/` | A plan for every planned feature | AGPL-3.0-or-later |

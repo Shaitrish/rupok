@@ -21,6 +21,10 @@ use std::f32::consts::{PI, TAU};
 /// Largest distance (world units) between the round outline and its polygon.
 pub const OUTLINE_TOLERANCE: f32 = 0.12;
 
+/// Vertices closer than this (world units) to the simplified outline are
+/// dropped (Douglas–Peucker). 0.1 units is 0.05 pt on a slide page.
+pub const SIMPLIFY_TOLERANCE: f32 = 0.1;
+
 #[derive(Clone, Copy, Debug)]
 struct Disc {
     x: f32,
@@ -157,7 +161,7 @@ pub fn stroke_outline(
     let tol = tol.max(0.01);
     chains(points, width, offset)
         .iter()
-        .map(|d| flatten(chain_outline(d, tol)))
+        .map(|d| flatten(simplify_closed(&chain_outline(d, tol), SIMPLIFY_TOLERANCE)))
         .filter(|p| p.len() >= 6)
         .collect()
 }
@@ -226,6 +230,52 @@ fn chain_outline(d: &[Disc], tol: f32) -> Vec<P> {
     poly
 }
 
+/// Distance from `p` to the segment `a`–`b`.
+fn segment_distance(p: P, a: P, b: P) -> f32 {
+    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+    let len2 = dx * dx + dy * dy;
+    if len2 <= f32::EPSILON {
+        return dist(p, a);
+    }
+    let t = (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2).clamp(0.0, 1.0);
+    dist(p, [a[0] + dx * t, a[1] + dy * t])
+}
+
+/// Douglas–Peucker on a closed polygon (iterative, so long strokes cannot
+/// overflow the stack). The first vertex is always kept.
+fn simplify_closed(poly: &[P], tol: f32) -> Vec<P> {
+    let n = poly.len();
+    if n < 4 {
+        return poly.to_vec();
+    }
+    // Treat the ring as the open path poly[0] … poly[n-1], poly[0].
+    let at = |i: usize| poly[i % n];
+    let mut keep = vec![false; n + 1];
+    keep[0] = true;
+    keep[n] = true;
+    let mut stack = vec![(0usize, n)];
+    while let Some((a, b)) = stack.pop() {
+        if b <= a + 1 {
+            continue;
+        }
+        let (pa, pb) = (at(a), at(b));
+        let (mut far, mut best) = (a, -1.0f32);
+        for i in a + 1..b {
+            let d = segment_distance(at(i), pa, pb);
+            if d > best {
+                best = d;
+                far = i;
+            }
+        }
+        if best > tol {
+            keep[far] = true;
+            stack.push((a, far));
+            stack.push((far, b));
+        }
+    }
+    (0..n).filter(|&i| keep[i]).map(|i| poly[i]).collect()
+}
+
 /// Round to 0.1 world units and drop repeated vertices.
 fn flatten(poly: Vec<P>) -> Vec<f32> {
     let mut out = Vec::with_capacity(poly.len() * 2);
@@ -273,6 +323,9 @@ enum ExportItem<'a> {
         text: &'a str,
         size: f64,
         color: u32,
+        /// `text` is LaTeX maths.
+        #[serde(skip_serializing_if = "std::ops::Not::not")]
+        latex: bool,
     },
     Image {
         rect: [f64; 4],
@@ -334,6 +387,7 @@ pub fn page_export_json(lesson: &Lesson, pkg: &Package, index: usize, strokes: b
                 text: &t.text,
                 size: t.size,
                 color: t.color,
+                latex: t.latex,
             },
             ItemData::Image(i) => ExportItem::Image {
                 rect: rect(&i.geom),
@@ -551,6 +605,28 @@ mod tests {
     }
 
     #[test]
+    fn simplification_drops_collinear_vertices_only() {
+        let square: Vec<P> = vec![
+            [0.0, 0.0],
+            [5.0, 0.0],
+            [10.0, 0.0],
+            [10.0, 5.0],
+            [10.0, 10.0],
+            [5.0, 10.02],
+            [0.0, 10.0],
+        ];
+        let s = simplify_closed(&square, 0.1);
+        assert_eq!(s, vec![[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]]);
+        // Dense smooth ink loses most of its outline vertices.
+        let pts: Vec<_> = (0..300)
+            .map(|i| pt(i as f32 * 0.5, (i as f32 * 0.01).sin() * 4.0, 0.5))
+            .collect();
+        let raw = chain_outline(&chains(&pts, 4.0, [0.0, 0.0])[0], OUTLINE_TOLERANCE).len();
+        let kept = stroke_outline(&pts, 4.0, [0.0, 0.0], OUTLINE_TOLERANCE)[0].len() / 2;
+        assert!(kept * 3 < raw, "{kept} of {raw} vertices kept");
+    }
+
+    #[test]
     fn dot_and_contained_points() {
         let dot = stroke_outline(&[pt(5.0, 5.0, 1.0)], 10.0, [1.0, 2.0], 0.1);
         let poly = pairs(&dot[0]);
@@ -592,6 +668,7 @@ mod tests {
                 &[
                     rupok_core::NewItem {
                         data: ItemData::Text(rupok_core::TextData {
+                            latex: false,
                             geom: BoxGeom {
                                 x: 1.0,
                                 y: 2.0,

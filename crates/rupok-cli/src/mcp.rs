@@ -14,6 +14,8 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use rmcp::{ServerHandler, ServiceExt, tool, tool_handler, tool_router};
 use serde::Serialize;
 
+use crate::live::LiveHub;
+use crate::mcp_live::is_live;
 use crate::ops::OpError;
 use crate::tools::*;
 use crate::workspace::Workspace;
@@ -32,7 +34,24 @@ Remote URLs are rejected unless their host is listed in `network_hosts`.\n\
 - `add_smart_object` and `update_smart_object` validate first. If they return diagnostics, nothing \
 was saved: fix the HTML and call again. Use `validate_smart_object` to check HTML without saving.\n\
 - Paths are relative to the workspace and must end in `.rpk`; page numbers start at 1. \
-Use `get_lesson_outline` to find page numbers, item ids and bundle ids before editing.",
+Use `get_lesson_outline` to find page numbers, item ids and bundle ids before editing.\n\
+\n\
+Live board (during class): the teacher can pair their open Rupok board with you. They click \
+\"Connect AI\" on the board and give you a 6-digit code: call `connect_board` with it \
+(`get_board_status` says whether a board is paired and what to do next). Once paired:\n\
+- Pass `path: \"live\"` to the lesson tools (get_lesson_outline, add_page, add_text, add_smart_object, \
+update_smart_object, delete_item, set_page_background) to change the lesson open on the board; the class \
+sees each change at once and the teacher can undo it with Ctrl+Z.\n\
+- Look before you act: `get_current_page` (items and ids), `get_page_snapshot` (an image, to read \
+handwriting), `get_selection` (what the teacher selected).\n\
+- Put new content on a new page (`add_page_after_current`) unless the teacher asks to change the \
+current one; show it with `go_to_page` when it is ready. Never delete or replace the teacher's work \
+without asking first. Match the page `scheme` (light/dark) so objects stay themed.\n\
+- `point_at`, `step_object`, `replace_items_with_text` (ink to text) and `set_board_theme` help \
+you teach on the board.\n\
+- To solve a problem written on the board, read it (`get_page_snapshot` with its item_ids), check every \
+step, then `write_handwriting` the solution as short lines; the board writes it in handwriting next to \
+the problem. If the result says `preview`, the teacher is checking it first: do not write it again.",
         libs = rupok_format::LIBS.join(", ")
     )
 }
@@ -40,14 +59,25 @@ Use `get_lesson_outline` to find page numbers, item ids and bundle ids before ed
 #[derive(Clone)]
 pub struct McpServer {
     tools: Arc<Tools>,
+    /// The live board channel (see `crate::mcp_live`); disabled without `--live`.
+    pub(crate) live: Arc<LiveHub>,
     tool_router: ToolRouter<Self>,
 }
 
 impl McpServer {
     pub fn new(tools: Tools) -> Self {
+        Self::with_live(
+            tools,
+            LiveHub::disabled("the server was started without the live channel"),
+        )
+    }
+
+    /// A server whose live tools use `live`.
+    pub fn with_live(tools: Tools, live: Arc<LiveHub>) -> Self {
         Self {
             tools: Arc::new(tools),
-            tool_router: Self::tool_router(),
+            live,
+            tool_router: Self::tool_router() + Self::live_tool_router(),
         }
     }
 
@@ -81,7 +111,17 @@ and page count. Returned paths are relative to the workspace and can be passed t
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn list_lessons(&self) -> CallToolResult {
-        self.run(|t| t.list_lessons()).await
+        let board = self.live.status().board;
+        self.run(move |t| {
+            let mut v = serde_json::to_value(t.list_lessons()?)
+                .map_err(|e| OpError::Invalid(e.to_string()))?;
+            if let Some(b) = board {
+                v["live_board"] =
+                    serde_json::json!({ "path": "live", "title": b.title, "pages": b.page_count });
+            }
+            Ok(v)
+        })
+        .await
     }
 
     #[tool(
@@ -107,6 +147,9 @@ title, bundle_id, declared steps and current step). Call this before editing an 
         &self,
         Parameters(p): Parameters<LessonPathParams>,
     ) -> CallToolResult {
+        if is_live(&p.path) {
+            return self.live_outline().await;
+        }
         self.run(move |t| t.get_lesson_outline(p)).await
     }
 
@@ -120,6 +163,9 @@ title, bundle_id, declared steps and current step). Call this before editing an 
         )
     )]
     async fn add_page(&self, Parameters(p): Parameters<AddPageParams>) -> CallToolResult {
+        if is_live(&p.path) {
+            return self.live_call(crate::mcp_live::op_add_page(&p)).await;
+        }
         self.run(move |t| t.add_page(p)).await
     }
 
@@ -139,6 +185,11 @@ update_smart_object), the placed geometry and any warnings. Default size 1280×7
         &self,
         Parameters(p): Parameters<AddSmartObjectParams>,
     ) -> CallToolResult {
+        if is_live(&p.path) {
+            return self
+                .live_call(crate::mcp_live::op_add_smart_object(&p))
+                .await;
+        }
         self.run(move |t| t.add_smart_object(p)).await
     }
 
@@ -158,6 +209,11 @@ the diagnostics are returned.",
         &self,
         Parameters(p): Parameters<UpdateSmartObjectParams>,
     ) -> CallToolResult {
+        if is_live(&p.path) {
+            return self
+                .live_call(crate::mcp_live::op_update_smart_object(&p))
+                .await;
+        }
         self.run(move |t| t.update_smart_object(p)).await
     }
 
@@ -171,7 +227,29 @@ frame. Font size defaults to 32px; keep it 24px or larger so it is readable on a
         )
     )]
     async fn add_text(&self, Parameters(p): Parameters<AddTextParams>) -> CallToolResult {
+        if is_live(&p.path) {
+            return self.live_call(crate::mcp_live::op_add_text(&p)).await;
+        }
         self.run(move |t| t.add_text(p)).await
+    }
+
+    #[tool(
+        description = "Replace handwritten ink strokes with a text box saying what they say (handwriting to \
+text). Pass the stroke ids from get_lesson_outline and the text; the box lands over the ink, sized to the \
+handwriting and in the ink's colour unless given. Saved as one change, so replay still shows the ink being \
+written before it became text.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = true,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn replace_strokes_with_text(
+        &self,
+        Parameters(p): Parameters<ReplaceStrokesWithTextParams>,
+    ) -> CallToolResult {
+        self.run(move |t| t.replace_strokes_with_text(p)).await
     }
 
     #[tool(
@@ -185,6 +263,9 @@ the item id shown in get_lesson_outline.",
         )
     )]
     async fn delete_item(&self, Parameters(p): Parameters<DeleteItemParams>) -> CallToolResult {
+        if is_live(&p.path) {
+            return self.live_call(crate::mcp_live::op_delete_item(&p)).await;
+        }
         self.run(move |t| t.delete_item(p)).await
     }
 
@@ -202,6 +283,11 @@ as #rrggbb.",
         &self,
         Parameters(p): Parameters<SetPageBackgroundParams>,
     ) -> CallToolResult {
+        if is_live(&p.path) {
+            return self
+                .live_call(crate::mcp_live::op_set_page_background(&p))
+                .await;
+        }
         self.run(move |t| t.set_page_background(p)).await
     }
 
@@ -244,10 +330,27 @@ impl ServerHandler for McpServer {
     }
 }
 
-/// Serve MCP on stdin/stdout until the client disconnects.
+/// Serve MCP on stdin/stdout until the client disconnects (no live channel).
 pub async fn serve_stdio(workspace: Workspace) -> anyhow::Result<()> {
-    let server = McpServer::new(Tools::new(workspace));
+    serve_stdio_with(
+        workspace,
+        LiveHub::disabled("the server was started with --no-live"),
+    )
+    .await
+}
+
+/// Serve MCP on stdin/stdout with the live board channel `live` (already
+/// started). The board shows the MCP client's name ("Claude Code", …).
+pub async fn serve_stdio_with(workspace: Workspace, live: Arc<LiveHub>) -> anyhow::Result<()> {
+    let server = McpServer::with_live(Tools::new(workspace), live.clone());
     let running = server.serve(rmcp::transport::stdio()).await?;
+    if let Some(info) = running.peer_info() {
+        let c = &info.client_info;
+        live.set_agent(&crate::live::agent_display_name(
+            &c.name,
+            c.title.as_deref(),
+        ));
+    }
     running.waiting().await?;
     Ok(())
 }

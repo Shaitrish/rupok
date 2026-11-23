@@ -258,6 +258,16 @@ pub struct AddedText {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct ReplacedWithText {
+    pub item_id: String,
+    pub page: usize,
+    /// How many strokes the text replaced.
+    pub removed: usize,
+    pub geometry: Geometry,
+    pub warnings: Vec<Diagnostic>,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct DeletedItem {
     pub item_id: String,
     pub kind: &'static str,
@@ -618,6 +628,21 @@ pub fn outline_of(pkg: &Package, lesson: &Lesson) -> Result<LessonOutline> {
 pub fn outline(path: &Path) -> Result<LessonOutline> {
     let (pkg, lesson) = load(path)?;
     outline_of(&pkg, &lesson)
+}
+
+/// The lesson as Markdown (the package's `content.md`, regenerated with
+/// handwriting recognition), or with `json` the structured `content.json`.
+pub fn readable(path: &Path, json: bool) -> Result<String> {
+    let mut pkg = read_package(path)?;
+    pkg.refresh_outline()?;
+    let content = pkg
+        .content()
+        .ok_or_else(|| OpError::Invalid("lesson has no readable document".into()))?;
+    Ok(if json {
+        String::from_utf8_lossy(&rupok_format::readable::content_json(&content)).into_owned()
+    } else {
+        rupok_format::readable::content_md(&content)
+    })
 }
 
 pub fn info(path: &Path) -> Result<LessonInfo> {
@@ -1026,6 +1051,7 @@ pub fn add_text(path: &Path, nt: NewText) -> Result<AddedText> {
     }
     warnings.extend(placement_warning(&geom, page.frame));
     let data = ItemData::Text(TextData {
+        latex: false,
         geom,
         text: nt.text,
         size,
@@ -1036,6 +1062,111 @@ pub fn add_text(path: &Path, nt: NewText) -> Result<AddedText> {
     Ok(AddedText {
         item_id,
         page: nt.page,
+        geometry: geom.into(),
+        warnings,
+    })
+}
+
+/// Most strokes one conversion may replace.
+const MAX_REPLACED_STROKES: usize = 5000;
+
+/// Replace handwritten strokes with a text box (handwriting conversion done
+/// by the teacher's own agent): the text sits over the ink, sized to its
+/// line height, in the ink's colour unless given. One change, so replay
+/// still shows the ink being written before it became text.
+pub fn replace_strokes_with_text(
+    path: &Path,
+    page: usize,
+    stroke_ids: &[String],
+    text: &str,
+    size: Option<f64>,
+    color: Option<u32>,
+) -> Result<ReplacedWithText> {
+    if text.trim().is_empty() {
+        return Err(OpError::Invalid("text must not be empty".into()));
+    }
+    if stroke_ids.is_empty() || stroke_ids.len() > MAX_REPLACED_STROKES {
+        return Err(OpError::Invalid(format!(
+            "give between 1 and {MAX_REPLACED_STROKES} stroke ids"
+        )));
+    }
+    if let Some(s) = size {
+        positive("size", s)?;
+    }
+    let (mut pkg, mut lesson) = load(path)?;
+    let p = page_at(&lesson, page)?;
+    let mut bounds: Option<[f32; 4]> = None;
+    let mut weight: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut ids: Vec<String> = Vec::with_capacity(stroke_ids.len());
+    for id in stroke_ids {
+        if ids.contains(id) {
+            continue;
+        }
+        let item = match lesson.item(&p.id, id) {
+            Ok(i) => i,
+            Err(CoreError::ItemNotFound(_)) => {
+                return Err(OpError::NotFound(format!(
+                    "item `{id}` is not on page {page}; call get_lesson_outline to see item ids"
+                )));
+            }
+            Err(e) => return Err(e.into()),
+        };
+        let ItemData::Stroke(s) = &item.data else {
+            return Err(OpError::Invalid(format!(
+                "item `{id}` is a {}, not an ink stroke",
+                item.data.kind()
+            )));
+        };
+        *weight.entry(s.color).or_default() += s.points.len();
+        let b = s.aabb();
+        bounds = Some(match bounds {
+            Some(u) => [
+                u[0].min(b[0]),
+                u[1].min(b[1]),
+                u[2].max(b[2]),
+                u[3].max(b[3]),
+            ],
+            None => b,
+        });
+        ids.push(id.clone());
+    }
+    let b = bounds.map(|b| b.map(f64::from)).unwrap_or_default();
+    let lines = text.lines().count().max(1) as f64;
+    let h = (b[3] - b[1]).max(1.0);
+    let size = size.unwrap_or_else(|| (h / lines / 1.1).clamp(16.0, 400.0));
+    let geom = BoxGeom {
+        x: b[0],
+        y: b[1] + (h - lines * size * 1.25) / 2.0,
+        w: (b[2] - b[0]).max(size),
+        h: lines * size * 1.3,
+        rot: 0.0,
+    };
+    let ink = weight
+        .iter()
+        .max_by_key(|(_, n)| **n)
+        .map(|(c, _)| *c)
+        .unwrap_or(0x000000ff);
+    let mut warnings = Vec::new();
+    if size < MIN_PROJECTOR_TEXT {
+        warnings.push(Diagnostic {
+            severity: Severity::Warning,
+            code: "font_size",
+            message: format!("text size {size}px is below {MIN_PROJECTOR_TEXT}px and may be unreadable on a projector"),
+        });
+    }
+    let data = ItemData::Text(TextData {
+        latex: false,
+        geom,
+        text: text.to_string(),
+        size,
+        color: color.unwrap_or(ink),
+    });
+    let item_id = lesson.replace_items(&p.id, &ids, &data, now_ms())?;
+    save(path, &mut pkg, &lesson)?;
+    Ok(ReplacedWithText {
+        item_id,
+        page,
+        removed: ids.len(),
         geometry: geom.into(),
         warnings,
     })

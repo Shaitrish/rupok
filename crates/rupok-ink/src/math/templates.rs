@@ -32,7 +32,7 @@ pub struct Glyph {
 /// an elliptical arc (degrees, 0° = +x, 90° = down) and `;` ends the stroke.
 const AUTHORED: &[(&str, &str)] = &[
     // x as two back-to-back arcs ")(", and in one stroke ("\", up, "/").
-    ("x", "A -7 2 6 7 -90 90 ; A 7 2 6 7 270 90"),
+    ("x", "A -6 2 6 7 -90 90 ; A 6 2 6 7 270 90"),
     ("x", "M -5 -5 L 5 9 L 5 -5 L -5 9"),
     // Open 4 (an L and a crossing stem); 7 with a bar; plain and based 1.
     ("4", "M -4 -12 L -6 3 L 8 3 ; M 4 -7 L 4 9"),
@@ -45,13 +45,15 @@ const AUTHORED: &[(&str, &str)] = &[
         "M -5 -12 L -6 -3 L -3 -4 L 1 -4 L 4 -3 L 6 0 L 6 4 L 4 7 L 1 9 L -3 9 L -6 7 ; M -5 -12 L 6 -12",
     ),
     ("9", "A 0 -6 6 6 0 -360 L 6 9"),
+    // Round-top 3 (two bowls); the Hershey 3 has a flat top.
+    ("3", "A 0 -7.5 5.5 4.5 -160 90 A 0 3 6 6 -90 160"),
     // Straight t; curly y (a u with a tail) and a two-stroke straight y.
     ("t", "M 0 -12 L 0 9 ; M -5 -5 L 5 -5"),
     (
         "y",
         "M -6 -5 L -6 4 L -4 8 L -1 9 L 2 8 L 5 5 L 6 -5 L 6 12 L 4 15 L 1 16 L -2 16 L -5 14",
     ),
-    ("y", "M -6 -5 L 0 7 ; M 6 -5 L -3 16"),
+    ("y", "M -6 -5 L 0.9 7 ; M 6 -5 L -3 16"),
     // z with a crossbar (tells it from 2).
     ("z", "M -5 -5 L 6 -5 L -5 9 L 6 9 ; M -3 2 L 4 2"),
     // Two-storey a, and the one-stroke single-storey a.
@@ -288,7 +290,7 @@ mod tests {
             let s = sym(g.sym);
             let n = g.strokes.len() as u8;
             assert!(
-                n >= s.strokes.0 && n <= s.strokes.1,
+                n >= s.strokes.0 && n <= s.strokes.2,
                 "{} ({:?}) has {n} strokes, table says {:?}",
                 s.name,
                 g.source,

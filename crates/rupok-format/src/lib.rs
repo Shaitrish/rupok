@@ -4,6 +4,9 @@
 //! ```text
 //! mimetype             "application/vnd.rupok.lesson+zip" (first, stored)
 //! manifest.json        title, format version, course refs
+//! README.md            what this file is + readable outline (derived)
+//! content.md           readable outline of the lesson (derived)
+//! content.json         the same outline, structured (derived)
 //! doc.loro             Loro snapshot with full history (= the recording)
 //! assets/<blake3>.ext  content-addressed media
 //! objects/<id>/...     Smart Object bundles
@@ -13,9 +16,11 @@
 
 pub mod object;
 pub mod package;
+pub mod readable;
 
 pub use object::{Diagnostic, LIBS, ObjectBundle, ObjectManifest, Severity};
 pub use package::{CourseRef, Manifest, Package};
+pub use readable::{Content, Outline, ReadableCache};
 
 pub const MIMETYPE: &str = "application/vnd.rupok.lesson+zip";
 pub const FORMAT_VERSION: u32 = 1;

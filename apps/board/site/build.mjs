@@ -61,6 +61,17 @@ write("site/inputs.json", JSON.stringify(inputs, null, 2) + "\n");
   if (html !== before) writeFileSync(file, html);
 }
 
+// ------------------------------------------------------------ agent skill
+// skills/read-rpk/ (Apache-2.0) is served as /skills/read-rpk.md, with its
+// script and sample lesson, so a model given only a link can read a .rpk.
+{
+  const skill = join(root, "../../skills/read-rpk");
+  write("public/skills/read-rpk.md", readFileSync(join(skill, "SKILL.md"), "utf8"));
+  write("public/skills/read_rpk.py", readFileSync(join(skill, "read_rpk.py"), "utf8"));
+  const p = join(root, "public/skills/sample-lesson.rpk");
+  writeFileSync(p, readFileSync(join(skill, "tests/sample-lesson.rpk")));
+}
+
 // ---------------------------------------------------------------- sitemap
 const entries = [...PAGES.map(({ page }) => page), { path: "/board/", lang: "en", updated: UPDATED, priority: "0.8" }];
 const order = (p) => (p.path === "/" ? 0 : p.path === "/bn/" ? 1 : p.path.split("/").length);

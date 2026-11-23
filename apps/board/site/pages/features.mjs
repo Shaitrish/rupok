@@ -46,7 +46,7 @@ const smartboard = {
   lang: "en",
   title: "Free Smartboard Software for Teachers: Open Source, Any Board | Rupok",
   description:
-    "Rupok is free, open-source smartboard software for any interactive panel, smart board or projector. Write on PDF slides with fast ink, add AI-made activities, replay every class. No licence, no account.",
+    "Rupok is free, open-source smartboard software for any interactive panel, smart board or projector. Write on PDF slides, add AI-made activities, replay every class. No licence.",
   tag: "Smartboard software",
   h1: "Free smartboard software that works on any board",
   lede: "Rupok turns any interactive flat panel, smart board or projector into a teaching board: fast pen ink on your slides, live interactive lessons, and a replay of every class. Free and open source, with no licence keys and no account.",

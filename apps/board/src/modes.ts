@@ -16,7 +16,7 @@ export type ToolbarItem = Tool | "smartink" | "undo" | "redo" | "pager" | "repla
 /** Chrome elements a mode can show or hide. */
 export type ChromeKey =
   | "switcher" | "logo" | "title" | "pagesToggle" | "history" | "insert" | "replay" | "open"
-  | "theme" | "fullscreen" | "settings" | "save" | "pages" | "zoom" | "stats" | "colors" | "sizes";
+  | "theme" | "fullscreen" | "settings" | "save" | "ai" | "overflow" | "pages" | "zoom" | "stats" | "colors" | "sizes";
 
 export interface ModeConfig {
   chrome: Record<ChromeKey, boolean>;
@@ -86,18 +86,20 @@ export const CHROME_ITEMS: { id: ChromeKey; label: string }[] = [
   { id: "title", label: "Lesson title" },
   { id: "pagesToggle", label: "Pages button" },
   { id: "history", label: "Undo and redo" },
-  { id: "insert", label: "PDF, image, Smart Object" },
+  { id: "insert", label: "Insert menu (image, PDF, Smart Object, text)" },
   { id: "replay", label: "Replay button" },
   { id: "open", label: "Open" },
   { id: "theme", label: "Light / dark" },
   { id: "fullscreen", label: "Fullscreen" },
   { id: "settings", label: "Settings" },
-  { id: "save", label: "Save" },
+  { id: "save", label: "Save state, Save and Export PDF" },
+  { id: "ai", label: "AI assistant status" },
+  { id: "overflow", label: "⋯ menu (open, export, theme, fullscreen, help)" },
   { id: "pages", label: "Pages panel" },
   { id: "zoom", label: "Zoom" },
   { id: "stats", label: "Statistics (when enabled)" },
-  { id: "colors", label: "Ink colours" },
-  { id: "sizes", label: "Ink sizes" },
+  { id: "colors", label: "Recent colours on the dock" },
+  { id: "sizes", label: "Ink sizes (tap the pen again)" },
 ];
 
 /** Toolbar entries each mode may use (the student view cannot edit). */
@@ -110,7 +112,7 @@ export const ALLOWED_TOOLS: Record<Mode, ToolbarItem[]> = {
 export const ALLOWED_CHROME: Record<Mode, ChromeKey[]> = {
   prepare: CHROME_ITEMS.map((c) => c.id),
   teach: CHROME_ITEMS.map((c) => c.id),
-  view: ["switcher", "logo", "title", "pagesToggle", "replay", "open", "theme", "fullscreen", "pages", "zoom", "stats"],
+  view: ["switcher", "logo", "title", "pagesToggle", "replay", "open", "theme", "fullscreen", "overflow", "pages", "zoom", "stats"],
 };
 
 const chrome = (on: ChromeKey[]): Record<ChromeKey, boolean> =>
@@ -118,17 +120,17 @@ const chrome = (on: ChromeKey[]): Record<ChromeKey, boolean> =>
 
 export const DEFAULT_MODES: ModesConfig = {
   prepare: {
-    chrome: chrome(["switcher", "title", "pagesToggle", "history", "insert", "replay", "open", "theme", "fullscreen", "settings", "save", "pages", "zoom", "stats", "colors", "sizes"]),
+    chrome: chrome(["switcher", "title", "pagesToggle", "history", "insert", "replay", "open", "theme", "fullscreen", "settings", "save", "ai", "overflow", "pages", "zoom", "stats", "colors", "sizes"]),
     tools: ["pen", "highlighter", "eraser", "rect", "ellipse", "line", "arrow", "smartink", "text", "lasso", "laser", "hand", "interact", "undo", "redo"],
     dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["shapes", "text", "lasso"] },
   },
   teach: {
-    chrome: chrome(["colors"]),
+    chrome: chrome(["colors", "sizes"]),
     tools: ["pen", "highlighter", "eraser", "laser", "smartink", "undo", "pager", "exit"],
     dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["smartink", "pager", "exit"] },
   },
   view: {
-    chrome: chrome(["switcher", "title", "pagesToggle", "open", "theme", "fullscreen", "pages", "zoom"]),
+    chrome: chrome(["switcher", "title", "pagesToggle", "open", "theme", "fullscreen", "overflow", "pages", "zoom"]),
     tools: ["pager", "hand", "interact", "replay"],
     dock: { position: "bottom", orientation: "auto", minimized: false, pinned: ["pager", "hand", "interact", "replay"] },
   },
@@ -205,7 +207,7 @@ export function resolveMode(stored: Partial<ModesConfig> | undefined, m: Mode): 
 /** True when any top-bar element is on, i.e. the top bar is drawn at all. */
 export function hasTopBar(c: ModeConfig): boolean {
   const k = c.chrome;
-  return k.switcher || k.logo || k.title || (k.pagesToggle && k.pages) || k.history || k.insert || k.replay || k.open || k.theme || k.fullscreen || k.settings || k.save;
+  return k.switcher || k.logo || k.title || (k.pagesToggle && k.pages) || k.history || k.insert || k.replay || k.open || k.theme || k.fullscreen || k.settings || k.save || k.ai || k.overflow;
 }
 
 // ---------------------------------------------------------- UI config file
@@ -218,4 +220,6 @@ export interface UiConfigFile {
   version: number;
   modes?: Partial<ModesConfig>;
   appearance?: { theme?: string; accent?: string; iconStyle?: string; toolbar?: string; density?: string; hand?: string };
+  /** Classroom touch gestures (gestures.ts → GestureConfig). */
+  gestures?: Record<string, unknown>;
 }

@@ -23,11 +23,11 @@ Last updated: 23 November 2026. Website: https://rupok.app/ · Source: https://g
 - **Student viewer:** https://rupok.app/open/ opens a `.rpk` file in the browser, read-only, with replay and working Smart Objects. No account, nothing uploaded.
 - **Bangla:** Bangla text and fonts work in lessons (Hind Siliguri, Noto Sans Bengali).
 - **MCP server:** the `rupok` CLI includes an MCP server (stdio) with 11 tools for creating lessons and adding validated Smart Objects. Works with Claude Code, Codex CLI, OpenCode and any MCP client.
-- **Open file format:** `.rpk` is a ZIP package (media type `application/vnd.rupok.lesson+zip`) holding a Loro CRDT document with full history, assets and Smart Object bundles. Spec: https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md
+- **Open file format:** `.rpk` (RPK, Rich Presentation Kit) is a ZIP package (media type `application/vnd.rupok.lesson+zip`) holding a Loro CRDT document with full history, assets and Smart Object bundles, plus a readable outline (`README.md`, `content.md`, `content.json`) that AI models and scripts read without Loro. Format page: https://rupok.app/rpk/ · Agent skill: https://rupok.app/skills/read-rpk.md · Spec: https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md
 
 ## Coming soon (not shipped yet)
 
-Desktop app for Windows and Linux (Tauri), draw over any app (desktop overlay), offline install (PWA), Bangla interface, replay with audio, Rupok Cloud (500 MB free cloud storage per teacher, share links `rupok.app/s/<id>`, a remote Claude connector, Google Drive), live classes, live quizzes, handwriting recognition, subject tools (ruler, protractor, compass), Android app.
+Desktop app for Windows and Linux (Tauri), draw over any app (desktop overlay), offline install (PWA), Bangla interface, replay with audio, Rupok Cloud (500 MB free cloud storage per teacher, share links `rupok.app/s/<id>`, a remote Claude connector, Google Drive "Open with"), live classes, live quizzes, handwriting recognition, subject tools (ruler, protractor, compass), Android app.
 
 ## Use the MCP server (for AI agents)
 
@@ -102,7 +102,7 @@ Every stroke is saved with its timing. Students who missed the class open the le
 
 ## Students: open the lesson, replay the class
 
-Got a `.rpk` file from your teacher? Open it at [rupok.app/open](https://rupok.app/open/): no account, no download, with every live object still working.
+Got an [.rpk file (Rich Presentation Kit)](https://rupok.app/rpk/) from your teacher? Open it at [rupok.app/open](https://rupok.app/open/): no account, no download, with every live object still working.
 
 ## Pricing: the app is free, forever
 
@@ -141,6 +141,10 @@ Ask the AI you already use for a simulation, 3D model or quiz as a single HTML f
 ### How do students open my lessons?
 
 Save the lesson as a `.rpk` file and send it on WhatsApp, Gmail or Google Drive. Students open it at [rupok.app/open](https://rupok.app/open/) on a phone or computer, with no account, and replay the class.
+
+### What is an RPK file?
+
+An RPK (Rich Presentation Kit) file, `.rpk`, is a Rupok lesson: its slides, the teacher’s ink with timing, live Smart Objects and a readable outline that AI can read, in one open ZIP package. Open one free at [rupok.app/open](https://rupok.app/open/); see [the RPK file format](https://rupok.app/rpk/).
 
 ### Is Rupok open source?
 
@@ -326,7 +330,7 @@ Prestigio Note3 বিক্রি করে প্রতি ডিভাইস�
 
 # Open .rpk files: free online RPK viewer
 
-> Got a .rpk file from your teacher? Open it free in your browser: replay the class stroke by stroke, use the live activities, and download a PDF. No account, no app, nothing uploaded.
+> Got a .rpk (Rich Presentation Kit) file from your teacher? Open it free in your browser: replay the class stroke by stroke, use the live activities, and download a PDF. No account, no app, nothing uploaded.
 
 Canonical: https://rupok.app/open/ · Language: en · Updated: 2026-11-23
 
@@ -334,19 +338,20 @@ Got a lesson file from your teacher on WhatsApp, Gmail or Google Drive? Drop it 
 
 ## What is an .rpk file?
 
-An **.rpk file is a Rupok lesson.** Rupok is a free, open-source whiteboard for teachers, and a `.rpk` file holds one whole class in a single file:
+An **RPK (Rich Presentation Kit) file is a Rupok lesson.** Rupok is a free, open-source whiteboard for teachers, and a `.rpk` file holds one whole class in a single file:
 
 - **Slides:** every page the teacher prepared, including PDF slides.
 - **Ink:** everything written on them with the pen.
 - **Live Smart Objects:** simulations, 3D models and quizzes that still work.
 - **A replay:** the timing of every stroke, so you can watch the class unfold.
 
-- **File type**: Rupok lesson
+- **File type**: Rupok lesson (RPK: Rich Presentation Kit)
 - **Extension**: `.rpk`
 - **Media type**: `application/vnd.rupok.lesson+zip`
 - **Inside**: A ZIP package: the lesson document with its full history, images and Smart Objects
 - **Opens with**: Rupok, free in Chrome or Edge, on this page or at rupok.app/board
-- **Format**: Open and documented ([spec](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md), Apache-2.0)
+- **Format**: Open and documented ([RPK file format](https://rupok.app/rpk/), Apache-2.0 [spec](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))
+- **Readable by AI**: Yes: each file carries a Markdown outline ChatGPT or Claude can read
 
 ## How to open an .rpk file on a phone or computer
 
@@ -384,7 +389,11 @@ The lesson opens exactly as your teacher left it. Press play to watch it being w
 
 ### What is an .rpk file?
 
-An .rpk file is a lesson made with Rupok, a free whiteboard for teachers. It holds the slides, the teacher’s ink, live interactive Smart Objects and a replay of the class. Technically it’s a ZIP package with an open, documented format.
+An .rpk file is a lesson made with Rupok, a free whiteboard for teachers. It holds the slides, the teacher’s ink, live interactive Smart Objects and a replay of the class. Technically it’s a ZIP package with an open, documented format: see [the RPK file format](https://rupok.app/rpk/).
+
+### What does RPK stand for?
+
+RPK stands for Rich Presentation Kit, the name of Rupok’s lesson file format.
 
 ### How do I open an .rpk file?
 
@@ -397,6 +406,10 @@ Yes. Save the file from WhatsApp, Gmail or Google Drive, open rupok.app/open in 
 ### How do I convert an .rpk file to PDF?
 
 Open the file on this page, then press Download PDF in the viewer. The PDF has every page with the teacher’s ink, and it’s made on your device.
+
+### Can ChatGPT or Claude read my .rpk file?
+
+Yes. Upload the file and ask about the lesson: every .rpk from current Rupok versions includes a plain Markdown outline of its pages (`content.md`) that AI models read. See [how AI reads RPK files](https://rupok.app/rpk/#ai).
 
 ### Is my file uploaded anywhere?
 
@@ -435,11 +448,11 @@ Canonical: https://rupok.app/bn/open/ · Language: bn · Updated: 2026-11-23
 - **লাইভ স্মার্ট অবজেক্ট:** সিমুলেশন, থ্রিডি মডেল আর কুইজ, যা এখনো চলে।
 - **রিপ্লে:** প্রতিটি টানের সময়, তাই ক্লাসটি শুরু থেকে আবার দেখা যায়।
 
-- **ফাইলের ধরন**: Rupok লেসন
+- **ফাইলের ধরন**: Rupok লেসন (RPK: Rich Presentation Kit)
 - **এক্সটেনশন**: `.rpk`
 - **ভেতরে যা থাকে**: একটি ZIP প্যাকেজ: পুরো ইতিহাসসহ লেসন, ছবি আর স্মার্ট অবজেক্ট
 - **যা দিয়ে খোলে**: Rupok, Chrome বা Edge ব্রাউজারে ফ্রি: এই পাতায় বা rupok.app/board-এ
-- **ফরম্যাট**: খোলা ও নথিভুক্ত ([স্পেসিফিকেশন](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))
+- **ফরম্যাট**: খোলা ও নথিভুক্ত ([আরপিকে ফাইল ফরম্যাট](https://rupok.app/bn/rpk/), [স্পেসিফিকেশন](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))
 
 ## মোবাইল বা কম্পিউটারে .rpk ফাইল কীভাবে খুলবেন
 
@@ -479,6 +492,10 @@ Canonical: https://rupok.app/bn/open/ · Language: bn · Updated: 2026-11-23
 
 .rpk ফাইল হলো Rupok দিয়ে বানানো একটি লেসন। Rupok শিক্ষকদের জন্য ফ্রি হোয়াইটবোর্ড। এই ফাইলে স্লাইড, শিক্ষকের হাতের লেখা, লাইভ স্মার্ট অবজেক্ট আর পুরো ক্লাসের রিপ্লে থাকে। ভেতরে এটি একটি ZIP প্যাকেজ, যার ফরম্যাট খোলা ও নথিভুক্ত।
 
+### RPK-এর পুরো নাম কী?
+
+RPK মানে Rich Presentation Kit, Rupok-এর লেসন ফাইলের ফরম্যাট। বিস্তারিত: [আরপিকে ফাইল ফরম্যাট](https://rupok.app/bn/rpk/)।
+
 ### rpk ফাইল কীভাবে খুলবো?
 
 ফাইলটি এই পাতায় ছেড়ে দিন, অথবা “.rpk ফাইল বেছে নিন”-এ চাপুন। Rupok-এর স্টুডেন্ট মোডে ব্রাউজারেই খুলে যাবে। অ্যাকাউন্ট বা অ্যাপ লাগবে না।
@@ -511,9 +528,331 @@ Canonical: https://rupok.app/bn/open/ · Language: bn · Updated: 2026-11-23
 
 ---
 
+# RPK file format (Rich Presentation Kit)
+
+> An RPK (Rich Presentation Kit) file is a Rupok lesson: slides, handwriting, live activities and a class replay in one open ZIP package. What's inside, how to open it, convert it to PDF, and read it with AI.
+
+Canonical: https://rupok.app/rpk/ · Language: en · Updated: 2026-11-23
+
+An **RPK file** (`.rpk`, short for **Rich Presentation Kit**) is a lesson made with Rupok, the free, open-source whiteboard for teachers. One file holds the slides, everything written on them, live interactive activities and a replay of the class. The format is open, documented and readable by people, scripts and AI.
+
+## What is an RPK file?
+
+RPK stands for **Rich Presentation Kit**. Teachers make `.rpk` lessons in [Rupok](https://rupok.app/board/) and share them with students like slide decks, on WhatsApp, Gmail or Google Drive. Unlike a PDF, the lesson stays alive:
+
+- **Pages:** slides (often from a PDF) or infinite boards.
+- **Ink:** every pen stroke, with its timing, so the class can be replayed.
+- **Smart Objects:** simulations, 3D models and quizzes that still run.
+- **A readable outline:** the lesson as Markdown and JSON, for search and AI.
+
+- **Full name**: Rich Presentation Kit (Rupok lesson)
+- **Extension**: `.rpk`
+- **Media type**: `application/vnd.rupok.lesson+zip`
+- **Container**: ZIP, with a `mimetype` first entry (like EPUB)
+- **Opens with**: Rupok, free in Chrome or Edge ([rupok.app/open](https://rupok.app/open/))
+- **Specification**: Open, Apache-2.0 ([spec on GitHub](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))
+
+## What's inside a .rpk file
+
+A `.rpk` is a ZIP archive. Rename a copy to `.zip` and you can look inside:
+
+```text
+lesson.rpk                 a ZIP archive
+├── mimetype               application/vnd.rupok.lesson+zip (first entry)
+├── manifest.json          title, dates, course and chapter, page count
+├── README.md              "This is a Rupok lesson…" + the outline
+├── content.md             the lesson as readable Markdown
+├── content.json           the same outline, structured
+├── doc.loro               the lesson itself: pages, ink, history (Loro CRDT)
+├── assets/<hash>.png      images and media
+├── objects/<id>/index.html  interactive Smart Objects (HTML)
+└── thumbs/<n>.png         page previews (optional)
+```
+
+`doc.loro` is the authoritative lesson: a [Loro](https://loro.dev) CRDT document that keeps its whole edit history, so one file is the lesson, its undo history and its class recording. `README.md`, `content.md` and `content.json` are plain-text summaries Rupok rewrites on every save, so anyone can read a lesson without special software.
+
+## How to open an RPK file
+
+1. **Go to rupok.app/open** in Chrome or Edge, on a phone or a computer.
+2. **Drop the .rpk file on the page** or tap “Choose a .rpk file”. It opens in Student mode, read-only.
+3. **Replay the class,** flip through the pages and try the live activities.
+
+[Open the RPK viewer](https://rupok.app/open/)
+
+*Nothing is uploaded: the file is opened by your browser on your device. Teachers edit lessons at rupok.app/board.*
+
+## How to convert an RPK file to PDF
+
+1. **Open the file** at [rupok.app/open](https://rupok.app/open/).
+2. **Press Download PDF.** Every page is exported with the teacher's ink on it.
+3. **Print it or share it.** The PDF is made in your browser; nothing leaves your device.
+
+## How AI and developers read RPK files
+
+Every `.rpk` describes itself. Give one to ChatGPT, Claude or an agent and it can tell what the lesson contains.
+
+### For ChatGPT, Claude and other chatbots
+
+1. **Upload the .rpk file** (or a link to it) and ask about the lesson.
+2. **The model unzips it** and reads `README.md` and `content.md`: titles, text, maths, diagrams, images and activities, page by page.
+3. **Interactive parts** are HTML files in `objects/`, which the model can read too.
+
+### For agents and developers
+
+- Agent skill: [rupok.app/skills/read-rpk.md](https://rupok.app/skills/read-rpk.md), or [download it with its script](https://github.com/Shaitrish/rupok/tree/main/skills/read-rpk).
+- Markdown twin of this page: [rupok.app/rpk.md](https://rupok.app/rpk.md).
+- Full fidelity: read `doc.loro` with the official Loro packages (`pip install loro`, `npm install loro-crdt`).
+- Command line: `rupok export --md lesson.rpk` prints the outline.
+
+```sh
+pip install loro          # Python
+npm install loro-crdt     # JavaScript
+
+python3 read_rpk.py lesson.rpk        # the skill's script: .rpk → Markdown
+rupok export --md lesson.rpk          # the Rupok CLI does the same
+```
+
+## Example: the outline inside a lesson
+
+This is the `content.md` Rupok wrote for a short ICT lesson ([download the sample .rpk](https://rupok.app/skills/sample-lesson.rpk)).
+
+```markdown
+# Binary numbers
+
+- Subject: ICT
+- Chapter: Number systems
+- Pages: 3
+
+## Page 1: Place value in base 2
+
+> Each place is worth twice the place to its right.
+
+$$1011_2 = 8 + 2 + 1 = 11$$
+
+- Handwriting: 3 ink strokes
+  - recognised maths (machine reading, may be wrong): $x^2$
+- Shapes and diagrams: coordinate axes
+
+## Page 2: Logic gates
+
+- Shapes and diagrams: AND gate, OR gate, 2 × arrow
+
+## Page 3: Try it
+
+- Image: `assets/6c91…2ee8.png` (480 × 320)
+- Smart Object: **Binary counter** (8 steps, `objects/binary-counter/index.html`)
+```
+
+## Questions people ask
+
+### What does RPK stand for?
+
+RPK stands for Rich Presentation Kit. A .rpk file is a lesson made with Rupok, the free, open-source whiteboard for teachers.
+
+### What is an RPK file?
+
+An RPK file is one whole lesson: its pages, the teacher's handwriting with timing, images, live Smart Objects (simulations, 3D models, quizzes) and a readable outline. It is a ZIP package with an open, documented format.
+
+### How do I open an RPK file?
+
+Go to [rupok.app/open](https://rupok.app/open/) in Chrome or Edge and drop the file on the page. It opens free in your browser, with no account and nothing uploaded.
+
+### Is there a free RPK file viewer?
+
+Yes. Rupok's student viewer at [rupok.app/open](https://rupok.app/open/) is free, runs in the browser on phones and computers, and replays the class stroke by stroke.
+
+### How do I convert an RPK file to PDF?
+
+Open the file at [rupok.app/open](https://rupok.app/open/), then press Download PDF. Every page is exported with the teacher's ink, on your device.
+
+### Can ChatGPT or Claude read an RPK file?
+
+Yes. Every .rpk made by current Rupok versions carries `README.md`, `content.md` and `content.json`: the lesson as plain Markdown and JSON. Upload the file and ask about it; agents can also use the [read-rpk skill](https://rupok.app/skills/read-rpk.md).
+
+### Is the RPK format open?
+
+Yes. The specification and the reference reader and writer are Apache-2.0, so anyone can build tools that read or write .rpk files. See the [spec on GitHub](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md).
+
+### Can I open a .rpk file as a ZIP?
+
+Yes. Rename a copy to .zip, or open it with any ZIP tool. Start with `content.md`; the lesson itself is `doc.loro`, which the Loro libraries for Python and JavaScript read.
+
+### My .rpk file isn't a Rupok lesson. What is it?
+
+Other programs also use the .rpk extension, for example Esri CityEngine rule packages, Tizen resource packages and TI-99/4A cartridge files for the MAME emulator. If [rupok.app/open](https://rupok.app/open/) says it isn't a Rupok lesson, open it with the program that made it.
+
+---
+
+# আরপিকে (RPK) ফাইল ফরম্যাট
+
+> RPK (Rich Presentation Kit) ফাইল হলো Rupok-এর একটি লেসন: স্লাইড, হাতের লেখা, লাইভ অ্যাক্টিভিটি আর ক্লাসের রিপ্লে, একটি খোলা ZIP প্যাকেজে। ভেতরে কী আছে, কীভাবে খুলবেন, PDF বানাবেন আর এআই দিয়ে পড়বেন।
+
+Canonical: https://rupok.app/bn/rpk/ · Language: bn · Updated: 2026-11-23
+
+**RPK ফাইল** (`.rpk`, পুরো নাম **Rich Presentation Kit**) হলো Rupok দিয়ে বানানো একটি লেসন। Rupok শিক্ষকদের জন্য ফ্রি, ওপেন সোর্স হোয়াইটবোর্ড। একটি ফাইলেই থাকে স্লাইড, বোর্ডের সব লেখা, লাইভ অ্যাক্টিভিটি আর পুরো ক্লাসের রিপ্লে। ফরম্যাটটি খোলা ও নথিভুক্ত; মানুষ, প্রোগ্রাম আর এআই, সবাই পড়তে পারে।
+
+## RPK ফাইল কী?
+
+RPK মানে **Rich Presentation Kit**। শিক্ষকরা [Rupok](https://rupok.app/board/)-এ .rpk লেসন বানান আর হোয়াটসঅ্যাপ, জিমেইল বা গুগল ড্রাইভে শিক্ষার্থীদের পাঠান। PDF-এর মতো স্থির নয়, লেসনটি জীবন্ত থাকে:
+
+- **পাতা:** স্লাইড (প্রায়ই PDF থেকে) বা অসীম বোর্ড।
+- **হাতের লেখা:** প্রতিটি টান, সময়সহ, তাই ক্লাসের রিপ্লে দেখা যায়।
+- **স্মার্ট অবজেক্ট:** সিমুলেশন, থ্রিডি মডেল আর কুইজ, যা এখনো চলে।
+- **পড়ার উপযোগী সারাংশ:** লেসনটি Markdown আর JSON-এ, সার্চ আর এআই-এর জন্য।
+
+- **পুরো নাম**: Rich Presentation Kit (Rupok লেসন)
+- **এক্সটেনশন**: `.rpk`
+- **মিডিয়া টাইপ**: `application/vnd.rupok.lesson+zip`
+- **ভেতরে**: একটি ZIP প্যাকেজ
+- **যা দিয়ে খোলে**: Rupok, Chrome বা Edge-এ ফ্রি ([rupok.app/bn/open](https://rupok.app/bn/open/))
+- **স্পেসিফিকেশন**: খোলা, Apache-2.0 ([GitHub-এ](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))
+
+## .rpk ফাইলের ভেতরে কী থাকে
+
+.rpk আসলে একটি ZIP ফাইল। একটি কপির নাম বদলে `.zip` করলেই ভেতরটা দেখা যায়:
+
+```text
+lesson.rpk                 a ZIP archive
+├── mimetype               application/vnd.rupok.lesson+zip (first entry)
+├── manifest.json          title, dates, course and chapter, page count
+├── README.md              "This is a Rupok lesson…" + the outline
+├── content.md             the lesson as readable Markdown
+├── content.json           the same outline, structured
+├── doc.loro               the lesson itself: pages, ink, history (Loro CRDT)
+├── assets/<hash>.png      images and media
+├── objects/<id>/index.html  interactive Smart Objects (HTML)
+└── thumbs/<n>.png         page previews (optional)
+```
+
+`doc.loro` হলো মূল লেসন: একটি [Loro](https://loro.dev) CRDT ডকুমেন্ট, যাতে সম্পাদনার পুরো ইতিহাস থাকে। `README.md`, `content.md` আর `content.json` হলো সহজে পড়ার মতো সারাংশ, যা Rupok প্রতিবার সেভ করার সময় নতুন করে লেখে।
+
+## RPK ফাইল কীভাবে খুলবেন
+
+1. **rupok.app/bn/open খুলুন,** মোবাইল বা কম্পিউটারের Chrome বা Edge ব্রাউজারে।
+2. **.rpk ফাইলটি পাতায় ছেড়ে দিন,** অথবা “.rpk ফাইল বেছে নিন”-এ চাপুন। স্টুডেন্ট মোডে খুলবে।
+3. **ক্লাসের রিপ্লে দেখুন,** পাতা উল্টান, লাইভ অ্যাক্টিভিটি চালান।
+
+[আরপিকে ভিউয়ার খুলুন](https://rupok.app/bn/open/)
+
+## RPK থেকে PDF বানাবেন কীভাবে
+
+1. **ফাইলটি খুলুন,** [rupok.app/bn/open](https://rupok.app/bn/open/)-এ।
+2. **Download PDF চাপুন।** শিক্ষকের লেখাসহ সব পাতা PDF হয়ে যাবে।
+3. **প্রিন্ট বা শেয়ার করুন।** PDF আপনার ব্রাউজারেই তৈরি হয়, কিছুই আপলোড হয় না।
+
+## এআই দিয়ে RPK ফাইল পড়া
+
+প্রতিটি .rpk নিজের পরিচয় নিজেই দেয়। ChatGPT বা Claude-কে ফাইলটি দিন, সে বুঝে নেবে লেসনে কী আছে।
+
+1. **.rpk ফাইলটি আপলোড করুন** আর লেসন নিয়ে প্রশ্ন করুন।
+2. **এআই ফাইলটি আনজিপ করে** `README.md` আর `content.md` পড়ে: পাতাভিত্তিক শিরোনাম, লেখা, গণিত, চিত্র, ছবি আর অ্যাক্টিভিটি।
+3. **ডেভেলপার আর এজেন্টদের জন্য** [read-rpk স্কিল](https://rupok.app/skills/read-rpk.md) আর [ইংরেজি পাতা](https://rupok.app/rpk/)।
+
+## আরপিকে ফাইল নিয়ে প্রশ্নোত্তর
+
+### RPK-এর পুরো নাম কী?
+
+RPK মানে Rich Presentation Kit। .rpk ফাইল হলো Rupok দিয়ে বানানো লেসন; Rupok শিক্ষকদের জন্য ফ্রি, ওপেন সোর্স হোয়াইটবোর্ড।
+
+### RPK ফাইল কীভাবে খুলবো?
+
+Chrome বা Edge-এ [rupok.app/bn/open](https://rupok.app/bn/open/) খুলে ফাইলটি ছেড়ে দিন। ফ্রি, অ্যাকাউন্ট লাগে না, কিছু আপলোড হয় না।
+
+### RPK ফাইলকে PDF বানাবো কীভাবে?
+
+ফাইলটি [rupok.app/bn/open](https://rupok.app/bn/open/)-এ খুলে Download PDF চাপুন।
+
+### ChatGPT বা Claude কি RPK ফাইল পড়তে পারে?
+
+হ্যাঁ। Rupok-এর নতুন সংস্করণে বানানো প্রতিটি .rpk-এ `README.md`, `content.md` আর `content.json` থাকে, অর্থাৎ পুরো লেসনের সহজপাঠ্য সারাংশ। ফাইলটি আপলোড করে প্রশ্ন করুন।
+
+### RPK ফরম্যাট কি খোলা?
+
+হ্যাঁ। স্পেসিফিকেশন আর রেফারেন্স রিডার-রাইটার Apache-2.0 লাইসেন্সে, তাই যে কেউ .rpk পড়ার বা লেখার টুল বানাতে পারে। [GitHub-এ স্পেসিফিকেশন](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md)।
+
+---
+
+# Download Rupok
+
+> Download Rupok, the free, open-source whiteboard for teachers, for Windows (.exe, .msi) and Linux (.deb, AppImage). Mac is coming; phones and tablets use it in the browser.
+
+Canonical: https://rupok.app/download/ · Language: en · Updated: 2026-11-23
+
+The free whiteboard for teachers, as a desktop app for Windows and Linux. Or open it in Chrome or Edge on any device: same board, no install.
+
+## Every platform
+
+## Install as an app
+
+On a phone, tablet or Chromebook, the web app works like an installed one: its own window, offline, on the home screen.
+
+### Android, Chromebook, Windows
+
+Open [rupok.app/board](https://rupok.app/board/) in Chrome or Edge, open the browser menu and choose **Install app** (or **Add to Home screen**).
+
+### iPhone and iPad
+
+Open [rupok.app/board](https://rupok.app/board/) in Safari, tap **Share**, then **Add to Home Screen**.
+
+## A note on the warnings
+
+The installers aren’t code-signed yet, so your computer may ask once before it opens Rupok. That’s expected; signing is on the roadmap.
+
+- **Windows:** if SmartScreen says “Windows protected your PC”, choose **More info**, then **Run anyway**.
+- **Mac** (when the app ships): right-click the app, choose **Open**, then **Open** again.
+
+## System requirements
+
+- **Windows**: Windows 10 or 11, 64-bit
+- **Linux**: 64-bit; .deb for Debian and Ubuntu, AppImage for other distributions
+- **Browser**: A recent Chrome or Edge (any OS), with WebGL2 or WebGPU
+- **Hardware**: Any smartboard, interactive panel, laptop or tablet; a pen is optional
+- **Account**: None
+
+---
+
+# Rupok ডাউনলোড করুন
+
+> শিক্ষকদের ফ্রি, ওপেন সোর্স হোয়াইটবোর্ড Rupok ডাউনলোড করুন: Windows (.exe, .msi) ও Linux (.deb, AppImage)। Mac আসছে; ফোন ও ট্যাবলেটে ব্রাউজারেই চলে।
+
+Canonical: https://rupok.app/bn/download/ · Language: bn · Updated: 2026-11-23
+
+শিক্ষকদের ফ্রি হোয়াইটবোর্ড, Windows ও Linux-এর ডেস্কটপ অ্যাপ হিসেবে। অথবা যেকোনো ডিভাইসে Chrome বা Edge-এ খুলুন: একই বোর্ড, ইনস্টল ছাড়াই।
+
+## সব প্ল্যাটফর্ম
+
+## অ্যাপ হিসেবে ইনস্টল করুন
+
+ফোন, ট্যাবলেট বা Chromebook-এ ওয়েব অ্যাপ ইনস্টল করা অ্যাপের মতোই চলে: নিজের উইন্ডো, অফলাইন, হোম স্ক্রিনে।
+
+### Android, Chromebook, Windows
+
+Chrome বা Edge-এ [rupok.app/board](https://rupok.app/board/) খুলুন, ব্রাউজারের মেনু থেকে **Install app** (বা **Add to Home screen**) বেছে নিন।
+
+### iPhone ও iPad
+
+Safari-তে [rupok.app/board](https://rupok.app/board/) খুলুন, **Share** চাপুন, তারপর **Add to Home Screen**।
+
+## সতর্কবার্তা নিয়ে একটি কথা
+
+ইনস্টলারগুলো এখনো কোড-সাইন করা নয়, তাই প্রথমবার কম্পিউটার একবার জিজ্ঞেস করতে পারে। এটা স্বাভাবিক; সাইনিং রোডম্যাপে আছে।
+
+- **Windows:** SmartScreen “Windows protected your PC” দেখালে **More info**, তারপর **Run anyway** বেছে নিন।
+- **Mac** (অ্যাপ এলে): অ্যাপে রাইট-ক্লিক করে **Open**, তারপর আবার **Open**।
+
+## সিস্টেম রিকোয়ারমেন্ট
+
+- **Windows**: Windows 10 বা 11, 64-বিট
+- **Linux**: 64-বিট; Debian ও Ubuntu-র জন্য .deb, অন্য ডিস্ট্রোর জন্য AppImage
+- **ব্রাউজার**: সাম্প্রতিক Chrome বা Edge (যেকোনো OS), WebGL2 বা WebGPU সহ
+- **হার্ডওয়্যার**: যেকোনো স্মার্ট বোর্ড, ইন্টারঅ্যাক্টিভ প্যানেল, ল্যাপটপ বা ট্যাবলেট; পেন ঐচ্ছিক
+- **অ্যাকাউন্ট**: লাগবে না
+
+---
+
 # Free smartboard software that works on any board
 
-> Rupok is free, open-source smartboard software for any interactive panel, smart board or projector. Write on PDF slides with fast ink, add AI-made activities, replay every class. No licence, no account.
+> Rupok is free, open-source smartboard software for any interactive panel, smart board or projector. Write on PDF slides, add AI-made activities, replay every class. No licence.
 
 Canonical: https://rupok.app/smartboard-software/ · Language: en · Updated: 2026-11-23
 

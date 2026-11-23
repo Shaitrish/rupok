@@ -1,163 +1,35 @@
 import { For, Show, createMemo, createSignal } from "solid-js";
 import { controller } from "../controller";
 import {
-  BOARD_COLORS, camera, canRedo, canUndo, pageIndex, pages, prefs, replay, revision, savedRevision, setPrefs, showToast, stats,
-  title, isView, modeConfig, studentEntry, lessonOpened,
+  BOARD_COLORS, camera, pageIndex, pages, prefs, replay, showToast, stats, isView, modeConfig,
 } from "../state";
 import { hasTopBar } from "../modes";
-import { ModeSwitcher } from "./ModeSwitcher";
-import { Icon, Mark } from "./Icon";
+import { Icon } from "./Icon";
 import { SelectionOverlay } from "./Selection";
+import { MathPreview } from "./MathPreview";
 import { ThumbCanvas } from "./PageThumb";
-import { ExportHost, openExport } from "./ExportDialog";
-import { FILE_EXT, WORDMARK } from "../brand";
+import { ExportHost } from "./ExportDialog";
+import { FloatingAiStatus, Header } from "./Header";
+import { livePhase } from "../live";
+import { isPhone, setPagesDrawer } from "../viewport";
 
-function pick(accept: string, multiple = false): Promise<File[]> {
-  return new Promise((resolve) => {
-    const i = document.createElement("input");
-    i.type = "file";
-    i.accept = accept;
-    i.multiple = multiple;
-    i.onchange = () => resolve(Array.from(i.files ?? []));
-    i.click();
-  });
-}
-
+// The top bar itself lives in Header.tsx (with HeaderMenu.tsx for Insert ▾
+// and ⋯, and AiStatus.tsx for the AI). Add top-bar actions there: an item on
+// the bar, or an entry in the ⋯ menu (overflowEntries).
 export function TopBar(props: { onObject: () => void; onSettings: () => void }) {
-  const dark = () => document.documentElement.dataset.theme === "dark";
-  const c = () => modeConfig().chrome;
-  const leftOn = () => c().switcher || c().logo || c().title || (c().pagesToggle && c().pages);
-  const editOn = () => c().history || c().insert || c().replay;
-  /** Student view: a lesson is on the board (opened, or switched to from Prepare). */
-  const hasLesson = () => !studentEntry || lessonOpened();
-  const fileOn = () => c().open || c().theme || c().fullscreen || c().settings || c().save || (isView() && hasLesson());
+  const aiAround = () => livePhase() !== "idle";
   return (
     <>
       <Show when={hasTopBar(modeConfig())}>
-        <header class="topbar">
-          <Show when={leftOn()}>
-            <div class="cluster surface">
-              <Show when={c().pagesToggle && c().pages}>
-                <button class="btn icon" title="Pages panel" aria-label="Toggle pages panel" onClick={() => setPrefs({ showPages: !prefs().showPages })}>
-                  <Icon name="sidebar" />
-                </button>
-              </Show>
-              <Show when={c().logo}>
-                <div class="brand">
-                  <Mark size={28} />
-                  <span class="wordmark"><b>{WORDMARK.accent}</b>{WORDMARK.rest}</span>
-                </div>
-              </Show>
-              <Show when={c().switcher}>
-                <ModeSwitcher />
-              </Show>
-              <Show when={c().title}>
-                <Show when={c().switcher || c().logo || (c().pagesToggle && c().pages)}>
-                  <div class="vsep" />
-                </Show>
-                <Show
-                  when={!isView()}
-                  fallback={
-                    <>
-                      <span class="title-text" title={title()}>{title()}</span>
-                      <span class="view-chip"><Icon name="eye" size={16} />View only</span>
-                    </>
-                  }
-                >
-                  <input
-                    class="title-input"
-                    value={title()}
-                    size={Math.min(28, Math.max(10, title().length + 1))}
-                    onChange={(e) => controller.board.set_title(e.currentTarget.value.trim() || "Untitled lesson")}
-                    onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-                    aria-label="Lesson title"
-                  />
-                  <Show when={revision() !== savedRevision()}>
-                    <span class="dirty-dot" title={`Changes are autosaved in this browser. Save to keep a .${FILE_EXT} file.`} />
-                  </Show>
-                </Show>
-              </Show>
-            </div>
-          </Show>
-          <div class="grow" />
-          <Show when={editOn()}>
-            <div class="cluster surface">
-              <Show when={c().history && !isView()}>
-                <button class="btn icon" disabled={!canUndo()} onClick={() => controller.board.undo()} title="Undo  ·  Ctrl Z" aria-label="Undo"><Icon name="undo" /></button>
-                <button class="btn icon" disabled={!canRedo()} onClick={() => controller.board.redo()} title="Redo  ·  Ctrl Shift Z" aria-label="Redo"><Icon name="redo" /></button>
-                <Show when={c().insert || c().replay}>
-                  <div class="vsep" />
-                </Show>
-              </Show>
-              <Show when={c().insert && !isView()}>
-                <button class="btn" onClick={async () => controller.importFiles(await pick(".pdf,application/pdf"))} title="Import a PDF — every page becomes a slide you can write on">
-                  <Icon name="pdf" /><span class="label">PDF</span>
-                </button>
-                <button class="btn" onClick={async () => { const [f] = await pick("image/*"); if (f) controller.insertImage(f); }} title="Insert an image">
-                  <Icon name="image" /><span class="label">Image</span>
-                </button>
-                <button class="btn" onClick={props.onObject} title="Add a Smart Object — live HTML made by your AI">
-                  <Icon name="object" /><span class="label">Smart Object</span>
-                </button>
-              </Show>
-              <Show when={c().replay}>
-                <button class="btn" onClick={() => controller.board.replay_start()} title="Replay this page stroke by stroke">
-                  <Icon name="replay" /><span class="label">Replay</span>
-                </button>
-              </Show>
-            </div>
-          </Show>
-          <Show when={fileOn()}>
-            <div class="cluster surface">
-              <Show when={c().open && !isView()}>
-                <button class="btn icon" onClick={() => controller.openFile()} title="Open  ·  Ctrl O" aria-label="Open"><Icon name="open" /></button>
-              </Show>
-              <Show when={c().save && !isView()}>
-                <button class="btn icon" onClick={openExport} title="Export PDF  ·  Ctrl Shift E" aria-label="Export PDF"><Icon name="export" /></button>
-              </Show>
-              <Show when={c().theme}>
-                <button class="btn icon" onClick={() => setPrefs({ theme: dark() ? "light" : "dark" })} title="Light / dark" aria-label="Toggle theme">
-                  <Icon name={dark() ? "sun" : "moon"} />
-                </button>
-              </Show>
-              <Show when={c().fullscreen}>
-                <button class="btn icon" onClick={() => controller.toggleFullscreen()} title="Fullscreen  ·  F" aria-label="Fullscreen"><Icon name="fullscreen" /></button>
-              </Show>
-              <Show when={c().settings && !isView()}>
-                <button class="btn icon" onClick={props.onSettings} title="Settings" aria-label="Settings"><Icon name="settings" /></button>
-              </Show>
-              <Show when={isView() ? c().open : c().save}>
-                <Show when={c().theme || c().fullscreen || (c().settings && !isView()) || (c().open && !isView())}>
-                  <div class="vsep" />
-                </Show>
-                <Show
-                  when={!isView()}
-                  fallback={
-                    <button class="btn" classList={{ solid: !hasLesson() }} onClick={() => controller.openFile()} title={`Open a .${FILE_EXT} lesson  ·  Ctrl O`}>
-                      <Icon name="open" /><span class="label">Open lesson</span>
-                    </button>
-                  }
-                >
-                  <button class="btn solid" onClick={() => controller.saveFile()} title={`Save .${FILE_EXT}  ·  Ctrl S`}>
-                    <Icon name="save" /><span class="label">Save</span>
-                  </button>
-                </Show>
-              </Show>
-              <Show when={isView() && hasLesson()}>
-                <Show when={!c().open && (c().theme || c().fullscreen)}>
-                  <div class="vsep" />
-                </Show>
-                <button class="btn solid" onClick={openExport} title="Download this lesson as a PDF  ·  Ctrl Shift E">
-                  <Icon name="download" /><span class="label">Download PDF</span>
-                </button>
-              </Show>
-            </div>
-          </Show>
-        </header>
+        <Header onObject={props.onObject} onSettings={props.onSettings} />
+      </Show>
+      <Show when={!hasTopBar(modeConfig()) && !isView() && aiAround()}>
+        <FloatingAiStatus />
       </Show>
       {/* Mounted here because the top bar component is always rendered; the
           overlay itself is a full-screen layer. */}
       <SelectionOverlay />
+      <MathPreview />
       <ExportHost />
     </>
   );
@@ -257,6 +129,10 @@ export function PagesPanel() {
 
   return (
     <Show when={modeConfig().chrome.pages}>
+    {/* Phones: a drawer over the board; tapping outside closes it. */}
+    <Show when={isPhone()}>
+      <div class="pages-scrim" onClick={() => setPagesDrawer(false)} />
+    </Show>
     <aside class="pages surface" classList={{ viewing: isView(), top: !hasTopBar(modeConfig()) }} aria-label="Pages">
       <div class="pages-head">
         <span>Pages · {pages().length}</span>
@@ -280,7 +156,11 @@ export function PagesPanel() {
                   background: thumbBg(p()?.bg_color ?? 0xffffffff),
                   transform: lifted() ? `translateY(${drag()!.dy}px)` : undefined,
                 }}
-                onClick={() => !suppressClick && controller.board.goto_page(i())}
+                onClick={() => {
+                  if (suppressClick) return;
+                  controller.board.goto_page(i());
+                  if (isPhone()) setPagesDrawer(false);
+                }}
                 onPointerDown={(e) => startDrag(e, i())}
                 title={p()?.title || `Page ${i() + 1}`}
               >

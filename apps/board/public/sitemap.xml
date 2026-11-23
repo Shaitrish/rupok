@@ -28,6 +28,13 @@
     <lastmod>2026-11-23</lastmod>
   </url>
   <url>
+    <loc>https://rupok.app/download/</loc>
+    <lastmod>2026-11-23</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/download/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://rupok.app/bn/download/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/download/"/>
+  </url>
+  <url>
     <loc>https://rupok.app/for-teachers/</loc>
     <lastmod>2026-11-23</lastmod>
   </url>
@@ -43,8 +50,22 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/open/"/>
   </url>
   <url>
+    <loc>https://rupok.app/rpk/</loc>
+    <lastmod>2026-11-23</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/rpk/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://rupok.app/bn/rpk/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/rpk/"/>
+  </url>
+  <url>
     <loc>https://rupok.app/smartboard-software/</loc>
     <lastmod>2026-11-23</lastmod>
+  </url>
+  <url>
+    <loc>https://rupok.app/bn/download/</loc>
+    <lastmod>2026-11-23</lastmod>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://rupok.app/bn/download/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/download/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/download/"/>
   </url>
   <url>
     <loc>https://rupok.app/bn/open/</loc>
@@ -52,6 +73,13 @@
     <xhtml:link rel="alternate" hreflang="bn" href="https://rupok.app/bn/open/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/open/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/open/"/>
+  </url>
+  <url>
+    <loc>https://rupok.app/bn/rpk/</loc>
+    <lastmod>2026-11-23</lastmod>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://rupok.app/bn/rpk/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/rpk/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/rpk/"/>
   </url>
   <url>
     <loc>https://rupok.app/compare/activinspire/</loc>

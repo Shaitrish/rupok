@@ -63,11 +63,11 @@ Last updated: 23 November 2026. Website: ${SITE}/ · Source: ${GITHUB}
 - **Student viewer:** ${SITE}/open/ opens a \`.rpk\` file in the browser, read-only, with replay and working Smart Objects. No account, nothing uploaded.
 - **Bangla:** Bangla text and fonts work in lessons (Hind Siliguri, Noto Sans Bengali).
 - **MCP server:** the \`rupok\` CLI includes an MCP server (stdio) with 11 tools for creating lessons and adding validated Smart Objects. Works with Claude Code, Codex CLI, OpenCode and any MCP client.
-- **Open file format:** \`.rpk\` is a ZIP package (media type \`application/vnd.rupok.lesson+zip\`) holding a Loro CRDT document with full history, assets and Smart Object bundles. Spec: ${GITHUB}/blob/main/spec/rupok-format.md
+- **Open file format:** \`.rpk\` (RPK, Rich Presentation Kit) is a ZIP package (media type \`application/vnd.rupok.lesson+zip\`) holding a Loro CRDT document with full history, assets and Smart Object bundles, plus a readable outline (\`README.md\`, \`content.md\`, \`content.json\`) that AI models and scripts read without Loro. Format page: ${SITE}/rpk/ · Agent skill: ${SITE}/skills/read-rpk.md · Spec: ${GITHUB}/blob/main/spec/rupok-format.md
 
 ## Coming soon (not shipped yet)
 
-Desktop app for Windows and Linux (Tauri), draw over any app (desktop overlay), offline install (PWA), Bangla interface, replay with audio, Rupok Cloud (500 MB free cloud storage per teacher, share links \`rupok.app/s/<id>\`, a remote Claude connector, Google Drive), live classes, live quizzes, handwriting recognition, subject tools (ruler, protractor, compass), Android app.
+Desktop app for Windows and Linux (Tauri), draw over any app (desktop overlay), offline install (PWA), Bangla interface, replay with audio, Rupok Cloud (500 MB free cloud storage per teacher, share links \`rupok.app/s/<id>\`, a remote Claude connector, Google Drive "Open with"), live classes, live quizzes, handwriting recognition, subject tools (ruler, protractor, compass), Android app.
 
 ## Use the MCP server (for AI agents)
 

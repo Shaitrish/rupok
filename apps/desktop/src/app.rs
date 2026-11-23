@@ -9,7 +9,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, State, WindowEvent};
 use tauri_plugin_fs::FsExt;
 use tauri_plugin_window_state::StateFlags;
 
-use crate::{files, overlay};
+use crate::{agent_cmd, cloud_cmd, files, library_cmd, overlay, voice_cmd};
 
 /// Label of the board window (`tauri.conf.json`).
 pub const MAIN: &str = "main";
@@ -54,6 +54,10 @@ pub fn run() {
         )
         .manage(PendingFiles::default())
         .manage(overlay::OverlayState::default())
+        .manage(library_cmd::LibraryState::default())
+        .manage(cloud_cmd::CloudAuthState::default())
+        .manage(voice_cmd::VoiceState::default())
+        .manage(agent_cmd::AgentState::default())
         .invoke_handler(tauri::generate_handler![
             take_pending_files,
             save_lesson,
@@ -66,12 +70,38 @@ pub fn run() {
             overlay::overlay_capture,
             overlay::overlay_deliver_page,
             overlay::take_overlay_page,
+            library_cmd::library_info,
+            library_cmd::library_list,
+            library_cmd::library_stat,
+            library_cmd::library_read,
+            library_cmd::library_read_range,
+            library_cmd::library_write,
+            library_cmd::library_mkdir,
+            library_cmd::library_rename,
+            library_cmd::library_copy,
+            library_cmd::library_remove,
+            library_cmd::library_choose_root,
+            library_cmd::library_reset_root,
+            library_cmd::library_save_zip,
+            cloud_cmd::cloud_auth_begin,
+            cloud_cmd::cloud_auth_wait,
+            agent_cmd::agent_start,
+            voice_cmd::voice_status,
+            voice_cmd::voice_model_download,
+            voice_cmd::voice_model_cancel,
+            voice_cmd::voice_model_remove,
+            voice_cmd::voice_transcribe,
         ])
         .setup(|app| {
             let args: Vec<String> = std::env::args().skip(1).collect();
             let cwd = std::env::current_dir().unwrap_or_default();
             queue_files(app.handle(), files::paths_from_args(&args, &cwd));
             overlay::register_shortcuts(app.handle());
+            voice_cmd::init(app.handle()); // the board may use the microphone (voice input)
+            // The lesson library (Documents/Rupok) and its folder watcher.
+            if let Err(e) = library_cmd::init(app.handle()) {
+                eprintln!("library: {e}");
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -141,7 +171,7 @@ pub(crate) fn header(request: &Request<'_>, name: &str) -> Result<String, String
 /// Only write where the teacher pointed: a path from a save/open dialog (the
 /// dialog plugin adds it to the scope), a file the OS opened, or that path
 /// plus `.rpk` (GTK save dialogs do not append the extension).
-fn may_write<R: Runtime>(app: &AppHandle<R>, path: &Path) -> bool {
+pub(crate) fn may_write<R: Runtime>(app: &AppHandle<R>, path: &Path) -> bool {
     let scope = app.fs_scope();
     scope.is_allowed(path) || scope.is_allowed(path.with_extension(""))
 }

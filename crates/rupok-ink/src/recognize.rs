@@ -2,6 +2,12 @@
 //! clean shape (line, arrow, circle, ellipse, rectangle, square, triangle,
 //! diamond, pentagon, hexagon or five-point star), or into nothing.
 //!
+//! Phase 2 adds *templates* for science, maths and ICT classes (axes and
+//! fitted graphs, flowcharts, logic gates, number lines, angle marks,
+//! tables, Venn diagrams, circuit symbols, benzene, ⇌), most of them
+//! *contextual*: they look at the strokes around the new one (see
+//! [`registry`]). Each family can be switched off ([`family`]).
+//!
 //! Pure geometry, no model and no clock. The pipeline:
 //!
 //! 1. **Size gate** in screen pixels: handwriting is small, shapes are big.
@@ -27,6 +33,46 @@
 use crate::StrokePoint;
 
 type P = [f32; 2];
+
+/// Smart Ink families (Settings → Smart ink), as bits of [`Options::families`].
+pub mod family {
+    /// Axes from a "+" or an "L", curves fitted over them.
+    pub const GRAPHS: u32 = 1;
+    /// Terminator and input/output shapes, sticky connectors.
+    pub const FLOWCHART: u32 = 1 << 1;
+    /// AND, OR, NOT, NAND, NOR, XOR, XNOR.
+    pub const GATES: u32 = 1 << 2;
+    pub const NUMBER_LINE: u32 = 1 << 3;
+    /// Angle marks, right-angle marks, parallel / perpendicular lines.
+    pub const GEOMETRY: u32 = 1 << 4;
+    /// Tables and Venn diagrams.
+    pub const TABLES: u32 = 1 << 5;
+    /// Circuit symbols, benzene, ⇌.
+    pub const SCIENCE: u32 = 1 << 6;
+    /// Every family.
+    pub const ALL: u32 = (1 << 7) - 1;
+    /// On by default: everything but circuits & chemistry, whose symbols
+    /// (a zig-zag, a long/short line pair) are the most likely to be meant
+    /// as something else in other subjects.
+    pub const DEFAULT: u32 = ALL & !SCIENCE;
+    /// Names used by settings and the board, in Settings order.
+    pub const NAMES: [(&str, u32); 7] = [
+        ("graphs", GRAPHS),
+        ("flowchart", FLOWCHART),
+        ("gates", GATES),
+        ("numberline", NUMBER_LINE),
+        ("geometry", GEOMETRY),
+        ("tables", TABLES),
+        ("science", SCIENCE),
+    ];
+
+    /// Bits from a comma-separated list of names; unknown names are ignored.
+    pub fn parse(list: &str) -> u32 {
+        list.split(',')
+            .filter_map(|n| NAMES.iter().find(|(k, _)| *k == n.trim()).map(|(_, b)| *b))
+            .fold(0, |a, b| a | b)
+    }
+}
 
 /// Smallest closed shape that snaps on pen-up: its larger side, screen px.
 /// Board handwriting is about 40–90 px tall at 1080p.
@@ -86,12 +132,63 @@ pub enum ShapeKind {
     Pentagon,
     Hexagon,
     Star,
+    // ---- Phase 2 templates
+    Axes,
+    GraphLine,
+    GraphQuad,
+    GraphSine,
+    GraphExp,
+    NumberLine,
+    Terminator,
+    Parallelogram,
+    AndGate,
+    OrGate,
+    NotGate,
+    NandGate,
+    NorGate,
+    XorGate,
+    XnorGate,
+    Resistor,
+    Cell,
+    Bulb,
+    Switch,
+    Benzene,
+    Equilibrium,
+    Table,
+    Venn,
+    Angle,
+    RightAngle,
 }
 
 impl ShapeKind {
     /// Stored `shape` name (see `spec/rupok-format.md`).
     pub fn as_str(self) -> &'static str {
         match self {
+            ShapeKind::Axes => "axes",
+            ShapeKind::GraphLine => "graph-line",
+            ShapeKind::GraphQuad => "graph-quad",
+            ShapeKind::GraphSine => "graph-sine",
+            ShapeKind::GraphExp => "graph-exp",
+            ShapeKind::NumberLine => "numberline",
+            ShapeKind::Terminator => "terminator",
+            ShapeKind::Parallelogram => "parallelogram",
+            ShapeKind::AndGate => "and-gate",
+            ShapeKind::OrGate => "or-gate",
+            ShapeKind::NotGate => "not-gate",
+            ShapeKind::NandGate => "nand-gate",
+            ShapeKind::NorGate => "nor-gate",
+            ShapeKind::XorGate => "xor-gate",
+            ShapeKind::XnorGate => "xnor-gate",
+            ShapeKind::Resistor => "resistor",
+            ShapeKind::Cell => "cell",
+            ShapeKind::Bulb => "bulb",
+            ShapeKind::Switch => "switch",
+            ShapeKind::Benzene => "benzene",
+            ShapeKind::Equilibrium => "equilibrium",
+            ShapeKind::Table => "table",
+            ShapeKind::Venn => "venn",
+            ShapeKind::Angle => "angle",
+            ShapeKind::RightAngle => "right-angle",
             ShapeKind::Line => "line",
             ShapeKind::Arrow => "arrow",
             ShapeKind::Circle => "circle",
@@ -119,6 +216,52 @@ pub enum Geometry {
     /// Closed polygon through these vertices, in drawing order (a pentagram
     /// lists its tips in star order).
     Polygon { pts: Vec<P> },
+    /// A template (stored `geom` kind `kind`): the unrotated box (`x`, `y`
+    /// top-left, `w`, `h`) turned by `rot` about its centre, and the kind's
+    /// numbers `v` (see `spec/rupok-format.md`, Shape geometry).
+    Template {
+        kind: &'static str,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        rot: f32,
+        v: Vec<f32>,
+    },
+}
+
+impl Geometry {
+    /// A template from its centre, size and rotation.
+    pub fn template(kind: &'static str, c: P, w: f32, h: f32, rot: f32, v: Vec<f32>) -> Self {
+        Geometry::Template {
+            kind,
+            x: c[0] - w / 2.0,
+            y: c[1] - h / 2.0,
+            w,
+            h,
+            rot,
+            v,
+        }
+    }
+
+    /// An open polyline template (`path` smooth, `polyline` straight)
+    /// through absolute points: `v` holds them normalised to the box.
+    pub fn open_path(kind: &'static str, pts: &[P]) -> Self {
+        let b = bbox(pts);
+        let (w, h) = ((b[2] - b[0]).max(1e-3), (b[3] - b[1]).max(1e-3));
+        Geometry::Template {
+            kind,
+            x: b[0],
+            y: b[1],
+            w: b[2] - b[0],
+            h: b[3] - b[1],
+            rot: 0.0,
+            v: pts
+                .iter()
+                .flat_map(|p| [(p[0] - b[0]) / w, (p[1] - b[1]) / h])
+                .collect(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -136,6 +279,8 @@ pub struct Options {
     pub px_per_unit: f32,
     /// Hold-to-snap: the teacher asked for a shape, so smaller ones count.
     pub deliberate: bool,
+    /// Enabled [`family`] bits.
+    pub families: u32,
 }
 
 impl Default for Options {
@@ -143,11 +288,16 @@ impl Default for Options {
         Self {
             px_per_unit: 1.0,
             deliberate: false,
+            families: family::DEFAULT,
         }
     }
 }
 
 impl Options {
+    /// True when family `f` is on.
+    pub fn has(&self, f: u32) -> bool {
+        self.families & f != 0
+    }
     fn px(&self) -> f32 {
         self.px_per_unit.max(1e-4)
     }
@@ -398,16 +548,102 @@ fn closed_shape(p: &[P], opts: Options) -> Option<Recognized> {
     let diag = bw.hypot(bh);
     let (total, abs) = total_turning(p);
     let c = corners(p, CORNER_WINDOW, CORNER_TURN, true);
+    let once = (1.7 * PI..=2.35 * PI).contains(&total.abs()) && abs <= 1.3 * total.abs();
     if c.len() >= 3 {
-        return polygon(p, &c, total, abs, diag);
+        let poly = polygon(p, &c, total, abs, diag, opts);
+        if poly.is_none() && c.len() <= 4 && once && opts.has(family::FLOWCHART) {
+            // Kinks where a terminator's straight sides meet its round ends.
+            return stadium(p, diag);
+        }
+        return poly;
     }
     // Smooth: an ellipse turns once, in one direction, with at most one
     // kink where the ends meet (a `D` has two sharp corners, an `8` turns
     // both ways).
-    if c.len() > 1 || !(1.7 * PI..=2.35 * PI).contains(&total.abs()) || abs > 1.3 * total.abs() {
+    if !once {
+        return None;
+    }
+    if opts.has(family::FLOWCHART)
+        && let Some(r) = stadium(p, diag)
+    {
+        return Some(r);
+    }
+    if c.len() > 1 {
         return None;
     }
     ellipse(p)
+}
+
+/// Flowchart terminator: two straight parallel sides joined by half
+/// circles. Taken only when it fits clearly better than an ellipse (an oval
+/// stays an ellipse) and the long sides really are straight.
+fn stadium(p: &[P], diag: f32) -> Option<Recognized> {
+    let n = p.len() as f32;
+    let c = p
+        .iter()
+        .fold([0.0, 0.0], |s, q| [s[0] + q[0] / n, s[1] + q[1] / n]);
+    let (_, d) = fit_line(p);
+    let rot = angle(d);
+    let (s, co) = rot.sin_cos();
+    let uv: Vec<P> = p
+        .iter()
+        .map(|q| {
+            let (dx, dy) = (q[0] - c[0], q[1] - c[1]);
+            [dx * co + dy * s, -dx * s + dy * co]
+        })
+        .collect();
+    let b = bbox(&uv);
+    let (cu, cv) = ((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0);
+    let (a, r) = ((b[2] - b[0]) / 2.0, (b[3] - b[1]) / 2.0);
+    if r <= f32::EPSILON || a / r < 1.6 {
+        return None;
+    }
+    let half = a - r;
+    // Distance to the stadium outline and to the inscribed ellipse.
+    let d_stadium = |q: P| {
+        let (u, v) = (q[0] - cu, q[1] - cv);
+        if u.abs() <= half {
+            (v.abs() - r).abs()
+        } else {
+            ((u.abs() - half).hypot(v) - r).abs()
+        }
+    };
+    let ring: Vec<P> = (0..240)
+        .map(|i| {
+            let t = i as f32 / 240.0 * TAU;
+            [cu + a * t.cos(), cv + r * t.sin()]
+        })
+        .collect();
+    let d_ellipse = |q: P| {
+        ring.iter()
+            .map(|e| dist(*e, q))
+            .fold(f32::INFINITY, f32::min)
+    };
+    let (mut es, mut ee, mut worst, mut side) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+    for q in &uv {
+        let ds = d_stadium(*q);
+        es += ds;
+        ee += d_ellipse(*q);
+        worst = worst.max(ds);
+        if (q[0] - cu).abs() <= 0.8 * half {
+            side = side.max(ds);
+        }
+    }
+    let (es, ee) = (es / n, ee / n);
+    if es / diag > 0.022 || es > 0.6 * ee || worst > 0.3 * r || side > 0.16 * r {
+        return None;
+    }
+    let mut rot = wrap_half_pi(rot);
+    if rot.abs() <= 10.0 * DEG {
+        rot = 0.0;
+    }
+    let (s, co) = rot.sin_cos();
+    let centre = [c[0] + cu * co - cv * s, c[1] + cu * s + cv * co];
+    Some(Recognized {
+        kind: ShapeKind::Terminator,
+        geometry: Geometry::template("stadium", centre, 2.0 * a, 2.0 * r, rot, Vec::new()),
+        confidence: (1.0 - es / diag / 0.022).clamp(0.0, 1.0),
+    })
 }
 
 fn ellipse(p: &[P]) -> Option<Recognized> {
@@ -498,7 +734,14 @@ fn ellipse(p: &[P]) -> Option<Recognized> {
     })
 }
 
-fn polygon(p: &[P], c: &[usize], total: f32, abs: f32, diag: f32) -> Option<Recognized> {
+fn polygon(
+    p: &[P],
+    c: &[usize],
+    total: f32,
+    abs: f32,
+    diag: f32,
+    opts: Options,
+) -> Option<Recognized> {
     let n = p.len();
     let k = c.len();
     let turns: Vec<f32> = c
@@ -579,6 +822,11 @@ fn polygon(p: &[P], c: &[usize], total: f32, abs: f32, diag: f32) -> Option<Reco
         4 if same_sign && simple => {
             if let Some(pts) = diamond(&v) {
                 return rec(ShapeKind::Diamond, Geometry::Polygon { pts });
+            }
+            if opts.has(family::FLOWCHART)
+                && let Some(pts) = parallelogram(&v)
+            {
+                return rec(ShapeKind::Parallelogram, Geometry::Polygon { pts });
             }
             let (geometry, square) = rectangle(&v)?;
             rec(
@@ -730,6 +978,54 @@ fn diamond(v: &[P]) -> Option<Vec<P>> {
             .map(|m| [b[0] + m[0] * w, b[1] + m[1] * h])
             .collect(),
     )
+}
+
+/// Flowchart input/output: level top and bottom, slanted sides (45°–80°),
+/// opposite sides parallel. Vertices clockwise from the top left.
+fn parallelogram(v: &[P]) -> Option<Vec<P>> {
+    let dir = |i: usize| {
+        let (a, b) = (v[i], v[(i + 1) % 4]);
+        [b[0] - a[0], b[1] - a[1]]
+    };
+    // Opposite sides parallel (directions opposite as we go round).
+    for i in 0..2 {
+        let (a, b) = (dir(i), dir(i + 2));
+        if angle_between(a, [-b[0], -b[1]]) > 8.0 * DEG {
+            return None;
+        }
+    }
+    // Which pair is level?
+    let level = |i: usize| {
+        axis_offset(angle(dir(i))) <= 10.0 * DEG && {
+            let d = dir(i);
+            d[0].abs() > d[1].abs()
+        }
+    };
+    let k = (0..2).find(|&i| level(i) && level(i + 2))?;
+    let slant = angle_between(dir(k + 1), [1.0, 0.0]);
+    let slant = slant.min(PI - slant);
+    if !(45.0 * DEG..=80.0 * DEG).contains(&slant) {
+        return None;
+    }
+    let (l1, l2) = (dist(v[k], v[k + 1]), dist(v[k + 2], v[(k + 3) % 4]));
+    if l1.min(l2) / l1.max(l2) < 0.8 {
+        return None;
+    }
+    let mut q: Vec<P> = v.to_vec();
+    q.sort_by(|a, b| a[1].total_cmp(&b[1]));
+    let (mut top, mut bot) = ([q[0], q[1]], [q[2], q[3]]);
+    top.sort_by(|a, b| a[0].total_cmp(&b[0]));
+    bot.sort_by(|a, b| a[0].total_cmp(&b[0]));
+    let len = (top[1][0] - top[0][0] + bot[1][0] - bot[0][0]) / 2.0;
+    let shift = (top[0][0] - bot[0][0] + top[1][0] - bot[1][0]) / 2.0;
+    if shift.abs() < 0.15 * len {
+        // Barely slanted: a rectangle.
+        return None;
+    }
+    let (yt, yb) = ((top[0][1] + top[1][1]) / 2.0, (bot[0][1] + bot[1][1]) / 2.0);
+    let cx = (top[0][0] + top[1][0] + bot[0][0] + bot[1][0]) / 4.0;
+    let (xt, xb) = (cx + shift / 2.0 - len / 2.0, cx - shift / 2.0 - len / 2.0);
+    Some(vec![[xt, yt], [xt + len, yt], [xb + len, yb], [xb, yb]])
 }
 
 /// Rectangle (axis-aligned when within [`RECT_SNAP_DEG`]); the flag is true
@@ -1224,7 +1520,77 @@ fn snap_segment(a: P, b: P) -> (P, P) {
 }
 
 pub mod registry;
-pub use registry::{Context, Neighbour, Proposal, Recognizer, Registry};
+pub use registry::{Context, Label, Neighbour, Proposal, Recognizer, Registry};
+
+pub mod diagram;
+pub mod geometry;
+pub mod graph;
+pub mod logic;
+pub mod science;
+
+/// A stroke that is a straight segment of any length: its ends.
+fn straight(p: &[P], max_dev_ratio: f32) -> Option<(P, P)> {
+    if p.len() < 2 {
+        return None;
+    }
+    let (a, b) = (p[0], p[p.len() - 1]);
+    let l = dist(a, b);
+    if l <= f32::EPSILON || path_len(p) / l > 1.15 || max_dev(p, a, b) / l > max_dev_ratio {
+        return None;
+    }
+    Some((a, b))
+}
+
+/// A neighbour as a straight segment: its stored line or arrow, or its ink
+/// when that is straight.
+fn as_segment(n: &Neighbour) -> Option<(P, P)> {
+    match &n.geometry {
+        Some(Geometry::Segment { a, b }) => Some((*a, *b)),
+        Some(_) => None,
+        None => straight(&n.points, 0.07),
+    }
+}
+
+/// A neighbour as a circle (centre, radius): a stored circle (or a nearly
+/// round ellipse), or round ink.
+fn as_circle(n: &Neighbour, min_ratio: f32) -> Option<(P, f32)> {
+    match &n.geometry {
+        Some(Geometry::Ellipse { c, rx, ry, .. }) => {
+            (rx.min(*ry) / rx.max(*ry) >= min_ratio).then_some((*c, (rx + ry) / 2.0))
+        }
+        Some(_) => None,
+        None => circle_of(&n.points, min_ratio),
+    }
+}
+
+/// Round ink: a closed loop that fits an ellipse with axes within `min_ratio`.
+fn circle_of(points: &[P], min_ratio: f32) -> Option<(P, f32)> {
+    if points.len() < 6 {
+        return None;
+    }
+    // Fewer samples on a small loop, so pen jitter doesn't read as turning.
+    let n = ((path_len(points) / 2.0) as usize).clamp(32, N_CLOSED);
+    let p = resample(points, n);
+    let loop_pts = close_loop(
+        &p,
+        Options {
+            deliberate: true,
+            ..Options::default()
+        },
+    )?;
+    // Pen jitter adds a lot of absolute turning on a small loop; the ellipse
+    // fit's residuals keep letters out.
+    let (total, abs) = total_turning(&loop_pts);
+    if !(1.7 * PI..=2.35 * PI).contains(&total.abs()) || abs > 1.8 * total.abs() {
+        return None;
+    }
+    match ellipse(&loop_pts)?.geometry {
+        Geometry::Ellipse { c, rx, ry, .. } if rx.min(ry) / rx.max(ry) >= min_ratio => {
+            Some((c, (rx + ry) / 2.0))
+        }
+        _ => None,
+    }
+}
 
 #[cfg(test)]
 mod tests;

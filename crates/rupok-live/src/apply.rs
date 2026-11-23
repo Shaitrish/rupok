@@ -56,14 +56,14 @@ pub struct Outcome {
 }
 
 impl Outcome {
-    fn read(result: Value) -> Self {
+    pub(crate) fn read(result: Value) -> Self {
         Self {
             result,
             changed: false,
             show_page: None,
         }
     }
-    fn changed(result: Value) -> Self {
+    pub(crate) fn changed(result: Value) -> Self {
         Self {
             result,
             changed: true,
@@ -108,12 +108,28 @@ type Result<T> = std::result::Result<T, LiveError>;
 
 /// Run `op` on the board as `agent`. `now_ms` is the wall-clock time of the
 /// board (ms since the Unix epoch), used for item creation times.
-pub fn apply(mut ctx: BoardCtx<'_>, op: &Op, agent: &str, now_ms: f64) -> Result<Outcome> {
+pub fn apply(ctx: BoardCtx<'_>, op: &Op, agent: &str, now_ms: f64) -> Result<Outcome> {
+    apply_with(ctx, op, agent, now_ms, None)
+}
+
+/// [`apply`] with the board's handwriting glyphs (the teacher's calibrated
+/// forms) for `write_handwriting`; `None` writes in the neat built-in hand.
+pub fn apply_with(
+    mut ctx: BoardCtx<'_>,
+    op: &Op,
+    agent: &str,
+    now_ms: f64,
+    glyphs: Option<&rupok_ink::write::GlyphSet>,
+) -> Result<Outcome> {
     if ctx.read_only && op.access() == Access::Write {
         return Err(LiveError::ReadOnly);
     }
     let msg = crate::commit_message(agent, op.name());
-    let out = run(&mut ctx, op, &msg, now_ms);
+    let out = if let Op::WriteHandwriting { .. } = op {
+        crate::handwriting::run(&mut ctx, op, &msg, now_ms, glyphs)
+    } else {
+        run(&mut ctx, op, &msg, now_ms)
+    };
     // A failed op leaves no commit behind, and Loro carries pending commit
     // options over to the next change: never let the agent's tag leak onto
     // the teacher's next stroke.
@@ -123,7 +139,7 @@ pub fn apply(mut ctx: BoardCtx<'_>, op: &Op, agent: &str, now_ms: f64) -> Result
 
 /// Tag the next commit with the agent's message. Call right before the one
 /// mutation that commits.
-fn tag(lesson: &Lesson, msg: &str) {
+pub(crate) fn tag(lesson: &Lesson, msg: &str) {
     lesson.loro().set_next_commit_message(msg);
 }
 
@@ -183,6 +199,7 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
             })))
         }
         Op::Snapshot { .. } => Err(LiveError::Unsupported("snapshot")),
+        Op::WriteHandwriting { .. } => crate::handwriting::run(ctx, op, msg, now, None),
         Op::PointAt { .. } => Err(LiveError::Unsupported("point_at")),
 
         Op::GoToPage { page } => {
@@ -310,6 +327,7 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
             }
             warnings.extend(placement_warning(&geom, info.frame));
             let data = ItemData::Text(TextData {
+                latex: false,
                 geom,
                 text: text.clone(),
                 size,
@@ -555,6 +573,7 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
                 rot: 0.0,
             };
             let data = ItemData::Text(TextData {
+                latex: false,
                 geom,
                 text: text.clone(),
                 size,
@@ -648,7 +667,11 @@ pub fn page_index(lesson: &Lesson, page_id: &str) -> Option<usize> {
 }
 
 /// Resolve a 1-based page number (default: the current page).
-fn page_ref(lesson: &Lesson, current: &str, page: Option<u32>) -> Result<(usize, PageInfo)> {
+pub(crate) fn page_ref(
+    lesson: &Lesson,
+    current: &str,
+    page: Option<u32>,
+) -> Result<(usize, PageInfo)> {
     let pages = lesson.pages();
     let idx = match page {
         None => pages.iter().position(|p| p.id == current).unwrap_or(0),
@@ -672,7 +695,7 @@ fn page_ref(lesson: &Lesson, current: &str, page: Option<u32>) -> Result<(usize,
 
 /// A new page: the given look, else the look of the current page (a lesson
 /// on a chalkboard stays on chalkboard).
-fn new_page_spec(
+pub(crate) fn new_page_spec(
     lesson: &Lesson,
     current: &str,
     title: &Option<String>,
@@ -895,7 +918,7 @@ pub fn page_outline(
     })
 }
 
-fn union_bounds<'a>(items: impl Iterator<Item = &'a Item>) -> Option<BoxGeom> {
+pub(crate) fn union_bounds<'a>(items: impl Iterator<Item = &'a Item>) -> Option<BoxGeom> {
     let mut b: Option<[f32; 4]> = None;
     for it in items {
         let a = it.data.aabb();
@@ -944,7 +967,7 @@ fn check_text(text: &str) -> Result<()> {
     Ok(())
 }
 
-fn finite(name: &str, v: f64) -> Result<f64> {
+pub(crate) fn finite(name: &str, v: f64) -> Result<f64> {
     if v.is_finite() && v.abs() < 1e7 {
         Ok(v)
     } else {
@@ -954,7 +977,7 @@ fn finite(name: &str, v: f64) -> Result<f64> {
     }
 }
 
-fn positive(name: &str, v: f64) -> Result<f64> {
+pub(crate) fn positive(name: &str, v: f64) -> Result<f64> {
     if v.is_finite() && v > 0.0 && v < 1e6 {
         Ok(v)
     } else {
@@ -1022,7 +1045,7 @@ fn scheme(rgba: u32) -> &'static str {
 
 /// Default text colour on a page: near-black on light pages, near-white on
 /// chalkboard and blackboard.
-fn default_ink(bg: u32) -> u32 {
+pub(crate) fn default_ink(bg: u32) -> u32 {
     if is_dark(bg) { 0xf1f3f5ff } else { 0x1c2024ff }
 }
 

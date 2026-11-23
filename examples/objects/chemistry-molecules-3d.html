@@ -13,13 +13,12 @@
     3      lone-pair lobes, bond-angle arcs and the shape name
     4      CH4, NH3 and H2O side by side: lone pairs squeeze the angle
   Molecules: H2O, CO2, CH4, NH3, C2H5OH, C6H6. Ball-and-stick and
-  space-filling (they morph), CPK colours, physically based materials,
+  space-filling (they morph), CPK colours, physically based materials, LaTeX
+  formulas and angles (typeset by the SDK with KaTeX),
   soft contact shadow, gentle auto-rotation until touched. Drag to rotate,
   pinch or scroll to zoom. Uses three.js from rupoklib. Light and dark
   schemes. The molecule and view mode are saved with the lesson.
 -->
-<link rel="stylesheet" href="rupoklib://katex/katex.min.css">
-<script src="rupoklib://katex/katex.min.js"></script>
 <style>
   :root {
     --bg: var(--rupok-color-bg, #ffffff);
@@ -76,19 +75,24 @@
   .card { background: linear-gradient(var(--surface), var(--surface)), var(--glass); border: .0625rem solid var(--line); border-radius: 1.25rem; box-shadow: var(--shadow); }
   .info { width: 22rem; padding: 1rem 1.375rem 1.125rem; display: grid; gap: .45rem; }
   .info .k { font: 800 .9375rem/1 var(--font); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-  .info .f { font: 650 2.25rem/1.15 var(--font); }
+  .info .f { font: 650 1.85rem/1.25 var(--font); min-height: 1.25em; }
   .info .n { font: 850 1.625rem/1.1 var(--font-h); letter-spacing: -.01em; }
   .info.cmp .f, .info.cmp .a { font-size: 1.5rem; white-space: nowrap; }
   .legend.cmp { display: none; }
   .info .n:empty { display: none; }
-  .info .a { font: 900 2.5rem/1 var(--font); color: var(--accent-text); font-variant-numeric: tabular-nums; }
+  .info .a { font: 900 1.9rem/1.1 var(--font); color: var(--accent-text); font-variant-numeric: tabular-nums; }
   .info p { margin: .1rem 0 0; font: 550 1.125rem/1.35 var(--font); color: var(--muted); }
   .info .gone { display: none; }
   .swap { animation: swap .45s ease-out; }
   @keyframes swap { from { opacity: 0; transform: translateY(-.5rem); } to { opacity: 1; transform: none; } }
-  .katex { font-family: var(--font) !important; font-size: 1em !important; font-weight: 650; line-height: 1.25; }
-  .katex .mathnormal, .katex .mathit { font-family: var(--font); font-style: italic; }
-  .katex .mord, .katex .mbin, .katex .mrel, .katex .mop, .katex .mopen, .katex .mclose, .katex .mpunct, .katex .mathrm, .katex .text, .katex .textrm { font-family: var(--font); }
+  /* Floating labels on the scene, typeset with LaTeX (tag()). */
+  .tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; left: 0; top: 0; padding: .32rem .7rem; border-radius: 999px; white-space: nowrap; font: 650 1.15rem/1.15 var(--font); color: var(--fg); background: color-mix(in srgb, var(--bg) 90%, transparent); border: .1rem solid var(--line); will-change: transform; }
+  .tag.bare { padding: 0 .1rem; background: none; border: 0; border-radius: 0; text-shadow: 0 0 .2em var(--bg), 0 0 .2em var(--bg), 0 0 .08em var(--bg); }
+  /* Plain-HTML stand-in for maths until KaTeX has loaded. */
+  .tx { font-style: normal; }
+  .nw { white-space: nowrap; }
+  .tx sub, .tx sup { font-size: .68em; }
   .hl { color: var(--accent-text); background: var(--hl); border-radius: .4rem; padding: 0 .1em; }
 
   .legend { position: fixed; left: 2.5rem; bottom: 7.5rem; display: grid; gap: .55rem; pointer-events: none; }
@@ -122,14 +126,14 @@
   <div class="fallback" id="fallback">The 3D view could not load three.js from Rupok's offline libraries (rupoklib).<br>The shapes, angles and steps still work in the panel.</div>
 
   <div class="top">
-    <div>
+    <div data-avoid>
       <p class="eyebrow">Chemistry · Molecular shapes</p>
       <h1>Molecules in 3D</h1>
       <p class="caption" id="caption" aria-live="polite"></p>
     </div>
     <div class="right">
       <div class="dots" id="dots" aria-hidden="true"></div>
-      <div class="card info" id="info" aria-live="polite">
+      <div class="card info" id="info" aria-live="polite" data-avoid>
         <span class="k" id="i-k"></span>
         <div class="f" id="i-f"></div>
         <span class="n" id="i-n"></span>
@@ -139,9 +143,9 @@
     </div>
   </div>
 
-  <div class="legend" id="legend"></div>
+  <div class="legend" id="legend" data-avoid></div>
 
-  <div class="card dock">
+  <div class="card dock" data-avoid>
     <div class="mols" id="mols" role="group" aria-label="Molecule"></div>
     <span class="sep"></span>
     <button class="chip small" type="button" id="m-ball" aria-pressed="true">Ball &amp; stick</button>
@@ -264,10 +268,10 @@
   function counts(m) { const c = {}; for (const [el] of m.make().atoms) c[el] = (c[el] || 0) + 1; return c; }
   function countWords(m) { return Object.entries(counts(m)).map(([el, n]) => `${n} ${EL[el].name.toLowerCase()}`).join(" + "); }
   const CAPTIONS = (m) => [
-    `<b>${m.name}</b> is built from ${countWords(m)}. Count them.`,
+    `<b>${m.name}</b> ($\\mathrm{${m.tex}}$) is built from ${countWords(m)}. Count them.`,
     `The atoms <b>fly into place</b>, one by one, in real 3D geometry.`,
     `<b>Bonds</b> form: shared electron pairs hold the atoms together.`,
-    `Electron pairs repel, so ${m.f} is <b>${m.shape.toLowerCase()}</b>.`,
+    `Electron pairs repel, so $\\mathrm{${m.tex}}$ is <b>${m.shape.toLowerCase()}</b>.`,
     `Same 4 electron pairs, more <b>lone pairs</b>: the bond angle shrinks.`,
   ];
 
@@ -276,16 +280,40 @@
   const isDark = () => document.documentElement.getAttribute("data-scheme") === "dark";
 
   /* ---------------------------------------------------------- panel */
-  const TRUST = { throwOnError: false, trust: (c) => c.command === "\\htmlClass", strict: false };
-  function tex(el, src, html) {
-    if (window.katex) { try { window.katex.render(src, el, TRUST); return; } catch (e) { /* fall back */ } }
-    el.innerHTML = html;
+
+  /* ---------------------------------------------------------- LaTeX
+     Maths is typeset by the SDK (rupok.tex / data-tex, KaTeX from rupoklib).
+     Until KaTeX has loaded, or when this file is opened without Rupok, a
+     plain-HTML approximation stands in. */
+  const TEX_SYM = { theta: "θ", pi: "π", times: "×", cdot: "·", Delta: "Δ", Omega: "Ω", to: "→", longrightarrow: "→", circ: "°", approx: "≈", quad: " ", ",": " ", ";": " ", ":": " ", "!": "", sin: "sin ", cos: "cos ", tan: "tan " };
+  function texHtml(t) {
+    let s = String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    for (let i = 0; i < 2; i++) s = s.replace(/\\hl\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g, '<span class="hl">$1</span>');
+    s = s.replace(/\\(?:begin|end)\{array\}(?:\{[^{}]*\})?/g, "").replace(/\\\\/g, "<br>");
+    s = s.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2").replace(/\\(?:mathrm|text|mathit|operatorname)\{([^{}]*)\}/g, "$1");
+    s = s.replace(/\\([A-Za-z]+|[,;:!])/g, (m, w) => TEX_SYM[w] ?? "");
+    s = s.replace(/\^\{([^{}]*)\}|\^(\S)/g, (m, a, b) => `<sup>${a ?? b}</sup>`).replace(/_\{([^{}]*)\}|_(\S)/g, (m, a, b) => `<sub>${a ?? b}</sub>`);
+    return `<span class="tx">${s.replace(/[{}]/g, "").replace(/(^|[^a-z"])-/g, "$1−")}</span>`;
   }
-  const HL = (s) => `\\htmlClass{hl}{${s}}`;
+  /* Typeset `src` into `el`; cheap to call again with the same formula. */
+  function tex(el, src, display) {
+    if (!el.querySelector(".katex")) el.innerHTML = texHtml(src);
+    if (rupok.tex) rupok.tex(el, src, { display: !!display });
+  }
+  /* Rich text with $…$ formulas (captions): each becomes a [data-tex] span the SDK typesets. */
+  function rich(el, html) {
+    /* punctuation right after a formula stays on its line */
+    el.innerHTML = html.replace(/\$([^$]+)\$([.,;:!?)]*)/g, (m, t, p) =>
+      `<span class="nw"><span data-tex="${t.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">${texHtml(t)}</span>${p}</span>`);
+    if (rupok.math) rupok.math.render(el);
+  }
+  const HL = (s) => `\\hl{${s}}`;
+  /* "104.5°" as LaTeX */
+  const deg = (a) => a.replace("≈ ", "\\approx ").replace(/°/g, "^\\circ").replace(/ → /g, " \\to ");
   for (let i = 0; i <= STEPS; i++) $("dots").appendChild(document.createElement("i"));
   for (const m of MOLS) {
     const b = document.createElement("button");
-    b.type = "button"; b.className = "chip"; b.dataset.id = m.id; b.textContent = m.f; b.setAttribute("aria-label", m.name);
+    b.type = "button"; b.className = "chip"; b.dataset.id = m.id; tex(b, `\\mathrm{${m.tex}}`); b.setAttribute("aria-label", m.name);
     b.addEventListener("click", () => { if (step >= 4 || molId === m.id) return; molId = m.id; persist(); rebuild(true); updatePanel(true); });
     $("mols").appendChild(b);
   }
@@ -294,27 +322,27 @@
     document.querySelectorAll("#mols .chip").forEach((b) => { const on = b.dataset.id === molId; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
     $("mols").classList.toggle("locked", step >= 4);
     for (const [id, on] of [["m-ball", mode === "ball"], ["m-fill", mode === "fill"], ["spin", spin]]) { $(id).classList.toggle("on", on); $(id).setAttribute("aria-pressed", String(on)); }
-    $("caption").innerHTML = CAPTIONS(m)[step];
+    rich($("caption"), CAPTIONS(m)[step]);
     document.querySelectorAll("#dots i").forEach((d, i) => { d.classList.toggle("on", i <= step); d.classList.toggle("now", i === step); });
     const f = $("i-f"), shapeOn = step >= 3;
     if (step >= 4) {
       $("i-k").textContent = "Lone pairs (E) squeeze";
-      tex(f, `AX_4 \\to AX_3${HL("E")} \\to AX_2${HL("E_2")}`, "AX₄ → AX₃<span class='hl'>E</span> → AX₂<span class='hl'>E₂</span>");
+      tex(f, `\\mathrm{AX_4 \\to AX_3${HL("E")} \\to AX_2${HL("E_2")}}`);
       $("i-n").textContent = "";
-      $("i-a").textContent = "109.5° → 107° → 104.5°";
+      tex($("i-a"), deg("109.5° → 107° → 104.5°"));
       $("i-p").textContent = "A lone pair belongs to one atom only, so it spreads out and pushes the bonds closer.";
     } else if (shapeOn) {
       $("i-k").textContent = "VSEPR shape";
       const ax = m.ax.replace(/E(_\d)?/, (e) => HL(e));
-      tex(f, ax, m.ax.replace(/_(\d)/g, "<sub>$1</sub>"));
-      $("i-n").textContent = m.shape; $("i-a").textContent = m.angle; $("i-p").textContent = m.info;
+      tex(f, `\\mathrm{${ax}}`);
+      $("i-n").textContent = m.shape; tex($("i-a"), deg(m.angle)); $("i-p").textContent = m.info;
     } else {
       $("i-k").textContent = step === 0 ? "Count the atoms" : step === 1 ? "Molecular formula" : "Bonds";
       const t = step === 0 ? m.tex.replace(/_(\d)/g, (s, d) => `_{${HL(d)}}`) : m.tex;
-      tex(f, `\\mathrm{${t}}`, m.f);
+      tex(f, `\\mathrm{${t}}`);
       const nb = m.make().bonds.length;
       $("i-n").textContent = step === 2 ? `${nb} bonds` : m.name;
-      $("i-a").textContent = step === 0 ? String(m.make().atoms.length) + " atoms" : "";
+      if (step === 0) tex($("i-a"), `${m.make().atoms.length}\\ \\text{atoms}`); else $("i-a").textContent = "";
       $("i-p").textContent = step === 0 ? countWords(m) : step === 1 ? "Each atom sits where its electron pairs are farthest apart." : m.make().bonds.some((b) => b[2] === 2) ? "Double bonds share two pairs of electrons." : "Each line is one shared pair of electrons.";
     }
     $("i-a").classList.toggle("gone", !$("i-a").textContent);
@@ -464,7 +492,9 @@
       const fan = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: accentLine.color.clone(), transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false }));
       inner.add(tube); inner.add(fan); fans.push(fan);
       const mid = C.clone().addScaledVector(u, Math.cos(th / 2)).addScaledVector(w, Math.sin(th / 2)).sub(C).normalize();
-      angles.push({ tube, fan, anchor: C.clone().addScaledVector(mid, r + 0.42), lbl: label("angle", text) });
+      const lbl = label("angle", "");
+      tex(lbl, deg(text));
+      angles.push({ tube, fan, anchor: C.clone().addScaledVector(mid, r + 0.42), lbl });
     }
     const extras = [];
     if (data.aromatic) for (const z of [-0.45, 0.45]) { const t = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.12, 20, 72), accentMat); t.position.z = z; inner.add(t); extras.push(t); }
@@ -496,7 +526,8 @@
     if (step >= 4) {
       COMPARE.map(mdef).forEach((d, i) => {
         const g = buildMolecule(d, (i - 1) * 3.3);
-        g.cap = label("cap", `<b>${d.f}</b><span>${d.shape}</span>`);
+        g.cap = label("cap", `<b data-tex="\\mathrm{${d.tex}}">${d.f}</b><span>${d.shape}</span>`);
+        if (rupok.math) rupok.math.render(g.cap);
         groups.push(g);
       });
       home.setFromEuler(new THREE.Euler(14 * DEG, 26 * DEG, 0));
@@ -578,8 +609,22 @@
     }
   }
 
+  /* Move a centred label out of any [data-avoid] box (cards, legend, dock). */
+  let avoidRects = [];
+  function clear(el, x, y) {
+    if (!el.__k && el.querySelector(".katex")) { el.__k = true; el.__w = el.__h = 0; } /* re-measure once typeset */
+    const w = (el.__w = el.__w || el.offsetWidth) / 2 + 6, h = (el.__h = el.__h || el.offsetHeight) / 2 + 6;
+    for (const r of avoidRects) {
+      if (x + w < r.left || x - w > r.right || y + h < r.top || y - h > r.bottom) continue;
+      const moves = [[r.left - w - x, 0], [r.right + w - x, 0], [0, r.top - h - y], [0, r.bottom + h - y]];
+      moves.sort((a, b) => Math.abs(a[0]) + Math.abs(a[1]) - Math.abs(b[0]) - Math.abs(b[1]));
+      x += moves[0][0]; y += moves[0][1];
+    }
+    return [x, y];
+  }
   const proj = (v) => { const p = v.clone().project(camera); return [(p.x * 0.5 + 0.5) * W, (-p.y * 0.5 + 0.5) * H]; };
   function placeLabels(now) {
+    avoidRects = [...document.querySelectorAll("[data-avoid]")].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
     const compare = step >= 4, fill = mode === "fill";
     const camPos = camera.position;
     for (const g of groups) {
@@ -595,7 +640,8 @@
       const on = (compare || step >= 3) && !fill;
       for (const an of g.angles) {
         const [x, y] = proj(an.anchor.clone().applyMatrix4(g.inner.matrixWorld));
-        an.lbl.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+        const [cx2, cy2] = clear(an.lbl, x, y);
+        an.lbl.style.transform = `translate(${cx2}px, ${cy2}px) translate(-50%, -50%)`;
         an.lbl.style.opacity = on && (compare || animStep !== 3 || now - stepAt > 380) ? 1 : 0;
       }
       if (g.cap) { const [x, y] = proj(new THREE.Vector3(g.g.position.x, shadow.position.y + 0.1, 0)); g.cap.style.transform = `translate(${x}px, ${y}px) translate(-50%, 0)`; }

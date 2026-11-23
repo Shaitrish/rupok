@@ -1,14 +1,8 @@
 import { For, Show, createSignal } from "solid-js";
 import { controller } from "../controller";
-import type { IconVariant } from "../icons.generated";
-import { ACCENTS, prefs, setPrefs, type Prefs } from "../state";
-import { autosaveClear } from "../storage";
-import { downloadQuiz } from "./Chrome";
 import { Icon } from "./Icon";
-import { ModesSettings } from "./ModesSettings";
-import { SmartInkSettings } from "./SmartInkSettings";
 import { PresetGallery } from "./PresetGallery";
-import { APP_NAME, APP_SLUG } from "../brand";
+import { APP_SLUG } from "../brand";
 
 const SAMPLE = `<!doctype html>
 <html>
@@ -183,107 +177,6 @@ export function Seg<T extends string>(props: { value: T; options: readonly (read
   );
 }
 
-const ICON_STYLES: readonly (readonly [IconVariant, string])[] = [
-  ["linear", "Linear"], ["line-duotone", "Duotone"], ["broken", "Broken"], ["bold", "Bold"],
-];
-
-export function SettingsDialog(props: { onClose: () => void }) {
-  const p = prefs;
-  const set = (x: Partial<Prefs>) => {
-    setPrefs(x);
-    controller.applyPrefs();
-  };
-  return (
-    <Dialog icon="settings" title="Settings" sub={`Make ${APP_NAME} fit your board, your hands and your style. Saved in this browser.`} width={720} onClose={props.onClose}>
-      <div class="section-title">Appearance</div>
-      <div class="settings-grid">
-        <div class="field">
-          <label>Theme</label>
-          <Seg value={p().theme} options={[["system", "System"], ["light", "Light"], ["dark", "Dark"]] as const} onChange={(v) => set({ theme: v })} />
-        </div>
-        <div class="field">
-          <label>Accent</label>
-          <div class="accent-row">
-            <For each={ACCENTS}>
-              {(a) => (
-                <button
-                  class="accent-dot"
-                  classList={{ on: p().accent === a.id }}
-                  style={{ background: a.color, color: a.color }}
-                  title={a.label}
-                  aria-label={`Accent ${a.label}`}
-                  onClick={() => set({ accent: a.id })}
-                />
-              )}
-            </For>
-          </div>
-        </div>
-        <div class="field">
-          <label>Icons</label>
-          <Seg value={p().iconStyle} options={ICON_STYLES} onChange={(v) => set({ iconStyle: v })} />
-        </div>
-        <div class="field">
-          <label>Toolbar</label>
-          <Seg value={p().toolbar} options={[["bottom", "Bottom"], ["left", "Left"], ["right", "Right"]] as const} onChange={(v) => set({ toolbar: v })} />
-        </div>
-        <div class="field">
-          <label>Size</label>
-          <Seg value={p().density} options={[["compact", "Compact"], ["comfortable", "Comfortable"], ["large", "Large board"]] as const} onChange={(v) => set({ density: v })} />
-        </div>
-        <div class="field">
-          <label>Statistics overlay</label>
-          <Seg value={p().showStats ? "on" : "off"} options={[["off", "Hidden"], ["on", "Shown"]] as const} onChange={(v) => set({ showStats: v === "on" })} />
-        </div>
-      </div>
-
-      <div class="section-title">Pen & touch</div>
-      <div class="settings-grid">
-        <div class="field">
-          <label>Finger touches</label>
-          <Seg value={p().touchMode} options={[["auto", "Auto"], ["draw", "Draw"], ["navigate", "Pan & zoom"]] as const} onChange={(v) => set({ touchMode: v })} />
-          <span class="hint">Auto: fingers draw on touch-only boards and switch to pan & zoom once a pen is used (palm rejection).</span>
-        </div>
-        <div class="field">
-          <label>Renderer</label>
-          <Seg
-            value={p().forceWebgl ? "webgl" : "webgpu"}
-            options={[["webgl", "WebGL2"], ["webgpu", "WebGPU · beta"]] as const}
-            onChange={(v) => { setPrefs({ forceWebgl: v === "webgl" }); location.reload(); }}
-          />
-          <span class="hint">Switching reloads the page. Your lesson is autosaved.</span>
-        </div>
-        <div class="field">
-          <label for="smooth">Smoothing · {Math.round(p().smoothing * 100)}%</label>
-          <input id="smooth" class="slider" type="range" min="0" max="1" step="0.05" value={p().smoothing} onInput={(e) => set({ smoothing: Number(e.currentTarget.value) })} />
-          <span class="hint">Higher removes shake on large boards; lower feels more direct.</span>
-        </div>
-        <div class="field">
-          <label for="pressure">Pen pressure · {p().pressure < 0.8 ? "soft" : p().pressure > 1.2 ? "firm" : "normal"}</label>
-          <input id="pressure" class="slider" type="range" min="0.3" max="2" step="0.05" value={p().pressure} onInput={(e) => set({ pressure: Number(e.currentTarget.value) })} />
-        </div>
-      </div>
-
-      <SmartInkSettings />
-
-      <div class="section-title">Modes</div>
-      <ModesSettings />
-
-      <div class="section-title">Keyboard & clicker</div>
-      <div class="kbd-grid">
-        <For each={[["Pen", "P"], ["Highlighter", "H"], ["Eraser", "E"], ["Select", "V"], ["Laser", "L"], ["Text", "T"], ["Shapes", "R O N A"], ["Smart shapes", "M"], ["Use objects", "I"], ["Pan", "Space"], ["Next step / page", "→"], ["Previous", "←"], ["Fit page", "0"], ["Fullscreen", "F"], ["Undo / redo", "Ctrl Z / Y"], ["Save", "Ctrl S"], ["Copy / paste", "Ctrl C / V"], ["Duplicate", "Ctrl D"], ["Group / ungroup", "Ctrl G / ⇧G"], ["Merge ink", "Ctrl E"], ["Teach", "F5"], ["Modes", "Alt 1 2 3"]]}>
-          {([label, key]) => <div><span>{label}</span><kbd>{key}</kbd></div>}
-        </For>
-      </div>
-
-      <div class="actions" style={{ "margin-top": "24px" }}>
-        <button class="btn" onClick={downloadQuiz}><Icon name="download" /><span class="label">Quiz answers</span></button>
-        <button class="btn danger" onClick={async () => { await autosaveClear(); controller.board.new_lesson("Untitled lesson"); props.onClose(); }}>
-          <Icon name="trash" /><span class="label">New empty lesson</span>
-        </button>
-        <div class="grow" />
-        <button class="btn solid" onClick={props.onClose}>Done</button>
-      </div>
-      <p class="hint" style={{ "margin-top": "16px" }}>{APP_NAME} is open source (AGPL-3.0) by Shaitrish. Icons: Solar by 480 Design (CC BY 4.0). Typeface: Figtree (OFL).</p>
-    </Dialog>
-  );
-}
+// Settings moved to components/settings/SettingsDialog.tsx. Every setting is
+// an entry in the settings registry (src/settings/, docs/settings.md): add a
+// setting there, not here.

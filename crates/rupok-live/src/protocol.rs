@@ -148,7 +148,27 @@ pub enum BoardSession {
         #[serde(default)]
         title: String,
     },
+    /// Pairing the other way round: the teacher typed the code that the
+    /// agent process (`rupok agent`, or the desktop app) shows. Only valid
+    /// while waiting, and only when the welcome said `pair: "board"`.
+    Pair {
+        code: String,
+    },
     Bye,
+}
+
+/// How a waiting board pairs (the `pair` field of `welcome`).
+pub mod pair {
+    /// Show the code on the board; the teacher gives it to the agent
+    /// (`connect_board`). The default.
+    pub const AGENT: &str = "agent";
+    /// The agent process shows a code; the teacher types it on the board,
+    /// which sends `session/pair`.
+    pub const BOARD: &str = "board";
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 /// `session` channel, server → board.
@@ -162,6 +182,12 @@ pub enum ServerSession {
         code: String,
         expires_in: u64,
         channels: Vec<String>,
+        /// [`pair::AGENT`] (missing in older servers) or [`pair::BOARD`].
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pair: Option<String>,
+        /// The server relays the in-app chat (`chat` channel).
+        #[serde(default, skip_serializing_if = "is_false")]
+        chat: bool,
     },
     Paired {
         v: u32,

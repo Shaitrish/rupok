@@ -5,6 +5,9 @@ Objects** for a teacher. Claude Code users can install the skill in
 [`rupok-smart-objects/SKILL.md`](rupok-smart-objects/SKILL.md), which is the
 long form of this file.
 
+To **read** a `.rpk` someone gives you, follow
+[`read-rpk/SKILL.md`](read-rpk/SKILL.md): unzip it and read `content.md`.
+
 ## What you are making
 
 - A **lesson** is a `.rpk` file: pages of 1920 × 1080 slides holding ink,
@@ -45,12 +48,32 @@ slide pixels in the 1920 × 1080 frame.
 - `update_smart_object(path, bundle_id, html, steps?, network_hosts?)`
 - `add_text(path, page, text, x, y, w?, size?, color?)`,
   `delete_item(path, page, item_id)`,
+  `replace_strokes_with_text(path, page, stroke_ids, text, size?, color?)`
+  (handwriting to text; replay still shows the ink before it became text),
   `set_page_background(path, page, pattern, color?)`
 - `validate_smart_object(html, steps?, network_hosts?, width?, height?)`,
   `read_object_spec()`
 
 Without MCP, use the CLI: `rupok new`, `rupok validate file.html --steps N`,
 `rupok add-object lesson.rpk file.html --page N --steps N`, `rupok info`.
+
+## Live board (during class)
+
+`rupok mcp --live` (the default) also lets the teacher pair the Rupok board
+they have open: they click **Connect AI** and give you a 6-digit code; call
+`connect_board(code)` (`get_board_status` says what to do next). Then:
+
+- the lesson tools above take `path: "live"` to edit the open lesson; the
+  class sees each change at once and the teacher can undo it with Ctrl+Z;
+- `get_current_page`, `get_page_snapshot` (an image: read handwriting) and
+  `get_selection` show you the board;
+- `add_page_after_current`, `go_to_page`, `step_object`, `point_at`,
+  `replace_items_with_text` (ink to text) and `set_board_theme` help you teach.
+
+Rules: put new content on a new page unless asked otherwise, ask before
+deleting or replacing the teacher's work, match the page `scheme` (light or
+dark), keep text ≥ 32px. Long form: `rupok-live-board/SKILL.md`; setup for
+each agent and the protocol: `docs/ai-agents.md`.
 
 ## Loop
 

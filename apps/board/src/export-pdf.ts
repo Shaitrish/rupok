@@ -25,6 +25,7 @@
 // Exporting only reads the document: it never changes the lesson or its
 // undo history.
 
+import { renderTex } from "./katex";
 import { PDFDocument, PDFHexString, type PDFRef, StandardFonts, rgb } from "pdf-lib";
 import type { Controller } from "./controller";
 import { theme as objectTheme } from "./objects";
@@ -60,7 +61,7 @@ export class ExportCancelled extends Error {
 
 type Rect = [number, number, number, number];
 interface StrokeItem { kind: "stroke"; color: number; opacity: number; tool: string; shape: string | null; outline: number[][] }
-interface TextItem { kind: "text"; rect: Rect; text: string; size: number; color: number }
+interface TextItem { kind: "text"; rect: Rect; text: string; size: number; color: number; latex?: boolean }
 interface ImageItem { kind: "image"; rect: Rect; asset: string }
 interface ObjectItem { kind: "object"; id: string; rect: Rect; title: string; bundle: string; step: number; steps: number; state: string | null }
 type Item = StrokeItem | TextItem | ImageItem | ObjectItem;
@@ -81,14 +82,28 @@ const A4: [number, number] = [595.28, 841.89];
 /** Text is rasterised at this many pixels per world unit (≈ 430 dpi on a slide page). */
 const TEXT_SCALE = 3;
 const OBJECT_RADIUS = 8;
-const SNAPSHOT_SETTLE_MS = 700;
+const SNAPSHOT_SETTLE_MS = 1000;
 const SNAPSHOT_REPLY_MS = 1500;
-const SNAPSHOT_LOAD_MS = 6000;
-const SNAPSHOT_MAX_PIXELS = 4_200_000;
+const SNAPSHOT_IDLE_MS = 3000;
+const SNAPSHOT_LOAD_MS = 8000;
+/** Snapshot size: 1.5× (≈ 220 dpi for an object filling half a slide page),
+ * capped at 2.2 MP so the object can encode its PNG within the reply time. */
+const SNAPSHOT_SCALE = 1.5;
+const SNAPSHOT_MAX_PIXELS = 2_200_000;
 const SNAPSHOT_MAX_CHARS = 16 * 1024 * 1024;
-const SNAPSHOT_CONCURRENCY = 2;
+/** One object at a time: object frames share the board's main thread, so a
+ * heavy object loading would starve another one's snapshot. */
+const SNAPSHOT_CONCURRENCY = 1;
 
 const yieldToUi = () => new Promise<void>((r) => setTimeout(r, 0));
+
+/** Resolve in the next idle period of the main thread (at most `max` ms). */
+const whenIdle = (max: number) =>
+  new Promise<void>((r) => {
+    const ric = (window as any).requestIdleCallback as ((cb: () => void, o: { timeout: number }) => number) | undefined;
+    if (ric) ric(() => r(), { timeout: max });
+    else setTimeout(r, 50);
+  });
 
 // ----------------------------------------------------------------- colour
 
@@ -172,6 +187,22 @@ function paeth(src: Uint8Array, w: number, h: number, colors: number): Uint8Arra
   return out;
 }
 
+// ------------------------------------------------------------ compression
+
+const encoder = new TextEncoder();
+
+/** zlib-deflate with the browser's native CompressionStream (fast, off the
+ * main thread), or null where it is missing (pdf-lib's pako then). */
+async function nativeDeflate(data: Uint8Array): Promise<Uint8Array | null> {
+  if (typeof CompressionStream === "undefined") return null;
+  try {
+    const stream = new Blob([data as BlobPart]).stream().pipeThrough(new CompressionStream("deflate"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
 // --------------------------------------------------------------- exporter
 
 interface Resources {
@@ -230,6 +261,14 @@ class Exporter {
     return `/${name} gs`;
   }
 
+  /** A FlateDecode stream object (content streams are ASCII). */
+  private async flate(data: string | Uint8Array, dict: Record<string, unknown> = {}): Promise<PDFRef> {
+    const ctx = this.pdf.context;
+    const bytes = typeof data === "string" ? encoder.encode(data) : data;
+    const z = await nativeDeflate(bytes);
+    return ctx.register(z ? ctx.stream(z, { ...dict, Filter: "FlateDecode" } as any) : ctx.flateStream(bytes, dict as any));
+  }
+
   private xobject(ref: PDFRef, res: Resources): string {
     const name = `X${ref.objectNumber}`;
     res.xo.set(name, ref);
@@ -239,7 +278,7 @@ class Exporter {
   // ------------------------------------------------------------ images
 
   /** Image XObject from canvas pixels: RGB, plus a soft mask when not opaque. */
-  private embedPixels(canvas: HTMLCanvasElement, opaque: boolean): PDFRef {
+  private async embedPixels(canvas: HTMLCanvasElement, opaque: boolean): Promise<PDFRef> {
     const { width: w, height: h } = canvas;
     const data = canvas.getContext("2d")!.getImageData(0, 0, w, h).data;
     const rgbBytes = new Uint8Array(w * h * 3);
@@ -250,35 +289,33 @@ class Exporter {
       rgbBytes[j + 2] = data[i + 2];
       if (alpha) alpha[k] = data[i + 3];
     }
-    const ctx = this.pdf.context;
     const parms = (colors: number) => ({ Predictor: 15, Colors: colors, BitsPerComponent: 8, Columns: w });
     const dict: Record<string, unknown> = {
       Type: "XObject", Subtype: "Image", Width: w, Height: h, ColorSpace: "DeviceRGB", BitsPerComponent: 8, DecodeParms: parms(3),
     };
     if (alpha) {
-      dict.SMask = ctx.register(ctx.flateStream(paeth(alpha, w, h, 1), {
+      dict.SMask = await this.flate(paeth(alpha, w, h, 1), {
         Type: "XObject", Subtype: "Image", Width: w, Height: h, ColorSpace: "DeviceGray", BitsPerComponent: 8, DecodeParms: parms(1),
-      }));
+      });
     }
-    return ctx.register(ctx.flateStream(paeth(rgbBytes, w, h, 3), dict as any));
+    return this.flate(paeth(rgbBytes, w, h, 3), dict);
   }
 
   /** A one-colour image: the canvas alpha as soft mask over a 1-bit image of `color`. */
-  private embedMask(canvas: HTMLCanvasElement, color: number): PDFRef {
+  private async embedMask(canvas: HTMLCanvasElement, color: number): Promise<PDFRef> {
     const { width: w, height: h } = canvas;
     const data = canvas.getContext("2d")!.getImageData(0, 0, w, h).data;
     const alpha = new Uint8Array(w * h);
     for (let i = 3, k = 0; i < data.length; i += 4, k++) alpha[k] = data[i];
-    const ctx = this.pdf.context;
-    const smask = ctx.register(ctx.flateStream(paeth(alpha, w, h, 1), {
+    const smask = await this.flate(paeth(alpha, w, h, 1), {
       Type: "XObject", Subtype: "Image", Width: w, Height: h, ColorSpace: "DeviceGray", BitsPerComponent: 8,
       DecodeParms: { Predictor: 15, Colors: 1, BitsPerComponent: 8, Columns: w },
-    }));
+    });
     const base = new Uint8Array(Math.ceil(w / 8) * h); // every pixel is palette entry 0
-    return ctx.register(ctx.flateStream(base, {
+    return this.flate(base, {
       Type: "XObject", Subtype: "Image", Width: w, Height: h, BitsPerComponent: 1,
       ColorSpace: ["Indexed", "DeviceRGB", 0, PDFHexString.of(hex6(color))], SMask: smask,
-    } as any));
+    });
   }
 
   private asset(name: string): Promise<{ ref: PDFRef } | null> {
@@ -340,7 +377,7 @@ class Exporter {
         return { ref: jpg.ref };
       }
     }
-    return { ref: this.embedPixels(canvas, false) };
+    return { ref: await this.embedPixels(canvas, false) };
   }
 
   /** `q … cm /X Do Q` placing an image over the world rect (y down). */
@@ -352,9 +389,9 @@ class Exporter {
 
   private async drawText(ops: string[], res: Resources, t: TextItem, paper: boolean) {
     const color = paper ? darkInk(t.color) : t.color;
-    const r = await rasterText(t);
+    const r = t.latex ? await rasterLatex(t) : await rasterText(t);
     if (!r) return;
-    const ref = this.embedMask(r.canvas, color);
+    const ref = await this.embedMask(r.canvas, color);
     ops.push("q");
     if (alphaOf(color) < 0.995) ops.push(this.alpha(alphaOf(color), res));
     this.placeImage(ops, this.xobject(ref, res), ...r.rect);
@@ -363,14 +400,24 @@ class Exporter {
 
   // ------------------------------------------------------ Smart Objects
 
-  /** Start snapshots for the objects of every exported page (a few at a time). */
-  prefetchObjects() {
-    for (const index of this.o.pages) {
+  /**
+   * Snapshot the objects of every exported page, a few at a time, before any
+   * page is drawn: object frames share the main thread with the board, so
+   * they answer fastest while the exporter waits instead of working.
+   */
+  async snapshotObjects(onDone: (done: number, total: number) => void) {
+    const jobs: Promise<unknown>[] = [];
+    for (const [k, index] of this.o.pages.entries()) {
+      if (k % 10 === 9) await yieldToUi();
       const p = this.page(index, false);
       if (!p) continue;
       const bg = this.paper(p) ? 0xffffffff : p.bg;
-      for (const it of p.items) if (it.kind === "object") this.snapshot(index, it, bg);
+      for (const it of p.items) if (it.kind === "object") jobs.push(this.snapshot(index, it, bg));
     }
+    let done = 0;
+    if (jobs.length) onDone(0, jobs.length);
+    await Promise.all(jobs.map((j) => j.then(() => onDone(++done, jobs.length))));
+    return jobs.length;
   }
 
   private snapshot(index: number, o: ObjectItem, bg: number): Promise<HTMLImageElement | null> {
@@ -411,7 +458,7 @@ class Exporter {
     } else {
       canvas = placeholderCard(o, bg, paper);
     }
-    const ref = this.embedPixels(canvas, true);
+    const ref = await this.embedPixels(canvas, true);
     const r = Math.min(OBJECT_RADIUS, w / 2, h / 2);
     ops.push(`q ${roundRect(x, y, w, h, r)} W n`);
     this.placeImage(ops, this.xobject(ref, res), x, y, w, h);
@@ -490,10 +537,10 @@ class Exporter {
       ExtGState: ctx.obj(Object.fromEntries(res.gs)),
       XObject: ctx.obj(Object.fromEntries(res.xo)),
     });
-    const form = ctx.flateStream(ops.join("\n"), {
-      Type: "XObject", Subtype: "Form", BBox: [0, 0, aw, ah], Resources: resources,
-    } as any);
-    return { ref: ctx.register(form), w: aw, h: ah };
+    const content = ops.join("\n");
+    await yieldToUi();
+    const ref = await this.flate(content, { Type: "XObject", Subtype: "Form", BBox: [0, 0, aw, ah], Resources: resources });
+    return { ref, w: aw, h: ah };
   }
 
   private drawPattern(ops: string[], res: Resources, pattern: string, area: Rect, color: string | undefined) {
@@ -526,13 +573,12 @@ class Exporter {
 
   // ------------------------------------------------------------ layouts
 
-  slidePage(form: PageForm) {
+  async slidePage(form: PageForm) {
     const k = Math.min(SLIDE_PT_PER_UNIT, MAX_PAGE_PT / Math.max(form.w, form.h));
     const [pw, ph] = [form.w * k, form.h * k];
     const page = this.pdf.addPage([pw, ph]);
     const name = page.node.newXObject("Pg", form.ref).asString();
-    const ctx = this.pdf.context;
-    page.node.addContentStream(ctx.register(ctx.flateStream(`q ${num(k, 5)} 0 0 ${num(k, 5)} 0 0 cm ${name} Do Q`)));
+    page.node.addContentStream(await this.flate(`q ${num(k, 5)} 0 0 ${num(k, 5)} 0 0 cm ${name} Do Q`));
   }
 
   private handoutFont?: Awaited<ReturnType<PDFDocument["embedFont"]>>;
@@ -542,7 +588,6 @@ class Exporter {
     const [W, H] = A4;
     const page = this.pdf.addPage([W, H]);
     const font = (this.handoutFont ??= await this.pdf.embedFont(StandardFonts.Helvetica));
-    const ctx = this.pdf.context;
     const mx = 40, top = 44, bottom = 40, header = 26;
     const cw = W - 2 * mx;
     const y0 = H - top - header; // top of the first slot (PDF y up)
@@ -552,7 +597,7 @@ class Exporter {
     const lineGap = 22;
     const ops: string[] = [];
     // Header: the lesson title (drawn as an image so any script works).
-    if (this.titleMask === undefined) this.titleMask = this.embedTitle();
+    if (this.titleMask === undefined) this.titleMask = await this.embedTitle();
     if (this.titleMask) {
       const th = 11;
       const tw = Math.min(cw * 0.75, (this.titleMask.w / this.titleMask.h) * th);
@@ -578,7 +623,7 @@ class Exporter {
       }
       if (lines.length) ops.push(`0.78 0.8 0.83 RG 0.5 w ${lines.join(" ")} S`);
     });
-    page.node.addContentStream(ctx.register(ctx.flateStream(ops.join("\n"))));
+    page.node.addContentStream(await this.flate(ops.join("\n")));
     const grey = rgb(0.45, 0.47, 0.5);
     const label = `${sheet} / ${sheets}`;
     page.drawText(label, { x: W - mx - font.widthOfTextAtSize(label, 8.5), y: H - top - 2, size: 8.5, font, color: grey });
@@ -590,7 +635,7 @@ class Exporter {
     });
   }
 
-  private embedTitle(): { ref: PDFRef; w: number; h: number } | null {
+  private async embedTitle(): Promise<{ ref: PDFRef; w: number; h: number } | null> {
     const title = this.o.title.trim();
     if (!title) return null;
     const px = 44;
@@ -605,7 +650,7 @@ class Exporter {
     g.font = probe.font;
     g.textBaseline = "alphabetic";
     g.fillText(title, 2, px * 1.1);
-    return { ref: this.embedMask(canvas, 0x1c2024ff), w: canvas.width, h: canvas.height };
+    return { ref: await this.embedMask(canvas, 0x1c2024ff), w: canvas.width, h: canvas.height };
   }
 }
 
@@ -708,6 +753,102 @@ async function rasterText(t: TextItem): Promise<{ canvas: HTMLCanvasElement; rec
   }
 }
 
+/**
+ * Draw a typeset maths item: KaTeX lays it out with the board's CSS, then
+ * each glyph run is drawn with its own font at its own place, rules (a
+ * fraction bar) as rectangles and KaTeX's SVG parts (a root sign) as
+ * images. Returns a black-on-transparent mask like `rasterText`.
+ */
+async function rasterLatex(t: TextItem): Promise<{ canvas: HTMLCanvasElement; rect: Rect } | null> {
+  if (!t.text.trim()) return null;
+  const [x, y, w] = t.rect;
+  const size = t.size > 0 ? t.size : 40;
+  if (!measureRoot) {
+    measureRoot = document.createElement("div");
+    measureRoot.setAttribute("aria-hidden", "true");
+    measureRoot.style.cssText = "position:absolute;left:0;top:0;visibility:hidden;pointer-events:none";
+    document.body.appendChild(measureRoot);
+  }
+  const el = document.createElement("div");
+  el.className = "item text math";
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  el.style.minWidth = `${w}px`;
+  el.style.fontSize = `${size}px`;
+  el.style.color = "#000";
+  measureRoot.appendChild(el);
+  try {
+    await renderTex(el, t.text);
+    await document.fonts.ready;
+    const box = el.getBoundingClientRect();
+    const pad = Math.ceil(size * 0.4);
+    const W = box.width + 2 * pad, H = box.height + 2 * pad;
+    let s = TEXT_SCALE;
+    while (W * H * s * s > 48e6 && s > 1) s -= 0.5;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.ceil(W * s));
+    canvas.height = Math.max(1, Math.ceil(H * s));
+    const g = canvas.getContext("2d")!;
+    g.scale(s, s);
+    g.translate(pad - box.left, pad - box.top);
+    g.fillStyle = "#000";
+    g.textBaseline = "alphabetic";
+    const range = document.createRange();
+    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    const svgs: Promise<void>[] = [];
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (n.nodeType === Node.TEXT_NODE) {
+        const text = n.textContent ?? "";
+        const parent = n.parentElement;
+        if (!text.trim() || !parent || parent.closest(".katex-mathml")) continue;
+        const cs = getComputedStyle(parent);
+        g.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        range.selectNodeContents(n);
+        const r = range.getBoundingClientRect();
+        if (!r.width) continue;
+        const m = g.measureText(text);
+        const asc = m.fontBoundingBoxAscent || parseFloat(cs.fontSize) * 0.8;
+        const desc = m.fontBoundingBoxDescent || parseFloat(cs.fontSize) * 0.2;
+        // The glyph run's box is its font's ascent + descent, centred.
+        const base = r.top + (r.height - (asc + desc)) / 2 + asc;
+        g.fillText(text, r.left, base);
+      } else {
+        const e = n as Element;
+        if (e.closest(".katex-mathml")) continue;
+        if (e instanceof SVGSVGElement) {
+          const r = e.getBoundingClientRect();
+          if (!r.width || !r.height) continue;
+          const copy = e.cloneNode(true) as SVGSVGElement;
+          copy.setAttribute("width", `${r.width}`);
+          copy.setAttribute("height", `${r.height}`);
+          copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+          copy.setAttribute("fill", "#000");
+          const img = new Image();
+          svgs.push(new Promise<void>((done) => {
+            img.onload = () => {
+              g.drawImage(img, r.left, r.top, r.width, r.height);
+              done();
+            };
+            img.onerror = () => done();
+          }));
+          img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(copy.outerHTML)}`;
+          continue;
+        }
+        const cs = getComputedStyle(e);
+        const bw = parseFloat(cs.borderBottomWidth);
+        if (bw > 0 && cs.borderBottomStyle !== "none") {
+          const r = e.getBoundingClientRect();
+          g.fillRect(r.left, r.bottom - bw, r.width, Math.max(bw, 0.04 * size));
+        }
+      }
+    }
+    await Promise.all(svgs);
+    return { canvas, rect: [x - pad, y - pad, W, H] };
+  } finally {
+    el.remove();
+  }
+}
+
 /** Card drawn for a Smart Object that gave no snapshot. */
 function placeholderCard(o: ObjectItem, bg: number, paper: boolean): HTMLCanvasElement {
   const [, , w, h] = o.rect;
@@ -766,7 +907,13 @@ function placeholderCard(o: ObjectItem, bg: number, paper: boolean): HTMLCanvasE
  * change the lesson (state, goto, resize) are ignored. Resolves to null when
  * the object does not answer in time.
  */
-function snapshotObject(c: Controller, o: ObjectItem, bg: string, requestId: string, signal?: AbortSignal): Promise<HTMLImageElement | null> {
+function snapshotObject(
+  c: Controller,
+  o: ObjectItem,
+  bg: string,
+  requestId: string,
+  signal?: AbortSignal,
+): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const [, , w, h] = o.rect;
     const iframe = document.createElement("iframe");
@@ -782,7 +929,33 @@ function snapshotObject(c: Controller, o: ObjectItem, bg: string, requestId: str
       `z-index:-1;pointer-events:none;background:${bg};color-scheme:normal`;
     let done = false;
     let timer = 0;
+    let loaded = false;
+    let ready = false;
+    let asked = false;
     const post = (m: Record<string, unknown>) => iframe.contentWindow?.postMessage({ rupok: 1, ...m }, "*");
+    // Ask once the frame has loaded (scripts, modules) and is initialised,
+    // after a moment for first paint and intro animations, and once the main
+    // thread (shared with a srcdoc frame) is idle, so a heavy object has
+    // finished starting up and the reply time measures only the snapshot.
+    const schedule = () => {
+      if (!loaded || !ready || asked || done) return;
+      asked = true;
+      clearTimeout(timer);
+      timer = window.setTimeout(async () => {
+        await whenIdle(SNAPSHOT_IDLE_MS);
+        if (done) return;
+        const scale = Math.max(0.5, Math.min(SNAPSHOT_SCALE, Math.sqrt(SNAPSHOT_MAX_PIXELS / (w * h))));
+        post({ type: "snapshot", id: requestId, scale });
+        // About 1.5 s for the reply. A first snapshot in a fresh frame pays a
+        // one-off warm-up (its first SVG picture and PNG encode), so a slow
+        // but working object gets one more 1.5 s (a late reply to either
+        // request counts) before the placeholder.
+        timer = window.setTimeout(() => {
+          post({ type: "snapshot", id: requestId, scale });
+          timer = window.setTimeout(() => finish(null), SNAPSHOT_REPLY_MS);
+        }, SNAPSHOT_REPLY_MS);
+      }, SNAPSHOT_SETTLE_MS);
+    };
     const finish = (img: HTMLImageElement | null) => {
       if (done) return;
       done = true;
@@ -805,12 +978,8 @@ function snapshotObject(c: Controller, o: ObjectItem, bg: string, requestId: str
         post({
           type: "init", id: o.id, step: o.step, steps: Math.max(o.steps, o.step), state, theme: objectTheme(bg), mode: "present",
         });
-        clearTimeout(timer);
-        timer = window.setTimeout(() => {
-          const scale = Math.max(0.5, Math.min(2, Math.sqrt(SNAPSHOT_MAX_PIXELS / (w * h))));
-          post({ type: "snapshot", id: requestId, scale });
-          timer = window.setTimeout(() => finish(null), SNAPSHOT_REPLY_MS);
-        }, SNAPSHOT_SETTLE_MS);
+        ready = true;
+        schedule();
       } else if (m.type === "snapshot" && m.id === requestId) {
         const url = m.dataUrl;
         if (typeof url !== "string" || url.length > SNAPSHOT_MAX_CHARS || !/^data:image\/png;base64,/.test(url)) return finish(null);
@@ -824,6 +993,10 @@ function snapshotObject(c: Controller, o: ObjectItem, bg: string, requestId: str
     if (signal?.aborted) return resolve(null);
     signal?.addEventListener("abort", onAbort);
     window.addEventListener("message", onMessage);
+    iframe.addEventListener("load", () => {
+      loaded = true;
+      schedule();
+    });
     timer = window.setTimeout(() => finish(null), SNAPSHOT_LOAD_MS);
     iframe.srcdoc = c.objects.srcdoc(o.bundle);
     document.body.appendChild(iframe);
@@ -849,7 +1022,9 @@ export async function exportPdf(
   const total = o.pages.length;
   onProgress({ done: 0, total, label: "Preparing…" });
   await document.fonts.ready;
-  ex.prefetchObjects();
+  await ex.snapshotObjects((done, n) =>
+    onProgress({ done: 0, total, label: `Picturing Smart Objects: ${Math.min(done + 1, n)} of ${n}` }),
+  );
   const perPage = o.layout === "handout2" ? 2 : o.layout === "handout3" ? 3 : 0;
   const sheets = perPage ? Math.ceil(total / perPage) : total;
   let pending: { form: PageForm; number: number }[] = [];
@@ -859,7 +1034,7 @@ export async function exportPdf(
     await yieldToUi();
     const form = await ex.pageForm(o.pages[i]);
     if (!form) continue;
-    if (!perPage) ex.slidePage(form);
+    if (!perPage) await ex.slidePage(form);
     else {
       pending.push({ form, number: o.pages[i] + 1 });
       if (pending.length === perPage || i === total - 1) {

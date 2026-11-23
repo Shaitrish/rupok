@@ -7,6 +7,8 @@ import "@fontsource/hind-siliguri/600.css";
 import "@fontsource/hind-siliguri/700.css";
 import "./site.css";
 import "./pages.css";
+import "./theme"; // the nav's light / dark toggle
+import "./download"; // platform-matched download buttons
 import { stashPendingLesson } from "./pending";
 
 const LESSON_MIME = "application/vnd.rupok.lesson+zip";

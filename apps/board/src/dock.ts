@@ -16,6 +16,7 @@ import { createSignal } from "solid-js";
 import { APP_SLUG } from "./brand";
 import { type DockOrientation, type DockPosition, type Mode, type ModeConfig, hasTopBar } from "./modes";
 import { type Tool, prefs } from "./state";
+import { cssPx, isPhone, keyboard, safeArea } from "./viewport";
 
 /** Which screen edge the dock sits on; "float" is anywhere. */
 export type DockEdge = "bottom" | "top" | "left" | "right" | "float";
@@ -43,6 +44,8 @@ interface DockStore {
   /** Slot colours, most recently used first (decides which slot a new colour replaces). */
   used: Record<Kind, number[]>;
   shape: Tool;
+  /** Opacity of new highlighter strokes. */
+  hlOpacity: number;
 }
 
 const GRAPHITE = 0x1c2024ff;
@@ -63,7 +66,7 @@ function cleanPlace(p: unknown): DockPlace | null {
 
 /** Untrusted (localStorage): anything odd falls back to the defaults. */
 function load(): DockStore {
-  const out: DockStore = { modes: {}, slots: structuredClone(DEFAULT_SLOTS), used: structuredClone(DEFAULT_SLOTS), shape: "rect" };
+  const out: DockStore = { modes: {}, slots: structuredClone(DEFAULT_SLOTS), used: structuredClone(DEFAULT_SLOTS), shape: "rect", hlOpacity: 0.38 };
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "{}") as Record<string, any>;
     for (const m of ["prepare", "teach", "view"] as Mode[]) {
@@ -83,6 +86,7 @@ function load(): DockStore {
       if (Array.isArray(u) && u.every(isColor)) out.used[k] = u.filter((c: number) => out.slots[k].includes(c)).slice(0, 3);
     }
     if (SHAPES.includes(raw.shape)) out.shape = raw.shape;
+    if (typeof raw.hlOpacity === "number" && raw.hlOpacity >= 0.1 && raw.hlOpacity <= 1) out.hlOpacity = raw.hlOpacity;
   } catch { /* storage unavailable or corrupt */ }
   return out;
 }
@@ -154,6 +158,11 @@ export function resetDock(m: Mode) {
   save({ ...s, modes });
 }
 
+/** Forget every learnt place and minimised state (all modes, all screen sizes). */
+export function resetDockAll() {
+  save({ ...store(), modes: {} });
+}
+
 export function isVertical(p: DockPlace, o: DockOrientation): boolean {
   if (o !== "auto") return o === "vertical";
   return p.edge === "left" || p.edge === "right" || (p.edge === "float" && !!p.vertical);
@@ -168,16 +177,29 @@ export interface DockFrame { w: number; h: number; top: number; left: number; ri
 const INSET = 12;
 const GAP = 8;
 
-/** Margins for a dock on `edge` in the current mode (CSS px). */
-export function dockFrame(c: ModeConfig, edge: DockEdge, vertical: boolean, w: number, h: number, pagesOn: boolean): DockFrame {
+/** Margins for a dock on `edge` in the current mode (CSS px). `x` is where
+ * along the width the dock is (0..1): only a dock towards the right end
+ * keeps clear of the zoom chip, so a centred dock stays centred. */
+export function dockFrame(c: ModeConfig, edge: DockEdge, vertical: boolean, w: number, h: number, pagesOn: boolean, x = 0.5): DockFrame {
   const topBar = hasTopBar(c);
-  const f: DockFrame = { w, h, top: INSET + (topBar ? 48 + GAP : 0), left: INSET, right: INSET, bottom: INSET };
-  // The pages panel runs from under the top bar to 76px above the bottom.
-  if (pagesOn && (vertical || edge === "top")) f.left = INSET + 176 + GAP;
-  // The zoom chip sits in the bottom-right corner.
-  if (c.chrome.zoom) {
-    if (edge === "bottom" && !vertical) f.right = INSET + 136 + GAP;
-    else if (vertical) f.bottom = INSET + 40 + GAP;
+  // Phones: a tighter inset, the taller phone top bar, and the safe area
+  // (notch, home indicator); the on-screen keyboard pushes a bottom dock up.
+  const phone = isPhone();
+  const inset = phone ? 8 : INSET;
+  const s = safeArea();
+  const kb = keyboard();
+  const f: DockFrame = {
+    w, h, top: s.top + inset + (topBar ? cssPx("--bar", 48) + GAP : 0), left: s.left + inset, right: s.right + inset, bottom: s.bottom + inset + kb,
+  };
+  // The pages panel runs from under the top bar to 76px above the bottom (a drawer over the board on phones).
+  if (pagesOn && !phone && (vertical || edge === "top")) f.left = INSET + 176 + GAP;
+  // The zoom chip sits in the bottom-right corner; on a phone it floats above
+  // the dock (styles.css), so a bottom dock keeps the thumb's edge.
+  // Narrow tablets do the same under 900px, so a centred dock has the full width.
+  if (c.chrome.zoom && !phone) {
+    if (edge === "bottom" && !vertical && w < 900) { /* the zoom chip sits above the dock */ }
+    else if (edge === "bottom" && !vertical && x > 0.75) f.right = INSET + 136 + GAP;
+    else if (vertical && x > 0.75) f.bottom = INSET + 40 + GAP;
   }
   return f;
 }
@@ -198,7 +220,7 @@ const MAGNET = 24;
  * centre relative to the dock's top-left; `size` is the current dock size. */
 export function snapPlace(
   px: number, py: number, grip: { x: number; y: number }, size: { w: number; h: number },
-  frameFor: (edge: DockEdge, vertical: boolean) => DockFrame, wasVertical: boolean, o: DockOrientation,
+  frameFor: (edge: DockEdge, vertical: boolean, x?: number) => DockFrame, wasVertical: boolean, o: DockOrientation,
 ): DockPlace {
   const { w, h } = frameFor("float", wasVertical);
   const nearL = px < EDGE_ZONE, nearR = px > w - EDGE_ZONE, nearB = py > h - EDGE_ZONE;
@@ -212,7 +234,7 @@ export function snapPlace(
   const vertical = isVertical({ edge, x: 0, y: 0, vertical: wasVertical }, o);
   // Turning on its side swaps the dock's width and height.
   const [sw, sh] = vertical === wasVertical ? [size.w, size.h] : [size.h, size.w];
-  const f = frameFor(edge, vertical);
+  const f = frameFor(edge, vertical, px / Math.max(1, w));
   const fw = f.w - f.left - f.right - sw, fh = f.h - f.top - f.bottom - sh;
   const frac = (v: number, free: number) => (free > 0 ? Math.min(1, Math.max(0, v / free)) : 0.5);
   let x = frac(px - grip.x - f.left, fw);
@@ -280,6 +302,11 @@ export function useColor(k: Kind, c: number) {
   }
   const used = [slots[at], ...s.used[k].filter((u) => !same(u, slots[at]) && slots.some((x) => same(x, u)))].slice(0, 3);
   save({ ...s, slots: { ...s.slots, [k]: slots }, used: { ...s.used, [k]: used } });
+}
+
+export const hlOpacity = () => store().hlOpacity;
+export function setHlOpacityStored(a: number) {
+  save({ ...store(), hlOpacity: Math.min(1, Math.max(0.1, a)) });
 }
 
 export const lastShape = () => store().shape;

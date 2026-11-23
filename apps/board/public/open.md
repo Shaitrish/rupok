@@ -1,6 +1,6 @@
 # Open .rpk files: free online RPK viewer
 
-> Got a .rpk file from your teacher? Open it free in your browser: replay the class stroke by stroke, use the live activities, and download a PDF. No account, no app, nothing uploaded.
+> Got a .rpk (Rich Presentation Kit) file from your teacher? Open it free in your browser: replay the class stroke by stroke, use the live activities, and download a PDF. No account, no app, nothing uploaded.
 
 Canonical: https://rupok.app/open/ · Language: en · Updated: 2026-11-23
 
@@ -8,19 +8,20 @@ Got a lesson file from your teacher on WhatsApp, Gmail or Google Drive? Drop it 
 
 ## What is an .rpk file?
 
-An **.rpk file is a Rupok lesson.** Rupok is a free, open-source whiteboard for teachers, and a `.rpk` file holds one whole class in a single file:
+An **RPK (Rich Presentation Kit) file is a Rupok lesson.** Rupok is a free, open-source whiteboard for teachers, and a `.rpk` file holds one whole class in a single file:
 
 - **Slides:** every page the teacher prepared, including PDF slides.
 - **Ink:** everything written on them with the pen.
 - **Live Smart Objects:** simulations, 3D models and quizzes that still work.
 - **A replay:** the timing of every stroke, so you can watch the class unfold.
 
-- **File type**: Rupok lesson
+- **File type**: Rupok lesson (RPK: Rich Presentation Kit)
 - **Extension**: `.rpk`
 - **Media type**: `application/vnd.rupok.lesson+zip`
 - **Inside**: A ZIP package: the lesson document with its full history, images and Smart Objects
 - **Opens with**: Rupok, free in Chrome or Edge, on this page or at rupok.app/board
-- **Format**: Open and documented ([spec](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md), Apache-2.0)
+- **Format**: Open and documented ([RPK file format](https://rupok.app/rpk/), Apache-2.0 [spec](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))
+- **Readable by AI**: Yes: each file carries a Markdown outline ChatGPT or Claude can read
 
 ## How to open an .rpk file on a phone or computer
 
@@ -58,7 +59,11 @@ The lesson opens exactly as your teacher left it. Press play to watch it being w
 
 ### What is an .rpk file?
 
-An .rpk file is a lesson made with Rupok, a free whiteboard for teachers. It holds the slides, the teacher’s ink, live interactive Smart Objects and a replay of the class. Technically it’s a ZIP package with an open, documented format.
+An .rpk file is a lesson made with Rupok, a free whiteboard for teachers. It holds the slides, the teacher’s ink, live interactive Smart Objects and a replay of the class. Technically it’s a ZIP package with an open, documented format: see [the RPK file format](https://rupok.app/rpk/).
+
+### What does RPK stand for?
+
+RPK stands for Rich Presentation Kit, the name of Rupok’s lesson file format.
 
 ### How do I open an .rpk file?
 
@@ -71,6 +76,10 @@ Yes. Save the file from WhatsApp, Gmail or Google Drive, open rupok.app/open in 
 ### How do I convert an .rpk file to PDF?
 
 Open the file on this page, then press Download PDF in the viewer. The PDF has every page with the teacher’s ink, and it’s made on your device.
+
+### Can ChatGPT or Claude read my .rpk file?
+
+Yes. Upload the file and ask about the lesson: every .rpk from current Rupok versions includes a plain Markdown outline of its pages (`content.md`) that AI models read. See [how AI reads RPK files](https://rupok.app/rpk/#ai).
 
 ### Is my file uploaded anywhere?
 

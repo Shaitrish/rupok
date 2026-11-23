@@ -1,14 +1,16 @@
-// Settings → Modes: per-mode chrome and toolbar, plus import/export of the
+// Settings → Teaching modes: per-mode chrome and toolbar, plus import/export of the
 // whole UI config as JSON (format: docs/ui-config.md), so a teacher can use a
 // config that Claude or any AI wrote for them.
 
 import { For, Show, createSignal } from "solid-js";
 import { controller } from "../controller";
 import {
-  ALLOWED_CHROME, ALLOWED_TOOLS, CHROME_ITEMS, DEFAULT_MODES, MODES, TOOLBAR_ITEMS, UI_CONFIG_FORMAT, UI_CONFIG_VERSION,
-  type ChromeKey, type Mode, type ModeConfig, type ToolbarItem, type UiConfigFile, resolveMode, sanitizeModes,
+  ALLOWED_CHROME, ALLOWED_TOOLS, CHROME_ITEMS, CORE_TOOLS, DEFAULT_MODES, DOCK_POSITIONS, MODES, SHAPE_TOOLS, TOOLBAR_ITEMS, UI_CONFIG_FORMAT,
+  UI_CONFIG_VERSION, type ChromeKey, type DockConfig, type DockPin, type Mode, type ModeConfig, type ToolbarItem, type UiConfigFile,
+  resolveMode, sanitizeModes,
 } from "../modes";
 import { ACCENTS, type Prefs, mode, modeConfig, prefs, setPrefs, showToast } from "../state";
+import { exportGestures, importGestures } from "../gesturePrefs";
 import { Icon } from "./Icon";
 
 const TOOL_META = new Map(TOOLBAR_ITEMS.map((t) => [t.id, t]));
@@ -17,6 +19,11 @@ const APPEARANCE: Record<string, readonly string[]> = {
   iconStyle: ["linear", "line-duotone", "broken", "bold"],
   toolbar: ["bottom", "left", "right"],
   density: ["compact", "comfortable", "large"],
+  hand: ["right", "left"],
+};
+const POSITION_LABEL: Record<(typeof DOCK_POSITIONS)[number], string> = {
+  auto: "Auto (Appearance → Dock side)", bottom: "Bottom", top: "Top", left: "Left", right: "Right",
+  "bottom-left": "Bottom left", "bottom-right": "Bottom right", "top-left": "Top left", "top-right": "Top right",
 };
 
 /** The current UI config as a file anyone (or any AI) can edit and import. */
@@ -26,7 +33,8 @@ export function exportUiConfig(): UiConfigFile {
     format: UI_CONFIG_FORMAT,
     version: UI_CONFIG_VERSION,
     modes: Object.fromEntries(MODES.map((m) => [m.id, resolveMode(p.modes, m.id)])) as UiConfigFile["modes"],
-    appearance: { theme: p.theme, accent: p.accent, iconStyle: p.iconStyle, toolbar: p.toolbar, density: p.density },
+    appearance: { theme: p.theme, accent: p.accent, iconStyle: p.iconStyle, toolbar: p.toolbar, density: p.density, hand: p.hand },
+    gestures: exportGestures(),
   };
 }
 
@@ -49,6 +57,7 @@ export function importUiConfig(raw: unknown): string {
   controller.updateInsets(true);
   const parts = [...Object.keys(modes).map((m) => MODES.find((x) => x.id === m)!.label)];
   if (Object.keys(next).some((k) => k !== "modes")) parts.push("appearance");
+  if (f.gestures !== undefined && importGestures(f.gestures)) parts.push("gestures");
   return parts.length ? `Imported UI config: ${parts.join(", ")}` : "The file had nothing to import";
 }
 
@@ -62,6 +71,16 @@ export function ModesSettings() {
   const setChrome = (k: ChromeKey, on: boolean) => save({ ...cfg(), chrome: { ...cfg().chrome, [k]: on } });
   const setTool = (id: ToolbarItem, on: boolean) =>
     save({ ...cfg(), tools: on ? [...cfg().tools, id] : cfg().tools.filter((t) => t !== id) });
+  /** Core tools are always on the dock in Prepare and Teach. */
+  const isCore = (id: ToolbarItem) => editing() !== "view" && CORE_TOOLS.includes(id);
+  const pinOf = (id: ToolbarItem): DockPin => (SHAPE_TOOLS.includes(id) ? "shapes" : id);
+  const pinned = (id: ToolbarItem) => cfg().dock.pinned.includes(pinOf(id));
+  const setDock = (d: Partial<DockConfig>) => save({ ...cfg(), dock: { ...cfg().dock, ...d } });
+  const setPinned = (id: ToolbarItem, on: boolean) => {
+    const pin = pinOf(id);
+    const rest = cfg().dock.pinned.filter((x) => x !== pin);
+    setDock({ pinned: on ? [...rest, pin] : rest });
+  };
   const move = (id: ToolbarItem, dir: -1 | 1) => {
     const tools = [...cfg().tools];
     const i = tools.indexOf(id), j = i + dir;
@@ -141,11 +160,25 @@ export function ModesSettings() {
                 return (
                   <li classList={{ off: !on() }}>
                     <label class="check">
-                      <input type="checkbox" checked={on()} onChange={(e) => setTool(id, e.currentTarget.checked)} />
+                      <input type="checkbox" checked={on()} disabled={isCore(id)} onChange={(e) => setTool(id, e.currentTarget.checked)} />
                       <Icon name={TOOL_META.get(id)!.icon} size={16} />
                       <span>{TOOL_META.get(id)!.label}</span>
                     </label>
                     <Show when={on()}>
+                      <Show
+                        when={!isCore(id) && !(id === "smartink" && cfg().dock.pinned.includes("shapes"))}
+                        fallback={<span class="pin-toggle fixed">{isCore(id) ? "Always" : "In Shapes"}</span>}
+                      >
+                        <button
+                          class="pin-toggle"
+                          classList={{ on: pinned(id) }}
+                          aria-pressed={pinned(id)}
+                          title={pinned(id) ? "On the dock. Click to move it to the ⋯ menu" : "In the ⋯ menu. Click to pin it to the dock"}
+                          onClick={() => setPinned(id, !pinned(id))}
+                        >
+                          {pinned(id) ? "Dock" : "⋯ menu"}
+                        </button>
+                      </Show>
                       <button class="btn icon" disabled={at() === 0} onClick={() => move(id, -1)} aria-label={`Move ${TOOL_META.get(id)!.label} up`}>
                         <Icon name="up" size={16} />
                       </button>
@@ -160,6 +193,38 @@ export function ModesSettings() {
           </ol>
         </div>
       </div>
+      <div class="dock-settings">
+        <div class="field">
+          <label for="dock-pos">Dock starts at</label>
+          <select
+            id="dock-pos"
+            value={typeof cfg().dock.position === "string" ? (cfg().dock.position as string) : "float"}
+            onChange={(e) => setDock({ position: e.currentTarget.value as DockConfig["position"] })}
+          >
+            <For each={DOCK_POSITIONS}>{(p) => <option value={p}>{POSITION_LABEL[p]}</option>}</For>
+            <Show when={typeof cfg().dock.position === "object"}>
+              <option value="float" disabled>Floating (from a UI config)</option>
+            </Show>
+          </select>
+        </div>
+        <div class="field">
+          <label>Orientation</label>
+          <div class="seg" role="radiogroup" aria-label="Dock orientation">
+            <For each={[["auto", "Auto"], ["horizontal", "Across"], ["vertical", "Down"]] as const}>
+              {([v, l]) => (
+                <button role="radio" aria-checked={cfg().dock.orientation === v} classList={{ on: cfg().dock.orientation === v }} onClick={() => setDock({ orientation: v })}>
+                  {l}
+                </button>
+              )}
+            </For>
+          </div>
+        </div>
+        <label class="check">
+          <input type="checkbox" checked={cfg().dock.minimized} onChange={(e) => setDock({ minimized: e.currentTarget.checked })} />
+          <span>Start minimised (a small round button)</span>
+        </label>
+      </div>
+      <p class="hint">Pen, highlighter, eraser, laser and undo are always on the dock in Prepare and Teach. Tools set to “⋯ menu” wait in the dock's ⋯ button. Drag the dock by its grip; it remembers where you leave it on each screen size.</p>
       <div class="actions">
         <button class="btn" onClick={upload}><Icon name="import" /><span class="label">Import UI config</span></button>
         <button class="btn" onClick={download}><Icon name="export" /><span class="label">Export UI config</span></button>

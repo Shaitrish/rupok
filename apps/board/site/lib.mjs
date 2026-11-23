@@ -95,7 +95,7 @@ export function blockMd(b) {
     const t = b.table;
     return [`*${md(t.caption)}*`, "", `| ${t.head.map(mdCell).join(" | ")} |`, `|${t.head.map(() => "---").join("|")}|`, ...t.rows.map((r) => `| ${r.map(mdCell).join(" | ")} |`)].join("\n");
   }
-  if (b.code) return "```sh\n" + b.code + "\n```";
+  if (b.code) return "```" + (b.lang ?? "sh") + "\n" + b.code + "\n```";
   if (b.cta) return b.cta.map((c) => `[${c.label}](${abs(c.href)})`).join(" · ");
   if (b.note) return `*${md(b.note)}*`;
   if (b.cols) return b.cols.map((c) => c.map(blockMd).join("\n\n")).join("\n\n");
@@ -139,6 +139,25 @@ const NAV = {
   },
 };
 
+// Light / dark theme: the inline script applies a saved choice before first
+// paint; src/theme.ts wires the toggle. Keep both in step with index.html.
+export const THEME_HEAD_SCRIPT = `<script>try{var t=localStorage.getItem("rupok.site-theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}}catch(e){}</script>`;
+const THEME_LABELS = {
+  en: { group: "Colour theme", system: "Use the system theme", light: "Light theme", dark: "Dark theme" },
+  bn: { group: "রঙের থিম", system: "সিস্টেমের থিম", light: "লাইট থিম", dark: "ডার্ক থিম" },
+};
+const THEME_ICONS = {
+  system: `<rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8.5 20h7M12 16v4"/>`,
+  light: `<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>`,
+  dark: `<path d="M20 14.6A8.2 8.2 0 0 1 9.4 4 8.2 8.2 0 1 0 20 14.6Z"/>`,
+};
+export function themeToggle(lang) {
+  const l = THEME_LABELS[lang] ?? THEME_LABELS.en;
+  const btn = (k) =>
+    `<button type="button" role="radio" aria-checked="${k === "system"}" data-theme-set="${k}" aria-label="${l[k]}" title="${l[k]}"><svg viewBox="0 0 24 24" aria-hidden="true">${THEME_ICONS[k]}</svg></button>`;
+  return `<div class="theme-toggle" role="radiogroup" aria-label="${l.group}">${["system", "light", "dark"].map(btn).join("")}</div>`;
+}
+
 export function nav(page) {
   const n = NAV[page.lang];
   const other = page.lang === "en" ? page.alt?.bn : page.alt?.en;
@@ -155,6 +174,7 @@ export function nav(page) {
         <a class="brand" href="${n.home}" aria-label="${n.homeLabel}"><span class="mark">${MARK_SVG("#20C997")}</span><span class="word">rupok</span></a>
         <nav class="links" aria-label="${n.label}">${links}${swap}</nav>
         <div class="nav-cta">
+          ${themeToggle(page.lang)}
           <a class="pill ghost" href="${GITHUB}" rel="noopener">GitHub</a>
           <a class="pill dark" href="/board/">${n.board}</a>
         </div>
@@ -177,8 +197,8 @@ export function footer(page) {
   const bn = page.lang === "bn";
   const a = (href, label, extra = "") => `<a href="${href}"${extra}>${label}</a>`;
   const product = bn
-    ? [a("/board/", "বোর্ড খুলুন"), a("/bn/", "স্মার্ট বোর্ড সফটওয়্যার"), a("/bn/open/", ".rpk ফাইল খুলুন"), a("/bn/compare/note3/", "Note3 বনাম Rupok"), a("/#plans", "মূল্য", ' hreflang="en"')]
-    : [a("/board/", "Open the board"), a("/smartboard-software/", "Smartboard software"), a("/ai-whiteboard/", "AI whiteboard"), a("/online-class-whiteboard/", "Online class whiteboard"), a("/for-teachers/", "For teachers"), a("/open/", "Open a .rpk file"), a("/#plans", "Pricing")];
+    ? [a("/board/", "বোর্ড খুলুন"), a("/bn/download/", "ডাউনলোড"), a("/bn/", "স্মার্ট বোর্ড সফটওয়্যার"), a("/bn/open/", ".rpk ফাইল খুলুন"), a("/bn/rpk/", "আরপিকে ফাইল ফরম্যাট"), a("/bn/compare/note3/", "Note3 বনাম Rupok"), a("/#plans", "মূল্য", ' hreflang="en"')]
+    : [a("/board/", "Open the board"), a("/download/", "Download"), a("/smartboard-software/", "Smartboard software"), a("/ai-whiteboard/", "AI whiteboard"), a("/online-class-whiteboard/", "Online class whiteboard"), a("/for-teachers/", "For teachers"), a("/open/", "Open a .rpk file"), a("/rpk/", "RPK file format"), a("/#plans", "Pricing")];
   const compare = [a("/compare/", bn ? "সব তুলনা" : "All comparisons", bn ? ' hreflang="en"' : ""), ...COMPARE_LINKS.map(([h, l]) => a(h, l, bn ? ' hreflang="en"' : ""))];
   const oss = [a(GITHUB, "GitHub", ' rel="noopener"'), a(`${GITHUB}/blob/main/ROADMAP.md`, bn ? "রোডম্যাপ" : "Roadmap", ' rel="noopener"'), a(`${GITHUB}/blob/main/CONTRIBUTING.md`, bn ? "অবদান রাখুন" : "Contribute", ' rel="noopener"'), a("/llms.txt", "llms.txt"), `<span class="lic">AGPL-3.0</span>`];
   const lang = bn
@@ -189,7 +209,7 @@ export function footer(page) {
     : `The free, open-source whiteboard for teachers. Made by <a href="https://shaitrish.com" rel="noopener">Shaitrish</a> in Bangladesh, for classrooms everywhere.`;
   return `<footer class="foot">
       <div class="wrap foot-in">
-        <div class="foot-brand"><span class="word">${MARK_SVG("#3EE6B0")}rupok</span><p>${blurb}</p></div>
+        <div class="foot-brand"><span class="word">${MARK_SVG("#3EE6B0")}rupok</span><p>${blurb}</p><p class="foot-dl" data-download="foot"><a href="${bn ? "/bn/download/" : "/download/"}">${bn ? "ডেস্কটপ অ্যাপ ডাউনলোড করুন" : "Download the desktop app"}</a></p></div>
         <nav aria-label="${bn ? "Rupok" : "Product"}"><b>${bn ? "Rupok" : "Product"}</b>${product.join("")}</nav>
         <nav aria-label="${bn ? "তুলনা" : "Compare"}"><b>${bn ? "তুলনা" : "Compare"}</b>${compare.join("")}</nav>
         <nav aria-label="Open source"><b>${bn ? "ওপেন সোর্স" : "Open source"}</b>${oss.join("")}</nav>
@@ -290,6 +310,7 @@ export function jsonLd(page, { home = false } = {}) {
       })),
     });
   }
+  if (page.ld) graph.push(...page.ld); // extra nodes from the page (e.g. /download/)
   const json = JSON.stringify({ "@context": "https://schema.org", "@graph": graph }, null, 0);
   return `<script type="application/ld+json">${json.replace(/</g, "\\u003c")}</script>`;
 }
@@ -307,6 +328,8 @@ export function head(page) {
   const locale = page.lang === "bn" ? "bn_BD" : "en_US";
   return `<meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    ${THEME_HEAD_SCRIPT}
     <title>${esc(page.title)}</title>
     <meta name="description" content="${esc(page.description)}" />
     <meta name="theme-color" content="#ffffff" />

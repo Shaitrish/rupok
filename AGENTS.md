@@ -13,22 +13,23 @@ a Tauri 2 shell (planned). Status: Phase 0, pre-alpha. See
 
 | Path | Role | Key items |
 |---|---|---|
-| `crates/rupok-ink` | Pen input pipeline, wasm-safe | `StrokeBuilder` (wet ink), `filter::OneEuro2`, `pressure::PressureCurve`, `simplify`, `codec::{encode_points, decode_points}` (point codec v1), `MIN_WIDTH_RATIO`, `point_radius` |
+| `crates/rupok-ink` | Pen input pipeline, wasm-safe | `StrokeBuilder` (wet ink), `filter::OneEuro2`, `pressure::PressureCurve`, `simplify`, `codec::{encode_points, decode_points}` (point codec v1), `MIN_WIDTH_RATIO`, `point_radius`, `math` (handwritten maths → LaTeX), `write` (text + LaTeX → timed handwriting strokes) |
 | `crates/rupok-core` | Lesson document on Loro | `Lesson` (`doc.rs`: all mutations), model types (`model.rs`: `ItemData`, `StrokeData`, `ObjectData`, `PageSpec`…), `Scene` (`scene.rs`: R*-tree hit-test, eraser, lasso), `DOC_FORMAT` |
-| `crates/rupok-format` | `.rpk` package and Smart Object bundles (Apache-2.0) | `Package::{read, write, from_lesson, add_asset}`, `ObjectBundle::{from_single_html, from_files, from_dir, validate}`, `LIBS`, `safe_path`, `FORMAT_VERSION`, `MIMETYPE` |
+| `crates/rupok-format` | `.rpk` package and Smart Object bundles (Apache-2.0) | `Package::{read, write, from_lesson, add_asset, content_markdown}`, `readable` (derived `README.md`/`content.md`/`content.json`), `ObjectBundle::{from_single_html, from_files, from_dir, validate}`, `LIBS`, `safe_path`, `FORMAT_VERSION`, `MIMETYPE` |
+| `crates/rupok-live` | Live agent bridge shared by the board and `rupok mcp --live` | `protocol.rs` (WebSocket protocol v1: channels, ports, origin/host checks), `op.rs` (`Op`), `apply.rs` (`apply`: one attributed commit per agent op), `attribution.rs`, `sync` |
 | `crates/rupok-render` | wgpu ink renderer | `InkRenderer` (SDF capsules, chunk culling, cached dry layer, wet layer), `Camera`, `Gpu::headless`, `ink.wgsl` |
 | `crates/rupok-wasm` | Board engine and wasm-bindgen API | `engine.rs` (`Engine`: tools, gestures, selection), `lib.rs` (`Board` JS API), `replay.rs`, `shapes.rs` |
-| `crates/rupok-cli` | `rupok` binary: CLI and MCP server | `cli.rs` (clap), `ops.rs` (shared operations), `mcp.rs` + `tools.rs` (11 MCP tools), `workspace.rs` (path sandbox), `spec.rs` |
+| `crates/rupok-cli` | `rupok` binary: CLI and MCP server | `cli.rs` (clap), `ops.rs` (shared operations), `mcp.rs` + `tools.rs` (12 MCP tools), `workspace.rs` (path sandbox), `spec.rs`, `live/` (`LiveHub`: loopback WebSocket, pairing, Loro mirror) + `mcp_live.rs` (live tools; docs/ai-agents.md), `chat/` (`rupok agent`: ACP client relaying the in-app chat) + `mcp_http.rs` (MCP over loopback HTTP for it) |
 | `bench/` | Performance harness and budgets | `cargo run -p rupok-bench --release [-- --check]` |
-| `apps/board` | SolidJS board UI (Vite) | `controller.ts`, `objects.ts` (Smart Object host), `pdf.ts`, `storage.ts`, `components/` |
+| `apps/board` | SolidJS board UI (Vite) | `controller.ts`, `objects.ts` (Smart Object host), `pdf.ts`, `storage.ts`, `live.ts` + `snapshot.ts` + `components/LivePanel.tsx` (Connect AI), `chat.ts` + `components/ChatPanel.tsx` + `markdown.ts` (AI chat), `components/` |
 | `packages/object-sdk` | In-object SDK, `window.rupok` (Apache-2.0) | `sdk.js` (ES2019 IIFE), `index.d.ts`, `test/` |
 | `spec/` | Normative specs (Apache-2.0) | `rupok-format.md`, `smart-object.md` |
 | `examples/objects/` | Validated example Smart Objects | checked by `crates/rupok-format/tests/examples.rs` |
-| `skills/` | Agent skill pack (Apache-2.0) | `rupok-smart-objects/SKILL.md`, `AGENTS.md` |
+| `skills/` | Agent skill pack (Apache-2.0) | `rupok-smart-objects/SKILL.md`, `rupok-live-board/SKILL.md`, `read-rpk/` (SKILL.md + `read_rpk.py`, tests: `python3 -m unittest discover -s skills/read-rpk/tests`), `AGENTS.md` |
 | `docs/roadmap/` | One plan per planned feature | |
 
-Dependency direction: `rupok-ink` ← `rupok-core` ← `rupok-format` ← (`rupok-wasm`,
-`rupok-cli`, `bench`); `rupok-render` depends on `rupok-ink` and `rupok-core`. Never
+Dependency direction: `rupok-ink` ← `rupok-core` ← `rupok-format` ← `rupok-live` ← (`rupok-wasm`,
+`rupok-cli`); `bench` uses `rupok-format`; `rupok-render` depends on `rupok-ink` and `rupok-core`. Never
 add a dependency that points the other way.
 
 ## Commands

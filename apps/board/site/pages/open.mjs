@@ -25,7 +25,7 @@ const en = {
   title: "Open .rpk Files: Free Online RPK Viewer | Rupok",
   ogTitle: "Open .rpk files: free online RPK viewer",
   description:
-    "Got a .rpk file from your teacher? Open it free in your browser: replay the class stroke by stroke, use the live activities, and download a PDF. No account, no app, nothing uploaded.",
+    "Got a .rpk (Rich Presentation Kit) file from your teacher? Open it free in your browser: replay the class stroke by stroke, use the live activities, and download a PDF. No account, no app, nothing uploaded.",
   bodyClass: "open-page",
   h1: "Open .rpk files: free online RPK viewer",
   lede: "Got a lesson file from your teacher on WhatsApp, Gmail or Google Drive? Drop it here. It opens right in your browser, with the class replay and the live activities still working.",
@@ -47,7 +47,7 @@ const en = {
       split: true,
       h2: "What is an .rpk file?",
       copy: [
-        "An **.rpk file is a Rupok lesson.** Rupok is a free, open-source whiteboard for teachers, and a `.rpk` file holds one whole class in a single file:",
+        "An **RPK (Rich Presentation Kit) file is a Rupok lesson.** Rupok is a free, open-source whiteboard for teachers, and a `.rpk` file holds one whole class in a single file:",
         { ticks: [
           "**Slides:** every page the teacher prepared, including PDF slides.",
           "**Ink:** everything written on them with the pen.",
@@ -57,12 +57,13 @@ const en = {
       ],
       blocks: [
         { dl: [
-          ["File type", "Rupok lesson"],
+          ["File type", "Rupok lesson (RPK: Rich Presentation Kit)"],
           ["Extension", "`.rpk`"],
           ["Media type", "`application/vnd.rupok.lesson+zip`"],
           ["Inside", "A ZIP package: the lesson document with its full history, images and Smart Objects"],
           ["Opens with", "Rupok, free in Chrome or Edge, on this page or at rupok.app/board"],
-          ["Format", "Open and documented ([spec](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md), Apache-2.0)"],
+          ["Format", "Open and documented ([RPK file format](/rpk/), Apache-2.0 [spec](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))"],
+          ["Readable by AI", "Yes: each file carries a Markdown outline ChatGPT or Claude can read"],
         ] },
       ],
     },
@@ -122,10 +123,12 @@ const en = {
     },
   ],
   faq: [
-    { q: "What is an .rpk file?", a: "An .rpk file is a lesson made with Rupok, a free whiteboard for teachers. It holds the slides, the teacher’s ink, live interactive Smart Objects and a replay of the class. Technically it’s a ZIP package with an open, documented format." },
+    { q: "What is an .rpk file?", a: "An .rpk file is a lesson made with Rupok, a free whiteboard for teachers. It holds the slides, the teacher’s ink, live interactive Smart Objects and a replay of the class. Technically it’s a ZIP package with an open, documented format: see [the RPK file format](/rpk/)." },
+    { q: "What does RPK stand for?", a: "RPK stands for Rich Presentation Kit, the name of Rupok’s lesson file format." },
     { q: "How do I open an .rpk file?", a: "Drop it on this page, or tap “Choose a .rpk file”. It opens in your browser in Rupok’s Student mode. You don’t need an account or an app." },
     { q: "Can I open an .rpk file on my phone?", a: "Yes. Save the file from WhatsApp, Gmail or Google Drive, open rupok.app/open in your phone’s browser (Chrome works best), and choose the file." },
     { q: "How do I convert an .rpk file to PDF?", a: "Open the file on this page, then press Download PDF in the viewer. The PDF has every page with the teacher’s ink, and it’s made on your device." },
+    { q: "Can ChatGPT or Claude read my .rpk file?", a: "Yes. Upload the file and ask about the lesson: every .rpk from current Rupok versions includes a plain Markdown outline of its pages (`content.md`) that AI models read. See [how AI reads RPK files](/rpk/#ai)." },
     { q: "Is my file uploaded anywhere?", a: "No. The file is opened by your browser on your device. This page hands it to the viewer through your browser’s local storage, and nothing is sent to a server." },
     { q: "Can I change the lesson?", a: "Student mode is read-only, so you can replay the class and use the live objects without changing anything. Teachers edit lessons at [rupok.app/board](/board/)." },
     { q: "My .rpk file won’t open. What can I do?", a: [
@@ -181,11 +184,11 @@ const bn = {
       ],
       blocks: [
         { dl: [
-          ["ফাইলের ধরন", "Rupok লেসন"],
+          ["ফাইলের ধরন", "Rupok লেসন (RPK: Rich Presentation Kit)"],
           ["এক্সটেনশন", "`.rpk`"],
           ["ভেতরে যা থাকে", "একটি ZIP প্যাকেজ: পুরো ইতিহাসসহ লেসন, ছবি আর স্মার্ট অবজেক্ট"],
           ["যা দিয়ে খোলে", "Rupok, Chrome বা Edge ব্রাউজারে ফ্রি: এই পাতায় বা rupok.app/board-এ"],
-          ["ফরম্যাট", "খোলা ও নথিভুক্ত ([স্পেসিফিকেশন](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))"],
+          ["ফরম্যাট", "খোলা ও নথিভুক্ত ([আরপিকে ফাইল ফরম্যাট](/bn/rpk/), [স্পেসিফিকেশন](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))"],
         ] },
       ],
     },
@@ -247,6 +250,7 @@ const bn = {
   faqTitle: "আরপিকে ফাইল নিয়ে প্রশ্নোত্তর",
   faq: [
     { q: ".rpk (আরপিকে) ফাইল কী?", a: ".rpk ফাইল হলো Rupok দিয়ে বানানো একটি লেসন। Rupok শিক্ষকদের জন্য ফ্রি হোয়াইটবোর্ড। এই ফাইলে স্লাইড, শিক্ষকের হাতের লেখা, লাইভ স্মার্ট অবজেক্ট আর পুরো ক্লাসের রিপ্লে থাকে। ভেতরে এটি একটি ZIP প্যাকেজ, যার ফরম্যাট খোলা ও নথিভুক্ত।" },
+    { q: "RPK-এর পুরো নাম কী?", a: "RPK মানে Rich Presentation Kit, Rupok-এর লেসন ফাইলের ফরম্যাট। বিস্তারিত: [আরপিকে ফাইল ফরম্যাট](/bn/rpk/)।" },
     { q: "rpk ফাইল কীভাবে খুলবো?", a: "ফাইলটি এই পাতায় ছেড়ে দিন, অথবা “.rpk ফাইল বেছে নিন”-এ চাপুন। Rupok-এর স্টুডেন্ট মোডে ব্রাউজারেই খুলে যাবে। অ্যাকাউন্ট বা অ্যাপ লাগবে না।" },
     { q: "মোবাইলে কি rpk ফাইল খোলা যায়?", a: "হ্যাঁ। হোয়াটসঅ্যাপ, জিমেইল বা গুগল ড্রাইভ থেকে ফাইলটি সেভ করুন, মোবাইলের ব্রাউজারে rupok.app/bn/open খুলুন (Chrome সবচেয়ে ভালো), তারপর ফাইলটি বেছে নিন।" },
     { q: "rpk ফাইলকে PDF বানাবো কীভাবে?", a: "ফাইলটি এই পাতায় খুলুন, তারপর ভিউয়ারে Download PDF চাপুন। শিক্ষকের লেখাসহ সব পাতা PDF হয়ে যাবে, আপনার ডিভাইসেই।" },

@@ -464,27 +464,32 @@ impl Lesson {
     pub fn set_group(&mut self, page_id: &str, ids: &[ItemId], group: Option<&str>) -> Result<()> {
         let items = self.items_map(page_id)?;
         for id in ids {
-            match items.get(id) {
-                Some(ValueOrContainer::Value(LoroValue::Map(v))) => {
-                    let mut f = ValueFields::from(&v);
-                    match group {
-                        Some(g) => f.set("group", g),
-                        None => f.remove("group"),
-                    }
-                    items.insert(id, f.into_value())?;
-                }
-                Some(ValueOrContainer::Container(Container::Map(m))) => match group {
-                    Some(g) => m.insert("group", g)?,
-                    None => {
-                        if m.get("group").is_some() {
-                            m.delete("group")?;
-                        }
-                    }
-                },
-                _ => return Err(CoreError::ItemNotFound(id.clone())),
-            }
+            Self::write_group(&items, id, group)?;
         }
         self.doc.commit();
+        Ok(())
+    }
+
+    fn write_group(items: &LoroMap, id: &ItemId, group: Option<&str>) -> Result<()> {
+        match items.get(id) {
+            Some(ValueOrContainer::Value(LoroValue::Map(v))) => {
+                let mut f = ValueFields::from(&v);
+                match group {
+                    Some(g) => f.set("group", g),
+                    None => f.remove("group"),
+                }
+                items.insert(id, f.into_value())?;
+            }
+            Some(ValueOrContainer::Container(Container::Map(m))) => match group {
+                Some(g) => m.insert("group", g)?,
+                None => {
+                    if m.get("group").is_some() {
+                        m.delete("group")?;
+                    }
+                }
+            },
+            _ => return Err(CoreError::ItemNotFound(id.clone())),
+        }
         Ok(())
     }
 
@@ -513,22 +518,73 @@ impl Lesson {
     ) -> Result<()> {
         let items = self.items_map(page_id)?;
         for id in ids {
-            match items.get(id) {
-                Some(ValueOrContainer::Value(LoroValue::Map(v))) => {
-                    let mut f = ValueFields::from(&v);
-                    f.set("ox", f64_of(&v, "ox").unwrap_or(0.0) + dx);
-                    f.set("oy", f64_of(&v, "oy").unwrap_or(0.0) + dy);
-                    items.insert(id, f.into_value())?;
-                }
-                Some(ValueOrContainer::Container(Container::Map(m))) => {
-                    m.insert("x", f64_of(&m, "x").unwrap_or(0.0) + dx)?;
-                    m.insert("y", f64_of(&m, "y").unwrap_or(0.0) + dy)?;
-                }
-                _ => return Err(CoreError::ItemNotFound(id.clone())),
-            }
+            Self::write_translate(&items, id, dx, dy)?;
         }
         self.doc.commit();
         Ok(())
+    }
+
+    fn write_translate(items: &LoroMap, id: &ItemId, dx: f64, dy: f64) -> Result<()> {
+        match items.get(id) {
+            Some(ValueOrContainer::Value(LoroValue::Map(v))) => {
+                let mut f = ValueFields::from(&v);
+                f.set("ox", f64_of(&v, "ox").unwrap_or(0.0) + dx);
+                f.set("oy", f64_of(&v, "oy").unwrap_or(0.0) + dy);
+                items.insert(id, f.into_value())?;
+            }
+            Some(ValueOrContainer::Container(Container::Map(m))) => {
+                m.insert("x", f64_of(&m, "x").unwrap_or(0.0) + dx)?;
+                m.insert("y", f64_of(&m, "y").unwrap_or(0.0) + dy)?;
+            }
+            _ => return Err(CoreError::ItemNotFound(id.clone())),
+        }
+        Ok(())
+    }
+
+    /// Apply several edits as **one** change (one undo step). Order:
+    /// translate, rewrite strokes, box geometry, groups, remove, add.
+    /// Returns the ids of the added items. Nothing is committed when an id
+    /// is missing (the error is returned and the edit is rolled back by the
+    /// caller's next undo-free commit; callers pass ids from the scene).
+    pub fn apply_edits(&mut self, page_id: &str, e: &Edits) -> Result<Vec<ItemId>> {
+        let items = self.items_map(page_id)?;
+        for (id, dx, dy) in &e.translate {
+            Self::write_translate(&items, id, *dx, *dy)?;
+        }
+        for (id, data) in &e.strokes {
+            Self::write_stroke(&items, id, data)?;
+        }
+        for (id, g, size) in &e.boxes {
+            let m = item_map(&items, id)?;
+            write_geom(&m, g)?;
+            if let Some(sz) = size
+                && str_of(&m, "kind").as_deref() == Some("text")
+            {
+                m.insert("size", *sz)?;
+            }
+        }
+        for (id, g) in &e.groups {
+            Self::write_group(&items, id, g.as_deref())?;
+        }
+        for id in &e.remove {
+            if items.get(id).is_some() {
+                items.delete(id)?;
+            }
+        }
+        let mut ids = Vec::with_capacity(e.add.len());
+        for it in &e.add {
+            ids.push(self.insert_item(
+                page_id,
+                &items,
+                &it.data,
+                it.created,
+                it.group.as_deref(),
+            )?);
+        }
+        if !e.is_empty() {
+            self.doc.commit();
+        }
+        Ok(ids)
     }
 
     /// Set the geometry of a box item (text, image, object).
@@ -599,18 +655,7 @@ impl Lesson {
     ) -> Result<()> {
         let items = self.items_map(page_id)?;
         for (id, data) in replace {
-            let Some(ValueOrContainer::Value(LoroValue::Map(v))) = items.get(id) else {
-                return Err(CoreError::ItemNotFound(id.clone()));
-            };
-            if v.get("kind") != Some(&LoroValue::from("stroke")) {
-                return Err(CoreError::ItemNotFound(id.clone()));
-            }
-            let mut f = ValueFields::from(&v);
-            for key in ["ox", "oy", "shape", "geom"] {
-                f.remove(key);
-            }
-            write_item_data(&mut f, &ItemData::Stroke(data.clone()))?;
-            items.insert(id, f.into_value())?;
+            Self::write_stroke(&items, id, data)?;
         }
         for id in remove {
             if items.get(id).is_some() {
@@ -620,6 +665,22 @@ impl Lesson {
         if !replace.is_empty() || !remove.is_empty() {
             self.doc.commit();
         }
+        Ok(())
+    }
+
+    fn write_stroke(items: &LoroMap, id: &ItemId, data: &StrokeData) -> Result<()> {
+        let Some(ValueOrContainer::Value(LoroValue::Map(v))) = items.get(id) else {
+            return Err(CoreError::ItemNotFound(id.clone()));
+        };
+        if v.get("kind") != Some(&LoroValue::from("stroke")) {
+            return Err(CoreError::ItemNotFound(id.clone()));
+        }
+        let mut f = ValueFields::from(&v);
+        for key in ["ox", "oy", "shape", "geom"] {
+            f.remove(key);
+        }
+        write_item_data(&mut f, &ItemData::Stroke(data.clone()))?;
+        items.insert(id, f.into_value())?;
         Ok(())
     }
 
@@ -645,6 +706,16 @@ impl Lesson {
 
     pub fn set_text(&mut self, page_id: &str, id: &str, text: &str) -> Result<()> {
         item_map(&self.items_map(page_id)?, id)?.insert("text", text)?;
+        self.doc.commit();
+        Ok(())
+    }
+
+    /// Recolour a text item (0xRRGGBBAA). Only text items; one commit.
+    pub fn set_text_color(&mut self, page_id: &str, id: &str, rgba: u32) -> Result<()> {
+        if !matches!(self.item(page_id, id)?.data, ItemData::Text(_)) {
+            return Err(CoreError::ItemNotFound(id.to_string()));
+        }
+        item_map(&self.items_map(page_id)?, id)?.insert("color", i64::from(rgba))?;
         self.doc.commit();
         Ok(())
     }
@@ -901,6 +972,9 @@ fn write_item_data(m: &mut impl FieldsMut, data: &ItemData) -> loro::LoroResult<
             m.insert("text", t.text.as_str())?;
             m.insert("size", t.size)?;
             m.insert("color", i64::from(t.color))?;
+            if t.latex {
+                m.insert("latex", true)?;
+            }
         }
         ItemData::Image(i) => {
             write_geom_to(m, &i.geom)?;
@@ -940,6 +1014,12 @@ fn shape_geom_value(g: &ShapeGeom) -> LoroValue {
             ),
         );
     }
+    if let Some(id) = &g.from {
+        f.set("from", id.as_str());
+    }
+    if let Some(id) = &g.to {
+        f.set("to", id.as_str());
+    }
     f.into_value()
 }
 
@@ -968,6 +1048,9 @@ fn read_shape_geom(m: &impl Fields) -> Option<ShapeGeom> {
         h: f64_of(&g, "h")?,
         rot: f64_of(&g, "rot").unwrap_or(0.0),
         v,
+        // A malformed link reads as no link (the connector stays put).
+        from: str_of(&g, "from").filter(|s| !s.is_empty() && s.len() <= 256),
+        to: str_of(&g, "to").filter(|s| !s.is_empty() && s.len() <= 256),
     };
     geom.is_valid().then_some(geom)
 }
@@ -998,6 +1081,7 @@ fn read_item(id: &str, m: &impl Fields) -> Result<Item> {
             })
         }
         "text" => ItemData::Text(TextData {
+            latex: matches!(value_of(m, "latex"), Some(LoroValue::Bool(true))),
             geom: read_geom(m),
             text: str_of(m, "text").unwrap_or_default(),
             size: f64_of(m, "size").unwrap_or(32.0),
@@ -1123,6 +1207,8 @@ mod tests {
             h: 30.0,
             rot: 0.25,
             v: vec![0.5, 0.0, 1.0, 1.0, 0.0, 1.0],
+            from: None,
+            to: Some("box-2".into()),
         });
         s
     }
@@ -1151,6 +1237,120 @@ mod tests {
         };
         assert_eq!(b.geom, None);
         assert_eq!(b.shape.as_deref(), Some("triangle"));
+    }
+
+    #[test]
+    fn latex_text_round_trips_and_plain_text_has_no_key() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let t = |latex| TextData {
+            latex,
+            geom: BoxGeom {
+                x: 0.0,
+                y: 0.0,
+                w: 100.0,
+                h: 40.0,
+                rot: 0.0,
+            },
+            text: "x^2".into(),
+            size: 32.0,
+            color: 0x000000ff,
+        };
+        let a = l.add_item(&p, &ItemData::Text(t(true)), 1.0).unwrap();
+        let b = l.add_item(&p, &ItemData::Text(t(false)), 2.0).unwrap();
+        let back = Lesson::load(&l.save()).unwrap();
+        assert_eq!(back.item(&p, &a).unwrap().data, ItemData::Text(t(true)));
+        assert_eq!(back.item(&p, &b).unwrap().data, ItemData::Text(t(false)));
+        // Editing the source keeps it maths.
+        l.set_text(&p, &a, "x^3").unwrap();
+        let ItemData::Text(td) = l.item(&p, &a).unwrap().data else {
+            panic!()
+        };
+        assert!(td.latex && td.text == "x^3");
+    }
+
+    #[test]
+    fn apply_edits_is_one_undo_step() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let a = l
+            .add_item(&p, &ItemData::Stroke(shape_stroke()), 1.0)
+            .unwrap();
+        let b = l
+            .add_item(&p, &ItemData::Stroke(shape_stroke()), 2.0)
+            .unwrap();
+        let text = ItemData::Text(TextData {
+            latex: false,
+            geom: BoxGeom {
+                x: 0.0,
+                y: 0.0,
+                w: 40.0,
+                h: 30.0,
+                rot: 0.0,
+            },
+            text: "x".into(),
+            size: 24.0,
+            color: 0x000000ff,
+        });
+        let t = l.add_item(&p, &text, 3.0).unwrap();
+        let mut moved = shape_stroke();
+        moved.width = 9.0;
+        let added = l
+            .apply_edits(
+                &p,
+                &Edits {
+                    translate: vec![(t.clone(), 10.0, 5.0)],
+                    strokes: vec![(a.clone(), moved)],
+                    boxes: vec![(
+                        t.clone(),
+                        BoxGeom {
+                            x: 50.0,
+                            y: 60.0,
+                            w: 40.0,
+                            h: 30.0,
+                            rot: 0.0,
+                        },
+                        Some(48.0),
+                    )],
+                    groups: vec![
+                        (a.clone(), Some("g1".into())),
+                        (t.clone(), Some("g1".into())),
+                    ],
+                    remove: vec![b.clone()],
+                    add: vec![NewItem {
+                        data: text.clone(),
+                        created: 4.0,
+                        group: Some("g1".into()),
+                    }],
+                },
+            )
+            .unwrap();
+        assert_eq!(added.len(), 1);
+        let items = l.items(&p).unwrap();
+        assert_eq!(items.len(), 3);
+        assert!(items.iter().all(|i| i.group.as_deref() == Some("g1")));
+        let ItemData::Text(td) = &l.item(&p, &t).unwrap().data else {
+            panic!()
+        };
+        assert_eq!((td.geom.x, td.size), (50.0, 48.0));
+        // One undo step brings everything back.
+        assert!(l.undo().unwrap());
+        let items = l.items(&p).unwrap();
+        assert_eq!(items.len(), 3);
+        assert!(items.iter().all(|i| i.group.is_none()));
+        assert!(items.iter().any(|i| i.id == b));
+        // A missing id is an error.
+        assert!(
+            l.apply_edits(
+                &p,
+                &Edits {
+                    remove: vec![],
+                    groups: vec![("nope".into(), None)],
+                    ..Default::default()
+                }
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1282,6 +1482,7 @@ mod tests {
 
     fn text_item(x: f64) -> ItemData {
         ItemData::Text(TextData {
+            latex: false,
             geom: BoxGeom {
                 x,
                 y: 10.0,
@@ -1427,6 +1628,18 @@ mod tests {
         let order: Vec<_> = l.items(&p).unwrap().into_iter().map(|i| i.id).collect();
         assert_eq!(order, vec![b, a, c]);
         assert!(l.bring_items_to_front(&p, &["nope".into()]).is_err());
+    }
+
+    #[test]
+    fn set_text_color_recolours_text_only_in_one_step() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let t = l.add_item(&p, &text_item(0.0), 1.0).unwrap();
+        l.set_text_color(&p, &t, 0xe5484dff).unwrap();
+        assert!(matches!(l.item(&p, &t).unwrap().data, ItemData::Text(td) if td.color == 0xe5484dff));
+        assert!(l.undo().unwrap());
+        assert!(matches!(l.item(&p, &t).unwrap().data, ItemData::Text(td) if td.color == 0x112233ff));
+        assert!(l.set_text_color(&p, "nope", 0).is_err());
     }
 
     #[test]

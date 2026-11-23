@@ -134,7 +134,13 @@ pub struct StrokeData {
 ///   `w`/`h` may be negative; for arrows the second end is the tip.
 /// - `poly`: a closed polyline through `v` (flat `[x0, y0, x1, y1, …]`,
 ///   normalised to the box, 0..1), rotated by `rot` about the box centre.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// - Smart Ink templates (`axes`, `numberline`, `gate-and`, …) use the box
+///   the same way, with kind-specific numbers in `v` (see
+///   `spec/rupok-format.md`, Shape geometry).
+///
+/// `from` / `to` link a connector (`line`, `arrow`) to the items its ends
+/// are attached to, so it follows them when they move.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct ShapeGeom {
     pub kind: String,
     pub x: f64,
@@ -145,6 +151,10 @@ pub struct ShapeGeom {
     pub rot: f64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub v: Vec<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
 }
 
 impl ShapeGeom {
@@ -162,6 +172,10 @@ impl ShapeGeom {
             && self.v.len() <= 2 * Self::MAX_VERTICES
             && self.v.iter().all(|v| v.is_finite() && v.abs() <= 16.0)
             && (self.kind != "poly" || self.v.len() >= 6)
+            && [&self.from, &self.to].iter().all(|l| {
+                l.as_ref()
+                    .is_none_or(|id| !id.is_empty() && id.len() <= 256)
+            })
     }
 }
 
@@ -189,6 +203,9 @@ pub struct TextData {
     pub text: String,
     pub size: f64,
     pub color: u32,
+    /// `text` is LaTeX maths, shown typeset (the optional `latex` key).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub latex: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -249,6 +266,36 @@ pub struct Item {
     /// Optional `group` key in the document; opaque, unique within a page.
     pub group: Option<String>,
     pub data: ItemData,
+}
+
+/// Several document edits applied as **one** change (one undo step) with
+/// [`crate::Lesson::apply_edits`]: a Smart Ink composite (strokes rewritten,
+/// raw ink removed, labels added in a group), a move that drags attached
+/// connectors along, or a resize of a whole group.
+#[derive(Clone, Debug, Default)]
+pub struct Edits {
+    /// Move items by (dx, dy) (strokes accumulate an offset).
+    pub translate: Vec<(ItemId, f64, f64)>,
+    /// Rewrite strokes in place (see [`crate::Lesson::edit_strokes`]).
+    pub strokes: Vec<(ItemId, StrokeData)>,
+    /// New geometry (and font size, for text) of box items.
+    pub boxes: Vec<(ItemId, BoxGeom, Option<f64>)>,
+    /// Set (`Some`) or clear (`None`) items' group.
+    pub groups: Vec<(ItemId, Option<String>)>,
+    pub remove: Vec<ItemId>,
+    /// Added on top, in order.
+    pub add: Vec<NewItem>,
+}
+
+impl Edits {
+    pub fn is_empty(&self) -> bool {
+        self.translate.is_empty()
+            && self.strokes.is_empty()
+            && self.boxes.is_empty()
+            && self.groups.is_empty()
+            && self.remove.is_empty()
+            && self.add.is_empty()
+    }
 }
 
 /// An item to add with [`crate::Lesson::add_items`].

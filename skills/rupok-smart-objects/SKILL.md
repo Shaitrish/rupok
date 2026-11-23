@@ -63,6 +63,17 @@ rupok add-object lesson.rpk counter.html --page 2 --steps 10 --w 1280 --h 720
 rupok info lesson.rpk
 ```
 
+## Live on the board (during class)
+
+If the teacher has Rupok open and pairs it with you (they click **Connect AI**
+and give you a 6-digit code: call `connect_board`), the same tools edit the
+open lesson live with `path: "live"`, and live tools let you see the board
+(`get_current_page`, `get_page_snapshot`, `get_selection`) and present
+(`add_page_after_current`, `go_to_page`, `step_object`, `point_at`,
+`replace_items_with_text`, `set_board_theme`). Follow the
+`rupok-live-board` skill: new content on a new page, confirm before
+destructive edits, keep objects themed to the page.
+
 ## The object contract
 
 - **One HTML file**, everything inline (CSS, JS, SVG, data). No build step.
@@ -91,13 +102,51 @@ rupok.theme.get("color.accent", "#2563eb")   // also CSS vars: var(--rupok-color
 rupok.quiz.submit({ questionId: "q1", answer: "b", correct: true, score: 3 })
 rupok.mode                         // "edit" | "present" | "replay" | "student"
 rupok.log("info", "anything")      // shows up for the teacher/agent
+rupok.tex(el, "v_x = \\hl{14.1}\\,\\text{m/s}")  // typeset LaTeX into el; cheap to repeat
+rupok.math.render(el)              // typeset $…$ etc. under el (usually automatic)
 ```
 
 Theme CSS variables: `--rupok-color-bg`, `--rupok-color-fg`, `--rupok-color-accent`,
 `--rupok-color-accent2`, `--rupok-color-muted`, `--rupok-color-success`,
 `--rupok-color-danger`, `--rupok-font-body`, `--rupok-font-heading`,
-`--rupok-font-mono`, `--rupok-radius`. Always write a fallback:
+`--rupok-font-mono`, `--rupok-radius`, plus `--rupok-color-surface`,
+`--rupok-color-line`, `--rupok-color-accent-text`, `--rupok-color-on-accent`
+and `--rupok-color-accent-soft`. Always write a fallback:
 `var(--rupok-color-fg, #1d2433)`.
+
+**Accent contrast.** The host picks accent tokens that suit the page (light or
+dark), so use the right one:
+- `--rupok-color-accent` only for fills and strokes (bars, lines, dots, button
+  backgrounds);
+- text in the accent colour: `--rupok-color-accent-text`, never
+  `--rupok-color-accent`;
+- labels and icons on an accent button: `--rupok-color-on-accent` (dark text on
+  mint, not white);
+- highlights: `--rupok-color-accent-soft` background behind
+  `--rupok-color-accent-text`.
+
+## Maths (LaTeX) is built in
+
+Write formulas as LaTeX and the SDK typesets them with KaTeX, offline. Don't
+load KaTeX yourself and don't fake maths with `<sup>`, `<sub>` or Unicode
+look-alikes.
+
+```html
+<p>Kinetic energy: $E_k = \tfrac{1}{2} m v^2$</p>           <!-- inline -->
+<p>$$R = \frac{v^2 \hl{\sin 2\theta}}{g}$$</p>              <!-- display, \hl highlights -->
+<span data-tex="2^7 = 128">128</span>                        <!-- fallback until typeset -->
+```
+
+- `$…$` / `\(…\)` inline, `$$…$$` / `\[…\]` display. Text set later with
+  `innerHTML` or `textContent` is typeset too.
+- Live values: ``rupok.tex(el, `v = ${v}\\,\\text{m/s}`)`` on every change (the same
+  formula again costs nothing).
+- `\hl{…}` marks the term that changes (accent text on the soft accent), in
+  light and dark.
+- Maths takes the text colour. `<code>`, `<pre>` and `[data-no-math]` are left
+  alone; `$5 and $10` stays text; `\$` is a literal dollar.
+- A canvas can't hold LaTeX: put formula labels in HTML over the canvas.
+- Opt out: `<meta name="rupok-math" content="off">` (the API still works).
 
 **Fonts.** The host provides **Inter** (variable, 100–900, Latin) and **Hind
 Siliguri** (400–700, Bengali and Latin) inside every object, even on machines
@@ -244,12 +293,9 @@ URL assembled at run time will not load.
   `rupoklib://three/addons/environments/RoomEnvironment.js`.
   Any other addon: inline it. Use a `<script type="module">` with a static
   `import` or `await import("rupoklib://three/three.module.js")`.
-- **KaTeX auto-render.** After `katex.min.js` (and `katex.min.css`), load
-  `rupoklib://katex/auto-render.min.js` and call
-  `renderMathInElement(element, { delimiters })`. Its defaults are `$$…$$`,
-  `\[…\]` and `\(…\)`; single `$…$` is **off** unless you add
-  `{ left: "$", right: "$", display: false }` to `delimiters`. For one formula,
-  `katex.render("V = IR", el, { throwOnError: false })` is simpler.
+- **KaTeX: you don't need it.** Maths is built into the SDK (see "Maths
+  (LaTeX) is built in"): write `$…$`. Load `rupoklib://katex/…` yourself only
+  for KaTeX features beyond the SDK.
 
 ## Fixing validation diagnostics
 
@@ -275,3 +321,6 @@ URL assembled at run time will not load.
 - [ ] Looks right at half size and at full slide size.
 - [ ] Saves only after `rupok.ready`; no storage, no network, no `alert`.
 - [ ] Facts checked.
+- [ ] Formulas are LaTeX (`$…$`, `rupok.tex`), not hand-styled HTML.
+- [ ] Accent-coloured text uses `--rupok-color-accent-text`; text on accent
+      buttons uses `--rupok-color-on-accent`.

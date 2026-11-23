@@ -16,6 +16,7 @@ rupok-core = { path = "crates/rupok-core" }
 rupok-format = { path = "crates/rupok-format" }
 rupok-render = { path = "crates/rupok-render" }
 rupok-live = { path = "crates/rupok-live" }
+rupok-cli = { path = "crates/rupok-cli" }
 
 loro = "1.18"
 serde = { version = "1", features = ["derive"] }
@@ -37,6 +38,17 @@ clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
 rmcp = "3.11"
 schemars = "1.2"
+
+# Keep development builds small: line tables are enough for backtraces, and
+# dependencies need no debug info. Cuts the target/ cache several-fold.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.test]
+debug = "line-tables-only"
 
 [profile.release]
 lto = "thin"

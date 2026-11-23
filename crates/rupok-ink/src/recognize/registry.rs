@@ -11,7 +11,7 @@
 //! every proposal the same way (one undo step, the first undo brings the
 //! hand-drawn stroke back).
 
-use super::{Geometry, Options, P, Recognized, ShapeKind, arrow_head, recognize_xy};
+use super::{Geometry, Options, P, Recognized, ShapeKind, arrow_head, family, recognize_xy};
 use crate::StrokePoint;
 
 /// A stroke or shape near the new stroke (world units).
@@ -39,6 +39,17 @@ pub struct Context {
     pub neighbours: Vec<Neighbour>,
 }
 
+/// A text label that goes with a result (axis names, an equation, number
+/// line values, an angle's degrees).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Label {
+    pub text: String,
+    /// Centre of the text, world units.
+    pub at: P,
+    /// Font size, world units.
+    pub size: f32,
+}
+
 /// A recogniser's answer.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Proposal {
@@ -46,10 +57,48 @@ pub struct Proposal {
     /// Neighbours (indices into [`Context::neighbours`]) the result replaces.
     /// Empty: the result replaces the new stroke. Otherwise the result is
     /// drawn in place of the first absorbed neighbour (keeping its style and
-    /// replay time) and the new stroke and the other absorbed ones go.
+    /// replay time) and the new stroke and the other absorbed ones go
+    /// (unless [`Proposal::onto_stroke`]).
     pub absorbs: Vec<usize>,
     /// The recogniser's name.
     pub by: &'static str,
+    /// The result replaces the new stroke even though it absorbs
+    /// neighbours (which all go).
+    pub onto_stroke: bool,
+    /// More strokes in the result's style, grouped with it: parts one
+    /// polyline can't draw (a cell's two plates, Venn circles).
+    pub extra: Vec<Recognized>,
+    /// Text labels grouped with the result.
+    pub labels: Vec<Label>,
+    /// Put the result in this neighbour's group (a curve joins its axes).
+    pub join: Option<usize>,
+    /// Remove the labels grouped with these absorbed neighbours (a result
+    /// that redraws its labels).
+    pub relabel: Vec<usize>,
+}
+
+impl Proposal {
+    pub fn new(recognized: Recognized, absorbs: Vec<usize>, by: &'static str) -> Self {
+        Self {
+            recognized,
+            absorbs,
+            by,
+            onto_stroke: false,
+            extra: Vec::new(),
+            labels: Vec::new(),
+            join: None,
+            relabel: Vec::new(),
+        }
+    }
+
+    /// Every neighbour index the proposal refers to.
+    fn indices(&self) -> impl Iterator<Item = usize> + '_ {
+        self.absorbs
+            .iter()
+            .chain(self.join.iter())
+            .chain(self.relabel.iter())
+            .copied()
+    }
 }
 
 pub trait Recognizer: Send + Sync {
@@ -59,6 +108,11 @@ pub trait Recognizer: Send + Sync {
     /// mode on pen-up, handwriting in progress), because they only fire on
     /// an unmistakable pattern next to a shape the teacher already made.
     fn contextual(&self) -> bool {
+        false
+    }
+    /// True when it runs once the pen has rested (a number line is read
+    /// when its last tick is drawn, not at the fourth).
+    fn deferred(&self) -> bool {
         false
     }
     fn recognize(&self, stroke: &[P], ctx: &Context) -> Option<Proposal>;
@@ -72,11 +126,11 @@ impl Recognizer for Shapes {
         "shapes"
     }
     fn recognize(&self, stroke: &[P], ctx: &Context) -> Option<Proposal> {
-        Some(Proposal {
-            recognized: recognize_xy(stroke, ctx.opts)?,
-            absorbs: Vec::new(),
-            by: self.name(),
-        })
+        let mut r = recognize_xy(stroke, ctx.opts)?;
+        if ctx.opts.has(family::GEOMETRY) {
+            super::geometry::align_line(&mut r, ctx);
+        }
+        Some(Proposal::new(r, Vec::new(), self.name()))
     }
 }
 
@@ -114,15 +168,15 @@ impl Recognizer for ArrowHead {
             };
             let at_b = arrow_head(a, b, &head, ctx.opts)?;
             let (tail, tip) = if at_b { (a, b) } else { (b, a) };
-            Some(Proposal {
-                recognized: Recognized {
+            Some(Proposal::new(
+                Recognized {
                     kind: ShapeKind::Arrow,
                     geometry: Geometry::Segment { a: tail, b: tip },
                     confidence: 1.0,
                 },
-                absorbs: vec![i],
-                by: self.name(),
-            })
+                vec![i],
+                self.name(),
+            ))
         })
     }
 }
@@ -139,10 +193,31 @@ impl Default for Registry {
 }
 
 impl Registry {
-    /// Composites first (they are the more specific reading), then shapes.
+    /// Composites first (they are the more specific reading), then the
+    /// single-stroke templates, then shapes. Each Phase 2 recogniser checks
+    /// its own family bit.
     pub fn standard() -> Self {
+        use super::{diagram, geometry, graph, logic, science};
         Self {
-            list: vec![Box::new(ArrowHead), Box::new(Shapes)],
+            list: vec![
+                Box::new(ArrowHead),
+                Box::new(graph::CurveFit),
+                Box::new(graph::AxesPlus),
+                Box::new(logic::Gates),
+                Box::new(geometry::RightAngleMark),
+                Box::new(geometry::AngleMark),
+                Box::new(diagram::Table),
+                Box::new(diagram::Venn),
+                Box::new(science::Bulb),
+                Box::new(science::Cell),
+                Box::new(science::Switch),
+                Box::new(science::Benzene),
+                Box::new(science::Equilibrium),
+                Box::new(diagram::NumberLine),
+                Box::new(graph::AxesL),
+                Box::new(science::Resistor),
+                Box::new(Shapes),
+            ],
         }
     }
 
@@ -160,8 +235,9 @@ impl Registry {
     }
 
     /// The first proposal, trying only contextual recognisers when
-    /// `standalone` is false. Proposals that absorb a missing neighbour are
-    /// dropped.
+    /// `standalone` is false. Deferred recognisers don't run here (see
+    /// [`Registry::recognize_deferred`]). Proposals that refer to a missing
+    /// neighbour are dropped.
     pub fn recognize(
         &self,
         stroke: &[StrokePoint],
@@ -171,9 +247,25 @@ impl Registry {
         let xy: Vec<P> = stroke.iter().map(|p| [p.x, p.y]).collect();
         self.list
             .iter()
-            .filter(|r| standalone || r.contextual())
+            .filter(|r| !r.deferred() && (standalone || r.contextual()))
             .find_map(|r| r.recognize(&xy, ctx))
-            .filter(|p| p.absorbs.iter().all(|&i| i < ctx.neighbours.len()))
+            .filter(|p| p.indices().all(|i| i < ctx.neighbours.len()))
+    }
+
+    /// True when some deferred recogniser is enabled: the engine then reads
+    /// the last stroke again once the pen rests.
+    pub fn has_deferred(&self, opts: &Options) -> bool {
+        self.list.iter().any(|r| r.deferred()) && opts.has(family::NUMBER_LINE)
+    }
+
+    /// The first proposal of the deferred recognisers for a stroke that is
+    /// already on the board (not among `ctx.neighbours`).
+    pub fn recognize_deferred(&self, stroke: &[P], ctx: &Context) -> Option<Proposal> {
+        self.list
+            .iter()
+            .filter(|r| r.deferred())
+            .find_map(|r| r.recognize(stroke, ctx))
+            .filter(|p| p.indices().all(|i| i < ctx.neighbours.len()))
     }
 }
 
@@ -214,7 +306,8 @@ mod tests {
     #[test]
     fn a_v_next_to_a_recent_line_is_absorbed_into_an_arrow() {
         let reg = Registry::standard();
-        assert_eq!(reg.names(), ["arrow-head", "shapes"]);
+        assert_eq!(reg.names()[0], "arrow-head");
+        assert_eq!(*reg.names().last().unwrap(), "shapes");
         let v = pts(&[[460.0, 265.0], [501.0, 300.0], [458.0, 337.0]]);
         let ctx = Context {
             opts: Options::default(),
@@ -267,8 +360,8 @@ mod tests {
                 true
             }
             fn recognize(&self, _: &[P], _: &Context) -> Option<Proposal> {
-                Some(Proposal {
-                    recognized: Recognized {
+                Some(Proposal::new(
+                    Recognized {
                         kind: ShapeKind::Line,
                         geometry: Geometry::Segment {
                             a: [0.0, 0.0],
@@ -277,9 +370,9 @@ mod tests {
                         confidence: 1.0,
                     },
                     // A bad index is never applied.
-                    absorbs: vec![3],
-                    by: "test",
-                })
+                    vec![3],
+                    "test",
+                ))
             }
         }
         let mut reg = Registry::empty();

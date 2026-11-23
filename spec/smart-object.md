@@ -26,6 +26,7 @@ RFC 2119 and RFC 8174 when they appear in all capitals.
 - [Steps](#steps)
 - [State](#state)
 - [Theme](#theme)
+- [Maths (LaTeX)](#maths-latex)
 - [Modes](#modes)
 - [Validation](#validation)
 - [Design guidance for AI authors](#design-guidance-for-ai-authors)
@@ -157,6 +158,12 @@ connect-src 'none';
   MUST make `window.rupok` available, for example by inserting the SDK as
   the first `<script>` in `<head>` when it serves the entry file. Objects
   SHOULD NOT ship their own copy. If two copies load, the first one wins.
+- **Tell the SDK where the libraries are.** Hosts MUST write
+  `<meta name="rupok-lib" content="<library base URL>/">` into the object
+  document before the SDK script. The SDK loads KaTeX for
+  [built-in maths](#maths-latex) from there. It is a meta tag, not an `init`
+  field, so maths can start loading before `init` arrives and in standalone
+  previews.
 - **Serve `rupoklib://`.** `rupoklib:` is a syntactically valid URL scheme,
   so browsers parse `rupoklib://three/x.js` as an absolute URL everywhere
   (`src`, `href`, CSS `url()`, `import`) and cannot fetch it: no browser has
@@ -324,12 +331,14 @@ The SDK answers automatically; authors do nothing:
 4. Output is capped at 4096 × 4096 pixels; while the data URL exceeds 16 MiB
    the scale is halved (up to three times).
 
-Hosts MUST treat a missing or late reply as normal: the reference host waits
-about 1.5 s, then draws a placeholder card with the object's title. Hosts
-SHOULD take snapshots in a separate, hidden iframe of the same bundle, given
-the item's saved `step` and `state` in `init`, and MUST NOT store `state`,
-`goto`, `steps` or `resize` messages from such a frame (exporting must not
-change the lesson).
+Hosts MUST treat a missing or late reply as normal. The reference host asks
+once the frame has loaded, initialised and the page is idle, waits about
+1.5 s, asks once more (the first snapshot in a fresh frame pays a one-off
+warm-up), and after another 1.5 s draws a placeholder card with the object's
+title. Hosts SHOULD take snapshots in a separate, hidden iframe of the same
+bundle, given the item's saved `step` and `state` in `init`, and MUST NOT
+store `state`, `goto`, `steps` or `resize` messages from such a frame
+(exporting must not change the lesson).
 
 ## SDK API (`window.rupok`)
 
@@ -358,6 +367,9 @@ dependency-free script that the host injects. Types are in
 | `quiz.submit(payload)` | Send a `quiz` message. `questionId` is required. |
 | `resize(w, h)` | Send a `resize` message. |
 | `log(level, ...args)` | Log to the console and send a `log` message. Non-string args are JSON-encoded; the message is cut at 4,000 characters. |
+| `tex(el, latex, options)` | Typeset LaTeX into `el` with KaTeX, replacing its content; `options.display` for display style. Resolves to `true` once rendered. The same formula again is a no-op. See [Maths](#maths-latex). |
+| `math.render(root)` | Typeset `$…$`, `$$…$$`, `\(…\)`, `\[…\]` and `[data-tex]` under `root` (default: the body). Resolves to the number of formulas rendered. |
+| `math.load()` | Load KaTeX now. Resolves to whether maths can be rendered. |
 | *(automatic)* | Answers host `snapshot` requests; see [Snapshots](#snapshots). |
 
 `InitInfo` is `{ id, step, steps, state, theme, mode, standalone }`. In
@@ -465,6 +477,9 @@ tokens. The SDK mirrors each token to a CSS custom property on `:root`:
 | `color.line` | `--rupok-color-line` | `rgba(17, 20, 24, 0.12)` |
 | `color.fg` | `--rupok-color-fg` | `#111418` |
 | `color.accent` | `--rupok-color-accent` | `#0ca678` |
+| `color.accent-text` | `--rupok-color-accent-text` | `#087f5b` |
+| `color.on-accent` | `--rupok-color-on-accent` | `#04241b` |
+| `color.accent-soft` | `--rupok-color-accent-soft` | `#e6fcf5` |
 | `color.accent2` | `--rupok-color-accent2` | `#1c7ed6` |
 | `color.muted` | `--rupok-color-muted` | `#5f6670` |
 | `color.success` | `--rupok-color-success` | `#2b8a3e` |
@@ -489,6 +504,12 @@ page colour itself. Every object MUST render correctly in both schemes:
 - Canvas and WebGL code reads `rupok.theme.get(...)` and redraws in
   `rupok.theme.onChange` (the scheme changes when the teacher recolours the
   page).
+- **Accent contrast.** The host picks the accent tokens for the page's
+  scheme. `color.accent` is for fills and strokes (at least 3:1 on the page).
+  Text in the accent colour uses `color.accent-text` (at least 4.5:1), never
+  `color.accent`. Labels and icons on an accent fill (a button) use
+  `color.on-accent`. A highlight is `color.accent-soft` behind
+  `color.accent-text`.
 
 - Defaults apply as soon as the SDK loads, before `init`.
 - `init.theme` and `theme` messages carry the full theme; tokens they omit
@@ -525,6 +546,47 @@ allows them):
 - Keep the fallbacks in the stack: other hosts may not provide these fonts.
 - Never load fonts from the network. For another font, ship a subset woff2
   in the bundle and declare it with your own `@font-face`.
+
+## Maths (LaTeX)
+
+Maths is built in. Write LaTeX in the page and the SDK typesets it with
+KaTeX, which the host ships with its libraries, so it works offline. Write
+formulas as LaTeX, not as hand-styled HTML (`<sup>`, `<sub>`, Unicode
+look-alikes).
+
+- **Delimiters.** `$…$` and `\(…\)` inline; `$$…$$` and `\[…\]` display.
+  `<span data-tex="x^2">x²</span>` typesets its attribute (add `data-display`
+  for display style), and its content shows until KaTeX has loaded.
+- **When.** The SDK renders once the document is ready, and again whenever
+  text or a `data-tex` attribute changes later (a `MutationObserver`), so
+  `el.innerHTML = "$v_x = 3$"` just works.
+- **Not rendered:** `<script>`, `<style>`, `<textarea>`, `<pre>`, `<code>`,
+  `<svg>`, `<canvas>`, editable elements and anything under `[data-no-math]`.
+  `$5 and $10` stays text: an inline `$` formula must not start or end with a
+  space, and its closing `$` must not be followed by a digit. `\$` is a
+  literal dollar. A formula must sit in one text node (no tags inside).
+- **Live values.** `rupok.tex(el, latex, { display })` typesets into `el` and
+  resolves to `true` when done. Calling it again with the same formula does
+  nothing, so call it on every change. `rupok.math.render(root)` typesets
+  everything under `root`; `rupok.math.load()` loads KaTeX ahead of time.
+- **Highlight.** `\hl{…}` marks the term that changes, in
+  `color.accent-text` on `color.accent-soft`:
+  `R = \dfrac{v^2 \hl{\sin 2\theta}}{g}`. It is the only HTML extension
+  enabled (`\htmlClass{rupok-hl}` with a narrowly scoped `trust`); `\href`,
+  `\url`, `\htmlStyle`, `\htmlData` and other classes stay disabled.
+- **Colour.** Maths inherits the text colour, so it follows light and dark
+  pages.
+- **Cost.** KaTeX (script, stylesheet and the fonts it uses) loads lazily,
+  only when the page contains maths or calls the API. Opt out of automatic
+  rendering with `<meta name="rupok-math" content="off">`; the API keeps
+  working.
+- **Canvas** cannot hold KaTeX. Put formula labels in HTML positioned over
+  the canvas.
+- **Hosts** name the library base URL in `<meta name="rupok-lib">` (see
+  [Host duties](#host-duties)) and serve `katex/katex.min.js`,
+  `katex/katex.min.css` and `katex/fonts/` from it with CORS. Without the
+  meta tag (and without a `window.katex` the page loaded itself) maths stays
+  as source text and `rupok.tex()` resolves to `false`.
 
 ## Modes
 

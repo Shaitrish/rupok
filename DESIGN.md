@@ -186,6 +186,7 @@ Attribution lives in `NOTICE` and in Settings → About.
 | **Toast** | 40px pill under the top bar, with an info icon. It auto-dismisses after about 2.6s. |
 | **Page thumbnail** | 90px tall and tinted with the page's board colour. The page-number chip sits bottom-left. The current page gets a 2px accent ring. |
 | **Step badge** | A 28px pill at the bottom-right of a Smart Object showing `step / steps`, in tabular numbers. |
+| **Smart Dock** | The drawing toolbar (`components/Dock.tsx`, shell in `DockShell.tsx`). Grip, core tools (pen, highlighter, eraser, laser, undo), three recent colours, pinned tools, ⋯, minimise chevron, all in `--tb` cells. Surface: `--surface-solid` at 94%, hairline ring, small shadow; a 12px backdrop blur only on hardware GPUs and never while ink is drawn next to it. The pen and highlighter carry a colour dot sized by width. Contextual sections open by animating their width. Minimised: a 48px round bubble (56 on Large board) with the current tool and colour. Popovers: radius 14, `--surface-solid`, on the side facing the screen centre, opening away from the writing hand. |
 
 ---
 
@@ -193,7 +194,7 @@ Attribution lives in `NOTICE` and in Settings → About.
 
 - **Drawing always wins.** While a drawing tool is active, Smart Objects ignore the pointer and ink goes on top. *Use objects* (`I`) hands the pointer to them.
 - **Fit respects chrome.** The engine knows the screen insets that floating UI covers, so "Fit page" and newly placed items centre in the *visible* area.
-- **Toolbar placement:** bottom by default. Left or right suits tall panels where teachers can't reach the bottom, and for left- or right-handed use.
+- **Dock placement:** bottom centre by default. The teacher drags it anywhere by its grip: it snaps to the edges and corners, stands vertical on the left and right, or floats; the place is remembered per mode and screen size and always stays on screen. Ink drawn next to it fades it to 35% and passes through it. On big panels it comes to the teacher (Teach: double-tap with a finger; two-finger long-press).
 - **Laser pointer:** red `#ff2d55`, 9px, fades out over 1.4s. It is never saved.
 - **Projector legibility:** objects and text should use 24px or larger at 1920×1080. The Smart Object guide tells agents this.
 
@@ -224,12 +225,13 @@ Attribution lives in `NOTICE` and in Settings → About.
 | Theme | System · Light · Dark |
 | Accent | Iris · Teal · Blue · Violet · Grass · Ruby · Amber |
 | Icons | Linear · Duotone · Broken · Bold |
-| Toolbar | Bottom · Left · Right |
+| Dock | Bottom · Left · Right (where it starts); per mode in Settings → Modes: position, orientation, start minimised, pinned tools |
+| Writing hand | Right · Left (dock popovers open away from it) |
 | Size | Compact · Comfortable · Large board |
 | Pen & touch | Finger mode (auto palm rejection / draw / pan & zoom), smoothing, pressure curve |
 | Board | Page pattern (plain, grid, dots, lines) and board colour, per page |
 
-Planned customisation (see the [roadmap](ROADMAP.md)) includes custom accent hex values, toolbar tool order and pinning, a high-contrast theme, and agent-driven theming through the MCP tool `set_ui_theme`.
+Planned customisation (see the [roadmap](ROADMAP.md)) includes custom accent hex values, a high-contrast theme, and agent-driven theming through the MCP tool `set_ui_theme`.
 
 ---
 

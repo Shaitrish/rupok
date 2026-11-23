@@ -17,7 +17,11 @@
   :root {
     --bg: var(--rupok-color-bg, #ffffff);
     --fg: var(--rupok-color-fg, #1d2433);
-    --accent: var(--rupok-color-accent, #2563eb);
+    --accent: var(--rupok-color-accent, #0ca678);
+    /* accent text (4.5:1 on the page), text on accent fills, highlight background */
+    --accent-text: var(--rupok-color-accent-text, #087f5b);
+    --on-accent: var(--rupok-color-on-accent, #04241b);
+    --accent-soft: var(--rupok-color-accent-soft, #e6fcf5);
     --accent2: var(--rupok-color-accent2, #7c3aed);
     --muted: var(--rupok-color-muted, #64748b);
     --radius: var(--rupok-radius, 12px);
@@ -57,8 +61,8 @@
     transition: opacity .35s, transform .35s;
   }
   .tile.revealed .pow, .tile.revealed .place { opacity: 1; transform: none; }
-  .tile.on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
-  .tile.on .digit, .tile.on .pow { color: var(--bg); }
+  .tile.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .tile.on .digit, .tile.on .pow { color: var(--on-accent); }
   .tile.pulse { animation: pulse .7s ease-out; }
   @keyframes pulse {
     0% { box-shadow: 0 0 0 0 var(--accent2); }
@@ -73,7 +77,7 @@
   .sum.shown { opacity: 1; transform: none; }
   .sum .expr { font: 600 2rem/1.2 var(--mono); color: var(--muted); max-width: 46rem; text-align: right; }
   .sum .eq { font-size: 2.5rem; color: var(--muted); }
-  .sum .dec { font: 800 5rem/1 var(--font-h); color: var(--accent); min-width: 3ch; }
+  .sum .dec { font: 800 5rem/1 var(--font-h); color: var(--accent-text); min-width: 3ch; }
 
   .bottom { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4.5rem; }
   .hint { font-size: 1.5rem; color: var(--muted); }
@@ -82,11 +86,11 @@
   .btn {
     display: inline-flex; align-items: center; gap: .75rem;
     min-height: 4.5rem; padding: 0 1.75rem;
-    font: 700 1.75rem/1 var(--font); color: var(--accent); background: var(--bg);
+    font: 700 1.75rem/1 var(--font); color: var(--accent-text); background: var(--bg);
     border: .1875rem solid var(--accent); border-radius: 999px;
     cursor: pointer; touch-action: manipulation;
   }
-  .btn.primary { background: var(--accent); color: var(--bg); }
+  .btn.primary { background: var(--accent); color: var(--on-accent); }
   .btn:active { transform: scale(.97); }
   .btn:focus-visible { outline: .25rem solid var(--accent2); outline-offset: .25rem; }
   .btn svg { width: 1.75rem; height: 1.75rem; fill: currentColor; }
@@ -186,7 +190,7 @@
     el.type = "button";
     el.className = "tile";
     el.innerHTML =
-      '<span class="pow">2<sup>' + bit + "</sup></span>" +
+      '<span class="pow" data-tex="2^{' + bit + '}">2<sup>' + bit + "</sup></span>" +
       '<span class="digit">0</span>' +
       '<span class="place">' + (1 << bit) + "</span>";
     el.addEventListener("click", () => {
@@ -201,12 +205,12 @@
 
   function captionFor(s) {
     if (s === 0) return "A byte has <b>8 bits</b>. Each bit is off (0) or on (1).";
-    if (s === 1) return "The rightmost bit is worth <b>1</b>.";
+    if (s === 1) return 'The rightmost bit is worth <b><span data-tex="2^0 = 1">1</span></b>.';
     if (s < 8) {
       const v = 1 << (s - 1);
-      return "The next place is worth <b>" + v + "</b>: double " + v / 2 + ".";
+      return 'The next place is worth <b><span data-tex="2^{' + (s - 1) + "} = " + v + '">' + v + "</span></b>: double " + v / 2 + ".";
     }
-    if (s === 8) return "The leftmost bit is worth <b>128</b>. Eight places: 1 up to 128.";
+    if (s === 8) return 'The leftmost bit is worth <b><span data-tex="2^7 = 128">128</span></b>. Eight places: 1 up to 128.';
     if (s === SUM_STEP) return "Add the places that are on. Tap bits to make any number from <b>0 to 255</b>.";
     return "Counting up: watch the rightmost bit flip <b>every time</b>.";
   }
@@ -222,9 +226,12 @@
     }
     const parts = tiles.filter((t) => (value >> t.bit) & 1).map((t) => String(1 << t.bit));
     ui.expr.textContent = parts.length ? parts.join(" + ") : "0";
+    /* the sum as LaTeX (typeset by the SDK; the text above is the fallback) */
+    if (rupok.tex) rupok.tex(ui.expr, parts.length ? parts.join(" + ") : "0");
     ui.dec.textContent = String(value);
     ui.sum.classList.toggle("shown", step >= SUM_STEP);
     ui.caption.innerHTML = captionFor(step);
+    if (rupok.math) rupok.math.render(ui.caption);
     ui.controls.hidden = step < SUM_STEP;
     ui.play.hidden = step < COUNT_STEP;
     ui.playIcon.innerHTML = playing ? PAUSE_ICON : PLAY_ICON;

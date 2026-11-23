@@ -13,7 +13,11 @@
   :root {
     --bg: var(--rupok-color-bg, #ffffff);
     --fg: var(--rupok-color-fg, #1d2433);
-    --accent: var(--rupok-color-accent, #2563eb);
+    --accent: var(--rupok-color-accent, #0ca678);
+    /* accent text (4.5:1 on the page), text on accent fills, highlight background */
+    --accent-text: var(--rupok-color-accent-text, #087f5b);
+    --on-accent: var(--rupok-color-on-accent, #04241b);
+    --accent-soft: var(--rupok-color-accent-soft, #e6fcf5);
     --accent2: var(--rupok-color-accent2, #7c3aed);
     --muted: var(--rupok-color-muted, #64748b);
     --radius: var(--rupok-radius, 12px);
@@ -47,7 +51,7 @@
     cursor: default; touch-action: manipulation;
   }
   .era .year {
-    height: 3rem; font: 800 1.75rem/3rem var(--font); color: var(--accent);
+    height: 3rem; font: 800 1.75rem/3rem var(--font); color: var(--accent-text);
     opacity: 0; transform: translateY(.5rem); transition: opacity .4s, transform .4s;
   }
   .era .dot {
@@ -66,7 +70,7 @@
   .era.shown .year, .era.shown .name { opacity: 1; transform: none; }
   .era.shown .dot { border-style: solid; border-color: var(--accent); color: var(--accent); opacity: 1; }
   .era.shown .dot svg { opacity: 1; }
-  .era.focus .dot { background: var(--accent); color: var(--bg); transform: scale(1.12); }
+  .era.focus .dot { background: var(--accent); color: var(--on-accent); transform: scale(1.12); }
   .era:focus-visible { outline: none; }
   .era:focus-visible .dot { outline: .3rem solid var(--accent2); outline-offset: .4rem; }
 
@@ -81,7 +85,7 @@
   }
   .card .badge {
     width: 11rem; height: 11rem; border-radius: 50%; display: grid; place-items: center;
-    background: var(--accent); color: var(--bg);
+    background: var(--accent); color: var(--on-accent);
   }
   .card .badge svg { width: 6rem; height: 6rem; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   .card .head { display: flex; align-items: baseline; gap: 1.5rem; flex-wrap: wrap; }

@@ -52,7 +52,7 @@ pub fn agent_items(lesson: &Lesson, page_id: &str) -> BTreeMap<String, String> {
         };
         for op in &change.ops {
             if let JsonOpContent::Map(JsonMapOp::Insert { key, value }) = &op.content
-                && is_container(value)
+                && (is_container(value) || matches!(value, LoroValue::Map(_)))
                 && items.iter().any(|i| &i.id == key)
             {
                 out.entry(key.clone()).or_insert_with(|| agent.clone());
@@ -62,6 +62,8 @@ pub fn agent_items(lesson: &Lesson, page_id: &str) -> BTreeMap<String, String> {
     out
 }
 
+/// Box items are inserted as child containers; strokes (immutable) as map
+/// values, which `agent_items` accepts too.
 fn is_container(v: &LoroValue) -> bool {
     match v {
         LoroValue::Container(_) => true,
@@ -87,6 +89,7 @@ mod tests {
             .add_item(
                 &page,
                 &ItemData::Text(TextData {
+                    latex: false,
                     geom: BoxGeom {
                         x: 0.0,
                         y: 0.0,

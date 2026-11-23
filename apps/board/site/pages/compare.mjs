@@ -272,7 +272,7 @@ const activinspire = comparePage({
   name: "ActivInspire",
   owner: "Promethean",
   trademark: "ActivInspire, ActivPanel and ActivSuite are trademarks of Promethean Limited.",
-  title: "ActivInspire Alternative: Rupok vs ActivInspire, Free and Open Source (2026)",
+  title: "ActivInspire Alternative: Rupok vs ActivInspire, Free & Open Source",
   description:
     "A free, open-source alternative to Promethean ActivInspire for any interactive panel. Compare editions, price, platforms, AI and recording. Facts checked November 2026.",
   h1: "A free ActivInspire alternative for any panel",

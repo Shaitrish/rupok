@@ -425,8 +425,9 @@ test("scheme token sets data-scheme and color-scheme on the document", async () 
 
 // ------------------------------------------------------------------ snapshot
 
-/** A recording 2D canvas; `toDataURL` answers through `encode(canvas)`. */
-function fakeCanvasFactory(encode = () => "data:image/png;base64,UE5H") {
+/** A recording 2D canvas; `toDataURL` answers through `encode(canvas)`.
+ * `getImageData` reports drawn pixels unless `blank()` says otherwise. */
+function fakeCanvasFactory(encode = () => "data:image/png;base64,UE5H", blank = () => false) {
   const made = [];
   const create = () => {
     const ops = [];
@@ -440,7 +441,9 @@ function fakeCanvasFactory(encode = () => "data:image/png;base64,UE5H") {
           ops.push(["fillStyle", v]);
         },
         fillRect: (...a) => ops.push(["fillRect", ...a]),
+        clearRect: (...a) => ops.push(["clearRect", ...a]),
         drawImage: (src, ...a) => ops.push(["drawImage", src, ...a]),
+        getImageData: (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4).fill(blank(canvas) ? 0 : 255) }),
       }),
       toDataURL: () => encode(canvas),
     };
@@ -451,8 +454,8 @@ function fakeCanvasFactory(encode = () => "data:image/png;base64,UE5H") {
 }
 
 /** Give the fake frame a viewport, animation frames and `canvas` support. */
-function withPage(env, { canvases = [], encode, serializer = false } = {}) {
-  const f = fakeCanvasFactory(encode);
+function withPage(env, { canvases = [], encode, blank, serializer = false } = {}) {
+  const f = fakeCanvasFactory(encode, blank);
   const { ctx } = env;
   ctx.innerWidth = 400;
   ctx.innerHeight = 300;
@@ -461,9 +464,10 @@ function withPage(env, { canvases = [], encode, serializer = false } = {}) {
   ctx.document.createElement = (tag) => (tag === "canvas" ? f.create() : { tagName: tag.toUpperCase(), style: {}, setAttribute() {} });
   ctx.document.querySelectorAll = (sel) => (sel === "canvas" ? canvases : []);
   if (serializer) {
-    const clone = { style: {}, querySelectorAll: () => [] };
+    const clone = { style: {}, querySelectorAll: () => [], getElementsByTagName: () => [] };
     ctx.document.documentElement.cloneNode = () => clone;
     ctx.document.documentElement.querySelectorAll = () => [];
+    ctx.document.documentElement.getElementsByTagName = () => [];
     ctx.XMLSerializer = function () {
       this.serializeToString = () => '<html xmlns="http://www.w3.org/1999/xhtml"><body>hi</body></html>';
     };
@@ -497,7 +501,8 @@ test("snapshot: without DOM rendering, canvases are composited over the backgrou
   await sleep(30);
   assert.deepEqual(env.last("snapshot"), { type: "snapshot", id: "snap-1", dataUrl: "data:image/png;base64,UE5H", rupok: 1 });
   // The on-screen canvas is copied inside a frame, then drawn in place at 2×.
-  const [copy, out] = f.made;
+  const copy = f.made[0];
+  const out = f.made.at(-1);
   assert.deepEqual(copy.ops, [["drawImage", shown, 0, 0]]);
   assert.equal(out.width, 800);
   assert.equal(out.height, 600);
@@ -561,6 +566,31 @@ test("snapshot: scale is clamped and an oversize PNG is retried smaller", async 
   env.fromHost({ rupok: 1, type: "snapshot", id: "big", scale: 50 });
   await sleep(30);
   assert.equal(env.last("snapshot").dataUrl, "data:image/png;base64,c21hbGw=");
-  // Copy, then 4× (clamped), 2×, 1×.
-  assert.deepEqual(f.made.slice(1).map((c) => c.width), [1600, 800, 400]);
+  // Copy and a 16 × 16 blank probe, then 4× (clamped), 2×, 1×.
+  assert.deepEqual(f.made.slice(2).map((c) => c.width), [1600, 800, 400]);
+});
+
+test("snapshot: a blank WebGL copy asks on-demand renderers to draw (resize)", async () => {
+  const env = makeEnv();
+  env.fromHost(INIT);
+  await env.rupok.ready;
+  const shown = screenCanvas();
+  let drawn = false;
+  const f = withPage(env, { canvases: [shown], blank: () => !drawn });
+  env.ctx.Event = function (type) {
+    this.type = type;
+  };
+  let resizes = 0;
+  env.ctx.dispatchEvent = (e) => {
+    if (e.type === "resize") {
+      resizes++;
+      drawn = true; // the object's resize handler renders
+    }
+  };
+  env.fromHost({ rupok: 1, type: "snapshot", id: "gl" });
+  await sleep(40);
+  assert.equal(resizes, 1);
+  assert.equal(env.last("snapshot").dataUrl, "data:image/png;base64,UE5H");
+  const copy = f.made[0];
+  assert.deepEqual(copy.ops.filter((o) => o[0] === "drawImage").length, 2, "copied again after the resize");
 });

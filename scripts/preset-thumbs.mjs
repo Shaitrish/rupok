@@ -147,7 +147,11 @@ function theme(scheme) {
     "color.line": dark ? "rgba(255, 255, 255, 0.14)" : "rgba(17, 20, 24, 0.12)",
     "color.fg": dark ? "#eef0f2" : "#111418",
     "color.muted": dark ? "#a6adb7" : "#5f6670",
-    "color.accent": dark ? "#3ee6b0" : "#20c997",
+    "color.accent": dark ? "#3ee6b0" : "#0ca678",
+    // contrast-safe accent companions, as the board sends them (objects.ts ACCENTS, mint)
+    "color.accent-text": dark ? "#63e6be" : "#087f5b",
+    "color.on-accent": "#04241b",
+    "color.accent-soft": dark ? "#0b2b23" : "#e6fcf5",
     "color.accent2": dark ? "#74c0fc" : "#1c7ed6",
     "color.success": dark ? "#69db7c" : "#2b8a3e",
     "color.danger": dark ? "#ff8787" : "#e03131",

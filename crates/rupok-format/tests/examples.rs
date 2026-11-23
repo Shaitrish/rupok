@@ -56,13 +56,8 @@ const EXAMPLES: &[(&str, &str, f64, f64, u32)] = &[
 ];
 
 /// The rupoklib libraries each example uses (detected from `rupoklib://`).
-const EXAMPLE_LIBS: &[(&str, &[&str])] = &[
-    ("physics-projectile.html", &[]),
-    ("physics-circuit.html", &[]),
-    ("chemistry-molecules-3d.html", &["katex", "three"]),
-    ("chemistry-reaction.html", &[]),
-    ("math-graph.html", &[]),
-];
+/// Maths needs no entry: the SDK loads KaTeX itself when a page has LaTeX.
+const EXAMPLE_LIBS: &[(&str, &[&str])] = &[("chemistry-molecules-3d.html", &["three"])];
 
 fn examples_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/objects")

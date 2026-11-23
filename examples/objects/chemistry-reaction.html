@@ -227,14 +227,17 @@
     if (t.src !== src) { t.src = src; tex(t.el, src); t.w = 0; }
     const k = !!t.el.querySelector(".katex");
     if (!t.w || k !== t.k) { t.k = k; t.w = t.el.offsetWidth; t.h = t.el.offsetHeight; }
-    const w = t.w, h = t.h, g = opts.gap ?? 0.55 * R, m = 0.4 * R, d = g * 0.7;
-    const spots = { center: [x - w / 2, y - h / 2], right: [x + g, y - h / 2], left: [x - g - w, y - h / 2], above: [x - w / 2, y - g - h], below: [x - w / 2, y + g],
-      "above-right": [x + d, y - d - h], "above-left": [x - d - w, y - d - h], "below-right": [x + d, y + d], "below-left": [x - d - w, y + d] };
-    const at = opts.at || "center";
-    const order = opts.fixed ? [at] : [at, ...(TAG_FLIP[at] || []), "above", "below", "above-right", "above-left", "below-right", "below-left", "right", "left"];
+    const w = t.w, h = t.h, m = 0.4 * R;
+    const spotsAt = (g, d = g * 0.7) => ({ center: [x - w / 2, y - h / 2], right: [x + g, y - h / 2], left: [x - g - w, y - h / 2], above: [x - w / 2, y - g - h], below: [x - w / 2, y + g],
+      "above-right": [x + d, y - d - h], "above-left": [x - d - w, y - d - h], "below-right": [x + d, y + d], "below-left": [x - d - w, y + d] });
+    const g0 = opts.gap ?? 0.55 * R, at = opts.at || "center";
+    const names = opts.fixed ? [at] : [at, ...(TAG_FLIP[at] || []), "above", "below", "above-right", "above-left", "below-right", "below-left", "right", "left"];
+    /* a near ring of spots, then a far one */
+    const rings = opts.fixed ? [spotsAt(g0)] : [spotsAt(g0), spotsAt(g0 + 2.2 * R)];
+    const order = rings.flatMap((sp) => names.map((a) => sp[a]));
     let best = null, cost = Infinity;
-    for (const a of order) {
-      const lx = Math.max(m, Math.min(W - w - m, spots[a][0])), ly = Math.max(m, Math.min(H - h - m, spots[a][1]));
+    for (const spot of order) {
+      const lx = Math.max(m, Math.min(W - w - m, spot[0])), ly = Math.max(m, Math.min(H - h - m, spot[1]));
       if (opts.fixed) { best = [lx, ly]; break; }
       const box = { l: lx - 4, t: ly - 4, r: lx + w + 4, b: ly + h + 4 };
       let c = 0;

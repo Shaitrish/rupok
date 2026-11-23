@@ -24,12 +24,24 @@ function pageScheme(): "light" | "dark" {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.25 ? "dark" : "light";
 }
 
+/** Optional: replace items with the preset (one undo step brings them back),
+ * opening it at build step `step` with saved `state` (see its `rupok.state`). */
+export interface InsertOptions {
+  replace?: string[];
+  state?: unknown;
+  step?: number;
+}
+
 /** Place a preset on the current page, filling the slide frame (keeping its
  * aspect ratio), selected and ready to use. One undo step. */
-export async function insertPreset(p: Preset): Promise<boolean> {
+export async function insertPreset(p: Preset, opts: InsertOptions = {}): Promise<boolean> {
   const html = await presetHtml(p.id);
   const frame = pages()[pageIndex()]?.frame;
-  if (!frame) return controller.addObject(html, p.title, p.w, p.h, p.steps) !== null;
+  const add = (w: number, h: number) =>
+    opts.replace
+      ? controller.replaceWithObject(opts.replace, html, p.title, w, h, p.steps, opts.step ?? 0, opts.state)
+      : controller.addObject(html, p.title, w, h, p.steps);
+  if (!frame) return add(p.w, p.h) !== null;
   const s = Math.min(frame.w / p.w, frame.h / p.h);
   const [w, h] = [Math.round(p.w * s), Math.round(p.h * s)];
   // New objects land on the centre of the view. Centre the view on the frame
@@ -37,7 +49,7 @@ export async function insertPreset(p: Preset): Promise<boolean> {
   // in a single document change.
   const [x, y, zoom] = controller.board.camera();
   controller.board.fit_page();
-  const id = controller.addObject(html, p.title, w, h, p.steps);
+  const id = add(w, h);
   controller.board.set_camera(x, y, zoom);
   return id !== null;
 }

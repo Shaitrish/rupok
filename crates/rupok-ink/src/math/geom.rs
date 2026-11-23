@@ -176,14 +176,17 @@ fn orient(a: Pt, b: Pt, c: Pt) -> f32 {
     (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
 }
 
-/// Proper intersection of segments `ab` and `cd` (touching ends excluded).
+/// Whether segments `ab` and `cd` intersect (touching counts; collinear
+/// overlap does not).
 pub fn segments_cross(a: Pt, b: Pt, c: Pt, d: Pt) -> bool {
     let d1 = orient(c, d, a);
     let d2 = orient(c, d, b);
     let d3 = orient(a, b, c);
     let d4 = orient(a, b, d);
-    ((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0))
-        && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0))
+    if d1 == 0.0 && d2 == 0.0 {
+        return false;
+    }
+    d1 * d2 <= 0.0 && d3 * d4 <= 0.0
 }
 
 /// Whether two strokes cross. Both are coarsened to at most 24 points first.
@@ -199,8 +202,42 @@ pub fn strokes_cross(a: &[Pt], b: &[Pt]) -> bool {
     if ba.gap(bb) > 0.0 {
         return false;
     }
-    ra.windows(2)
-        .any(|s| rb.windows(2).any(|t| segments_cross(s[0], s[1], t[0], t[1])))
+    ra.windows(2).any(|s| {
+        rb.windows(2)
+            .any(|t| segments_cross(s[0], s[1], t[0], t[1]))
+    })
+}
+
+/// Whether some point of `a` lies within `tol` of some segment of `b` (both
+/// coarsened to at most 24 points).
+pub fn strokes_near(a: &[Pt], b: &[Pt], tol: f32) -> bool {
+    if a.is_empty() || b.is_empty() || BBox::of(a).gap(BBox::of(b)) > tol {
+        return false;
+    }
+    let mut ra = Vec::with_capacity(24);
+    let mut rb = Vec::with_capacity(24);
+    resample_into(a, a.len().clamp(1, 24), &mut ra);
+    resample_into(b, b.len().clamp(1, 24), &mut rb);
+    let seg_dist = |p: Pt, s: Pt, e: Pt| {
+        let (dx, dy) = (e.x - s.x, e.y - s.y);
+        let l2 = dx * dx + dy * dy;
+        let t = if l2 > 0.0 {
+            (((p.x - s.x) * dx + (p.y - s.y) * dy) / l2).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        p.dist(Pt::new(s.x + t * dx, s.y + t * dy))
+    };
+    let near = |xs: &[Pt], ys: &[Pt]| {
+        xs.iter().any(|&p| {
+            if ys.len() == 1 {
+                p.dist(ys[0]) <= tol
+            } else {
+                ys.windows(2).any(|w| seg_dist(p, w[0], w[1]) <= tol)
+            }
+        })
+    };
+    near(&ra, &rb) || near(&rb, &ra)
 }
 
 /// Writing slant as a shear factor `k` (x' = x + k·(y − y_ref) uprights the

@@ -36,7 +36,7 @@ pub type Row = Vec<Atom>;
 
 /// LaTeX for a row, in the canonical form used throughout: scripts without
 /// braces when they are one token (`x^2`, `30^\circ`), primes as `'`, a
-/// space after a command only when a letter follows.
+/// space after a command only when a letter or digit follows.
 pub fn to_latex(row: &[Atom]) -> String {
     let mut toks: Vec<String> = Vec::new();
     for a in row {

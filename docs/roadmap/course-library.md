@@ -1,8 +1,60 @@
 # Course library
 
-`Status: 📋 planned · Phase 2 · Difficulty: intermediate`
+`Status: 🚧 first version shipped (local Library) · Phase 2 · Difficulty: intermediate`
 
 Organise lessons into subjects, courses and chapters, with thumbnails, search and "next lesson", stored as plain folders and `.rpk` files so it syncs anywhere.
+
+## What shipped (first version)
+
+The **Library** is the board's home screen. How it works, where files live
+and how agents and sync clients use it: [docs/library.md](../library.md).
+
+- **Storage abstraction** `LibraryStore` (`apps/board/src/library/types.ts`),
+  implemented once (`FileLibrary`, `store.ts`) over small file-system drivers:
+  - desktop: a real folder, default `Documents/Rupok`, changeable in Settings
+    (Rust: `apps/desktop/src/library.rs`, sandboxed paths, validated atomic
+    writes; Tauri commands and a `notify` folder watcher in `library_cmd.rs`);
+  - browser: the Origin Private File System, or (Chrome, Edge) "Use a folder on
+    this computer" through the File System Access API, with the handle kept in
+    IndexedDB and permission asked again after a restart; IndexedDB when there
+    is no OPFS. Persistent storage is requested and usage shown against quota.
+  - The layout is `Subject/Course/Chapter/lesson.rpk`, the same plain folders
+    `rupok mcp` works in. `rupok mcp` now defaults to the library folder when
+    it exists (`$RUPOK_LIBRARY` overrides).
+- **Library UI** (`components/Library*.tsx`): Recent, My lessons, Shared with
+  me, My copies (students), Trash; Cloud is stubbed and hidden. Breadcrumbs,
+  search, sort, grid and list, multi-select, drag to move (mouse, pen, touch),
+  rename, duplicate, move, trash/restore/delete forever, new lesson from
+  templates (blank, 16:9 slides, lined, grid), new folder, new course (subject +
+  course + numbered chapters), import (`.rpk`, PDF → new lesson, drag and
+  drop), export (`.rpk`, folder as zip). Light and dark, large touch targets.
+- **Thumbnails** are generated on save from the engine's page preview and
+  stored as `thumbs/0.png` (in TypeScript, `src/library/thumbs.ts`, not yet
+  `Engine::set_thumbnail`).
+- **Fast summaries:** `src/library/zip.ts` reads only the central directory,
+  `manifest.json` and `thumbs/0.png` with range reads (the `read_summary` idea
+  below, done in TypeScript); summaries are cached in IndexedDB.
+- **Saving:** a lesson opened from the Library autosaves into its own file
+  (crash-safe), with the folder written back as manifest `course` and library
+  metadata (`library.id`, `author`, `copiedFrom`) in the manifest. One tab
+  edits a lesson at a time (BroadcastChannel). Lessons changed on disk by an
+  agent or a sync client reload, or ask when there are local changes.
+- **Roles:** Teacher/Student in Settings and a first-run choice. Students land
+  on Shared with me, read received lessons in the Student view, and "Save a
+  copy to my library" (also in `/board/?view`) makes an independent copy that
+  records `copiedFrom`.
+- **Migration:** the old single autosave becomes a library lesson on first
+  run; the autosave itself is kept as the recovery copy of the open lesson.
+
+### Not yet (still planned below)
+
+- `spec/library.md` and the RFC for the `library` manifest key, `course.json`
+  and `chapter.json` (order, colours, notes). Order is by numeric prefix only.
+- `rupok_format::read_summary` in Rust, `Engine::set_thumbnail`, an index cache
+  for desktop in Rust (the browser-side IndexedDB cache is used everywhere).
+- "Next lesson" button, page-title search, "Reveal in file manager".
+- MCP tools `list_courses`, `create_chapter`, `move_lesson`.
+- Cloud provider (Rupok Cloud) and sharing links.
 
 ## Goal
 
@@ -24,8 +76,8 @@ store.
 
 ## Scope
 
-- Library root folder (default `~/rupok/Library`, configurable).
-- Folder convention `Subject/Course/Chapter/lesson.rpk`, mirrored in each
+- Library root folder (default `~/Documents/Rupok`, configurable; shipped).
+- Folder convention `Subject/Course/Chapter/lesson.rpk` (shipped), mirrored in each
   lesson's `manifest.json` `course` field (`CourseRef { subject, course, chapter }`
   already exists in `crates/rupok-format/src/package.rs`).
 - Optional per-course and per-chapter metadata files (order, colours, notes).
@@ -43,6 +95,11 @@ store.
 ## Design
 
 ### On-disk layout (new spec, requires an RFC)
+
+> The first version ships `Subject/Course/Chapter/lesson.rpk` (the subject is a
+> folder, not a `course.json` key) plus `My copies/`, `Shared with me/` and
+> `.trash/`; see [docs/library.md](../library.md#folder-layout). The proposal
+> below is kept for the RFC.
 
 ```text
 Library/

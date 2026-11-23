@@ -137,6 +137,7 @@ fn mcp_server_over_stdio() {
         "update_smart_object",
         "add_text",
         "delete_item",
+        "replace_strokes_with_text",
         "set_page_background",
         "validate_smart_object",
         "read_object_spec",

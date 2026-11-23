@@ -226,14 +226,17 @@
     if (t.src !== src) { t.src = src; tex(t.el, src); t.w = 0; }
     const k = !!t.el.querySelector(".katex");
     if (!t.w || k !== t.k) { t.k = k; t.w = t.el.offsetWidth; t.h = t.el.offsetHeight; }
-    const w = t.w, h = t.h, g = opts.gap ?? 0.55 * R, m = 0.4 * R, d = g * 0.7;
-    const spots = { center: [x - w / 2, y - h / 2], right: [x + g, y - h / 2], left: [x - g - w, y - h / 2], above: [x - w / 2, y - g - h], below: [x - w / 2, y + g],
-      "above-right": [x + d, y - d - h], "above-left": [x - d - w, y - d - h], "below-right": [x + d, y + d], "below-left": [x - d - w, y + d] };
-    const at = opts.at || "center";
-    const order = opts.fixed ? [at] : [at, ...(TAG_FLIP[at] || []), "above", "below", "above-right", "above-left", "below-right", "below-left", "right", "left"];
+    const w = t.w, h = t.h, m = 0.4 * R;
+    const spotsAt = (g, d = g * 0.7) => ({ center: [x - w / 2, y - h / 2], right: [x + g, y - h / 2], left: [x - g - w, y - h / 2], above: [x - w / 2, y - g - h], below: [x - w / 2, y + g],
+      "above-right": [x + d, y - d - h], "above-left": [x - d - w, y - d - h], "below-right": [x + d, y + d], "below-left": [x - d - w, y + d] });
+    const g0 = opts.gap ?? 0.55 * R, at = opts.at || "center";
+    const names = opts.fixed ? [at] : [at, ...(TAG_FLIP[at] || []), "above", "below", "above-right", "above-left", "below-right", "below-left", "right", "left"];
+    /* a near ring of spots, then a far one */
+    const rings = opts.fixed ? [spotsAt(g0)] : [spotsAt(g0), spotsAt(g0 + 2.2 * R)];
+    const order = rings.flatMap((sp) => names.map((a) => sp[a]));
     let best = null, cost = Infinity;
-    for (const a of order) {
-      const lx = Math.max(m, Math.min(W - w - m, spots[a][0])), ly = Math.max(m, Math.min(H - h - m, spots[a][1]));
+    for (const spot of order) {
+      const lx = Math.max(m, Math.min(W - w - m, spot[0])), ly = Math.max(m, Math.min(H - h - m, spot[1]));
       if (opts.fixed) { best = [lx, ly]; break; }
       const box = { l: lx - 4, t: ly - 4, r: lx + w + 4, b: ly + h + 4 };
       let c = 0;
@@ -274,7 +277,7 @@
 
   let step = 0, fam = "trig";
   let P = { trig: { a: 1, b: 1, c: 0, d: 0 }, quad: { a: 1, b: -2, c: -3 } };
-  let tween = null, focus = null, focusTimer = 0, tracerX = 1.2, drag = null;
+  let tween = null, focus = null, focusTimer = 0, tracerX = 1.2, drag = null, restored = false;
   let W = 0, H = 0, R = 16, raf = 0, C = {};
 
   /* ---------------------------------------------------------- colour */
@@ -316,13 +319,6 @@
     ctx.font = `${weight} ${size * R}px ${C.font}`; ctx.textAlign = align; ctx.textBaseline = "middle";
     if (halo) { ctx.strokeStyle = C.bg; ctx.lineWidth = 0.35 * R; ctx.lineJoin = "round"; ctx.strokeText(str, x, y); }
     ctx.fillStyle = color; ctx.fillText(str, x, y);
-  }
-  function pill(str, x, y, color, size = 1.05, align = "center") {
-    ctx.font = `800 ${size * R}px ${C.font}`;
-    const w = ctx.measureText(str).width + 1.1 * R, h = size * R * 1.8, ax = align === "left" ? x : align === "right" ? x - w : x - w / 2;
-    ctx.fillStyle = C.bg; ctx.globalAlpha = 0.92; ctx.beginPath(); ctx.roundRect(ax, y - h / 2, w, h, h / 2); ctx.fill(); ctx.globalAlpha = 1;
-    ctx.strokeStyle = color; ctx.lineWidth = 0.12 * R; ctx.stroke();
-    ctx.fillStyle = C.fg; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(str, ax + w / 2, y + 0.05 * R);
   }
   function arrowLine(x0, y0, x1, y1, color, both = true) {
     ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 0.2 * R; ctx.lineCap = "round";
@@ -473,7 +469,10 @@
     if (fam === "trig") {
       k.textContent = "Sine wave";
       box.appendChild(line(`y = ${H("a", "a")}\\sin(${H("b", "b")}x + ${H("c", "c")}) + ${H("d", "d")}`));
-      const src = `y = ${H(num(p.a), "a")}\\sin(${H(num(p.b), "b")}x ${p.c < 0 ? "-" : "+"} ${H(piFrac(Math.abs(p.c))[0], "c")}) ${p.d < 0 ? "-" : "+"} ${H(num(Math.abs(p.d)), "d")}`;
+      /* the live equation, tidied: no "1·" or "+ 0" unless that is the highlighted term */
+      const coefT = (v, key) => (fo === key || Math.abs(Math.abs(v) - 1) > 1e-9 ? H(num(v), key) : v < 0 ? "-" : "");
+      const term = (v, t, key) => (fo === key || Math.abs(v) > 1e-9 ? ` ${v < 0 ? "-" : "+"} ${H(t, key)}` : "");
+      const src = `y = ${coefT(p.a, "a")}\\sin(${coefT(p.b, "b")}x${term(p.c, piFrac(Math.abs(p.c))[0], "c")})${term(p.d, num(Math.abs(p.d)), "d")}`;
       box.appendChild(line(src, "line sm"));
       rich(vals, [
         `amplitude $${H(num(Math.abs(p.a)), "a")}$`,
@@ -563,6 +562,7 @@
     const demo = DEMO[s];
     if (fam !== demo.fam) { fam = demo.fam; tracerX = fam === "trig" ? 1.2 : 2; buildControls(); }
     if (animate) { tween = { fam, from: { ...P[fam] }, to: { ...demo.p }, t0: performance.now() }; persistSoon(); }
+    else if (!restored) Object.assign(P[fam], demo.p); /* opened at this step with nothing saved: show its demo */
     focus = null;
     rich($("caption"), CAPTIONS[s]);
     document.querySelectorAll("#dots i").forEach((d, i) => { d.classList.toggle("on", i <= s); d.classList.toggle("now", i === s); });
@@ -588,6 +588,7 @@
     const saved = rupok.state.load();
     if (saved && typeof saved === "object") {
       const ok = (o, spec) => o && typeof o === "object" && Object.keys(spec).every((k) => Number.isFinite(o[k]));
+      restored = ok(saved.trig, SPEC.trig) || ok(saved.quad, SPEC.quad);
       if (ok(saved.trig, SPEC.trig)) for (const k of Object.keys(SPEC.trig)) P.trig[k] = snap(saved.trig[k], SPEC.trig[k]);
       if (ok(saved.quad, SPEC.quad)) for (const k of Object.keys(SPEC.quad)) P.quad[k] = snap(saved.quad[k], SPEC.quad[k]);
       if (saved.fam === "trig" || saved.fam === "quad") fam = saved.fam;

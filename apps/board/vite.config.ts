@@ -18,6 +18,12 @@ export default defineConfig({
     // Smart Objects run in opaque-origin frames (Origin: null); they load
     // /rupoklib/ modules and fonts, which need CORS.
     cors: { origin: "*" },
+    // Dev only: Rupok Cloud (private repo, `npm run dev` on :8787) behind the
+    // same origin, as in production (rupok.app/api, rupok.app/s). Override
+    // with RUPOK_CLOUD_DEV=http://host:port.
+    proxy: Object.fromEntries(
+      ["/api/", "/s/"].map((p) => [p, { target: process.env.RUPOK_CLOUD_DEV ?? "http://127.0.0.1:8787", changeOrigin: true }]),
+    ),
   },
   preview: { cors: { origin: "*" } },
   build: {

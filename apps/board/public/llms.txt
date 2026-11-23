@@ -1,6 +1,6 @@
 # Rupok
 
-> Rupok is a free, open-source (AGPL-3.0) smartboard and whiteboard app for teachers. Teachers write on slides with fast GPU ink, drop in live interactive "Smart Objects" that an AI made (simulations, 3D models, quizzes), and replay every class stroke by stroke. It runs in Chrome or Edge on any smartboard, interactive panel, projector or laptop, with no install and no account. Students open lesson files (`.rpk`) in the browser. Made by Shaitrish in Bangladesh.
+> Rupok is a free, open-source (AGPL-3.0) smartboard and whiteboard app for teachers. Teachers write on slides with fast GPU ink, drop in live interactive "Smart Objects" that an AI made (simulations, 3D models, quizzes), and replay every class stroke by stroke. It runs in Chrome or Edge on any smartboard, interactive panel, projector or laptop, with no install and no account. Students open lesson files (`.rpk`, RPK: Rich Presentation Kit) in the browser. Made by Shaitrish in Bangladesh.
 
 Key facts (November 2026):
 
@@ -30,6 +30,14 @@ claude mcp add rupok -- rupok mcp --workspace ~/Lessons    # Claude Code
 - [Agent guide (skills/AGENTS.md)](https://github.com/Shaitrish/rupok/blob/main/skills/AGENTS.md): setup for every agent and the full tool reference
 - [Smart Object skill](https://github.com/Shaitrish/rupok/blob/main/skills/rupok-smart-objects/SKILL.md): how to write good Smart Objects
 
+## Read a .rpk file (for AI models and agents)
+
+A `.rpk` (Rich Presentation Kit) file is a Rupok lesson and a ZIP archive. Unzip it and read `content.md` first (the lesson as Markdown, page by page), or `content.json` (structured). Interactive Smart Objects are HTML in `objects/<id>/index.html`. The authoritative document is `doc.loro` (Loro CRDT; `pip install loro` or `npm install loro-crdt`).
+
+- [RPK file format](https://rupok.app/rpk/): the human page ([Markdown twin](https://rupok.app/rpk.md))
+- [Agent skill: read-rpk](https://rupok.app/skills/read-rpk.md): step-by-step instructions and the schema summary
+- [read_rpk.py](https://rupok.app/skills/read_rpk.py): .rpk → Markdown with the Python standard library (uses `loro` when installed); [sample lesson](https://rupok.app/skills/sample-lesson.rpk)
+
 ## Pages
 
 - [Home](https://rupok.app/index.md): what Rupok is, features, pricing, FAQ
@@ -38,6 +46,7 @@ claude mcp add rupok -- rupok mcp --workspace ~/Lessons    # Claude Code
 - [Online class whiteboard](https://rupok.app/online-class-whiteboard.md): teaching on Zoom, Meet or Teams; replays instead of recordings
 - [For teachers](https://rupok.app/for-teachers.md): plan, teach, replay and share; note-taking
 - [Open .rpk files](https://rupok.app/open.md): the student viewer; what an .rpk file is; .rpk to PDF
+- [RPK file format (Rich Presentation Kit)](https://rupok.app/rpk.md): what's inside a .rpk, opening it, PDF, and how AI and developers read it
 - [Compare](https://rupok.app/compare.md): feature table vs other whiteboard software
 
 ## Comparisons (facts checked 23 Nov 2026, with sources)
@@ -55,12 +64,13 @@ claude mcp add rupok -- rupok mcp --workspace ~/Lessons    # Claude Code
 
 - [Rupok: শিক্ষকদের জন্য ফ্রি স্মার্ট বোর্ড সফটওয়্যার](https://rupok.app/bn.md)
 - [.rpk ফাইল খুলুন](https://rupok.app/bn/open.md)
+- [আরপিকে (RPK) ফাইল ফরম্যাট](https://rupok.app/bn/rpk.md)
 - [Note3-এর ফ্রি বিকল্প](https://rupok.app/bn/compare/note3.md)
 
 ## Docs
 
 - [README](https://github.com/Shaitrish/rupok/blob/main/README.md): overview and quick start
-- [.rpk file format spec](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md) (Apache-2.0)
+- [.rpk (Rich Presentation Kit) format spec](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md) (Apache-2.0)
 - [Smart Object spec](https://github.com/Shaitrish/rupok/blob/main/spec/smart-object.md) (Apache-2.0): sandbox, bridge protocol, SDK
 - [Roadmap](https://github.com/Shaitrish/rupok/blob/main/ROADMAP.md)
 - [Licensing](https://github.com/Shaitrish/rupok/blob/main/COPYING.md)

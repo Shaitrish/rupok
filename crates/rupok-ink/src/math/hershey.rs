@@ -60,17 +60,33 @@ pub const GLYPHS: &[HGlyph] = &[
     g("3", Futural, r#" 16H\MFXFRNUNWOXPYSYUXXVZS[P[MZLYKW"#),
     g("4", Futural, r#"  7H\UFKTZT RUFU["#),
     g("5", Futural, r#" 18H\WFMFLOMNPMSMVNXPYSYUXXVZS[P[MZLYKW"#),
-    g("6", Futural, r#" 24H\XIWGTFRFOGMJLOLTMXOZR[S[VZXXYUYTXQVOSNRNOOMQLT"#),
+    g(
+        "6",
+        Futural,
+        r#" 24H\XIWGTFRFOGMJLOLTMXOZR[S[VZXXYUYTXQVOSNRNOOMQLT"#,
+    ),
     g("7", Futural, r#"  6H\YFO[ RKFYF"#),
-    g("8", Futural, r#" 30H\PFMGLILKMMONSOVPXRYTYWXYWZT[P[MZLYKWKTLRNPQOUNWMXKXIWGTFPF"#),
-    g("9", Futural, r#" 24H\XMWPURRSQSNRLPKMKLLINGQFRFUGWIXMXRWWUZR[P[MZLX"#),
+    g(
+        "8",
+        Futural,
+        r#" 30H\PFMGLILKMMONSOVPXRYTYWXYWZT[P[MZLYKWKTLRNPQOUNWMXKXIWGTFPF"#,
+    ),
+    g(
+        "9",
+        Futural,
+        r#" 24H\XMWPURRSQSNRLPKMKLLINGQFRFUGWIXMXRWWUZR[P[MZLX"#,
+    ),
     g("a", Futural, r#" 18I\XMX[ RXPVNTMQMONMPLSLUMXOZQ[T[VZXX"#),
     g("b", Futural, r#" 18H[LFL[ RLPNNPMSMUNWPXSXUWXUZS[P[NZLX"#),
     g("c", Futural, r#" 15I[XPVNTMQMONMPLSLUMXOZQ[T[VZXX"#),
     g("d", Futural, r#" 18I\XFX[ RXPVNTMQMONMPLSLUMXOZQ[T[VZXX"#),
     g("e", Futural, r#" 18I[LSXSXQWOVNTMQMONMPLSLUMXOZQ[T[VZXX"#),
     g("f", Futural, r#"  9MYWFUFSGRJR[ ROMVM"#),
-    g("g", Futural, r#" 23I\XMX]W`VaTbQbOa RXPVNTMQMONMPLSLUMXOZQ[T[VZXX"#),
+    g(
+        "g",
+        Futural,
+        r#" 23I\XMX]W`VaTbQbOa RXPVNTMQMONMPLSLUMXOZQ[T[VZXX"#,
+    ),
     g("h", Futural, r#" 11I\MFM[ RMQPNRMUMWNXQX["#),
     g("i", Futural, r#"  9NVQFRGSFREQF RRMR["#),
     g("j", Futural, r#" 12MWRFSGTFSERF RSMS^RaPbNb"#),
@@ -91,17 +107,29 @@ pub const GLYPHS: &[HGlyph] = &[
     g("y", Futural, r#" 10JZLMR[ RXMR[P_NaLbKb"#),
     g("z", Futural, r#"  9J[XMM[ RMMXM RM[X["#),
     g("A", Futural, r#"  9I[RFJ[ RRFZ[ RMTWT"#),
-    g("B", Futural, r#" 24G\KFK[ RKFTFWGXHYJYLXNWOTP RKPTPWQXRYTYWXYWZT[K["#),
+    g(
+        "B",
+        Futural,
+        r#" 24G\KFK[ RKFTFWGXHYJYLXNWOTP RKPTPWQXRYTYWXYWZT[K["#,
+    ),
     g("C", Futural, r#" 19H]ZKYIWGUFQFOGMILKKNKSLVMXOZQ[U[WZYXZV"#),
     g("E", Futural, r#" 12H[LFL[ RLFYF RLPTP RL[Y["#),
     g("F", Futural, r#"  9HZLFL[ RLFYF RLPTP"#),
     g("H", Futural, r#"  9G]KFK[ RYFY[ RKPYP"#),
     g("M", Futural, r#" 12F^JFJ[ RJFR[ RZFR[ RZFZ["#),
     g("N", Futural, r#"  9G]KFK[ RKFY[ RYFY["#),
-    g("O", Futural, r#" 22G]PFNGLIKKJNJSKVLXNZP[T[VZXXYVZSZNYKXIVGTFPF"#),
+    g(
+        "O",
+        Futural,
+        r#" 22G]PFNGLIKKJNJSKVLXNZP[T[VZXXYVZSZNYKXIVGTFPF"#,
+    ),
     g("P", Futural, r#" 14G\KFK[ RKFTFWGXHYJYMXOWPTQKQ"#),
     g("R", Futural, r#" 17G\KFK[ RKFTFWGXHYJYLXNWOTPKP RRPY["#),
-    g("S", Futural, r#" 21H\YIWGTFPFMGKIKKLMMNOOUQWRXSYUYXWZT[P[MZKX"#),
+    g(
+        "S",
+        Futural,
+        r#" 21H\YIWGTFPFMGKIKKLMMNOOUQWRXSYUYXWZT[P[MZKX"#,
+    ),
     g("T", Futural, r#"  6JZRFR[ RKFYF"#),
     g("V", Futural, r#"  6I[JFR[ RZFR["#),
     g("+", Futural, r#"  6E_RIR[ RIR[R"#),
@@ -116,17 +144,37 @@ pub const GLYPHS: &[HGlyph] = &[
     g(",", Futural, r#"  8NVSWRXQWRVSWSYQ["#),
     g("′", Futural, r#"  8MWRHQGRFSGSIRKQL"#),
     g("|", Futural, r#"  3NVRBRb"#),
-    g("α", Greek, r#" 24H]QMONMPLRKUKXLZN[P[RZUWWTYPZM RQMSMTNUPWXXZY[Z["#),
-    g("β", Greek, r#" 31I\UFSGQIOMNPMTLZKb RUFWFYHYKXMWNUORO RROTPVRWTWWVYUZS[Q[OZNYMV"#),
-    g("θ", Greek, r#" 25G]PFNGLIKKJNJSKVLXNZP[T[VZXXYVZSZNYKXIVGTFPF ROPUP"#),
+    g(
+        "α",
+        Greek,
+        r#" 24H]QMONMPLRKUKXLZN[P[RZUWWTYPZM RQMSMTNUPWXXZY[Z["#,
+    ),
+    g(
+        "β",
+        Greek,
+        r#" 31I\UFSGQIOMNPMTLZKb RUFWFYHYKXMWNUORO RROTPVRWTWWVYUZS[Q[OZNYMV"#,
+    ),
+    g(
+        "θ",
+        Greek,
+        r#" 25G]PFNGLIKKJNJSKVLXNZP[T[VZXXYVZSZNYKXIVGTFPF ROPUP"#,
+    ),
     g("λ", Greek, r#"  9JZKFMFOGPHX[ RRML["#),
-    g("μ", Greek, r#" 21H]OMIb RNQMVMYO[Q[SZUXWT RYMWTVXVZW[Y[[Y\W"#),
+    g(
+        "μ",
+        Greek,
+        r#" 21H]OMIb RNQMVMYO[Q[SZUXWT RYMWTVXVZW[Y[[Y\W"#,
+    ),
     g("π", Greek, r#" 13G]PML[ RUMVSWXX[ RIPKNNM[M"#),
     g("Δ", Greek, r#"  9I[RFJ[ RRFZ[ RJ[Z["#),
     g("Σ", Greek, r#" 10I[KFRPK[ RKFYF RK[Y["#),
     g("±", Mathlow, r#"  9F^RJR[ RJRZR RJ[Z["#),
     g("≠", Mathlow, r#"  9E_YIK[ RIO[O RIU[U"#),
-    g("∞", Mathlow, r#" 26F_\S[UYVWVUUTTQPPONNLNJOIQISJULVNVPUQTTPUOWNYN[O\Q\S"#),
+    g(
+        "∞",
+        Mathlow,
+        r#" 26F_\S[UYVWVUUTTQPPONNLNJOIQISJULVNVPUQTTPUOWNYN[O\Q\S"#,
+    ),
     g("°", Mathlow, r#" 14KYQFOGNINKOMQNSNUMVKVIUGSFQF"#),
     g("·", Mathlow, r#"  6PURQRRSRSQRQ"#),
     g("÷", Mathlow, r#" 15E_RIQJRKSJRI RIR[R RRYQZR[SZRY"#),
@@ -138,7 +186,7 @@ pub fn parse(data: &str) -> Option<Vec<Vec<Pt>>> {
     let count: usize = std::str::from_utf8(b.get(..3)?).ok()?.trim().parse().ok()?;
     let body = b.get(3..3 + 2 * count)?;
     let mut strokes: Vec<Vec<Pt>> = vec![Vec::new()];
-    for pair in body.chunks_exact(2).skip(1) {
+    for pair in body.as_chunks::<2>().0.iter().skip(1) {
         if pair == b" R" {
             strokes.push(Vec::new());
             continue;

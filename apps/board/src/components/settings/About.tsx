@@ -1,0 +1,33 @@
+// Settings → About: version, licences and links.
+
+import { APP_NAME, SITE_URL } from "../../brand";
+import type { SettingProps } from "../../settings/registry";
+import { Mark } from "../Icon";
+
+export const VERSION = "0.1.0";
+const REPO = "https://github.com/shaitrish/rupok";
+
+export function AboutSection(props: SettingProps) {
+  return (
+    <div class="st-about">
+      <div class="st-about-head">
+        <Mark size={40} />
+        <div>
+          <div class="st-about-name" id={props.labelId}>{APP_NAME}</div>
+          <div class="st-help" id={props.descId}>Version {VERSION} · pre-alpha · the open-source whiteboard for teachers</div>
+        </div>
+      </div>
+      <dl class="st-facts">
+        <dt>Licence</dt><dd>AGPL-3.0-or-later. The file format, Smart Object SDK and agent skills are Apache-2.0.</dd>
+        <dt>Made by</dt><dd>Shaitrish</dd>
+        <dt>Icons</dt><dd>Solar by 480 Design (CC BY 4.0)</dd>
+        <dt>Typefaces</dt><dd>Inter and Hind Siliguri (SIL Open Font License)</dd>
+      </dl>
+      <div class="st-inline">
+        <a class="st-btn" href={SITE_URL} target="_blank" rel="noreferrer">Website</a>
+        <a class="st-btn" href={REPO} target="_blank" rel="noreferrer">Source code</a>
+        <a class="st-btn" href={`${REPO}/issues`} target="_blank" rel="noreferrer">Report a problem</a>
+      </div>
+    </div>
+  );
+}

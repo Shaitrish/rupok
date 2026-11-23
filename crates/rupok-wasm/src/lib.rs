@@ -9,8 +9,10 @@ mod b64;
 pub mod engine;
 pub mod export;
 pub mod live;
+pub mod math_ink;
 pub mod replay;
 pub mod shapes;
+pub mod templates;
 
 #[cfg(target_arch = "wasm32")]
 mod web {
@@ -198,6 +200,11 @@ mod web {
             self.engine.set_color(rgba);
         }
 
+        /// Opacity (0.1..1) of new highlighter strokes; stored per stroke.
+        pub fn set_highlighter_opacity(&mut self, a: f32) {
+            self.engine.set_highlighter_opacity(a);
+        }
+
         pub fn set_width(&mut self, w: f32) {
             self.engine.set_width(w);
         }
@@ -223,9 +230,22 @@ mod web {
         /// (hold the pen still to snap); `scratch` turns scratch-out to
         /// erase on while smart shapes are on. Pen only.
         pub fn set_smart_ink(&mut self, mode: &str, scratch: bool) {
+            let families = self.engine.smart_ink().families;
             self.engine.set_smart_ink(SmartInk {
                 mode: SmartMode::parse(mode),
                 scratch,
+                families,
+            });
+        }
+
+        /// Smart Ink families that are on, comma-separated: `graphs`,
+        /// `flowchart`, `gates`, `numberline`, `geometry`, `tables`,
+        /// `science`.
+        pub fn set_smart_families(&mut self, list: &str) {
+            let s = self.engine.smart_ink();
+            self.engine.set_smart_ink(SmartInk {
+                families: rupok_ink::recognize::family::parse(list),
+                ..s
             });
         }
 
@@ -265,6 +285,18 @@ mod web {
 
         pub fn pointer_cancel(&mut self, id: i32) {
             self.engine.pointer_cancel(id, now());
+        }
+
+        /// Palm / hand eraser: erase the strokes under a circle of screen
+        /// radius `r` swept from (x0, y0) to (x1, y1) in canvas CSS px.
+        /// Strokes only; `area_erase_end` makes the rub one undo step.
+        pub fn area_erase(&mut self, x0: f32, y0: f32, x1: f32, y1: f32, r: f32) -> u32 {
+            self.engine.area_erase([x0, y0], [x1, y1], r) as u32
+        }
+
+        /// End a palm erase; returns how many strokes it erased.
+        pub fn area_erase_end(&mut self) -> u32 {
+            self.engine.area_erase_end() as u32
         }
 
         pub fn pan(&mut self, dx: f32, dy: f32) {
@@ -465,6 +497,52 @@ mod web {
             self.engine.resize_shape(id, [x0, y0, x1, y1], commit)
         }
 
+        /// Resize the selected shapes and labels to the box (preview, or one
+        /// undo step on `commit`).
+        pub fn resize_shapes(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, commit: bool) -> bool {
+            self.engine.resize_shapes([x0, y0, x1, y1], commit)
+        }
+
+        /// The handwriting around the last pen stroke (maths preview), or
+        /// `null`.
+        pub fn math_cluster_json(&self) -> String {
+            self.engine.math_cluster_json()
+        }
+
+        /// The selected axes-and-curve graph for "Make it live", or `null`.
+        pub fn graph_live_json(&self) -> String {
+            self.engine.graph_live_json()
+        }
+
+        /// Replace items with a Smart Object at build step `step` with saved
+        /// `state` (JSON), as one undo step. Returns the object's id.
+        #[allow(clippy::too_many_arguments)]
+        pub fn replace_with_object_html(
+            &mut self,
+            remove: Vec<String>,
+            html: &str,
+            title: &str,
+            w: f64,
+            h: f64,
+            steps: u32,
+            step: u32,
+            state: Option<String>,
+        ) -> Result<String, JsValue> {
+            self.engine
+                .replace_with_object_html(
+                    &remove,
+                    html,
+                    title,
+                    w,
+                    h,
+                    steps,
+                    step,
+                    state.as_deref(),
+                    now(),
+                )
+                .map_err(err)
+        }
+
         /// Drop a resize preview.
         pub fn resize_shape_cancel(&mut self, id: &str) {
             self.engine.resize_shape_cancel(id);
@@ -489,6 +567,20 @@ mod web {
         ) -> Option<String> {
             self.engine
                 .replace_selection_with_text(text, x, y, w, size, now())
+        }
+
+        /// Replace the selected ink with typeset maths (LaTeX), one undo
+        /// step. Returns the new item's id.
+        pub fn replace_selection_with_latex(
+            &mut self,
+            latex: &str,
+            x: f64,
+            y: f64,
+            w: f64,
+            size: f64,
+        ) -> Option<String> {
+            self.engine
+                .replace_selection_with_latex(latex, x, y, w, size, now())
         }
 
         /// Group the selection (2+ items). Returns the group id.
@@ -581,6 +673,11 @@ mod web {
             self.engine.add_text(x, y, text, size, now())
         }
 
+        /// Recolour a text item, 0xRRGGBBAA (one undo step).
+        pub fn set_text_color(&mut self, id: &str, rgba: u32) {
+            self.engine.set_text_color(id, rgba);
+        }
+
         pub fn set_text(&mut self, id: &str, text: &str, h: f64) {
             self.engine.set_text(id, text, (h > 0.0).then_some(h));
         }
@@ -617,6 +714,53 @@ mod web {
         pub fn live_apply(&mut self, op_json: &str, agent: &str) -> Result<String, JsValue> {
             crate::live::apply(&mut self.engine, op_json, agent, now())
                 .map_err(|e| JsValue::from_str(&e))
+        }
+
+        // ------------------------------------------- AI handwriting (solve)
+        // `write_handwriting` writes through `live_apply`; these set the
+        // teacher's glyphs, preview without writing, and drive the reveal.
+
+        /// The teacher's calibrated glyphs (see `crate::live::set_glyphs_json`).
+        /// Returns how many characters were accepted.
+        pub fn set_handwriting_glyphs(&mut self, json: &str) -> Result<u32, JsValue> {
+            crate::live::set_glyphs_json(json)
+                .map(|n| n as u32)
+                .map_err(|e| JsValue::from_str(&e))
+        }
+
+        /// Synthesise lines (JSON array of strings) for a private preview.
+        pub fn handwriting_preview_json(
+            &self,
+            lines_json: &str,
+            x_height: f32,
+            teacher: bool,
+            speed: f32,
+        ) -> String {
+            crate::live::preview_json(lines_json, x_height, teacher, speed)
+        }
+
+        /// `[shown, total, waiting (0/1), lines released, lines]`, or empty
+        /// when no handwriting is being revealed.
+        pub fn reveal_state(&self) -> Vec<u32> {
+            self.engine.reveal_state().map_or_else(Vec::new, |r| {
+                vec![
+                    r.shown as u32,
+                    r.total as u32,
+                    u32::from(r.waiting),
+                    r.gate as u32,
+                    r.lines as u32,
+                ]
+            })
+        }
+
+        /// Step mode: write the next line. False when nothing waits for it.
+        pub fn reveal_next(&mut self) -> bool {
+            self.engine.reveal_next(now())
+        }
+
+        /// Show the rest of the writing at once.
+        pub fn reveal_finish(&mut self) {
+            self.engine.reveal_finish();
         }
 
         /// The lesson's encoded Loro version vector.

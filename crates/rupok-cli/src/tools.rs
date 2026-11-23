@@ -59,14 +59,16 @@ pub struct CreateLessonParams {
 #[serde(deny_unknown_fields)]
 pub struct LessonPathParams {
     /// Lesson file path relative to the workspace (as returned by list_lessons),
-    /// e.g. `science/water-cycle.rpk`.
+    /// e.g. `science/water-cycle.rpk`. `get_lesson_outline` also takes `"live"`
+    /// for the lesson open on the paired board.
     pub path: String,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AddPageParams {
-    /// Lesson file path relative to the workspace.
+    /// Lesson file path relative to the workspace, or `"live"` for the lesson
+    /// open on the paired board (the class sees the change at once).
     pub path: String,
     /// Optional page title (shown in the page sorter, not drawn on the slide).
     #[serde(default)]
@@ -84,7 +86,8 @@ pub struct AddPageParams {
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AddSmartObjectParams {
-    /// Lesson file path relative to the workspace.
+    /// Lesson file path relative to the workspace, or `"live"` for the lesson
+    /// open on the paired board (the class sees the change at once).
     pub path: String,
     /// 1-based page number to place the object on.
     #[schemars(range(min = 1))]
@@ -126,7 +129,8 @@ pub struct AddSmartObjectParams {
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpdateSmartObjectParams {
-    /// Lesson file path relative to the workspace.
+    /// Lesson file path relative to the workspace, or `"live"` for the lesson
+    /// open on the paired board (the class sees the change at once).
     pub path: String,
     /// Bundle id of the object (from add_smart_object or get_lesson_outline),
     /// e.g. `water-cycle-diagram-k3x9`.
@@ -146,7 +150,8 @@ pub struct UpdateSmartObjectParams {
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AddTextParams {
-    /// Lesson file path relative to the workspace.
+    /// Lesson file path relative to the workspace, or `"live"` for the lesson
+    /// open on the paired board (the class sees the change at once).
     pub path: String,
     /// 1-based page number.
     #[schemars(range(min = 1))]
@@ -170,8 +175,30 @@ pub struct AddTextParams {
 
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct DeleteItemParams {
+pub struct ReplaceStrokesWithTextParams {
     /// Lesson file path relative to the workspace.
+    pub path: String,
+    /// 1-based page number the strokes are on.
+    #[schemars(range(min = 1))]
+    pub page: u32,
+    /// Ids of the handwritten ink strokes to replace (from get_lesson_outline).
+    pub stroke_ids: Vec<String>,
+    /// What the handwriting says. Use `\n` for line breaks; write maths as
+    /// plain Unicode (x² + 3x − 4 = 0).
+    pub text: String,
+    /// Font size in pixels. Default: matches the handwriting's line height.
+    #[serde(default)]
+    pub size: Option<f64>,
+    /// Text colour as `#rrggbb`. Default: the ink's colour.
+    #[serde(default)]
+    pub color: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DeleteItemParams {
+    /// Lesson file path relative to the workspace, or `"live"` for the lesson
+    /// open on the paired board (the class sees the change at once).
     pub path: String,
     /// 1-based page number the item is on.
     #[schemars(range(min = 1))]
@@ -183,7 +210,8 @@ pub struct DeleteItemParams {
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SetPageBackgroundParams {
-    /// Lesson file path relative to the workspace.
+    /// Lesson file path relative to the workspace, or `"live"` for the lesson
+    /// open on the paired board (the class sees the change at once).
     pub path: String,
     /// 1-based page number.
     #[schemars(range(min = 1))]
@@ -352,6 +380,16 @@ impl Tools {
                 color,
             },
         )
+    }
+
+    pub fn replace_strokes_with_text(
+        &self,
+        p: ReplaceStrokesWithTextParams,
+    ) -> Result<ops::ReplacedWithText> {
+        let _g = self.guard();
+        let abs = self.lesson(&p.path)?;
+        let color = p.color.as_deref().map(ops::parse_color).transpose()?;
+        ops::replace_strokes_with_text(&abs, p.page as usize, &p.stroke_ids, &p.text, p.size, color)
     }
 
     pub fn delete_item(&self, p: DeleteItemParams) -> Result<ops::DeletedItem> {
@@ -714,6 +752,80 @@ rupok.steps.onChange(step => { document.getElementById("bars").textContent = "St
         });
         assert!(matches!(r, Err(OpError::Path(PathError::NotLesson(_)))));
         assert!(t.get_lesson_outline(lp("missing.rpk")).is_err());
+    }
+
+    #[test]
+    fn replace_strokes_with_text_swaps_ink_for_one_text_box() {
+        use rupok_core::{ItemData, StrokeData};
+        let (dir, t) = tools();
+        t.create_lesson(CreateLessonParams {
+            path: "hw.rpk".into(),
+            title: "Handwriting".into(),
+            pages: None,
+        })
+        .unwrap();
+        let abs = dir.path().join("hw.rpk");
+        let (mut pkg, mut lesson) = ops::load(&abs).unwrap();
+        let page = lesson.page_id_at(0).unwrap();
+        let stroke = |x0: f32| {
+            ItemData::Stroke(StrokeData {
+                tool: "pen".into(),
+                color: 0x3e63ddff,
+                width: 4.0,
+                opacity: 1.0,
+                points: (0..10)
+                    .map(|i| rupok_ink::StrokePoint {
+                        x: x0 + i as f32 * 5.0,
+                        y: 200.0 + (i % 2) as f32 * 60.0,
+                        p: 0.5,
+                        dt: i * 8,
+                    })
+                    .collect(),
+                offset: [0.0, 0.0],
+                shape: None,
+                geom: None,
+            })
+        };
+        let a = lesson.add_item(&page, &stroke(100.0), 1.0).unwrap();
+        let b = lesson.add_item(&page, &stroke(200.0), 2.0).unwrap();
+        ops::save(&abs, &mut pkg, &lesson).unwrap();
+        let params = |ids: Vec<String>, text: &str| ReplaceStrokesWithTextParams {
+            path: "hw.rpk".into(),
+            page: 1,
+            stroke_ids: ids,
+            text: text.into(),
+            size: None,
+            color: None,
+        };
+        let r = t
+            .replace_strokes_with_text(params(vec![a.clone(), b.clone()], "Photosynthesis"))
+            .unwrap();
+        assert_eq!(r.removed, 2);
+        let (_, lesson) = ops::load(&abs).unwrap();
+        let items = lesson.items(&page).unwrap();
+        assert_eq!(items.len(), 1);
+        let ItemData::Text(text) = &items[0].data else {
+            panic!("not text")
+        };
+        assert_eq!(
+            (text.text.as_str(), text.color),
+            ("Photosynthesis", 0x3e63ddff)
+        );
+        assert!(text.size > 40.0, "sized to the handwriting: {}", text.size);
+        // One change in the history: the ink before it is still there.
+        let before = lesson.loro().oplog_vv();
+        assert!(!before.is_empty());
+        // Bad input never saves anything.
+        assert!(t.replace_strokes_with_text(params(vec![], "x")).is_err());
+        assert!(
+            t.replace_strokes_with_text(params(vec!["nope".into()], "x"))
+                .is_err()
+        );
+        assert!(
+            t.replace_strokes_with_text(params(vec![r.item_id.clone()], "x"))
+                .is_err()
+        );
+        assert!(t.replace_strokes_with_text(params(vec![a], "  ")).is_err());
     }
 
     #[test]

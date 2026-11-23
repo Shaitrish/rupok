@@ -26,6 +26,21 @@ pub fn toolbar_position(monitor: Rect, toolbar_w: u32, toolbar_h: u32, margin: u
     (x, y)
 }
 
+/// Where the toolbar goes when it changes size (minimised to its bubble,
+/// palette opened) after the teacher may have dragged it: its bottom centre
+/// stays where it was, clamped so the whole window is on `area`.
+pub fn refit_toolbar(cur: Rect, new_w: u32, new_h: u32, area: Rect) -> (i32, i32) {
+    let cx = cur.x + (cur.w / 2) as i32;
+    let bottom = cur.y + cur.h as i32;
+    let clamp = |v: i32, lo: i32, len: u32, size: u32| {
+        let hi = lo + len.saturating_sub(size) as i32;
+        v.clamp(lo, hi.max(lo))
+    };
+    let x = clamp(cx - (new_w / 2) as i32, area.x, area.w, new_w);
+    let y = clamp(bottom - new_h as i32, area.y, area.h, new_h);
+    (x, y)
+}
+
 /// Length of the screenshot header: width and height as little-endian `u32`.
 pub const FRAME_HEADER: usize = 8;
 
@@ -63,6 +78,29 @@ mod tests {
         w: 1920,
         h: 1080,
     };
+
+    #[test]
+    fn refit_keeps_the_dragged_spot_and_stays_on_screen() {
+        // Dragged to the upper left, then minimised to a 96 px bubble window:
+        // the bottom centre stays put.
+        let cur = Rect {
+            x: 100,
+            y: 200,
+            w: 700,
+            h: 108,
+        };
+        assert_eq!(refit_toolbar(cur, 96, 96, FHD), (402, 212));
+        // Growing (palette opened) near the bottom-right corner is clamped.
+        let cur = Rect {
+            x: 1700,
+            y: 980,
+            w: 200,
+            h: 100,
+        };
+        assert_eq!(refit_toolbar(cur, 700, 300, FHD), (1220, 780));
+        // Larger than the screen: pinned to the top-left of the area.
+        assert_eq!(refit_toolbar(cur, 3000, 2000, FHD), (0, 0));
+    }
 
     #[test]
     fn toolbar_sits_bottom_centre() {

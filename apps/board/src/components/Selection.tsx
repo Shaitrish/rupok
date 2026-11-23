@@ -16,9 +16,14 @@ import { controller } from "../controller";
 import { type DomItem, camera, editingText, items, replay, selection, selectionIds, selectionMeta, setItems, isView } from "../state";
 import { Icon } from "./Icon";
 import { ToTextButton } from "./ToText";
+import { makeItLive } from "./MakeItLive";
+import { SolveButton } from "../solve/SolveUI";
 
 /** Shapes that keep their proportions while resizing (Shift frees them). */
-const KEEP_ASPECT = ["circle", "square", "star", "pentagon", "hexagon"];
+const KEEP_ASPECT = [
+  "circle", "square", "star", "pentagon", "hexagon", "venn", "benzene", "bulb",
+  "and-gate", "or-gate", "not-gate", "nand-gate", "nor-gate", "xor-gate", "xnor-gate",
+];
 
 export type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 export interface Geom { x: number; y: number; w: number; h: number }
@@ -94,11 +99,12 @@ export function SelectionOverlay() {
     return ids.length === 1 ? items.find((i) => i.id === ids[0]) : undefined;
   });
 
-  /** The selection when it is exactly one resizable shape stroke. */
+  /** The selection when it resizes as shapes: one shape stroke, or a
+   * Smart Ink template with its labels (the engine says which). */
   const shapeSel = createMemo(() => {
     const ids = selectionIds();
     const m = selectionMeta();
-    return ids.length === 1 && !single() && m.shape?.length === 4
+    return ids.length >= 1 && !single() && m.shape?.length === 4
       ? { id: ids[0], box: m.shape, name: m.shapeName ?? "" }
       : undefined;
   });
@@ -214,7 +220,7 @@ export function SelectionOverlay() {
       if (flatX) g = { ...g, x: start.x, w: start.w };
       if (flatY) g = { ...g, y: start.y, h: start.h };
       setShapeDrag(g);
-      controller.board.resize_shape(id, g.x, g.y, g.x + g.w, g.y + g.h, false);
+      controller.board.resize_shapes(g.x, g.y, g.x + g.w, g.y + g.h, false);
     };
     const finish = (commit: boolean) => {
       el.removeEventListener("pointermove", move);
@@ -224,7 +230,7 @@ export function SelectionOverlay() {
       setResizing(false);
       setShapeDrag(null);
       if (!moved) return;
-      if (commit) controller.board.resize_shape(id, g.x, g.y, g.x + g.w, g.y + g.h, true);
+      if (commit) controller.board.resize_shapes(g.x, g.y, g.x + g.w, g.y + g.h, true);
       else controller.board.resize_shape_cancel(id);
     };
     const up = (ev: PointerEvent) => ev.pointerId === e.pointerId && finish(true);
@@ -336,6 +342,14 @@ export function SelectionOverlay() {
               >
                 <Show when={selectionMeta().strokes > 0 && !shapeSel()}>
                   <ToTextButton />
+                  <SolveButton />
+                  <div class="vsep" />
+                </Show>
+                <Show when={selectionMeta().live}>
+                  <button class="btn totext" title="Replace with the interactive Function grapher" onClick={() => makeItLive()}>
+                    <Icon name="object" size={18} />
+                    <span>Make it live</span>
+                  </button>
                   <div class="vsep" />
                 </Show>
                 <button class="btn icon" title="Duplicate  ·  Ctrl D" aria-label="Duplicate" onClick={() => controller.duplicateSelection()}>

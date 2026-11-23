@@ -1,10 +1,13 @@
 import { Show, createEffect, createSignal, onMount } from "solid-js";
 import { controller } from "./controller";
 import World from "./components/World";
-import Toolbar from "./components/Toolbar";
-import { PagesPanel, ReplayBar, StatusChips, TopBar } from "./components/Chrome";
-import { ObjectDialog, SettingsDialog } from "./components/Dialogs";
-import { prefs, replay, toast, tool } from "./state";
+import Dock from "./components/Dock";
+import GestureLayer from "./components/GestureLayer";
+import { PagesPanel, StatusChips, TopBar } from "./components/Chrome";
+import { ObjectDialog } from "./components/Dialogs";
+import { SettingsDialog } from "./components/settings/SettingsDialog";
+import { closeSettings, openSettings, settingsRequest } from "./settings/open";
+import { prefs, toast, tool } from "./state";
 import { Icon, Mark } from "./components/Icon";
 import { APP_NAME, FILE_EXT, TAGLINE, WORDMARK } from "./brand";
 import { Suspense, lazy } from "solid-js";
@@ -12,6 +15,12 @@ import { attachDesktopBridge } from "./platform";
 import { onLaunchFiles, takePendingLesson } from "./pending";
 import { overlayRole } from "./overlay/role";
 import { registerSettingsOpener } from "./components/ToText";
+import LivePanel from "./components/LivePanel";
+import ChatPanel from "./components/ChatPanel";
+import VoiceLayer from "./voice/VoiceLayer";
+import { LibraryRoot } from "./components/Library";
+import { startLibrary } from "./library/session";
+import { isPhone, pagesShown } from "./viewport";
 
 const OverlayApp = lazy(() => import("./overlay/OverlayApp"));
 
@@ -26,12 +35,8 @@ export default function App() {
   const [ready, setReady] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [objectDialog, setObjectDialog] = createSignal(false);
-  const [settings, setSettings] = createSignal(false);
-  // "Open Settings" from the handwriting popover, scrolled to a section.
-  registerSettingsOpener((section) => {
-    setSettings(true);
-    if (section) requestAnimationFrame(() => document.getElementById(`settings-${section}`)?.scrollIntoView({ block: "start" }));
-  });
+  // Settings deep links (settings/open.ts): popovers open the exact setting.
+  registerSettingsOpener(openSettings);
   const [dragging, setDragging] = createSignal(false);
 
   // Theme, accent and density are attributes on <html>; CSS tokens do the rest.
@@ -49,7 +54,7 @@ export default function App() {
   // Re-fit when the chrome layout changes (toolbar side, size, pages panel).
   createEffect(() => {
     const p = prefs();
-    void p.toolbar; void p.density; void p.showPages;
+    void p.toolbar; void p.density; void p.showPages; void isPhone();
     if (ready()) controller.updateInsets(true);
   });
 
@@ -64,6 +69,8 @@ export default function App() {
         eraser.style.top = `${y}px`;
       };
       setReady(true);
+      void import("./solve").then((m) => m.initSolve()); // Solve this: AI handwriting, preview, reveal
+      startLibrary(controller); // the Library home and saving lessons to their files (before files below arrive)
       attachDesktopBridge(controller); // desktop: files opened by the OS, overlay snapshots
       onLaunchFiles((files) => void controller.importFiles(files)); // installed PWA: "Open with Rupok"
       void takePendingLesson().then((f) => f && controller.importFiles([f])); // a file picked on /open/
@@ -101,22 +108,28 @@ export default function App() {
         <canvas class="ink" ref={canvas} />
         <div class="input-layer" classList={{ interact: tool() === "interact" }} ref={input} style={{ cursor: cursorFor(tool()) }} />
         <div class="eraser-cursor" ref={eraser} style={{ display: "none", width: "28px", height: "28px" }} />
+        <GestureLayer onSettings={openSettings} />
       </div>
       <Show when={ready()}>
-        <TopBar onObject={() => setObjectDialog(true)} onSettings={() => setSettings(true)} />
-        <Show when={prefs().showPages}>
+        <TopBar onObject={() => setObjectDialog(true)} onSettings={() => openSettings()} />
+        <Show when={pagesShown()}>
           <PagesPanel />
         </Show>
-        <Show when={!replay()} fallback={<ReplayBar />}>
-          <Toolbar />
-        </Show>
+        {/* The Smart Dock; it also holds the replay controls while a replay runs. */}
+        <Dock onSettings={openSettings} />
         <StatusChips />
+        {/* Connect AI: the teacher's own agent edits the board live (live.ts). */}
+        <LivePanel />
+        {/* AI chat with the teacher's own agent (chat.ts, `rupok agent`). */}
+        <ChatPanel />
+        <VoiceLayer />
+        <LibraryRoot />
       </Show>
       <Show when={objectDialog()}>
         <ObjectDialog onClose={() => setObjectDialog(false)} />
       </Show>
-      <Show when={settings()}>
-        <SettingsDialog onClose={() => setSettings(false)} />
+      <Show when={settingsRequest()}>
+        {(r) => <SettingsDialog request={r()} onClose={closeSettings} />}
       </Show>
       <Show when={toast()}>
         <div class="toast surface" role="status"><Icon name="info" size={18} />{toast()}</div>

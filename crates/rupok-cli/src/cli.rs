@@ -38,8 +38,25 @@ pub enum Command {
     Info {
         file: PathBuf,
         /// Print machine-readable JSON.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "md")]
         json: bool,
+        /// Print the lesson as Markdown (the package's content.md): text,
+        /// recognised handwriting, shapes, images and Smart Objects per page.
+        #[arg(long)]
+        md: bool,
+    },
+    /// Export a lesson as readable text for people, scripts and AI agents.
+    Export {
+        file: PathBuf,
+        /// Markdown outline (the package's content.md). The default.
+        #[arg(long, conflicts_with = "content_json")]
+        md: bool,
+        /// Structured outline (the package's content.json).
+        #[arg(long = "content-json")]
+        content_json: bool,
+        /// Write to this file instead of standard output.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
     },
     /// Validate a Smart Object bundle directory, a single .html file, or every
     /// object in a .rpk lesson. Exits 1 if there are errors.
@@ -83,9 +100,56 @@ pub enum Command {
     },
     /// Run the MCP server on stdio so an AI agent can create and edit lessons.
     Mcp {
-        /// Directory the agent may read and write lessons in (default: current dir).
+        /// Directory the agent may read and write lessons in (default: $RUPOK_LIBRARY,
+        /// else the Rupok library folder ~/Documents/Rupok if it exists, else the
+        /// current dir).
         #[arg(long)]
         workspace: Option<PathBuf>,
+        /// Open the live board channel so a paired board can be edited during
+        /// class (the default; accepted for explicit configs).
+        #[arg(long, conflicts_with = "no_live")]
+        live: bool,
+        /// Do not open the live board channel: file tools only.
+        #[arg(long)]
+        no_live: bool,
+        /// Port of the live channel on 127.0.0.1 (default: the first free of
+        /// 47373, 47374, 47375, 47376, which the board probes).
+        #[arg(long)]
+        live_port: Option<u16>,
+        /// Extra board origin allowed to connect (a self-hosted board), e.g.
+        /// https://board.school.example. Repeatable.
+        #[arg(long = "live-origin", value_name = "ORIGIN")]
+        live_origins: Vec<String>,
+    },
+    /// Chat with your own AI agent inside Rupok: relay the board's chat panel
+    /// to Claude Code, Codex, OpenCode or Gemini CLI (over ACP), with the
+    /// Rupok tools attached so it builds on the board live.
+    Agent {
+        /// Lessons folder (default: as for `rupok mcp`).
+        #[arg(long)]
+        workspace: Option<PathBuf>,
+        /// Agent to use first: claude, codex, opencode, gemini (default: the
+        /// first installed). The teacher can switch in the chat panel.
+        #[arg(long)]
+        agent: Option<String>,
+        /// A custom ACP agent command, e.g. "my-agent --acp".
+        #[arg(long, value_name = "COMMAND")]
+        agent_command: Option<String>,
+        /// Name shown for --agent-command.
+        #[arg(long, default_value = "Custom agent")]
+        agent_name: String,
+        /// Port of the live channel on 127.0.0.1 (default: first free of 47373–47376).
+        #[arg(long)]
+        live_port: Option<u16>,
+        /// Extra board origin allowed to connect. Repeatable.
+        #[arg(long = "live-origin", value_name = "ORIGIN")]
+        live_origins: Vec<String>,
+        /// Open the board in the browser, already paired.
+        #[arg(long)]
+        open: bool,
+        /// Board address for --open.
+        #[arg(long, default_value = "https://rupok.app/board/")]
+        board_url: String,
     },
 }
 
@@ -116,7 +180,25 @@ pub fn run(cli: Cli) -> anyhow::Result<ExitCode> {
             );
             Ok(ExitCode::SUCCESS)
         }
-        Command::Info { file, json } => {
+        Command::Info { file, md: true, .. } => {
+            print!("{}", ops::readable(&file, false)?);
+            Ok(ExitCode::SUCCESS)
+        }
+        Command::Export {
+            file,
+            md: _,
+            content_json,
+            output,
+        } => {
+            let text = ops::readable(&file, content_json)?;
+            match output {
+                Some(out) => std::fs::write(&out, text)
+                    .with_context(|| format!("writing {}", out.display()))?,
+                None => print!("{text}"),
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Command::Info { file, json, .. } => {
             let info = ops::info(&file)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&info)?);
@@ -181,20 +263,134 @@ pub fn run(cli: Cli) -> anyhow::Result<ExitCode> {
                 Err(e) => Err(e.into()),
             }
         }
-        Command::Mcp { workspace } => {
-            let dir = match workspace {
-                Some(d) => d,
-                None => std::env::current_dir()?,
-            };
+        Command::Agent {
+            workspace,
+            agent,
+            agent_command,
+            agent_name,
+            live_port,
+            live_origins,
+            open,
+            board_url,
+        } => {
+            let dir = pick_workspace(
+                workspace,
+                std::env::var_os("RUPOK_LIBRARY")
+                    .filter(|v| !v.is_empty())
+                    .map(PathBuf::from),
+                library_dir().filter(|d| d.is_dir()),
+                std::env::current_dir()?,
+            );
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?;
+            rt.block_on(async move {
+                let started = crate::chat::start(crate::chat::AgentOptions {
+                    workspace: dir.clone(),
+                    default_agent: agent,
+                    custom: agent_command.map(|c| (agent_name, c)),
+                    ports: live_port.map(|p| vec![p]),
+                    extra_origins: live_origins,
+                    code: None,
+                })
+                .await
+                .with_context(|| "starting the Rupok agent relay")?;
+                let code = crate::live::spaced(&started.code);
+                println!(
+                    "Rupok agent relay is running (lessons folder: {}).",
+                    dir.display()
+                );
+                println!();
+                println!("  In Rupok, click the AI button and enter this code:  {code}");
+                println!();
+                println!("Leave this window open while you teach. Ctrl+C stops it.");
+                if open {
+                    let url = format!("{board_url}#rupok-agent={}:{}", started.port, started.code);
+                    open_browser(&url);
+                }
+                tokio::signal::ctrl_c().await.ok();
+                anyhow::Ok(())
+            })?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Command::Mcp {
+            workspace,
+            live: _,
+            no_live,
+            live_port,
+            live_origins,
+        } => {
+            let dir = pick_workspace(
+                workspace,
+                std::env::var_os("RUPOK_LIBRARY")
+                    .filter(|v| !v.is_empty())
+                    .map(PathBuf::from),
+                library_dir().filter(|d| d.is_dir()),
+                std::env::current_dir()?,
+            );
             let ws = crate::workspace::Workspace::new(&dir)
                 .with_context(|| format!("workspace {}", dir.display()))?;
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()?;
-            rt.block_on(crate::mcp::serve_stdio(ws))?;
+            rt.block_on(async move {
+                if no_live {
+                    return crate::mcp::serve_stdio(ws).await;
+                }
+                let mut cfg = crate::live::LiveConfig {
+                    extra_origins: live_origins,
+                    ..Default::default()
+                };
+                if let Some(p) = live_port {
+                    cfg.ports = vec![p];
+                }
+                let hub = crate::live::LiveHub::new(cfg);
+                // stdout is the MCP channel: log to stderr only.
+                match hub.start().await {
+                    Ok(port) => eprintln!("rupok: live board channel on ws://127.0.0.1:{port}"),
+                    Err(e) => {
+                        eprintln!("rupok: live board channel unavailable ({e}); file tools only")
+                    }
+                }
+                crate::mcp::serve_stdio_with(ws, hub).await
+            })?;
             Ok(ExitCode::SUCCESS)
         }
     }
+}
+
+/// The Rupok library folder the desktop app uses by default
+/// (`Documents/Rupok`, see docs/library.md), so agents and the app see the
+/// same lessons.
+pub fn library_dir() -> Option<PathBuf> {
+    dirs::document_dir().map(|d| d.join("Rupok"))
+}
+
+/// Open `url` in the default browser (best effort).
+fn open_browser(url: &str) {
+    let mut cmd = if cfg!(target_os = "macos") {
+        std::process::Command::new("open")
+    } else if cfg!(windows) {
+        let mut c = std::process::Command::new("cmd");
+        c.args(["/C", "start", ""]);
+        c
+    } else {
+        std::process::Command::new("xdg-open")
+    };
+    if cmd.arg(url).spawn().is_err() {
+        println!("Open {url} in your browser.");
+    }
+}
+
+/// The MCP workspace: `--workspace`, else `$RUPOK_LIBRARY`, else the library
+/// folder when it exists, else the current directory.
+fn pick_workspace(
+    explicit: Option<PathBuf>,
+    env: Option<PathBuf>,
+    library: Option<PathBuf>,
+    cwd: PathBuf,
+) -> PathBuf {
+    explicit.or(env).or(library).unwrap_or(cwd)
 }
 
 fn print_diagnostics(d: &[Diagnostic]) {
@@ -313,6 +509,28 @@ fn print_info(file: &str, info: &ops::LessonInfo) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn workspace_defaults_to_the_library_folder() {
+        use super::pick_workspace;
+        use std::path::PathBuf;
+        let p = |s: &str| Some(PathBuf::from(s));
+        let cwd = PathBuf::from("/cwd");
+        assert_eq!(
+            pick_workspace(p("/w"), p("/env"), p("/lib"), cwd.clone()),
+            PathBuf::from("/w")
+        );
+        assert_eq!(
+            pick_workspace(None, p("/env"), p("/lib"), cwd.clone()),
+            PathBuf::from("/env")
+        );
+        assert_eq!(
+            pick_workspace(None, None, p("/lib"), cwd.clone()),
+            PathBuf::from("/lib")
+        );
+        assert_eq!(pick_workspace(None, None, None, cwd.clone()), cwd);
+        assert!(super::library_dir().is_none_or(|d| d.ends_with("Rupok")));
+    }
+
     use super::*;
     use clap::CommandFactory;
 

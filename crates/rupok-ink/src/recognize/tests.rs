@@ -192,7 +192,7 @@ fn size_gate_is_in_screen_pixels() {
     assert_eq!(kind(&p), None);
     let zoomed = Options {
         px_per_unit: 2.0,
-        deliberate: false,
+        ..Options::default()
     };
     assert_eq!(
         recognize_xy(&p, zoomed).map(|r| r.kind),
@@ -200,8 +200,8 @@ fn size_gate_is_in_screen_pixels() {
     );
     // Hold-to-snap accepts it at 100 %.
     let held = Options {
-        px_per_unit: 1.0,
         deliberate: true,
+        ..Options::default()
     };
     assert_eq!(
         recognize_xy(&p, held).map(|r| r.kind),
@@ -1064,3 +1064,5 @@ fn stress_rates() {
         hand(&p, r, 0.0, 1.0)
     });
 }
+
+mod phase2;

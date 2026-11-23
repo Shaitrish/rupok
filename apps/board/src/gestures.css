@@ -1,0 +1,150 @@
+/* Classroom touch gestures: palm-eraser circle, swipe edge arrow and slide
+ * transition, first-time hint, calibration, and the large-touch-targets mode.
+ * Built from the design tokens in styles.css; flat, light and dark. */
+
+:root {
+  --g-palm-fill: rgba(255, 255, 255, 0.5);
+  --g-palm-ring: var(--accent-9);
+  --g-palm-edge: rgba(0, 0, 40, 0.18);
+  --g-edge-bg: var(--surface-solid);
+  --g-edge-fg: var(--text-2);
+  --g-edge-ready-bg: var(--accent-9);
+  --g-edge-ready-fg: var(--accent-contrast);
+  --g-chip-bg: var(--gray-12);
+  --g-chip-fg: var(--gray-1);
+  --g-target: var(--accent-9);
+  --g-target-soft: var(--accent-3);
+}
+:root[data-theme="dark"] {
+  --g-palm-fill: rgba(17, 17, 19, 0.45);
+  --g-palm-edge: rgba(255, 255, 255, 0.22);
+  --g-chip-bg: var(--gray-12);
+  --g-chip-fg: var(--gray-1);
+}
+
+/* ------------------------------------------------------------ on the board */
+.g-anchor { position: absolute; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; }
+.g-palm {
+  position: absolute; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: var(--g-palm-fill); box-shadow: 0 0 0 2px var(--g-palm-ring), 0 0 0 5px var(--g-palm-edge);
+  transition: width 90ms linear, height 90ms linear;
+}
+.board[data-gesture="palm"] .input-layer { cursor: none; }
+
+/* Slide transition after a swipe: the new slide arrives from the side the
+ * fingers came from. */
+.board.g-slide-next { animation: g-slide-next 300ms var(--ease); }
+.board.g-slide-prev { animation: g-slide-prev 300ms var(--ease); }
+@keyframes g-slide-next { from { transform: translateX(36px); opacity: 0.55; } }
+@keyframes g-slide-prev { from { transform: translateX(-36px); opacity: 0.55; } }
+
+/* ------------------------------------------------------------ swipe arrow */
+.g-edge {
+  --p: 0;
+  position: fixed; top: 50%; z-index: 55; width: 64px; height: 64px; border-radius: 50%;
+  display: grid; place-items: center; pointer-events: none;
+  background: var(--g-edge-bg); color: var(--g-edge-fg); box-shadow: var(--shadow-1);
+  opacity: calc(0.35 + var(--p) * 0.65);
+  transition: background-color 120ms var(--ease), color 120ms var(--ease);
+}
+.g-edge.next { right: 24px; transform: translate(calc((1 - var(--p)) * 48px), -50%); }
+.g-edge.prev { left: 24px; transform: translate(calc((var(--p) - 1) * 48px), -50%); }
+.g-edge.ready { background: var(--g-edge-ready-bg); color: var(--g-edge-ready-fg); }
+
+.g-landed {
+  position: fixed; top: 50%; z-index: 55; transform: translateY(-50%); height: 36px; padding: 0 14px; border-radius: 18px;
+  display: flex; align-items: center; pointer-events: none; font: 600 14px/1 var(--font); font-variant-numeric: tabular-nums;
+  background: var(--g-chip-bg); color: var(--g-chip-fg); animation: g-landed 1100ms var(--ease) forwards;
+}
+.g-landed.next { right: 24px; }
+.g-landed.prev { left: 24px; }
+@keyframes g-landed { 0% { opacity: 0; } 12% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ------------------------------------------------------------ first-time hint */
+.g-hint {
+  position: fixed; left: 50%; top: calc(var(--inset) + var(--bar) + 64px); transform: translateX(-50%); z-index: 61;
+  display: flex; align-items: center; gap: var(--s2); min-height: 44px; padding: 0 6px 0 var(--s4); border-radius: 14px;
+  font: 550 14px/18px var(--font); color: var(--text); white-space: nowrap; animation: toastin 180ms var(--ease);
+}
+:root[data-mode="teach"] .g-hint { top: var(--s6); }
+.g-hint .icon { color: var(--accent-11); }
+.g-hint-sep { color: var(--text-3); }
+.g-hint-link {
+  height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; cursor: pointer;
+  font: 600 14px/18px var(--font); color: var(--accent-11); text-decoration: underline; text-underline-offset: 3px;
+}
+.g-hint-link:hover { background: var(--accent-3); }
+
+/* ------------------------------------------------------------ settings */
+.g-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--s4); }
+.g-row {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: var(--s4); min-height: 52px;
+  padding: 6px var(--s2) 6px var(--s3); border-radius: 10px;
+}
+.g-row:hover { background: var(--hover); }
+.g-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.g-row-title { font: 600 13px/18px var(--font); color: var(--text); }
+.g-row-sub { font: 450 12px/18px var(--font); color: var(--text-3); }
+.g-row-sub kbd { height: 18px; min-width: 18px; font-size: 10px; margin: 0 1px; }
+.g-sub { padding: 0 var(--s3) var(--s2); display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--s6); }
+.g-sub .field { margin-bottom: var(--s2); }
+.g-toggle { position: relative; width: 44px; height: 26px; flex: none; border: 0; padding: 0; border-radius: 13px; background: var(--gray-a6); cursor: pointer; transition: background-color 120ms var(--ease); }
+.g-toggle::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--surface-solid); box-shadow: 0 1px 2px rgba(0, 0, 40, 0.2); transition: transform 140ms var(--ease);
+}
+.g-toggle[aria-checked="true"] { background: var(--accent-9); }
+.g-toggle[aria-checked="true"]::after { transform: translateX(18px); background: #fff; }
+.g-detect {
+  display: flex; align-items: flex-start; gap: var(--s3); padding: var(--s3) var(--s4); border-radius: 12px; margin-bottom: var(--s4);
+  background: var(--accent-3); color: var(--text); font: 450 13px/19px var(--font);
+}
+.g-detect .icon { color: var(--accent-11); margin-top: 1px; }
+.g-detect b { font-weight: 650; }
+.g-detect .grow { flex: 1; }
+.g-detect .btn { flex: none; }
+
+/* ------------------------------------------------------------ calibration */
+.g-cal { position: fixed; inset: 0; z-index: 90; background: var(--canvas); touch-action: none; display: grid; place-items: center; }
+.g-cal-card { width: min(560px, calc(100% - 32px)); text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--s3); pointer-events: none; }
+.g-cal-card .btn { pointer-events: auto; }
+.g-cal-step { font: 650 12px/16px var(--font); letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-11); }
+.g-cal-card h2 { margin: 0; font: 700 28px/34px var(--font); letter-spacing: -0.02em; color: var(--text); }
+.g-cal-card p { margin: 0; font: 450 15px/22px var(--font); color: var(--text-2); }
+.g-cal-target { width: 168px; height: 168px; margin: var(--s4) 0; display: grid; place-items: center; }
+.g-cal-target > * { grid-area: 1 / 1; }
+.g-cal-target svg.ring { width: 168px; height: 168px; transform: rotate(-90deg); }
+.g-cal-target .ring-track { fill: var(--g-target-soft); stroke: var(--gray-a4); stroke-width: 8; }
+.g-cal-target .ring-fill { fill: none; stroke: var(--g-target); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 80ms linear; }
+/* Positioned so it paints above the (transformed) ring. */
+.g-cal-target .icon { position: relative; color: var(--accent-11); }
+.g-cal-read { font: 600 13px/18px var(--font); color: var(--text-2); font-variant-numeric: tabular-nums; min-height: 18px; }
+.g-cal-result { padding: var(--s4); border-radius: 14px; background: var(--accent-3); color: var(--text); font: 500 15px/22px var(--font); text-align: left; }
+.g-cal-actions { display: flex; gap: var(--s2); margin-top: var(--s3); }
+
+/* ------------------------------------------------------------ large touch targets */
+:root[data-touch-targets="large"] .seg { height: 48px; padding: 3px; border-radius: 12px; }
+:root[data-touch-targets="large"] .seg button { height: 42px; padding: 0 var(--s4); font-size: 14px; border-radius: 9px; }
+:root[data-touch-targets="large"] .check { min-height: 48px; font-size: 14px; }
+:root[data-touch-targets="large"] .check input { width: 22px; height: 22px; }
+:root[data-touch-targets="large"] .tool-list li { min-height: 48px; }
+:root[data-touch-targets="large"] .tool-list .btn.icon { width: 40px; min-width: 40px; height: 40px; }
+:root[data-touch-targets="large"] .slider { height: 40px; }
+:root[data-touch-targets="large"] .dialog .btn { height: 48px; min-width: 48px; padding: 0 var(--s4); }
+:root[data-touch-targets="large"] .dialog .btn.icon { width: 48px; padding: 0; }
+:root[data-touch-targets="large"] .sel-handle { width: 56px; height: 56px; --knob: 16px; }
+:root[data-touch-targets="large"] .g-row { min-height: 60px; }
+:root[data-touch-targets="large"] .g-toggle { width: 56px; height: 32px; border-radius: 16px; }
+:root[data-touch-targets="large"] .g-toggle::after { width: 26px; height: 26px; }
+:root[data-touch-targets="large"] .g-toggle[aria-checked="true"]::after { transform: translateX(24px); }
+/* Settings (registry dialog): every control grows with its token. */
+:root[data-touch-targets="large"] { --st-ctl: 52px; --st-row-min: 76px; }
+:root[data-touch-targets="large"] .st-switch { width: 64px; }
+:root[data-touch-targets="large"] .st-switch-track { width: 56px; height: 32px; border-radius: 16px; }
+:root[data-touch-targets="large"] .st-switch-knob { width: 26px; height: 26px; }
+:root[data-touch-targets="large"] .st-switch[aria-checked="true"] .st-switch-knob { transform: translateX(24px); }
+:root[data-touch-targets="large"] .st-seg button { font-size: 14px; padding: 0 var(--s4); }
+/* Top-bar buttons keep their look; their hit area grows to the bar's edge. */
+:root[data-touch-targets="large"] .topbar .btn { position: relative; }
+:root[data-touch-targets="large"] .topbar .btn::after { content: ""; position: absolute; inset: -4px -1px; }
+:root[data-touch-targets="large"] .thumb-actions .btn::before { inset: -10px; }

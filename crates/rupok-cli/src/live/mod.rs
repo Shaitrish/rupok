@@ -40,7 +40,7 @@ use rupok_core::Lesson;
 use rupok_format::Package;
 use rupok_live::protocol::{
     BoardMsg, BoardSession, BoardTools, CHANNELS, DocInfo, DocMsg, PROTOCOL_VERSION, ServerMsg,
-    ServerSession, ServerTools, encode,
+    ServerSession, ServerTools, encode, pair,
 };
 use rupok_live::{Op, sync};
 use serde::Serialize;
@@ -65,6 +65,9 @@ pub struct LiveConfig {
     pub hello_timeout: Duration,
     /// How long a pairing code stays valid.
     pub code_ttl: Duration,
+    /// Offer the in-app chat (`chat` channel), relayed to an extension
+    /// (`rupok agent`, see [`crate::chat`]).
+    pub chat: bool,
 }
 
 impl Default for LiveConfig {
@@ -75,6 +78,7 @@ impl Default for LiveConfig {
             op_timeout: Duration::from_secs(30),
             hello_timeout: Duration::from_secs(10),
             code_ttl: Duration::from_secs(600),
+            chat: false,
         }
     }
 }
@@ -133,6 +137,11 @@ struct State {
     mirror: Option<Mirror>,
     bad_codes: u32,
     extension: Option<mpsc::UnboundedSender<(String, Value)>>,
+    /// Set when the agent process shows the code and the teacher types it on
+    /// the board (`rupok agent`, the desktop app).
+    host_code: Option<String>,
+    /// Copy of [`LiveConfig::chat`] for the free functions.
+    chat: bool,
 }
 
 /// A failed agent call: a message for the agent and optional details.
@@ -171,6 +180,9 @@ pub struct Status {
     pub paired: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub board: Option<BoardState>,
+    /// The paired board's client string (web app or desktop, and version).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client: Option<String>,
     /// Boards showing a pairing code right now.
     pub boards_waiting: usize,
     /// What to do next.
@@ -191,6 +203,7 @@ impl std::fmt::Debug for LiveHub {
 
 impl LiveHub {
     pub fn new(cfg: LiveConfig) -> Arc<Self> {
+        let chat = cfg.chat;
         Arc::new(Self {
             cfg,
             state: Mutex::new(State {
@@ -206,6 +219,8 @@ impl LiveHub {
                 mirror: None,
                 bad_codes: 0,
                 extension: None,
+                host_code: None,
+                chat,
             }),
         })
     }
@@ -311,6 +326,7 @@ impl LiveHub {
             agent: s.agent.clone(),
             paired: s.board.is_some(),
             board,
+            client: s.board.as_ref().map(|b| b.client.clone()),
             boards_waiting: s.pending.len(),
             hint,
         }
@@ -323,7 +339,9 @@ impl LiveHub {
         {
             let mut s = self.lock();
             if let Some(why) = &s.unavailable {
-                return Err(CallError::new(format!("live board editing is unavailable: {why}")));
+                return Err(CallError::new(format!(
+                    "live board editing is unavailable: {why}"
+                )));
             }
             // Drop expired codes.
             let ttl = self.cfg.code_ttl;
@@ -335,7 +353,11 @@ impl LiveHub {
                 .collect();
             for id in expired {
                 if let Some(p) = s.pending.remove(&id) {
-                    close(&p.tx, "code_expired", "The pairing code expired. Click Connect AI to get a new one.");
+                    close(
+                        &p.tx,
+                        "code_expired",
+                        "The pairing code expired. Click Connect AI to get a new one.",
+                    );
                 }
             }
             if typed.len() != 6 {
@@ -360,12 +382,18 @@ impl LiveHub {
                 if s.bad_codes >= MAX_BAD_CODES {
                     s.bad_codes = 0;
                     let agent = s.agent.clone();
+                    let board_pairs = s.host_code.is_some();
                     let mut codes: Vec<String> = Vec::new();
                     for p in s.pending.values_mut() {
                         p.code = fresh_code(&codes);
                         p.created = Instant::now();
                         codes.push(p.code.clone());
-                        let _ = p.tx.send(Outgoing::Text(welcome(&agent, &p.code, ttl)));
+                        let _ = p.tx.send(Outgoing::Text(welcome(
+                            &self.cfg,
+                            &agent,
+                            &p.code,
+                            board_pairs,
+                        )));
                     }
                     return Err(CallError::new(
                         "that code does not match, and after several wrong codes the board now shows a new one; ask the teacher for the new code",
@@ -437,7 +465,9 @@ impl LiveHub {
             let frame = encode(&ServerMsg::Tools(ServerTools::Op { id, agent, op }));
             if tx.send(Outgoing::Text(frame)).is_err() {
                 s.waiting.remove(&id);
-                return Err(CallError::new("the board connection closed; ask the teacher to check the board"));
+                return Err(CallError::new(
+                    "the board connection closed; ask the teacher to check the board",
+                ));
             }
             (id, orx, track)
         };
@@ -474,7 +504,10 @@ impl LiveHub {
 
     /// Encoded version vector of the mirror, if any (tests, diagnostics).
     pub fn mirror_version(&self) -> Option<Vec<u8>> {
-        self.lock().mirror.as_ref().map(|m| sync::version(&m.lesson))
+        self.lock()
+            .mirror
+            .as_ref()
+            .map(|m| sync::version(&m.lesson))
     }
 
     /// Run `f` on the mirror lesson, if any.
@@ -526,12 +559,21 @@ impl LiveHub {
             return;
         }
         if s.pending.len() >= MAX_PENDING {
-            close(&tx, "busy", "Too many boards are waiting to pair with this AI assistant.");
+            close(
+                &tx,
+                "busy",
+                "Too many boards are waiting to pair with this AI assistant.",
+            );
             return;
         }
         let used: Vec<String> = s.pending.values().map(|p| p.code.clone()).collect();
         let code = fresh_code(&used);
-        let _ = tx.send(Outgoing::Text(welcome(&s.agent, &code, self.cfg.code_ttl)));
+        let _ = tx.send(Outgoing::Text(welcome(
+            &self.cfg,
+            &s.agent,
+            &code,
+            s.host_code.is_some(),
+        )));
         s.pending.insert(
             conn,
             Pending {
@@ -549,14 +591,20 @@ impl LiveHub {
         let mut s = self.lock();
         let paired = s.board.as_ref().is_some_and(|b| b.conn == conn);
         if !paired {
-            // Waiting boards may only say goodbye.
-            if matches!(msg, BoardMsg::Session(BoardSession::Bye)) {
-                s.pending.remove(&conn);
+            // Waiting boards may only pair (by the host's code) or say goodbye.
+            match msg {
+                BoardMsg::Session(BoardSession::Bye) => {
+                    s.pending.remove(&conn);
+                }
+                BoardMsg::Session(BoardSession::Pair { code }) => {
+                    self.pair_by_host_code(&mut s, conn, &code)
+                }
+                _ => {}
             }
             return;
         }
         match msg {
-            BoardMsg::Session(BoardSession::Hello { .. }) => {}
+            BoardMsg::Session(BoardSession::Hello { .. } | BoardSession::Pair { .. }) => {}
             BoardMsg::Session(BoardSession::State {
                 page,
                 page_count,
@@ -591,7 +639,8 @@ impl LiveHub {
                         Ok(result.unwrap_or(Value::Null))
                     } else {
                         Err(CallError {
-                            message: error.unwrap_or_else(|| "the board refused the operation".into()),
+                            message: error
+                                .unwrap_or_else(|| "the board refused the operation".into()),
                             data,
                         })
                     };
@@ -600,6 +649,70 @@ impl LiveHub {
             }
             BoardMsg::Doc(d) => doc_frame(&mut s, d),
         }
+    }
+
+    /// The agent process shows `code` (printed to the terminal, or handed to
+    /// the board by the desktop app); a board that sends it in `session/pair`
+    /// pairs. `None` turns board-side pairing off.
+    pub fn set_host_code(&self, code: Option<String>) {
+        self.lock().host_code = code;
+    }
+
+    /// A fresh 6-digit host code (see [`Self::set_host_code`]).
+    pub fn new_host_code(&self) -> String {
+        let code = fresh_code(&[]);
+        self.set_host_code(Some(code.clone()));
+        code
+    }
+
+    pub fn host_code(&self) -> Option<String> {
+        self.lock().host_code.clone()
+    }
+
+    fn pair_by_host_code(&self, s: &mut State, conn: u64, code: &str) {
+        let Some(host) = s.host_code.clone() else {
+            return;
+        };
+        let Some(p) = s.pending.get(&conn) else {
+            return;
+        };
+        let typed: String = code.chars().filter(char::is_ascii_digit).collect();
+        if !ct_eq(typed.as_bytes(), host.as_bytes()) {
+            s.bad_codes += 1;
+            let tx = p.tx.clone();
+            if s.bad_codes >= MAX_BAD_CODES {
+                // Replace the code: the terminal (or app) shows the new one.
+                s.bad_codes = 0;
+                let fresh = fresh_code(&[host]);
+                eprintln!(
+                    "rupok: too many wrong codes; the new pairing code is {}",
+                    spaced(&fresh)
+                );
+                s.host_code = Some(fresh);
+                let _ = tx.send(Outgoing::Text(encode(&ServerMsg::Session(
+                    ServerSession::Error {
+                        error:
+                            "Too many wrong codes. Look for the new code where rupok is running."
+                                .into(),
+                        code: "bad_code".into(),
+                    },
+                ))));
+            } else {
+                let _ = tx.send(Outgoing::Text(encode(&ServerMsg::Session(
+                    ServerSession::Error {
+                        error: "That code does not match. Check the code where rupok is running."
+                            .into(),
+                        code: "bad_code".into(),
+                    },
+                ))));
+            }
+            return;
+        }
+        s.bad_codes = 0;
+        let p = s.pending.remove(&conn).expect("checked");
+        let token = random_hex(16);
+        s.token = Some(token.clone());
+        pair(s, conn, p.tx, p.client, p.doc, token);
     }
 
     /// A frame on a channel (or of a type) the hub does not handle.
@@ -618,6 +731,9 @@ impl LiveHub {
         if s.board.as_ref().is_some_and(|b| b.conn == conn) {
             s.board = None;
             fail_waiting(&mut s, "the board disconnected");
+            if let Some(ext) = &s.extension {
+                let _ = ext.send(("session".into(), json!({"t": "closed"})));
+            }
         }
     }
 }
@@ -670,9 +786,10 @@ fn doc_frame(s: &mut State, d: DocMsg) {
                 return;
             }
             if let (Ok(delta), Some(b)) = (sync::export_since(&m.lesson, &peer), s.board.as_ref()) {
-                let _ = b.tx.send(Outgoing::Text(encode(&ServerMsg::Doc(DocMsg::Update {
-                    data: B64.encode(delta),
-                }))));
+                let _ =
+                    b.tx.send(Outgoing::Text(encode(&ServerMsg::Doc(DocMsg::Update {
+                        data: B64.encode(delta),
+                    }))));
             }
         }
     }
@@ -683,24 +800,40 @@ fn pair(s: &mut State, conn: u64, tx: Tx, client: String, doc: Option<DocInfo>, 
     if let Some(old) = s.board.take()
         && old.conn != conn
     {
-        close(&old.tx, "replaced", "Another board connected to this AI assistant.");
+        close(
+            &old.tx,
+            "replaced",
+            "Another board connected to this AI assistant.",
+        );
         fail_waiting(s, "the board was replaced by another board");
     }
-    let channels: Vec<String> = CHANNELS.iter().map(|c| c.to_string()).collect();
-    let _ = tx.send(Outgoing::Text(encode(&ServerMsg::Session(ServerSession::Paired {
-        v: PROTOCOL_VERSION,
-        token,
-        agent: s.agent.clone(),
-        channels,
-    }))));
+    let mut channels: Vec<String> = CHANNELS.iter().map(|c| c.to_string()).collect();
+    if s.chat {
+        channels.push(rupok_live::protocol::ch::CHAT.to_string());
+    }
+    if let Some(ext) = &s.extension {
+        let _ = ext.send(("session".into(), json!({"t": "paired"})));
+    }
+    let _ = tx.send(Outgoing::Text(encode(&ServerMsg::Session(
+        ServerSession::Paired {
+            v: PROTOCOL_VERSION,
+            token,
+            agent: s.agent.clone(),
+            channels,
+        },
+    ))));
     // Tell the board what the mirror has of this lesson, if anything.
     let (key, vv) = match (&s.mirror, &doc) {
-        (Some(m), Some(d)) if m.key == d.key => {
-            (Some(m.key.clone()), Some(B64.encode(sync::version(&m.lesson))))
-        }
+        (Some(m), Some(d)) if m.key == d.key => (
+            Some(m.key.clone()),
+            Some(B64.encode(sync::version(&m.lesson))),
+        ),
         _ => (None, None),
     };
-    let _ = tx.send(Outgoing::Text(encode(&ServerMsg::Doc(DocMsg::Sync { key, vv }))));
+    let _ = tx.send(Outgoing::Text(encode(&ServerMsg::Doc(DocMsg::Sync {
+        key,
+        vv,
+    }))));
     s.board = Some(Board {
         conn,
         tx,
@@ -716,26 +849,61 @@ fn fail_waiting(s: &mut State, why: &str) {
     }
 }
 
-fn welcome(agent: &str, code: &str, ttl: Duration) -> String {
+fn welcome(cfg: &LiveConfig, agent: &str, code: &str, board_pairs: bool) -> String {
     encode(&ServerMsg::Session(ServerSession::Welcome {
         v: PROTOCOL_VERSION,
         agent: agent.to_string(),
         code: code.to_string(),
-        expires_in: ttl.as_secs(),
-        channels: CHANNELS.iter().map(|c| c.to_string()).collect(),
+        expires_in: cfg.code_ttl.as_secs(),
+        channels: channels(cfg),
+        pair: Some(
+            if board_pairs {
+                pair::BOARD
+            } else {
+                pair::AGENT
+            }
+            .to_string(),
+        ),
+        chat: cfg.chat,
     }))
 }
 
+/// The channels this server speaks.
+fn channels(cfg: &LiveConfig) -> Vec<String> {
+    // Keep in step with `pair()`.
+    let mut c: Vec<String> = CHANNELS.iter().map(|c| c.to_string()).collect();
+    if cfg.chat {
+        c.push(rupok_live::protocol::ch::CHAT.to_string());
+    }
+    c
+}
+
 fn close(tx: &Tx, code: &str, msg: &str) {
-    let _ = tx.send(Outgoing::Text(encode(&ServerMsg::Session(ServerSession::Error {
-        error: msg.to_string(),
-        code: code.to_string(),
-    }))));
+    let _ = tx.send(Outgoing::Text(encode(&ServerMsg::Session(
+        ServerSession::Error {
+            error: msg.to_string(),
+            code: code.to_string(),
+        },
+    ))));
     let _ = tx.send(Outgoing::Close(4000, code.to_string()));
 }
 
+/// A 128-bit random token (hex).
+pub fn random_token() -> String {
+    random_hex(16)
+}
+
+/// "482913" → "482 913".
+pub fn spaced(code: &str) -> String {
+    if code.len() == 6 {
+        format!("{} {}", &code[..3], &code[3..])
+    } else {
+        code.to_string()
+    }
+}
+
 /// Constant-time byte comparison (codes and tokens).
-fn ct_eq(a: &[u8], b: &[u8]) -> bool {
+pub fn ct_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }
@@ -791,11 +959,7 @@ pub fn agent_display_name(name: &str, title: Option<&str>) -> String {
         "Cursor"
     } else {
         let raw = title.filter(|t| !t.trim().is_empty()).unwrap_or(name);
-        let clean: String = raw
-            .chars()
-            .filter(|c| !c.is_control())
-            .take(40)
-            .collect();
+        let clean: String = raw.chars().filter(|c| !c.is_control()).take(40).collect();
         return if clean.trim().is_empty() {
             "AI assistant".into()
         } else {

@@ -587,19 +587,15 @@ impl InkRenderer {
             self.vbuf = Self::make_vbuf(device, self.vcap, "ink vertices");
             self.upload_from = Some(0);
         }
-        if let Some(from) = self.upload_from.take() {
-            queue.write_buffer(
-                &self.vbuf,
-                from as u64 * STRIDE,
-                bytemuck::cast_slice(&self.verts[from..]),
-            );
-            self.tombstones.clear();
-        }
-        for (start, len) in self.tombstones.drain(..) {
+        for (start, end) in pending_uploads(
+            self.upload_from.take(),
+            &mut self.tombstones,
+            self.verts.len(),
+        ) {
             queue.write_buffer(
                 &self.vbuf,
                 start as u64 * STRIDE,
-                bytemuck::cast_slice(&self.verts[start..start + len]),
+                bytemuck::cast_slice(&self.verts[start..end]),
             );
         }
         if self.wet.len() > self.wet_cap {
@@ -821,9 +817,47 @@ impl InkRenderer {
     }
 }
 
+/// Vertex ranges `[start, end)` to write to the GPU: the appended tail from
+/// `upload_from`, plus every tombstone *before* it. A stroke replaced in place
+/// (removed, then re-added at the end in the same frame) leaves a tombstone
+/// ahead of the tail; skipping it would keep drawing the old geometry.
+fn pending_uploads(
+    upload_from: Option<usize>,
+    tombstones: &mut Vec<(usize, usize)>,
+    len: usize,
+) -> Vec<(usize, usize)> {
+    let mut out = Vec::with_capacity(tombstones.len() + 1);
+    for (start, n) in tombstones.drain(..) {
+        if upload_from.is_none_or(|from| start < from) {
+            out.push((start, (start + n).min(upload_from.unwrap_or(len)).min(len)));
+        }
+    }
+    if let Some(from) = upload_from {
+        out.push((from, len));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stroke_replaced_in_one_frame_uploads_its_tombstone() {
+        // Old copy at 1..11 tombstoned, new copy appended from 20.
+        let mut t = vec![(1, 10)];
+        assert_eq!(
+            pending_uploads(Some(20), &mut t, 40),
+            vec![(1, 11), (20, 40)]
+        );
+        assert!(t.is_empty());
+        // Tombstones inside the tail are covered by the tail upload.
+        let mut t = vec![(25, 5)];
+        assert_eq!(pending_uploads(Some(20), &mut t, 40), vec![(20, 40)]);
+        // Removal only.
+        let mut t = vec![(3, 4)];
+        assert_eq!(pending_uploads(None, &mut t, 40), vec![(3, 7)]);
+    }
 
     #[test]
     fn dot_strokes_get_two_vertices() {

@@ -31,8 +31,11 @@ pub const LAMBDA: f32 = 1.0;
 const DOT_COST: f32 = 0.4;
 /// Cost per unit of the largest gap inside a group.
 const GAP_COST: f32 = 1.0;
+/// Cost of a small, non-flat stroke sitting outside the rest of its group
+/// (usually a script or a neighbour, not part of the symbol).
+const SATELLITE_COST: f32 = 2.0;
 /// Guesses kept per group.
-pub const TOP_K: usize = 6;
+pub const TOP_K: usize = 3;
 
 /// Strokes ready for grouping: deslanted, with boxes and scale.
 pub struct Prepared {
@@ -61,14 +64,16 @@ fn median(v: &mut [f32]) -> f32 {
 
 /// Typical symbol size: the median stroke size, ignoring dots.
 pub fn unit_of(boxes: &[BBox]) -> f32 {
-    let mut sizes: Vec<f32> = boxes
+    let sizes: Vec<f32> = boxes
         .iter()
         .map(|b| b.size())
         .filter(|s| *s > 0.0)
         .collect();
-    let m = median(&mut sizes);
-    let mut big: Vec<f32> = sizes.into_iter().filter(|s| *s > 0.35 * m).collect();
-    median(&mut big).max(1e-3)
+    let max = sizes.iter().copied().fold(0.0f32, f32::max);
+    let mut big: Vec<f32> = sizes.iter().copied().filter(|s| *s >= 0.15 * max).collect();
+    let m = median(&mut big);
+    let mut typical: Vec<f32> = sizes.into_iter().filter(|s| *s >= 0.35 * m).collect();
+    median(&mut typical).max(1e-3)
 }
 
 pub const SLANT_STEP: f32 = 0.05;
@@ -122,8 +127,21 @@ fn attaches(p: &Prepared, s: usize, e: usize) -> bool {
     if p.is_dot(e) {
         return false;
     }
+    // Not into a container (a radical or a big bracket around it).
+    let contains = be.x0 <= bs.x0 && be.x1 >= bs.x1 && be.y0 <= bs.y0 && be.y1 >= bs.y1;
+    if contains && (be.w() > 2.0 * bs.w() || be.h() > 2.0 * bs.h()) {
+        return false;
+    }
     let r = bs.diag() / be.diag().max(1e-6);
-    if !(0.4..=2.5).contains(&r) || bs.gap(be) > 0.0 {
+    if !(0.2..=5.0).contains(&r) {
+        return false;
+    }
+    // The second line of "=" (flat, stacked, overlapping in x).
+    let flat = |b: BBox| b.h() <= 0.3 * b.w();
+    if flat(bs) && flat(be) && bs.x_overlap(be) > 0.5 * bs.w().min(be.w()) && bs.gap(be) < 0.5 * u {
+        return true;
+    }
+    if bs.gap(be) > 0.0 {
         return false;
     }
     let inside = |a: BBox, b: BBox| {
@@ -168,7 +186,7 @@ fn reorder(p: &Prepared) -> Vec<usize> {
 }
 
 /// Could these strokes be one symbol? Cheap geometric checks only.
-fn admissible(p: &Prepared, ids: &[usize]) -> Option<f32> {
+pub(super) fn admissible(p: &Prepared, ids: &[usize]) -> Option<f32> {
     if ids.len() == 1 {
         return Some(0.0);
     }
@@ -177,13 +195,12 @@ fn admissible(p: &Prepared, ids: &[usize]) -> Option<f32> {
     if dots == ids.len() {
         return None;
     }
-    let all = ids
-        .iter()
-        .fold(BBox::EMPTY, |b, &i| b.union(p.boxes[i]));
+    let all = ids.iter().fold(BBox::EMPTY, |b, &i| b.union(p.boxes[i]));
     if ids.len() >= 3 && all.size() > 3.0 * u {
         return None;
     }
     let mut worst_gap = 0.0f32;
+    let mut satellites = 0;
     for (k, &i) in ids.iter().enumerate() {
         let rest = ids
             .iter()
@@ -196,6 +213,43 @@ fn admissible(p: &Prepared, ids: &[usize]) -> Option<f32> {
             return None;
         }
         worst_gap = worst_gap.max(gap);
+        if !p.is_dot(i)
+            && b.h() > 0.25 * b.w()
+            && rest.h() > 0.3 * rest.w()
+            && b.size() < 1.2 * rest.size()
+        {
+            let m = 0.1 * u;
+            let inside = b.cx() >= rest.x0 - m
+                && b.cx() <= rest.x1 + m
+                && b.cy() >= rest.y0 - m
+                && b.cy() <= rest.y1 + m;
+            // Small marks (a degree circle, a prime) stay separate even when
+            // they touch; bigger strokes only when they don't.
+            if !inside && (b.size() < 0.45 * rest.size() || !touches(p, i, ids, 0.1 * u)) {
+                satellites += 1;
+            } else if inside && b.size() < 0.4 * rest.size() && is_loop(&p.strokes[i]) {
+                // A small closed loop near the edge of a bigger symbol is a
+                // degree sign or a little o, unless it sits well inside.
+                let (mx, my) = (0.2 * rest.w(), 0.2 * rest.h());
+                let deep = b.cx() > rest.x0 + mx
+                    && b.cx() < rest.x1 - mx
+                    && b.cy() > rest.y0 + my
+                    && b.cy() < rest.y1 - my;
+                if !deep {
+                    satellites += 1;
+                }
+            }
+        }
+        // A flat line floating above the rest (a fraction bar over its
+        // numerator) is not part of that symbol; "=" has both lines flat.
+        if !p.is_dot(i)
+            && b.h() <= 0.25 * b.w()
+            && rest.h() > 0.3 * rest.w()
+            && b.y1 < rest.y0
+            && !touches(p, i, ids, 0.1 * u)
+        {
+            satellites += 1;
+        }
         if p.is_dot(i) {
             // A dot sits above or below the ink of the other strokes (i, j, ÷).
             let ink = ids
@@ -203,25 +257,60 @@ fn admissible(p: &Prepared, ids: &[usize]) -> Option<f32> {
                 .filter(|&&j| !p.is_dot(j))
                 .fold(BBox::EMPTY, |a, &j| a.union(p.boxes[j]));
             let inx = b.cx() >= ink.x0 - 0.15 * u && b.cx() <= ink.x1 + 0.15 * u;
-            let above = b.y1 < ink.y0 + 0.05 * u;
+            let above = b.y1 < ink.y0 + 0.05 * u || b.cy() < ink.y0 + 0.1 * ink.h();
             let below = b.y0 > ink.y1 - 0.05 * u;
             if !(inx && (above || below)) {
                 return None;
             }
             continue;
         }
+        // Overlap is judged against the other ink, not against dots (the
+        // dot of an i is placed by the rule above).
+        let rest = ids
+            .iter()
+            .enumerate()
+            .filter(|(j, s)| *j != k && !p.is_dot(**s))
+            .fold(BBox::EMPTY, |b, (_, &j)| b.union(p.boxes[j]));
+        if rest.is_empty() {
+            continue;
+        }
         let ov = b.x_overlap(rest);
         let narrow = b.w().min(rest.w());
         let need = if narrow > 0.3 * u {
-            0.2 * narrow
+            0.1 * narrow
         } else {
             -0.1 * u
         };
-        if ov < need {
+        // Side by side is fine when the ink actually touches (the arches
+        // of an m, the arcs of a ")(" x).
+        if ov < need && !(ov > -0.15 * u && touches(p, i, ids, 0.1 * u)) {
             return None;
         }
     }
-    Some(worst_gap / u)
+    Some(GAP_COST * worst_gap / u + SATELLITE_COST * satellites as f32)
+}
+
+/// A stroke whose ends meet: a small circle.
+fn is_loop(s: &[Pt]) -> bool {
+    let b = BBox::of(s);
+    s.len() >= 4
+        && s[0].dist(s[s.len() - 1]) < 0.35 * b.size()
+        && b.h() > 0.5 * b.w()
+        && b.w() > 0.5 * b.h()
+}
+
+/// Whether stroke `i` comes within `tol` of another stroke of the group.
+fn touches(p: &Prepared, i: usize, ids: &[usize], tol: f32) -> bool {
+    let coarse = |s: &[Pt]| {
+        let mut v = Vec::with_capacity(24);
+        super::geom::resample_into(s, s.len().clamp(1, 24), &mut v);
+        v
+    };
+    let a = coarse(&p.strokes[i]);
+    ids.iter().filter(|&&j| j != i).any(|&j| {
+        let b = coarse(&p.strokes[j]);
+        a.iter().any(|pa| b.iter().any(|pb| pa.dist(*pb) <= tol))
+    })
 }
 
 /// One symbol of a segmentation.
@@ -242,7 +331,7 @@ pub struct Segmentation {
 
 /// Classification results by group, so live preview only classifies the
 /// groups that contain a new stroke.
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct GroupCache {
     slant_key: i32,
     map: HashMap<Vec<u32>, Vec<Guess>>,
@@ -260,6 +349,10 @@ impl GroupCache {
 
     pub fn len(&self) -> usize {
         self.map.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
 }
 
@@ -288,6 +381,140 @@ fn classify_group(
     g
 }
 
+/// A stroke that is clearly a radical on its own never groups with a
+/// non-flat stroke under its bar (its body); a separate flat bar is fine.
+fn swallows_body(
+    p: &Prepared,
+    lib: &Library,
+    ids: &[usize],
+    cache: &mut Option<&mut GroupCache>,
+) -> bool {
+    let root = id("√");
+    for &r in ids {
+        let rb = p.boxes[r];
+        if p.is_dot(r) || rb.w() < 0.8 * rb.h() {
+            continue;
+        }
+        let g = classify_group(p, lib, &[r], cache);
+        if g.first().is_none_or(|x| x.sym != root || x.dist > 0.02) {
+            continue;
+        }
+        let left = rb.x0 + 0.25 * rb.h().min(rb.w());
+        for &o in ids {
+            let b = p.boxes[o];
+            if o != r
+                && !p.is_dot(o)
+                && b.h() > 0.3 * b.w()
+                && b.cx() > left
+                && b.cx() < rb.x1
+                && b.cy() > rb.y0
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// A straight stroke: (length, direction in degrees from horizontal, 0–180)
+/// when it deviates from its chord by less than 12 % of the chord.
+fn straight(s: &[Pt]) -> Option<(f32, f32)> {
+    let (a, b) = (*s.first()?, *s.last()?);
+    let len = a.dist(b);
+    if len <= 0.0 {
+        return None;
+    }
+    let (dx, dy) = ((b.x - a.x) / len, (b.y - a.y) / len);
+    let dev = s
+        .iter()
+        .map(|p| ((p.x - a.x) * dy - (p.y - a.y) * dx).abs())
+        .fold(0.0f32, f32::max);
+    if dev > 0.12 * len {
+        return None;
+    }
+    let mut ang = dy.atan2(dx).to_degrees();
+    if ang < 0.0 {
+        ang += 180.0;
+    }
+    Some((len, ang % 180.0))
+}
+
+/// The two commonest operators by construction, independent of how far
+/// distortion pulls them from their templates: `+` (a horizontal and a
+/// vertical line crossing near both middles) and `=` (two stacked
+/// horizontal lines of similar length).
+fn structural(p: &Prepared, ids: &[usize]) -> Option<Guess> {
+    let [a, b] = ids else {
+        return None;
+    };
+    let (sa, sb) = (&p.strokes[*a], &p.strokes[*b]);
+    let ((la, aa), (lb, ab)) = (straight(sa)?, straight(sb)?);
+    let horiz = |ang: f32| !(25.0..=155.0).contains(&ang);
+    let vert = |ang: f32| (65.0..=115.0).contains(&ang);
+    let ratio = la.max(lb) / la.min(lb).max(1e-6);
+    let (ba, bb) = (p.boxes[*a], p.boxes[*b]);
+    if ((horiz(aa) && vert(ab)) || (vert(aa) && horiz(ab))) && ratio < 2.0 {
+        let (h, v) = if horiz(aa) { (ba, bb) } else { (bb, ba) };
+        let in_mid = |x: f32, lo: f32, hi: f32| {
+            let t = (x - lo) / (hi - lo).max(1e-6);
+            (0.2..=0.8).contains(&t)
+        };
+        let crosses = in_mid(v.cx(), h.x0, h.x1) && in_mid(h.cy(), v.y0, v.y1);
+        if crosses {
+            return Some(Guess {
+                sym: id("+"),
+                dist: 0.003,
+            });
+        }
+    }
+    let flat = |ang: f32| !(15.0..=165.0).contains(&ang);
+    if flat(aa) && flat(ab) && ratio < 1.7 {
+        let shorter = ba.w().min(bb.w());
+        let gap = (ba.cy() - bb.cy()).abs();
+        let mean = 0.5 * (la + lb);
+        if ba.x_overlap(bb) > 0.6 * shorter && gap > 0.12 * mean && gap < 0.8 * mean {
+            return Some(Guess {
+                sym: id("="),
+                dist: 0.002,
+            });
+        }
+    }
+    None
+}
+
+/// A radical drawn as a tick plus a separate overbar: the tick alone reads
+/// as a radical and a flat line starts at its top and runs right. Returns
+/// the tick's distance.
+fn radical_with_bar(
+    p: &Prepared,
+    lib: &Library,
+    ids: &[usize],
+    cache: &mut Option<&mut GroupCache>,
+) -> Option<f32> {
+    let [a, b] = ids else {
+        return None;
+    };
+    let flat = |i: usize| {
+        let bb = p.boxes[i];
+        bb.h() <= 0.2 * bb.w()
+    };
+    let (tick, bar) = match (flat(*a), flat(*b)) {
+        (false, true) => (*a, *b),
+        (true, false) => (*b, *a),
+        _ => return None,
+    };
+    let (tb, bb) = (p.boxes[tick], p.boxes[bar]);
+    let at_top = (bb.cy() - tb.y0).abs() < 0.25 * tb.h().max(0.3 * p.unit);
+    let starts = bb.x0 > tb.x0 + 0.3 * tb.w() && bb.x0 < tb.x1 + 0.3 * p.unit;
+    if !(at_top && starts && bb.x1 > tb.x1) {
+        return None;
+    }
+    let g = classify_group(p, lib, &[tick], cache);
+    g.first()
+        .filter(|x| x.sym == id("√") && x.dist < 0.015)
+        .map(|x| x.dist)
+}
+
 #[derive(Clone, Copy)]
 struct Partial {
     cost: f32,
@@ -299,9 +526,13 @@ struct Partial {
 pub fn segment(
     p: &Prepared,
     lib: &Library,
-    mut cache: Option<&mut GroupCache>,
+    cache: Option<&mut GroupCache>,
     beams: usize,
 ) -> Vec<Segmentation> {
+    // Without a caller's cache, a local one still saves re-classifying
+    // single strokes.
+    let mut local = GroupCache::default();
+    let mut cache = Some(cache.unwrap_or(&mut local));
     let k = p.seq.len();
     if k == 0 {
         return Vec::new();
@@ -334,14 +565,30 @@ pub fn segment(
             let Some(gap) = admissible(p, ids) else {
                 continue;
             };
+            if g > 1 && swallows_body(p, lib, ids, &mut cache) {
+                continue;
+            }
             let (guesses, cost, dot) = if g == 1 && p.is_dot(ids[0]) {
                 (dot_guesses.clone(), LAMBDA + DOT_COST, true)
+            } else if let Some(d) = radical_with_bar(p, lib, ids, &mut cache) {
+                let gs = vec![Guess {
+                    sym: id("√"),
+                    dist: d,
+                }];
+                (gs, d / TAU + LAMBDA + gap, false)
             } else {
-                let gs = classify_group(p, lib, ids, &mut cache);
+                let mut gs = classify_group(p, lib, ids, &mut cache);
+                if let Some(s) = structural(p, ids) {
+                    match gs.iter_mut().find(|x| x.sym == s.sym) {
+                        Some(x) => x.dist = x.dist.min(s.dist),
+                        None => gs.push(s),
+                    }
+                    gs.sort_by(|a, b| a.dist.total_cmp(&b.dist));
+                }
                 let Some(best) = gs.first() else {
                     continue;
                 };
-                let c = best.dist / TAU + LAMBDA + GAP_COST * gap;
+                let c = best.dist / TAU + LAMBDA + gap;
                 (gs, c, false)
             };
             let gi = groups.len();

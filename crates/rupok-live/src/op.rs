@@ -41,6 +41,25 @@ pub struct Rect {
     pub h: f64,
 }
 
+/// Where `write_handwriting` writes: next to items, a region or a point.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Anchor {
+    /// Write next to these items (e.g. the strokes of the problem).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_ids: Option<Vec<String>>,
+    /// Write next to this region (slide pixels).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<Rect>,
+    /// Start exactly here (top-left of the writing, slide pixels).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y: Option<f64>,
+    /// `below` (default) or `right` of the items or region.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side: Option<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Op {
@@ -188,6 +207,33 @@ pub enum Op {
         #[serde(default)]
         color: Option<String>,
     },
+    /// Write lines (text with inline LaTeX) on the board as handwriting
+    /// strokes, placed next to the anchor without covering anything, as one
+    /// undo step. The board animates them stroke by stroke.
+    WriteHandwriting {
+        #[serde(default)]
+        page: Option<u32>,
+        lines: Vec<String>,
+        #[serde(default)]
+        anchor: Option<Anchor>,
+        /// `teacher` (the teacher's calibrated hand where taught) or `neat`.
+        #[serde(default)]
+        style: Option<String>,
+        /// Pen speed multiplier, 0.25 to 4 (default 1).
+        #[serde(default)]
+        speed: Option<f64>,
+        /// Ink colour `#rrggbb`. Default: the anchor ink's colour.
+        #[serde(default)]
+        color: Option<String>,
+        /// Height of a capital or digit in slide pixels. Default: matches the
+        /// anchor's handwriting.
+        #[serde(default)]
+        size: Option<f64>,
+        /// `all` (write everything) or `one-line-per-click` (the teacher
+        /// reveals each line with Next). Handled by the board's animation.
+        #[serde(default)]
+        step_mode: Option<String>,
+    },
     /// Move a Smart Object's build step: absolute `step`, or `delta` (default +1).
     StepObject {
         #[serde(default)]
@@ -233,6 +279,7 @@ impl Op {
             Op::SetPageBackground { .. } => "set_page_background",
             Op::ReplaceItemsWithText { .. } => "replace_items_with_text",
             Op::StepObject { .. } => "step_object",
+            Op::WriteHandwriting { .. } => "write_handwriting",
         }
     }
 
@@ -273,6 +320,7 @@ impl Op {
             Op::SetPageBackground { .. } => "changed the background",
             Op::ReplaceItemsWithText { .. } => "turned ink into text",
             Op::StepObject { .. } => "stepped a Smart Object",
+            Op::WriteHandwriting { .. } => "wrote on the board",
         }
     }
 }

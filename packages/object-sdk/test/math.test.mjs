@@ -18,6 +18,9 @@ class FakeNode {
     this.parentNode = null;
     this.childNodes = [];
   }
+  get firstChild() {
+    return this.childNodes[0] || null;
+  }
   appendChild(n) {
     return this.insertBefore(n, null);
   }
@@ -174,6 +177,9 @@ test("tex() renders, skips identical re-renders and handles bad input", async ()
   assert.equal(target.rendered.opts.displayMode, false);
   assert.equal(await env.rupok.tex(target, "v = \\hl{9.8}"), true);
   assert.equal(env.renders.length, 1, "same formula is not re-rendered");
+  target.childNodes = [text("replaced by the page")];
+  await env.rupok.tex(target, "v = \\hl{9.8}");
+  assert.equal(env.renders.length, 2, "re-rendered after the page replaced the content");
   await env.rupok.tex(target, "x", { display: true });
   assert.equal(target.rendered.opts.displayMode, true);
   assert.equal(await env.rupok.tex(null, "x"), false);

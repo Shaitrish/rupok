@@ -22,7 +22,7 @@ export interface DockShellProps {
   place: DockPlace;
   vertical: boolean;
   orientation: DockOrientation;
-  frame: (edge: DockEdge, vertical: boolean) => DockFrame;
+  frame: (edge: DockEdge, vertical: boolean, x?: number) => DockFrame;
   /** A drag moved the dock (`done` once released). */
   onPlace: (p: DockPlace, done: boolean) => void;
   minimized: boolean;
@@ -39,7 +39,8 @@ export interface DockShellProps {
   /** Any touch, hover or key on the dock (wakes a faded dock). */
   onActivity?: () => void;
   onDragStart?: () => void;
-  ref?: (el: HTMLDivElement) => void;
+  /** The dock element, or the bubble while minimised. */
+  ref?: (el: HTMLElement) => void;
   gripClass?: string;
   children: JSX.Element;
 }
@@ -64,7 +65,7 @@ export function DockShell(props: DockShellProps) {
   const posStyle = (w?: number): JSX.CSSProperties | undefined => {
     if (props.windowed) return undefined;
     const p = props.place;
-    const f = props.frame(p.edge, props.vertical);
+    const f = props.frame(p.edge, props.vertical, p.x);
     const style: JSX.CSSProperties = {
       left: `calc(${f.left}px + (100% - ${f.left + f.right}px) * ${p.x})`,
       top: `calc(${f.top}px + (100% - ${f.top + f.bottom}px) * ${p.y})`,
@@ -160,7 +161,10 @@ export function DockShell(props: DockShellProps) {
       when={!props.minimized}
       fallback={
         <button
-          ref={(b) => (bubbleEl = b)}
+          ref={(b) => {
+            bubbleEl = b;
+            props.ref?.(b);
+          }}
           class="dock-bubble"
           classList={{ ...props.classList, dragging: dragging(), windowed: !!props.windowed }}
           style={posStyle(48)}
@@ -236,9 +240,12 @@ export function DockPopover(props: DockPopoverProps) {
   let el!: HTMLDivElement;
   const [pos, setPos] = createSignal<{ left: number; top: number } | null>(null);
   const GAP = 8, M = 8;
+  let alive = true;
+  onCleanup(() => (alive = false));
   const place = () => {
+    if (!alive) return;
     const d = props.dock();
-    if (props.inline || !d || !el) return;
+    if (props.inline || !d || !el || !props.anchor.isConnected) return;
     const dr = d.getBoundingClientRect(), ar = props.anchor.getBoundingClientRect();
     const pw = el.offsetWidth, ph = el.offsetHeight, W = window.innerWidth, H = window.innerHeight;
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));

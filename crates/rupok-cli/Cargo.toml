@@ -21,12 +21,22 @@ rupok-core.workspace = true
 rupok-format.workspace = true
 rupok-live.workspace = true
 clap.workspace = true
-tokio = { workspace = true, features = ["net", "sync", "time"] }
+tokio = { workspace = true, features = ["net", "sync", "time", "signal"] }
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake", "connect"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 base64 = "0.22"
 getrandom = "0.3"
-rmcp = { workspace = true, features = ["server", "macros", "transport-io"] }
+# Documents folder, for the default MCP workspace (the Rupok library).
+dirs = "7"
+rmcp = { workspace = true, features = ["server", "macros", "transport-io", "transport-streamable-http-server"] }
+# `rupok agent`: the in-app chat. ACP client for the teacher's agent, and the
+# Rupok MCP tools served to it over loopback HTTP.
+agent-client-protocol = { version = "5.5", features = ["process"] }
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"
+which = "8"
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -35,3 +45,4 @@ thiserror.workspace = true
 
 [dev-dependencies]
 tempfile = "3"
+rupok-ink.workspace = true

@@ -10,9 +10,11 @@
 pub mod builder;
 pub mod codec;
 pub mod filter;
+pub mod math;
 pub mod pressure;
 pub mod recognize;
 pub mod simplify;
+pub mod write;
 
 pub use builder::{BuilderConfig, StrokeBuilder, StrokeStyle, Tool};
 pub use codec::{CodecError, decode_points, encode_points};

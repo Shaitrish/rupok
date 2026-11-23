@@ -20,7 +20,7 @@ Every stroke is saved with its timing. Students who missed the class open the le
 
 ## Students: open the lesson, replay the class
 
-Got a `.rpk` file from your teacher? Open it at [rupok.app/open](https://rupok.app/open/): no account, no download, with every live object still working.
+Got an [.rpk file (Rich Presentation Kit)](https://rupok.app/rpk/) from your teacher? Open it at [rupok.app/open](https://rupok.app/open/): no account, no download, with every live object still working.
 
 ## Pricing: the app is free, forever
 
@@ -59,6 +59,10 @@ Ask the AI you already use for a simulation, 3D model or quiz as a single HTML f
 ### How do students open my lessons?
 
 Save the lesson as a `.rpk` file and send it on WhatsApp, Gmail or Google Drive. Students open it at [rupok.app/open](https://rupok.app/open/) on a phone or computer, with no account, and replay the class.
+
+### What is an RPK file?
+
+An RPK (Rich Presentation Kit) file, `.rpk`, is a Rupok lesson: its slides, the teacher’s ink with timing, live Smart Objects and a readable outline that AI can read, in one open ZIP package. Open one free at [rupok.app/open](https://rupok.app/open/); see [the RPK file format](https://rupok.app/rpk/).
 
 ### Is Rupok open source?
 

@@ -15,6 +15,13 @@
   Content-Type: text/markdown; charset=utf-8
   X-Robots-Tag: noindex
 
+# The read-rpk agent skill (copied from skills/read-rpk by site/build.mjs).
+/skills/*.py
+  Content-Type: text/x-python; charset=utf-8
+
+/skills/*.rpk
+  Content-Type: application/vnd.rupok.lesson+zip
+
 /llms.txt
   Content-Type: text/plain; charset=utf-8
 

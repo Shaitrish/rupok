@@ -6,7 +6,8 @@
 import { For, Show, createSignal } from "solid-js";
 import { controller } from "../controller";
 import { type InkSample, PROVIDERS, pickProvider, textPlacement } from "../handwriting";
-import { selectionIds, showToast } from "../state";
+import { prefs, selectionIds, showToast } from "../state";
+import { fromInk, looksLikeMath, mathPlacement, recognize } from "../mathInk";
 import { Icon } from "./Icon";
 
 let settingsOpener: ((section?: string) => void) | null = null;
@@ -14,6 +15,12 @@ let settingsOpener: ((section?: string) => void) | null = null;
 export function registerSettingsOpener(f: (section?: string) => void) {
   settingsOpener = f;
 }
+
+/** Offline maths converts straight away from this confidence; below it the
+ * AI reader gets a go when there is one. */
+const OFFLINE_SURE = 0.7;
+/** Without an AI reader, the offline reading is used from here. */
+const OFFLINE_MIN = 0.45;
 
 export function ToTextButton() {
   const [busy, setBusy] = createSignal(false);
@@ -33,15 +40,29 @@ export function ToTextButton() {
       abort?.abort();
       return;
     }
-    const provider = await pickProvider();
-    if (!provider) {
-      toggleHelp();
-      return;
-    }
     const json = controller.board.selection_ink_json();
     if (json === "null") return;
     const ink = JSON.parse(json) as InkSample;
     const ids = selectionIds();
+    // Maths first, offline: no key and no network. Messy maths goes to the
+    // AI reader when there is one.
+    const provider = await pickProvider();
+    if (prefs().smartMath) {
+      const { xy, counts } = fromInk(ink.strokes);
+      const best = recognize(xy, counts)[0];
+      if (looksLikeMath(best) && (best.confidence >= OFFLINE_SURE || (!provider && best.confidence >= OFFLINE_MIN))) {
+        const at = mathPlacement(ink.bounds, best.latex);
+        if (controller.board.replace_selection_with_latex(best.latex, at.x, at.y, at.w, at.size)) {
+          controller.sync(true);
+          showToast("Converted to maths, offline. Undo brings the ink back.");
+        }
+        return;
+      }
+    }
+    if (!provider) {
+      toggleHelp();
+      return;
+    }
     const ctl = new AbortController();
     abort = ctl;
     setBusy(true);
@@ -54,8 +75,14 @@ export function ToTextButton() {
       }
       // The teacher may have moved on while we waited: convert what was selected.
       controller.board.select_json(JSON.stringify(ids));
-      const at = textPlacement(ink.bounds, text);
-      const id = controller.board.replace_selection_with_text(text, at.x, at.y, at.w, at.size);
+      let id: string | undefined;
+      if (r.kind === "math" && r.latex.trim()) {
+        const at = mathPlacement(ink.bounds, r.latex);
+        id = controller.board.replace_selection_with_latex(r.latex.trim(), at.x, at.y, at.w, at.size);
+      } else {
+        const at = textPlacement(ink.bounds, text);
+        id = controller.board.replace_selection_with_text(text, at.x, at.y, at.w, at.size);
+      }
       if (id) showToast(`Converted to ${r.kind === "math" ? "maths" : "text"}. Undo brings the ink back.`);
     } catch (e: any) {
       if (!ctl.signal.aborted) showToast(`Could not convert: ${e?.message ?? e}`, 5000);

@@ -28,12 +28,13 @@
 
 pub mod apply;
 pub mod attribution;
+pub mod handwriting;
 pub mod op;
 pub mod protocol;
 
-pub use apply::{BoardCtx, LiveError, Outcome, apply, doc_key};
+pub use apply::{BoardCtx, LiveError, Outcome, apply, apply_with, doc_key};
 pub use attribution::{agent_items, parse_commit_message};
-pub use op::{Op, PatternName, Rect};
+pub use op::{Anchor, Op, PatternName, Rect};
 
 /// Prefix of the Loro commit message of every change an agent makes:
 /// `rupok-agent/1 {"agent":"Claude Code","op":"add_text"}`.

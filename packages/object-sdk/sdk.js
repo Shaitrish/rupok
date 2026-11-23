@@ -584,6 +584,56 @@
     return out;
   }
 
+  /* True when a canvas copy has nothing drawn (sampled at 16 × 16). */
+  function isBlank(copy) {
+    try {
+      var probe = newCanvas(16, 16);
+      var g = probe.getContext("2d");
+      g.drawImage(copy, 0, 0, 16, 16);
+      var d = g.getImageData(0, 0, 16, 16).data;
+      for (var i = 3; i < d.length; i += 4) if (d[i] !== 0) return false;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function recopy(entries) {
+    var left = [];
+    for (var i = 0; i < entries.length; i++) {
+      var c = entries[i];
+      try {
+        var g = c.copy.getContext("2d");
+        g.clearRect(0, 0, c.copy.width, c.copy.height);
+        g.drawImage(c.el, 0, 0);
+      } catch (e) {
+        /* unreadable */
+      }
+      if (isBlank(c.copy)) left.push(c);
+    }
+    return left;
+  }
+
+  /* WebGL canvases drawn on demand (no animation loop, no
+   * preserveDrawingBuffer) are empty between frames. Ask them to draw with
+   * a resize event and copy at once; else try again on the next frame. */
+  function fillBlanks(copies) {
+    var blank = [];
+    for (var i = 0; i < copies.length; i++) if (isBlank(copies[i].copy)) blank.push(copies[i]);
+    if (!blank.length) return Promise.resolve(copies);
+    try {
+      root.dispatchEvent(new root.Event("resize"));
+    } catch (e) {
+      /* no events */
+    }
+    blank = recopy(blank);
+    if (!blank.length) return Promise.resolve(copies);
+    return inFrame(function () {
+      recopy(blank);
+      return copies;
+    });
+  }
+
   function loadImage(src) {
     return new Promise(function (resolve, reject) {
       if (typeof root.Image !== "function") {
@@ -613,6 +663,26 @@
     var q = function (node, sel) {
       return list(node.querySelectorAll(sel));
     };
+    // What is hidden on screen stays hidden in the picture, even when the
+    // hiding rule lives in a stylesheet the picture cannot load (for example
+    // KaTeX's screen-reader MathML).
+    var liveAll = html.getElementsByTagName ? list(html.getElementsByTagName("*")) : [];
+    var cloneAll = clone.getElementsByTagName ? list(clone.getElementsByTagName("*")) : [];
+    var hidden = [];
+    for (var hi = 0; hi < liveAll.length && hi < cloneAll.length; hi++) {
+      var el = liveAll[hi];
+      var tag = String(el.tagName).toLowerCase();
+      if (tag === "head" || tag === "style" || tag === "script" || tag === "title" || tag === "meta" || tag === "link") continue;
+      try {
+        var cs = root.getComputedStyle(el);
+        var rr = el.getBoundingClientRect();
+        var srOnly = rr.width <= 1 && rr.height <= 1 && cs.overflow === "hidden";
+        if (cs.display === "none" || srOnly) hidden.push(cloneAll[hi]);
+      } catch (e) {
+        /* not an element we can measure */
+      }
+    }
+    for (var hj = 0; hj < hidden.length; hj++) if (hidden[hj].parentNode) hidden[hj].parentNode.removeChild(hidden[hj]);
     // Live form values are properties, not attributes: copy them over.
     var srcFields = q(html, "input, textarea, select");
     var dstFields = q(clone, "input, textarea, select");
@@ -689,25 +759,36 @@
     return theme["color.bg"] || "#ffffff";
   }
 
+  /* PNG data URL of a canvas. Synchronous on purpose: Chrome runs toBlob's
+   * PNG encoding in idle time, which a busy host page (srcdoc frames share
+   * its main thread) may not have for seconds. Throws on a tainted canvas. */
+  function toPng(canvas) {
+    return canvas.toDataURL("image/png");
+  }
+
   /* Draw `img` (the DOM picture) or, without it, the canvas copies over the
    * page background, at scale s. Halves the scale while the PNG is too big. */
-  function encode(w, h, s, img, copies) {
-    for (var tries = 0; tries < 4; tries++, s /= 2) {
-      var out = newCanvas(w * s, h * s);
-      var ctx = out.getContext("2d");
-      if (img) ctx.drawImage(img, 0, 0, w * s, h * s);
-      else {
-        ctx.fillStyle = backgroundColor();
-        ctx.fillRect(0, 0, w * s, h * s);
-        for (var i = 0; i < copies.length; i++) {
-          var r = copies[i].rect;
-          ctx.drawImage(copies[i].copy, r.left * s, r.top * s, r.width * s, r.height * s);
+  function encode(w, h, s, img, copies, tries) {
+    return Promise.resolve()
+      .then(function () {
+        var out = newCanvas(w * s, h * s);
+        var ctx = out.getContext("2d");
+        if (img) ctx.drawImage(img, 0, 0, w * s, h * s);
+        else {
+          ctx.fillStyle = backgroundColor();
+          ctx.fillRect(0, 0, w * s, h * s);
+          for (var i = 0; i < copies.length; i++) {
+            var r = copies[i].rect;
+            ctx.drawImage(copies[i].copy, r.left * s, r.top * s, r.width * s, r.height * s);
+          }
         }
-      }
-      var url = out.toDataURL("image/png");
-      if (typeof url === "string" && url.length <= SNAPSHOT_MAX_CHARS && /^data:image\/png[;,]/.test(url)) return url;
-    }
-    throw new Error("snapshot too large");
+        return toPng(out);
+      })
+      .then(function (url) {
+        if (typeof url === "string" && url.length <= SNAPSHOT_MAX_CHARS && /^data:image\/png[;,]/.test(url)) return url;
+        if (tries >= 3) throw new Error("snapshot too large");
+        return encode(w, h, s / 2, img, copies, tries + 1);
+      });
   }
 
   function snapshot(scale) {
@@ -717,15 +798,17 @@
     var s = Math.min(scale, Math.sqrt(SNAPSHOT_MAX_PIXELS / (w * h)));
     return inFrame(function () {
       return copyCanvases(w, h);
-    }).then(function (copies) {
+    })
+      .then(fillBlanks)
+      .then(function (copies) {
       return domImage(w, h, copies)
         .then(function (img) {
-          return encode(w, h, s, img, copies);
+          return encode(w, h, s, img, copies, 0);
         })
         .catch(function (e) {
           // Tainted, unsupported or broken: fall back to the canvases.
           if (!copies.length) throw e;
-          return encode(w, h, s, null, copies);
+          return encode(w, h, s, null, copies, 0);
         });
     });
   }
@@ -1032,6 +1115,7 @@
     try {
       k.render(latex, el, mathOptions(display));
       el.__rupokTex = (display ? "D" : "I") + latex;
+      el.__rupokTexNode = el.firstChild; /* if the page replaces the content, render again */
       return true;
     } catch (e) {
       consoleCall("warn", ["[rupok] maths:", e && e.message ? e.message : e]);
@@ -1153,12 +1237,16 @@
     }
   }
 
+  function rendered(el, key) {
+    return el.__rupokTex === key && el.firstChild === el.__rupokTexNode;
+  }
+
   function applyMath(jobs) {
     var n = 0;
     for (var i = 0; i < jobs.length; i++) {
       var job = jobs[i];
       if (job.el) {
-        if (job.el.__rupokTex !== (job.display ? "D" : "I") + job.tex && renderInto(job.el, job.tex, job.display)) n++;
+        if (!rendered(job.el, (job.display ? "D" : "I") + job.tex) && renderInto(job.el, job.tex, job.display)) n++;
         continue;
       }
       var node = job.node;
@@ -1211,7 +1299,7 @@
       el.__rupokTexWant = key;
       if (katexLib()) {
         if (mathState !== 2) settleMath(true);
-        return Promise.resolve(el.__rupokTex === key || renderInto(el, latex, display));
+        return Promise.resolve(rendered(el, key) || renderInto(el, latex, display));
       }
     } catch (e) {
       return Promise.resolve(false);
@@ -1219,7 +1307,7 @@
     /* Until KaTeX arrives the element keeps its current content (a fallback, if any). */
     return loadMath().then(function (ok) {
       if (!ok || el.__rupokTexWant !== key) return false;
-      return el.__rupokTex === key || renderInto(el, latex, display);
+      return rendered(el, key) || renderInto(el, latex, display);
     });
   }
 

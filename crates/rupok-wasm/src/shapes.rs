@@ -10,6 +10,8 @@ use rupok_core::ShapeGeom;
 use rupok_ink::StrokePoint;
 use rupok_ink::recognize::{Geometry, Recognized};
 
+use crate::templates;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShapeKind {
     Rect,
@@ -57,6 +59,7 @@ pub fn shape_geom(kind: ShapeKind, a: [f32; 2], b: [f32; 2]) -> ShapeGeom {
             h: b[1] - a[1],
             rot: 0.0,
             v: Vec::new(),
+            ..Default::default()
         },
         ShapeKind::Rect | ShapeKind::Ellipse => ShapeGeom {
             kind: kind.as_str().into(),
@@ -66,6 +69,7 @@ pub fn shape_geom(kind: ShapeKind, a: [f32; 2], b: [f32; 2]) -> ShapeGeom {
             h: (b[1] - a[1]).abs(),
             rot: 0.0,
             v: Vec::new(),
+            ..Default::default()
         },
     }
 }
@@ -86,6 +90,7 @@ pub fn from_recognized(r: &Recognized) -> (&'static str, ShapeGeom) {
             h: f(b[1] - a[1]),
             rot: 0.0,
             v: Vec::new(),
+            ..Default::default()
         },
         Geometry::Ellipse { c, rx, ry, rot } => ShapeGeom {
             kind: "ellipse".into(),
@@ -95,6 +100,7 @@ pub fn from_recognized(r: &Recognized) -> (&'static str, ShapeGeom) {
             h: f(2.0 * ry),
             rot: f(*rot),
             v: Vec::new(),
+            ..Default::default()
         },
         Geometry::Rect { c, w, h, rot } => ShapeGeom {
             kind: "rect".into(),
@@ -104,10 +110,29 @@ pub fn from_recognized(r: &Recognized) -> (&'static str, ShapeGeom) {
             h: f(*h),
             rot: f(*rot),
             v: Vec::new(),
+            ..Default::default()
         },
         Geometry::Polygon { pts } => {
             poly(&pts.iter().map(|p| [f(p[0]), f(p[1])]).collect::<Vec<_>>())
         }
+        Geometry::Template {
+            kind,
+            x,
+            y,
+            w,
+            h,
+            rot,
+            v,
+        } => ShapeGeom {
+            kind: (*kind).into(),
+            x: f(*x),
+            y: f(*y),
+            w: f(*w),
+            h: f(*h),
+            rot: f(*rot),
+            v: v.iter().map(|q| f(*q)).collect(),
+            ..Default::default()
+        },
     };
     (r.kind.as_str(), g)
 }
@@ -140,8 +165,44 @@ pub fn to_geometry(g: &ShapeGeom) -> Option<Geometry> {
         "poly" => Geometry::Polygon {
             pts: vertices(g).iter().map(|p| [f(p[0]), f(p[1])]).collect(),
         },
+        k if templates::is_template(k) => Geometry::Template {
+            kind: template_kind(k)?,
+            x: f(g.x),
+            y: f(g.y),
+            w: f(g.w),
+            h: f(g.h),
+            rot: f(g.rot),
+            v: g.v.iter().map(|q| *q as f32).collect(),
+        },
         _ => return None,
     })
+}
+
+/// The `'static` name of a template kind (recognisers match on it).
+fn template_kind(k: &str) -> Option<&'static str> {
+    const KINDS: [&str; 20] = [
+        "axes",
+        "numberline",
+        "stadium",
+        "arc",
+        "table",
+        "resistor",
+        "cell",
+        "bulb",
+        "switch",
+        "harpoon",
+        "path",
+        "polyline",
+        "gate-and",
+        "gate-nand",
+        "gate-or",
+        "gate-nor",
+        "gate-xor",
+        "gate-xnor",
+        "gate-not",
+        "poly",
+    ];
+    KINDS.iter().find(|n| **n == k).copied()
 }
 
 /// A named point on a shape that connectors and endpoint snapping can
@@ -192,12 +253,67 @@ pub fn anchors(g: &ShapeGeom) -> Vec<Anchor> {
             }
             v
         }
+        k if templates::is_template(k) => templates::anchors(g)
+            .into_iter()
+            .map(|(name, p)| a(name, p))
+            .collect(),
         _ => Vec::new(),
+    }
+}
+
+/// Where a connector may attach to a shape: side middles, polygon corners
+/// and edge middles, pins. Empty for shapes connectors don't attach to
+/// (lines, axes, number lines, curves).
+pub fn attach_points(g: &ShapeGeom) -> Vec<[f64; 2]> {
+    match g.kind.as_str() {
+        "line" | "arrow" | "harpoon" | "axes" | "numberline" | "path" | "polyline" | "arc" => {
+            Vec::new()
+        }
+        // Box sides' middles, never the corners.
+        "rect" | "ellipse" => anchors(g)
+            .into_iter()
+            .filter(|a| matches!(a.name, "n" | "e" | "s" | "w"))
+            .map(|a| a.p)
+            .collect(),
+        // Edge middles, and a diamond's corners (its side middles).
+        "poly" => {
+            let vs = vertices(g);
+            let mut out: Vec<[f64; 2]> = (0..vs.len())
+                .map(|i| {
+                    let (p, q) = (vs[i], vs[(i + 1) % vs.len()]);
+                    [(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0]
+                })
+                .collect();
+            if let Some(b) = geom_aabb(g) {
+                let (cx, cy) = ((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0);
+                let tol = 0.08 * (b[2] - b[0]).max(b[3] - b[1]);
+                let mid = |p: [f64; 2]| {
+                    ((p[0] - cx).abs() < tol
+                        && ((p[1] - b[1]).abs() < tol || (p[1] - b[3]).abs() < tol))
+                        || ((p[1] - cy).abs() < tol
+                            && ((p[0] - b[0]).abs() < tol || (p[0] - b[2]).abs() < tol))
+                };
+                if vs.len() == 4 && vs.iter().all(|p| mid(*p)) {
+                    out.extend(vs);
+                }
+            }
+            out
+        }
+        _ => anchors(g)
+            .into_iter()
+            .filter(|a| !matches!(a.name, "center" | "mid"))
+            .map(|a| a.p)
+            .collect(),
     }
 }
 
 /// A `poly` geometry through absolute vertices.
 fn poly(pts: &[[f64; 2]]) -> ShapeGeom {
+    poly_kind("poly", pts)
+}
+
+/// A vertex-list geometry (`poly`, `path`, `polyline`) through absolute points.
+fn poly_kind(kind: &str, pts: &[[f64; 2]]) -> ShapeGeom {
     let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
     for p in pts {
         x0 = x0.min(p[0]);
@@ -207,7 +323,7 @@ fn poly(pts: &[[f64; 2]]) -> ShapeGeom {
     }
     let (w, h) = ((x1 - x0).max(1e-6), (y1 - y0).max(1e-6));
     ShapeGeom {
-        kind: "poly".into(),
+        kind: kind.into(),
         x: x0,
         y: y0,
         w: x1 - x0,
@@ -217,6 +333,7 @@ fn poly(pts: &[[f64; 2]]) -> ShapeGeom {
             .iter()
             .flat_map(|p| [(p[0] - x0) / w, (p[1] - y0) / h])
             .collect(),
+        ..Default::default()
     }
 }
 
@@ -237,13 +354,13 @@ fn rot_about(p: [f64; 2], c: [f64; 2], rot: f64) -> [f64; 2] {
 fn vertices(g: &ShapeGeom) -> Vec<[f64; 2]> {
     let c = center(g);
     let local: Vec<[f64; 2]> = match g.kind.as_str() {
-        "rect" => vec![
+        k if k == "rect" || templates::is_box_kind(k) => vec![
             [g.x, g.y],
             [g.x + g.w, g.y],
             [g.x + g.w, g.y + g.h],
             [g.x, g.y + g.h],
         ],
-        "poly" => {
+        "poly" | "path" | "polyline" => {
             g.v.as_chunks::<2>()
                 .0
                 .iter()
@@ -314,6 +431,11 @@ pub fn geom_points(g: &ShapeGeom, width: f32, p: f32) -> Option<Vec<StrokePoint>
             out.push(out[0]);
             Some(out)
         }
+        k if templates::is_template(k) => {
+            let pts = templates::points(g, width)?;
+            (pts.len() >= 2 && pts.iter().all(|q| q[0].is_finite() && q[1].is_finite()))
+                .then(|| pts.into_iter().map(pt).collect())
+        }
         _ => None,
     }
 }
@@ -334,6 +456,8 @@ pub fn geom_aabb(g: &ShapeGeom) -> Option<[f64; 4]> {
             vec![[c[0] - ex, c[1] - ey], [c[0] + ex, c[1] + ey]]
         }
         "rect" | "poly" => vertices(g),
+        "harpoon" => vec![[g.x, g.y], [g.x + g.w, g.y + g.h]],
+        k if templates::is_template(k) => vertices(g),
         _ => return None,
     };
     let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
@@ -368,7 +492,7 @@ pub fn scale_rotate(g: &ShapeGeom, pivot: [f64; 2], s: f64, rot: f64) -> ShapeGe
         ]
     };
     match g.kind.as_str() {
-        "line" | "arrow" => {
+        "line" | "arrow" | "harpoon" => {
             let (a, b) = (tf([g.x, g.y]), tf([g.x + g.w, g.y + g.h]));
             ShapeGeom {
                 x: a[0],
@@ -378,7 +502,10 @@ pub fn scale_rotate(g: &ShapeGeom, pivot: [f64; 2], s: f64, rot: f64) -> ShapeGe
                 ..g.clone()
             }
         }
-        "poly" => poly(&vertices(g).into_iter().map(tf).collect::<Vec<_>>()),
+        "poly" | "path" | "polyline" => poly_kind(
+            &g.kind,
+            &vertices(g).into_iter().map(tf).collect::<Vec<_>>(),
+        ),
         _ => {
             let c = tf(center(g));
             let (w, h) = (g.w * s, g.h * s);
@@ -414,7 +541,7 @@ pub fn map_box(g: &ShapeGeom, from: [f64; 4], to: [f64; 4]) -> Option<ShapeGeom>
     let f = |p: [f64; 2]| [to[0] + (p[0] - from[0]) * sx, to[1] + (p[1] - from[1]) * sy];
     let rotated = g.rot.abs() > 1e-9;
     let out = match g.kind.as_str() {
-        "line" | "arrow" => {
+        "line" | "arrow" | "harpoon" => {
             let (a, b) = (f([g.x, g.y]), f([g.x + g.w, g.y + g.h]));
             ShapeGeom {
                 x: a[0],
@@ -425,6 +552,25 @@ pub fn map_box(g: &ShapeGeom, from: [f64; 4], to: [f64; 4]) -> Option<ShapeGeom>
             }
         }
         "rect" | "poly" if rotated => poly(&vertices(g).into_iter().map(f).collect::<Vec<_>>()),
+        k if rotated && templates::is_box_kind(k) => {
+            // Templates keep their shape and turn: the box scales along its
+            // own axes (a quarter turn swaps them).
+            let quarter = (g.rot / std::f64::consts::FRAC_PI_2).round() as i64;
+            let (kw, kh) = if quarter.rem_euclid(2) == 1 {
+                (sy.abs(), sx.abs())
+            } else {
+                (sx.abs(), sy.abs())
+            };
+            let c = f(center(g));
+            let (w, h) = (g.w * kw, g.h * kh);
+            ShapeGeom {
+                x: c[0] - w / 2.0,
+                y: c[1] - h / 2.0,
+                w,
+                h,
+                ..g.clone()
+            }
+        }
         "ellipse" if rotated => {
             // Semi-axes of M = diag(sx, sy) · R(rot) · diag(a, b) from M Mᵀ.
             let (a, b) = (g.w / 2.0, g.h / 2.0);
@@ -545,6 +691,7 @@ mod tests {
             h: 80.0,
             rot: 0.5,
             v: Vec::new(),
+            ..Default::default()
         };
         let from = geom_aabb(&g).unwrap();
         let to = [
@@ -579,6 +726,7 @@ mod tests {
             h: 50.0,
             rot: 0.3,
             v: Vec::new(),
+            ..Default::default()
         };
         let from = geom_aabb(&g).unwrap();
         let r = map_box(&g, from, [0.0, 0.0, 300.0, 300.0]).unwrap();

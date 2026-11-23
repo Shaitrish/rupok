@@ -6,6 +6,13 @@ import "./pages.css"; // FAQ and five-column footer, shared with the static page
 import sdkSource from "../../../packages/object-sdk/sdk.js?raw";
 import { objectFontStyle } from "./objectFonts";
 import { PRESETS } from "./presets";
+import { currentTheme, onThemeChange, type Theme } from "./theme";
+import "./download"; // platform-matched download buttons
+
+// Ink that reads on the current theme. Colours are written as their light
+// versions; on a dark page they become the board's dark-board inks.
+const DARK_INK: Record<string, string> = { "#111418": "#eef0f2", "#1c7ed6": "#74c0fc", "#e03131": "#ff8787", "#12b886": "#3ee6b0" };
+const inkFor = (c: string) => (currentTheme() === "dark" ? (DARK_INK[c] ?? c) : c);
 
 // ------------------------------------------------------------------ pad ----
 // A tiny ink pad: smoothed, pressure-aware strokes so visitors feel the pen.
@@ -13,6 +20,20 @@ const pad = document.getElementById("pad") as HTMLCanvasElement | null;
 if (pad) {
   const ctx = pad.getContext("2d")!;
   let ink = "#111418";
+  // Every segment drawn, so a resize or a theme switch can repaint the ink.
+  const segs: { x0: number; y0: number; x1: number; y1: number; w: number; ink: string }[] = [];
+  const paint = (s: (typeof segs)[number]) => {
+    ctx.strokeStyle = inkFor(s.ink);
+    ctx.lineWidth = s.w;
+    ctx.beginPath();
+    ctx.moveTo(s.x0, s.y0);
+    ctx.lineTo(s.x1, s.y1);
+    ctx.stroke();
+  };
+  const repaint = () => {
+    ctx.clearRect(0, 0, pad.width, pad.height);
+    segs.forEach(paint);
+  };
   const fit = () => {
     const r = pad.getBoundingClientRect();
     const d = devicePixelRatio || 1;
@@ -21,6 +42,7 @@ if (pad) {
     ctx.setTransform(d, 0, 0, d, 0, 0);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    segs.forEach(paint);
   };
   fit();
   addEventListener("resize", fit);
@@ -39,25 +61,35 @@ if (pad) {
     for (const c of e.getCoalescedEvents ? e.getCoalescedEvents() : [e]) {
       const p = pt(c);
       const w: number = last.w * 0.6 + p.w * 0.4; // smooth width
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.moveTo(last.x, last.y);
-      ctx.lineTo(p.x, p.y);
-      ctx.stroke();
+      const s = { x0: last.x, y0: last.y, x1: p.x, y1: p.y, w, ink };
+      segs.push(s);
+      paint(s);
       last = { ...p, w };
     }
   });
   addEventListener("pointerup", () => (last = null));
+  const swatches = () =>
+    document.querySelectorAll<HTMLButtonElement>(".inks button").forEach((b) => {
+      b.style.setProperty("--c", inkFor(b.dataset.ink!));
+      // The default ink is black on a light page and white on a dark one.
+      if (b.dataset.ink === "#111418") b.setAttribute("aria-label", currentTheme() === "dark" ? "White" : "Black");
+    });
+  swatches();
+  onThemeChange(() => {
+    swatches();
+    repaint();
+  });
   document.querySelectorAll<HTMLButtonElement>(".inks button").forEach((b) => {
-    b.style.setProperty("--c", b.dataset.ink!);
     b.addEventListener("click", () => {
       document.querySelectorAll(".inks button").forEach((x) => x.classList.remove("on"));
       b.classList.add("on");
       ink = b.dataset.ink!;
     });
   });
-  document.querySelector(".clear")?.addEventListener("click", () => ctx.clearRect(0, 0, pad.width, pad.height));
+  document.querySelector(".clear")?.addEventListener("click", () => {
+    segs.length = 0;
+    repaint();
+  });
 }
 
 // -------------------------------------------------------- live lessons ----
@@ -93,6 +125,19 @@ function srcdoc(html: string): string {
   return /<head[^>]*>/i.test(body) ? body.replace(/<head[^>]*>/i, (m) => m + head) : `<!doctype html><html><head>${head}</head><body>${body}</body></html>`;
 }
 
+// The object theme the board sends (objects.ts theme()): a white page in the
+// light theme, the blackboard page in the dark one. Mint accent.
+const FONT = '"Inter Variable", Inter, "Hind Siliguri", system-ui, sans-serif';
+const THEMES: Record<Theme, Record<string, string>> = {
+  light: {} as Record<string, string>,
+  dark: {
+    scheme: "dark", "color.bg": "#17191c", "color.surface": "rgba(255,255,255,0.06)", "color.line": "rgba(255,255,255,0.14)",
+    "color.fg": "#eef0f2", "color.muted": "#a6adb7", "color.accent": "#3ee6b0", "color.accent2": "#74c0fc",
+    "color.accent-text": "#63e6be", "color.on-accent": "#04241b", "color.accent-soft": "#0b2b23",
+    "color.success": "#69db7c", "color.danger": "#ff8787",
+    "font.body": FONT, "font.heading": FONT, "font.mono": "ui-monospace, Menlo, monospace", radius: "12px",
+  },
+};
 const THEME = {
   scheme: "light", "color.bg": "#ffffff", "color.surface": "rgba(17,20,24,0.04)", "color.line": "rgba(17,20,24,0.12)",
   "color.fg": "#111418", "color.muted": "#5f6670", "color.accent": "#0ca678", "color.accent2": "#1c7ed6",
@@ -108,12 +153,19 @@ const tabs = document.getElementById("tabs");
 const promptEl = document.getElementById("demo-prompt");
 let step = 0;
 let steps = 0;
+let demoReady = false;
+THEMES.light = THEME;
+// Re-theme the live object when the visitor switches the site theme.
+onThemeChange((t) => {
+  if (demo && demoReady) demo.contentWindow?.postMessage({ rupok: 1, type: "theme", theme: THEMES[t] }, "*");
+});
 
 addEventListener("message", (e) => {
   if (!demo || e.source !== demo.contentWindow || !e.data || e.data.rupok !== 1) return;
   const m = e.data;
   if (m.type === "hello") {
-    demo.contentWindow!.postMessage({ rupok: 1, type: "init", id: "demo", step, steps, state: null, theme: THEME, mode: "present" }, "*");
+    demoReady = true;
+    demo.contentWindow!.postMessage({ rupok: 1, type: "init", id: "demo", step, steps, state: null, theme: THEMES[currentTheme()], mode: "present" }, "*");
   } else if (m.type === "goto" && typeof m.step === "number") {
     step = Math.max(0, Math.min(steps, m.step));
     demo.contentWindow!.postMessage({ rupok: 1, type: "step", step }, "*");
@@ -132,6 +184,7 @@ async function show(id: string) {
   steps = PRESETS.find((p) => p.id === id)?.steps ?? 0;
   // Start fully built so visitors see the finished object; they can step back.
   step = steps;
+  demoReady = false;
   demo.srcdoc = srcdoc((await loader()) as string);
   if (promptEl) promptEl.textContent = `“${meta?.prompt ?? "Make an interactive lesson."}”`;
   tabs?.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.id === id)));
@@ -196,13 +249,13 @@ if (rp) {
   };
   const draw = () => {
     ctx.clearRect(0, 0, 640, 400);
-    ctx.fillStyle = "#111418";
+    ctx.fillStyle = inkFor("#111418");
     ctx.font = "800 34px 'Inter Variable', Inter, sans-serif";
     ctx.fillText("Projectile motion", 70, 78);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     for (const s of strokes) {
-      ctx.strokeStyle = s.color;
+      ctx.strokeStyle = inkFor(s.color);
       ctx.lineWidth = s.w;
       ctx.beginPath();
       let started = false;
@@ -249,4 +302,56 @@ if (rp) {
     }
   }, { threshold: 0.5 }).observe(rp);
   requestAnimationFrame(tick);
+}
+
+// ----------------------------------------------------------- hero video ----
+// A silent looping demo that behaves like a GIF: it plays while on screen and
+// pauses off screen. With reduced motion it waits for a click (the inline
+// script after the <video> drops autoplay). It follows the site theme; both
+// takes share one timeline, so a switch keeps the playback position.
+const video = document.getElementById("hero-video") as HTMLVideoElement | null;
+if (video) {
+  const big = document.querySelector<HTMLButtonElement>(".vplay");
+  const small = document.querySelector<HTMLButtonElement>(".vtoggle");
+  let wanted = !matchMedia("(prefers-reduced-motion: reduce)").matches; // the visitor wants it playing
+  let started = wanted;
+  let visible = false;
+  const render = () => {
+    if (big) big.hidden = started;
+    if (small) {
+      small.hidden = !started;
+      small.classList.toggle("paused", !wanted);
+      small.setAttribute("aria-label", wanted ? "Pause the demo" : "Play the demo");
+      small.title = wanted ? "Pause" : "Play";
+    }
+  };
+  const sync = () => {
+    if (wanted && visible) void video.play().catch(() => {});
+    else if (!video.paused) video.pause();
+    render();
+  };
+  const toggle = () => {
+    wanted = !wanted;
+    started = true;
+    sync();
+  };
+  big?.addEventListener("click", toggle);
+  small?.addEventListener("click", toggle);
+  video.addEventListener("click", toggle);
+  new IntersectionObserver((es) => {
+    visible = es.some((e) => e.isIntersecting);
+    sync();
+  }, { threshold: 0.2 }).observe(video);
+  onThemeChange((t) => {
+    const at = video.currentTime;
+    const swap = (u: string) => u.replace(/-(light|dark)\.(webm|mp4|webp)$/, `-${t}.$2`);
+    video.poster = swap(video.poster);
+    video.querySelectorAll("source").forEach((s) => (s.src = swap(s.src)));
+    video.load();
+    video.addEventListener("loadedmetadata", () => {
+      if (at) video.currentTime = at;
+      sync();
+    }, { once: true });
+  });
+  render();
 }

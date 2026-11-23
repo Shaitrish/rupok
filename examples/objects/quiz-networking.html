@@ -15,7 +15,11 @@
   :root {
     --bg: var(--rupok-color-bg, #ffffff);
     --fg: var(--rupok-color-fg, #1d2433);
-    --accent: var(--rupok-color-accent, #2563eb);
+    --accent: var(--rupok-color-accent, #0ca678);
+    /* accent text (4.5:1 on the page), text on accent fills, highlight background */
+    --accent-text: var(--rupok-color-accent-text, #087f5b);
+    --on-accent: var(--rupok-color-on-accent, #04241b);
+    --accent-soft: var(--rupok-color-accent-soft, #e6fcf5);
     --accent2: var(--rupok-color-accent2, #7c3aed);
     --muted: var(--rupok-color-muted, #64748b);
     --ok: var(--rupok-color-success, #15803d);
@@ -38,7 +42,7 @@
   #question-view { flex: 1; display: flex; flex-direction: column; }
 
   .top { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
-  .kicker { font: 800 1.5rem/1 var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .kicker { font: 800 1.5rem/1 var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); }
   .dots { display: flex; gap: .75rem; }
   .dots span {
     width: 1.75rem; height: 1.75rem; border-radius: 50%;
@@ -61,7 +65,7 @@
   .opt:focus-visible { outline: .25rem solid var(--accent2); outline-offset: .25rem; }
   .opt .letter {
     flex: none; width: 3.25rem; height: 3.25rem; border-radius: 50%; display: grid; place-items: center;
-    font: 800 1.625rem/1 var(--font); color: var(--bg); background: var(--accent);
+    font: 800 1.625rem/1 var(--font); color: var(--on-accent); background: var(--accent);
   }
   .opt .mark { margin-left: auto; flex: none; width: 2.5rem; height: 2.5rem; }
   .opt .mark svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
@@ -85,12 +89,12 @@
 
   .btn {
     flex: none; display: inline-flex; align-items: center; gap: .75rem; min-height: 4.5rem; padding: 0 2rem;
-    font: 800 1.75rem/1 var(--font); color: var(--bg); background: var(--accent);
+    font: 800 1.75rem/1 var(--font); color: var(--on-accent); background: var(--accent);
     border: 0; border-radius: 999px; cursor: pointer; touch-action: manipulation;
   }
   .btn:active { transform: scale(.97); }
   .btn:focus-visible { outline: .25rem solid var(--accent2); outline-offset: .25rem; }
-  .btn.ghost { color: var(--accent); background: var(--bg); border: .1875rem solid var(--accent); }
+  .btn.ghost { color: var(--accent-text); background: var(--bg); border: .1875rem solid var(--accent); }
 
   /* -------------------------------------------------------- results */
   .results { flex: 1; display: grid; grid-template-columns: 22rem 1fr; gap: 3rem; align-items: center; animation: rise .4s ease-out; }

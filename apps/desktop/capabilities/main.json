@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "The board window: open and save lessons, export PDFs, open the overlay, receive overlay snapshots.",
+  "description": "The board window: open and save lessons, the lesson library (Documents/Rupok), export PDFs, open the overlay, receive overlay snapshots.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -14,6 +14,27 @@
     "allow-take-overlay-page",
     "allow-overlay-show",
     "allow-overlay-toggle",
-    "allow-overlay-hide"
+    "allow-overlay-hide",
+    "allow-library-info",
+    "allow-library-list",
+    "allow-library-stat",
+    "allow-library-read",
+    "allow-library-read-range",
+    "allow-library-write",
+    "allow-library-mkdir",
+    "allow-library-rename",
+    "allow-library-copy",
+    "allow-library-remove",
+    "allow-library-choose-root",
+    "allow-library-reset-root",
+    "allow-library-save-zip",
+    "allow-cloud-auth-begin",
+    "allow-cloud-auth-wait",
+    "allow-agent-start",
+    "allow-voice-status",
+    "allow-voice-model-download",
+    "allow-voice-model-cancel",
+    "allow-voice-model-remove",
+    "allow-voice-transcribe"
   ]
 }

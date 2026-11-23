@@ -13,6 +13,8 @@ export interface DomItem {
   x: number; y: number; w: number; h: number; rot: number; z: number;
   title?: string; bundle?: string; step?: number; steps?: number; state?: string;
   text?: string; size?: number; color?: string; asset?: string;
+  /** A text item whose text is LaTeX maths. */
+  latex?: boolean;
   selected: boolean;
 }
 
@@ -48,6 +50,8 @@ export const [selectionMeta, setSelectionMeta] = createSignal<{
   count: number; strokes: number; boxes: number; groups: number; grouped: boolean;
   /** One resizable shape stroke: its geometric bounds [x0, y0, x1, y1] (world) and name. */
   shape?: number[] | null; shapeName?: string | null;
+  /** An axes-and-curve graph "Make it live" can replace. */
+  live?: boolean;
 }>({ count: 0, strokes: 0, boxes: 0, groups: 0, grouped: false });
 /** Opened as the student viewer (`/board/?view`): starts in the Student
  * mode and never touches the teacher's autosave. */
@@ -97,6 +101,16 @@ export interface Prefs {
   smartLast: Exclude<SmartShapes, "off">;
   /** Scratch out ink to erase it (while smart shapes are on). */
   scratchOut: boolean;
+  /** Smart ink families (Settings → Pen & ink → Smart ink). */
+  smartGraphs: boolean;
+  smartFlowchart: boolean;
+  smartGates: boolean;
+  smartNumberLine: boolean;
+  smartGeometry: boolean;
+  smartTables: boolean;
+  smartScience: boolean;
+  /** Typeset preview of handwritten maths while writing. */
+  smartMath: boolean;
   /** Per-mode chrome and toolbar (docs/ui-config.md); missing modes use the defaults. */
   modes?: Partial<ModesConfig>;
   /** Writing hand: dock popovers open away from it, so the arm never covers them. */
@@ -107,7 +121,22 @@ const defaults: Prefs = {
   theme: "system", accent: "mint", iconStyle: "linear", toolbar: "bottom", density: "comfortable",
   touchMode: "auto", smoothing: 0.5, pressure: 0.8, showStats: false, forceWebgl: true, showPages: true,
   smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right",
+  smartGraphs: true, smartFlowchart: true, smartGates: true, smartNumberLine: true,
+  smartGeometry: true, smartTables: true, smartScience: false, smartMath: true,
 };
+
+/** Smart ink families that are on, as the engine's comma-separated list. */
+export function smartFamilies(p: Prefs): string {
+  const on: [boolean, string][] = [
+    [p.smartGraphs, "graphs"], [p.smartFlowchart, "flowchart"], [p.smartGates, "gates"],
+    [p.smartNumberLine, "numberline"], [p.smartGeometry, "geometry"], [p.smartTables, "tables"],
+    [p.smartScience, "science"],
+  ];
+  return on.filter(([v]) => v).map(([, n]) => n).join(",");
+}
+
+/** The default of every pref (Settings → "Reset this section"). */
+export const PREF_DEFAULTS: Readonly<Prefs> = defaults;
 
 function loadPrefs(): Prefs {
   try {

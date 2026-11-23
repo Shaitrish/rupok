@@ -10,7 +10,7 @@ use base64::Engine as _;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock};
 use rmcp::{tool, tool_router};
-use rupok_live::{Op, PatternName, Rect};
+use rupok_live::{Anchor, Op, PatternName, Rect};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -256,10 +256,72 @@ pub struct SetBoardThemeParams {
     pub ui: Option<String>,
 }
 
+/// Where to write: next to items, a region, or an explicit point.
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AnchorArg {
+    /// Write next to these items, usually the strokes of the problem (from
+    /// get_selection or get_current_page). Default: the teacher's selection.
+    #[serde(default)]
+    pub item_ids: Option<Vec<String>>,
+    /// Write next to this region of the slide, in slide pixels.
+    #[serde(default)]
+    pub region: Option<RegionArg>,
+    /// Start exactly here instead: top-left of the writing, slide pixels.
+    #[serde(default)]
+    pub x: Option<f64>,
+    #[serde(default)]
+    pub y: Option<f64>,
+    /// `below` (default) or `right` of the items or region. If that side is
+    /// full the board tries the other, then a new page.
+    #[serde(default)]
+    pub side: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WriteHandwritingParams {
+    /// The solution, one short step per line (at most 40 lines, 400
+    /// characters each). Plain text with inline LaTeX between dollars, e.g.
+    /// `"Subtract 3 from both sides:"`, `"$2x = 4$"`, `"$x = \frac{4}{2} = 2$"`.
+    /// Fractions, powers, subscripts, square roots, Greek letters and common
+    /// operators are written properly.
+    pub lines: Vec<String>,
+    /// Where to write. Default: below the teacher's selection.
+    #[serde(default)]
+    pub anchor: Option<AnchorArg>,
+    /// `teacher` (default): the teacher's own handwriting where they have
+    /// taught it to Rupok; `neat`: a neat standard hand.
+    #[serde(default)]
+    pub style: Option<String>,
+    /// Pen speed, 0.25 to 4. Default: the teacher's setting (1 = brisk).
+    #[serde(default)]
+    pub speed: Option<f64>,
+    /// Ink colour `#rrggbb`. Default: the colour of the problem's ink.
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Height of a capital or digit in slide pixels. Default: the size of
+    /// the problem's handwriting.
+    #[serde(default)]
+    pub size: Option<f64>,
+    /// `all` writes every line; `one-line-per-click` lets the teacher reveal
+    /// one line per Next press. Default: the teacher's setting.
+    #[serde(default)]
+    pub step_mode: Option<String>,
+    /// 1-based page number. Omit for the current page.
+    #[serde(default)]
+    #[schemars(range(min = 1))]
+    pub page: Option<u32>,
+}
+
 // ------------------------------------------------------------------- tools
 
 fn wrap(v: Value) -> Value {
-    if v.is_object() { v } else { json!({ "result": v }) }
+    if v.is_object() {
+        v
+    } else {
+        json!({ "result": v })
+    }
 }
 
 impl McpServer {
@@ -294,7 +356,11 @@ during class. Call it when the teacher gives you a 6-digit code from the board (
 \"Connect AI\" in Rupok), or says something like \"connect to my board, code 482913\". If they have not \
 given a code, call get_board_status and relay its hint instead of guessing. After pairing, use path \"live\" \
 with the lesson tools and the live tools (get_current_page, get_page_snapshot, …).",
-        annotations(read_only_hint = false, destructive_hint = false, open_world_hint = false)
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
     )]
     async fn connect_board(&self, Parameters(p): Parameters<ConnectBoardParams>) -> CallToolResult {
         match self.live.connect(&p.code) {
@@ -386,7 +452,11 @@ into text\" or \"make a simulation of this\".",
     #[tool(
         description = "Show a page on the board (1-based). The whole class sees the page change, so use it when \
 the teacher asks, or once a page you built is ready to present.",
-        annotations(read_only_hint = false, destructive_hint = false, open_world_hint = false)
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
     )]
     async fn go_to_page(&self, Parameters(p): Parameters<GoToPageParams>) -> CallToolResult {
         self.live_call(Op::GoToPage { page: p.page }).await
@@ -397,7 +467,11 @@ the teacher asks, or once a page you built is ready to present.",
 (colour, pattern) unless you pass others. This is the default place for new content during class (a quiz, \
 practice problems, a simulation), so you never cover what the teacher wrote. Returns its page number: put \
 content on it with path \"live\" and that page, then go_to_page when ready (or pass show=true).",
-        annotations(read_only_hint = false, destructive_hint = false, open_world_hint = false)
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
     )]
     async fn add_page_after_current(
         &self,
@@ -416,7 +490,11 @@ content on it with path \"live\" and that page, then go_to_page when ready (or p
         description = "Move a Smart Object's build step on the board, like the presenter's Next/Back buttons: \
 delta 1 reveals the next step, -1 goes back, or set an absolute step. Use it to walk the class through an \
 object you built, or when the teacher says \"next step\" / \"show the answer\".",
-        annotations(read_only_hint = false, destructive_hint = false, open_world_hint = false)
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
     )]
     async fn step_object(&self, Parameters(p): Parameters<StepObjectParams>) -> CallToolResult {
         self.live_call(Op::StepObject {
@@ -433,7 +511,11 @@ object you built, or when the teacher says \"next step\" / \"show the answer\"."
 and puts a text box with `text` where they were, sized to match and in the ink's colour, as ONE undo step (the \
 teacher's Ctrl+Z brings the ink back). Read the handwriting first with get_page_snapshot(item_ids). Use it for \
 \"convert my writing to text\" or \"clean this up\"; for maths, write it in plain Unicode (x², √, π, ½).",
-        annotations(read_only_hint = false, destructive_hint = true, open_world_hint = false)
+        annotations(
+            read_only_hint = false,
+            destructive_hint = true,
+            open_world_hint = false
+        )
     )]
     async fn replace_items_with_text(
         &self,
@@ -456,7 +538,11 @@ teacher's Ctrl+Z brings the ink back). Read the handwriting first with get_page_
 highlight box when you give w and h, with an optional short label. Nothing is saved and it fades after a few \
 seconds. Use it while explaining (\"look at this term\"), or to show the teacher where you put something. \
 Coordinates are slide pixels on the page being shown.",
-        annotations(read_only_hint = false, destructive_hint = false, open_world_hint = false)
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
     )]
     async fn point_at(&self, Parameters(p): Parameters<PointAtParams>) -> CallToolResult {
         self.live_call(Op::PointAt {
@@ -471,13 +557,65 @@ Coordinates are slide pixels on the page being shown.",
     }
 
     #[tool(
+        description = "Write on the board in handwriting, animated stroke by stroke in front of the class: \
+use it to solve a problem the teacher wrote (\"solve this\"). Give the solution as short lines, one step \
+each, with inline LaTeX between dollars (\"$2x = 4$\", \"$x = \\frac{4}{2} = 2$\"). The board writes it \
+next to the anchor (default: below the teacher's selection) without covering anything, in the problem's \
+ink colour and letter size, in the teacher's own handwriting when they have taught it. It is one undo \
+step. Before calling: read the problem with get_page_snapshot(item_ids), solve it, and check every \
+step and the arithmetic; keep lines short (under ~30 characters) and at the class's level. If the \
+result has `\"status\": \"preview\"`, the teacher is checking your solution before the class sees it: \
+do NOT call it again; explain the steps in chat instead.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn write_handwriting(
+        &self,
+        Parameters(p): Parameters<WriteHandwritingParams>,
+    ) -> CallToolResult {
+        let anchor = p.anchor.map(|a| Anchor {
+            item_ids: a.item_ids,
+            region: a.region.map(|r| Rect {
+                x: r.x,
+                y: r.y,
+                w: r.w,
+                h: r.h,
+            }),
+            x: a.x,
+            y: a.y,
+            side: a.side,
+        });
+        self.live_call(Op::WriteHandwriting {
+            page: p.page,
+            lines: p.lines,
+            anchor,
+            style: p.style,
+            speed: p.speed,
+            color: p.color,
+            size: p.size,
+            step_mode: p.step_mode,
+        })
+        .await
+    }
+
+    #[tool(
         description = "Change the look of the board: the current page's colour (white, paper, chalkboard, \
 blackboard or #rrggbb) and pattern, and/or the app interface (light, dark, system). Smart Objects follow the \
 page colour automatically; new text you add picks a readable colour for it. Use it when the teacher asks for \
 \"chalkboard mode\", \"dark mode\" or a grid for graphs.",
-        annotations(read_only_hint = false, destructive_hint = false, open_world_hint = false)
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
     )]
-    async fn set_board_theme(&self, Parameters(p): Parameters<SetBoardThemeParams>) -> CallToolResult {
+    async fn set_board_theme(
+        &self,
+        Parameters(p): Parameters<SetBoardThemeParams>,
+    ) -> CallToolResult {
         if let Some(ui) = &p.ui
             && !matches!(ui.as_str(), "light" | "dark" | "system")
         {

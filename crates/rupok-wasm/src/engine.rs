@@ -22,6 +22,7 @@ use crate::b64;
 use crate::replay::Replay;
 use crate::shapes::{ShapeKind, shape_points};
 
+mod reveal;
 mod smart;
 pub use smart::{SmartInk, SmartMode};
 
@@ -216,6 +217,9 @@ pub struct DomItem<'a> {
     pub color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub asset: Option<&'a str>,
+    /// A text item whose text is LaTeX maths.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latex: Option<bool>,
     pub selected: bool,
 }
 
@@ -250,6 +254,8 @@ pub struct Engine<S: InkSink> {
     drag_offset: [f32; 2],
     lasers: Vec<LaserTrail>,
     replay: Option<Replay>,
+    /// AI handwriting being written stroke by stroke (`reveal.rs`).
+    reveal: Option<reveal::Reveal>,
     revision: u64,
     dirty: bool,
     /// Student view: every document edit is rejected.
@@ -258,6 +264,10 @@ pub struct Engine<S: InkSink> {
     smart: SmartInk,
     last_ink: Option<smart::LastInk>,
     flashes: Vec<smart::Flash>,
+    /// The last stroke and when to read it again (deferred recognisers).
+    pending: Option<(ItemId, f64)>,
+    /// The last plain pen stroke committed (maths live preview).
+    last_pen: Option<ItemId>,
 }
 
 fn css_color(rgba: u32) -> String {
@@ -309,6 +319,8 @@ enum PreviewItem<'a> {
         text: &'a str,
         size: f64,
         color: String,
+        #[serde(skip_serializing_if = "std::ops::Not::not")]
+        latex: bool,
     },
     Image {
         rect: [f64; 4],
@@ -488,7 +500,13 @@ impl Clip {
                             points,
                             offset: [s.ox, s.oy],
                             shape: s.shape,
-                            geom: s.geom.filter(ShapeGeom::is_valid),
+                            // Pasted connectors start free: their links name
+                            // the originals' shapes.
+                            geom: s.geom.filter(ShapeGeom::is_valid).map(|g| ShapeGeom {
+                                from: None,
+                                to: None,
+                                ..g
+                            }),
                         })
                     }
                     ClipItemJson::Text(t) if finite_geom(&t.geom) && t.size.is_finite() => {
@@ -579,12 +597,15 @@ impl<S: InkSink> Engine<S> {
             drag_offset: [0.0, 0.0],
             lasers: Vec::new(),
             replay: None,
+            reveal: None,
             revision: 1,
             dirty: true,
             read_only: false,
             smart: SmartInk::default(),
             last_ink: None,
             flashes: Vec::new(),
+            pending: None,
+            last_pen: None,
         };
         e.load_page();
         e
@@ -627,6 +648,7 @@ impl<S: InkSink> Engine<S> {
         !self.lasers.is_empty()
             || !self.flashes.is_empty()
             || self.replay.as_ref().is_some_and(|r| r.playing)
+            || self.reveal_animating()
     }
 
     pub fn set_view(&mut self, w: f32, h: f32) {
@@ -682,6 +704,13 @@ impl<S: InkSink> Engine<S> {
         }
     }
 
+    /// Highlighter opacity for new strokes; each stroke stores its own.
+    pub fn set_highlighter_opacity(&mut self, a: f32) {
+        if a.is_finite() {
+            self.highlighter.opacity = a.clamp(0.1, 1.0);
+        }
+    }
+
     pub fn set_width(&mut self, w: f32) {
         if self.tool == ToolKind::Eraser {
             self.eraser_radius = (w * 0.5).clamp(2.0, 200.0);
@@ -717,6 +746,8 @@ impl<S: InkSink> Engine<S> {
     // ---------------------------------------------------------------- pages
 
     fn load_page(&mut self) {
+        // A page change shows any writing still being revealed in full.
+        self.reveal = None;
         let items = self.lesson.items(&self.page).unwrap_or_default();
         self.sink.clear();
         for it in &items {
@@ -1301,13 +1332,7 @@ impl<S: InkSink> Engine<S> {
                 self.drag_offset = [0.0, 0.0];
                 if total != [0.0, 0.0] {
                     let sel = self.selection.clone();
-                    let _ = self.lesson.translate_items(
-                        &self.page.clone(),
-                        &sel,
-                        f64::from(total[0]),
-                        f64::from(total[1]),
-                    );
-                    self.resync();
+                    self.translate_with_connectors(&sel, f64::from(total[0]), f64::from(total[1]));
                 } else {
                     self.bump();
                 }
@@ -1403,8 +1428,12 @@ impl<S: InkSink> Engine<S> {
     /// `created` is the pen-down wall-clock time (spec § Replay).
     fn commit_stroke(&mut self, s: StrokeData, created: f64) -> Option<ItemId> {
         let page = self.page.clone();
+        let plain_pen = s.tool == "pen" && s.shape.is_none();
         let data = ItemData::Stroke(s);
         let id = self.lesson.add_item(&page, &data, created).ok()?;
+        if plain_pen {
+            self.last_pen = Some(id.clone());
+        }
         if let ItemData::Stroke(s) = &data {
             self.sink.add_stroke(&id, s);
         }
@@ -1461,17 +1490,70 @@ impl<S: InkSink> Engine<S> {
         self.bump();
     }
 
+    /// Gesture slot of the area eraser (real pointer ids are never negative).
+    const AREA_ERASE_ID: i32 = i32::MIN;
+
+    /// Area erase for the palm / hand eraser (the board's gesture layer):
+    /// erase the strokes under a circle of screen radius `r` swept from
+    /// screen point `a` to `b`. Only strokes are erased, never objects,
+    /// images or text. Strokes vanish at once; `area_erase_end` commits them,
+    /// so a whole rub is one undo step. Returns the strokes this call erased.
+    pub fn area_erase(&mut self, a: [f32; 2], b: [f32; 2], r: f32) -> usize {
+        let finite = a.iter().chain(&b).all(|v| v.is_finite()) && r.is_finite();
+        if self.read_only || self.replay.is_some() || !finite || r <= 0.0 {
+            return 0;
+        }
+        let r = r.min(400.0) / self.camera.zoom;
+        let (wa, wb) = (self.world(a[0], a[1]), self.world(b[0], b[1]));
+        let new_hits = self.erase_at(wa, wb, r);
+        let n = new_hits.len();
+        if let Gesture::Erase { last, hits } = self
+            .gestures
+            .entry(Self::AREA_ERASE_ID)
+            .or_insert_with(|| Gesture::Erase {
+                last: wb,
+                hits: Vec::new(),
+            })
+        {
+            *last = wb;
+            hits.extend(new_hits);
+        }
+        n
+    }
+
+    /// End an area erase: commit its strokes as one undo step. Returns how
+    /// many strokes the whole rub erased.
+    pub fn area_erase_end(&mut self) -> usize {
+        match self.gestures.remove(&Self::AREA_ERASE_ID) {
+            Some(Gesture::Erase { hits, .. }) => {
+                let n = hits.len();
+                self.commit_erase(hits);
+                n
+            }
+            _ => 0,
+        }
+    }
+
     fn preview_move(&mut self, total: [f32; 2]) {
         self.drag_offset = total;
-        for id in self.selection.clone() {
+        let sel = self.selection.clone();
+        for id in &sel {
             if let Some(Item {
                 data: ItemData::Stroke(s),
                 ..
-            }) = self.scene.get(&id)
+            }) = self.scene.get(id)
             {
                 let mut moved = s.clone();
                 moved.offset = [s.offset[0] + total[0], s.offset[1] + total[1]];
-                self.sink.add_stroke(&id, &moved);
+                self.sink.add_stroke(id, &moved);
+            }
+        }
+        // Attached connectors follow (or let go) as the selection moves.
+        if sel.len() <= 200 {
+            for (id, s) in
+                self.connectors_for_move(&sel, [f64::from(total[0]), f64::from(total[1])])
+            {
+                self.sink.add_stroke(&id, &s);
             }
         }
         self.bump();
@@ -1556,12 +1638,15 @@ impl<S: InkSink> Engine<S> {
             "boxes": items.len() - strokes,
             "groups": groups.len(),
             "grouped": grouped,
-            // A single resizable shape stroke: its geometric bounds and name.
-            "shape": self.selected_shape().map(|(_, b)| b),
-            "shapeName": self.selected_shape().and_then(|(id, _)| match &self.scene.get(&id)?.data {
-                ItemData::Stroke(s) => s.shape.clone(),
+            // Resizable shapes (Smart Ink templates with their labels): the
+            // bounds and the first shape's name.
+            "shape": self.selected_shapes(),
+            "shapeName": items.iter().find_map(|it| match &it.data {
+                ItemData::Stroke(s) if s.geom.is_some() => s.shape.clone(),
                 _ => None,
             }),
+            // An axes-and-curve graph that "Make it live" can replace.
+            "live": self.graph_live_json() != "null",
         })
         .to_string()
     }
@@ -1597,7 +1682,29 @@ impl<S: InkSink> Engine<S> {
         if self.read_only {
             return;
         }
-        let _ = self.lesson.translate_items(&self.page.clone(), ids, dx, dy);
+        self.translate_with_connectors(ids, dx, dy);
+    }
+
+    /// Move items, and in the same change the connectors attached to them
+    /// (Smart Ink): one undo step.
+    fn translate_with_connectors(&mut self, ids: &[ItemId], dx: f64, dy: f64) {
+        let page = self.page.clone();
+        let conn = self.connectors_for_move(ids, [dx, dy]);
+        if conn.is_empty() {
+            let _ = self.lesson.translate_items(&page, ids, dx, dy);
+        } else {
+            let moved: HashSet<&ItemId> = conn.iter().map(|c| &c.0).collect();
+            let e = rupok_core::Edits {
+                translate: ids
+                    .iter()
+                    .filter(|id| !moved.contains(id))
+                    .map(|id| (id.clone(), dx, dy))
+                    .collect(),
+                strokes: conn,
+                ..Default::default()
+            };
+            let _ = self.lesson.apply_edits(&page, &e);
+        }
         self.resync();
     }
 
@@ -1921,6 +2028,7 @@ impl<S: InkSink> Engine<S> {
     ) -> Option<ItemId> {
         let w = self.world(x, y);
         let data = ItemData::Text(TextData {
+            latex: false,
             geom: BoxGeom {
                 x: f64::from(w[0]),
                 y: f64::from(w[1]),
@@ -1933,6 +2041,16 @@ impl<S: InkSink> Engine<S> {
             color: self.pen.color,
         });
         self.add_box_item(data, now_ms).ok()
+    }
+
+    pub fn set_text_color(&mut self, id: &str, rgba: u32) {
+        if self.read_only {
+            return;
+        }
+        let page = self.page.clone();
+        if self.lesson.set_text_color(&page, id, rgba).is_ok() {
+            self.resync();
+        }
     }
 
     pub fn set_text(&mut self, id: &str, text: &str, h: Option<f64>) {
@@ -2099,6 +2217,7 @@ impl<S: InkSink> Engine<S> {
                     size: None,
                     color: None,
                     asset: None,
+                    latex: None,
                     selected,
                 };
                 match &it.data {
@@ -2114,6 +2233,7 @@ impl<S: InkSink> Engine<S> {
                         text: Some(&t.text),
                         size: Some(t.size),
                         color: Some(css_color(t.color)),
+                        latex: t.latex.then_some(true),
                         ..base(&t.geom, "text")
                     },
                     ItemData::Image(i) => DomItem {
@@ -2185,6 +2305,7 @@ impl<S: InkSink> Engine<S> {
                     text: &t.text,
                     size: t.size,
                     color: css_color(t.color),
+                    latex: t.latex,
                 },
                 ItemData::Image(i) => PreviewItem::Image {
                     rect: rect(&i.geom),
@@ -2306,6 +2427,9 @@ impl<S: InkSink> Engine<S> {
         {
             wet.push(w);
         }
+        if let Some(w) = self.reveal_partial() {
+            wet.push(w);
+        }
         wet.retain(|w| !w.points.is_empty());
         self.sink.set_wet(&wet);
         self.dirty = true;
@@ -2325,8 +2449,10 @@ impl<S: InkSink> Engine<S> {
                 r.playing = false;
             }
         }
-        let snapped = self.hold_tick(now_ms);
+        let revealing = self.reveal_tick(now_ms);
+        let snapped = self.hold_tick(now_ms) | self.deferred_tick(now_ms);
         if snapped
+            || revealing
             || !self.lasers.is_empty()
             || !self.flashes.is_empty()
             || self
@@ -2341,6 +2467,7 @@ impl<S: InkSink> Engine<S> {
     // ------------------------------------------------------------- replay
 
     pub fn replay_start(&mut self) -> f64 {
+        self.reveal_finish();
         let items = self.lesson.items(&self.page).unwrap_or_default();
         let r = Replay::new(items);
         let d = r.duration;
@@ -2497,6 +2624,41 @@ pub(crate) mod tests {
         assert_eq!(e.lesson.items(&e.page.clone()).unwrap().len(), 0);
         assert!(e.undo());
         assert_eq!(e.sink.strokes.len(), 2, "both strokes return with one undo");
+    }
+
+    #[test]
+    fn area_erase_is_one_undo_step_and_spares_boxes() {
+        let mut e = engine();
+        draw(&mut e, 1, PointerKind::Pen, [100.0, 100.0], [400.0, 100.0]);
+        draw(&mut e, 1, PointerKind::Pen, [100.0, 200.0], [400.0, 200.0]);
+        draw(&mut e, 1, PointerKind::Pen, [100.0, 600.0], [400.0, 600.0]);
+        let id = e
+            .add_object_html("<p>x</p>", "t", 200.0, 200.0, 0, 0.0)
+            .unwrap();
+        let (cx, cy) = {
+            let g = item_geom(&e, &id);
+            let s = screen_of(&e, &g, 0.5, 0.5);
+            (s[0], s[1])
+        };
+        // A rub across the first two strokes, in two moves of a 30 px palm.
+        assert_eq!(e.area_erase([250.0, 80.0], [250.0, 150.0], 30.0), 1);
+        assert_eq!(e.area_erase([250.0, 150.0], [250.0, 220.0], 30.0), 1);
+        // Rubbing over the object never erases it.
+        assert_eq!(e.area_erase([cx, cy], [cx + 10.0, cy], 60.0), 0);
+        assert_eq!(e.sink.strokes.len(), 1, "strokes vanish while rubbing");
+        assert_eq!(e.area_erase_end(), 2);
+        assert_eq!(e.area_erase_end(), 0, "ending twice is harmless");
+        assert_eq!(
+            e.lesson.items(&e.page.clone()).unwrap().len(),
+            2,
+            "one stroke and the object stay"
+        );
+        assert!(e.undo());
+        assert_eq!(e.sink.strokes.len(), 3, "the whole rub is one undo step");
+        // Read-only boards never erase.
+        e.set_read_only(true);
+        assert_eq!(e.area_erase([250.0, 80.0], [250.0, 220.0], 30.0), 0);
+        assert_eq!(e.area_erase([f32::NAN, 0.0], [0.0, 0.0], 30.0), 0);
     }
 
     #[test]

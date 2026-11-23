@@ -13,11 +13,11 @@ use rupok_live::protocol::{
 };
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
+use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::protocol::{CloseFrame, WebSocketConfig};
-use tokio_tungstenite::tungstenite::Message;
 
 use super::{LiveHub, Outgoing};
 
@@ -58,6 +58,8 @@ fn refuse(status: StatusCode, why: &str) -> ErrorResponse {
 
 async fn connection(stream: TcpStream, port: u16, hub: Arc<LiveHub>) {
     let extra = hub.config().extra_origins.clone();
+    // The handshake callback's signature (and its large error type) is tungstenite's.
+    #[allow(clippy::result_large_err)]
     let check = move |req: &Request, resp: Response| -> Result<Response, ErrorResponse> {
         let header = |name: &str| {
             req.headers()
@@ -112,10 +114,12 @@ async fn connection(stream: TcpStream, port: u16, hub: Arc<LiveHub>) {
     let conn = hub.next_conn();
     let hello = tokio::time::timeout(hub.config().hello_timeout, next_text(&mut source)).await;
     let refuse_hello = |why: &str| {
-        let _ = tx.send(Outgoing::Text(encode(&ServerMsg::Session(ServerSession::Error {
-            error: why.to_string(),
-            code: "bad_hello".into(),
-        }))));
+        let _ = tx.send(Outgoing::Text(encode(&ServerMsg::Session(
+            ServerSession::Error {
+                error: why.to_string(),
+                code: "bad_hello".into(),
+            },
+        ))));
         let _ = tx.send(Outgoing::Close(4001, "bad_hello".into()));
     };
     let accepted = match hello {

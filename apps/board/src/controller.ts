@@ -9,8 +9,11 @@ import {
   setCamera, setCanRedo, setCanUndo, setItems, setPageIndex, setPages, setReplay, setSelection, setStats,
   setTitle, setRevision, items, prefs, setPrefs, showToast, tool, setTool, setEditingText, revision, setSavedRevision, color, setColor,
   editingText, selectionIds, setSelectionIds, setSelectionMeta, studentEntry, isView, setLessonOpened, mode, setModeSignal, modeConfig,
+  smartFamilies,
 } from "./state";
 import { type Mode, type ToolbarItem, hasTopBar } from "./modes";
+import { dockSide } from "./dock";
+import { cssPx, isPhone, safeArea } from "./viewport";
 import { ObjectHost } from "./objects";
 import { autosaveLoad, autosaveStore } from "./storage";
 import { APP_NAME, FILE_EXT, LESSON_MIME } from "./brand";
@@ -43,6 +46,12 @@ export class Controller {
   private spaceHeld = false;
   private toolBeforeSpace: Tool | null = null;
   fileHandle: any = null;
+  /** Library hooks (src/library/session.ts): save to the lesson's file, adopt opened files. */
+  libraryHooks: {
+    beforeLoad?(): Promise<void>;
+    loaded?(file: File, bytes: Uint8Array): void;
+    saved?(bytes: Uint8Array, rev: number): void;
+  } = {};
 
   async init(root: HTMLElement, canvas: HTMLCanvasElement, world: HTMLElement) {
     this.root = root;
@@ -89,6 +98,7 @@ export class Controller {
     this.board.set_smoothing(p.smoothing);
     this.board.set_pressure_gamma(p.pressure);
     this.board.set_smart_ink(p.smartShapes, p.scratchOut);
+    this.board.set_smart_families(smartFamilies(p));
   }
 
   /** Toolbar / M key: Smart shapes off, or back to the last on-mode. */
@@ -105,11 +115,20 @@ export class Controller {
     );
   }
 
+  private lastSize = { w: 0, h: 0 };
   resize() {
     const r = this.root.getBoundingClientRect();
+    const wasFit = !!this.fitCam && this.board.camera().join(",") === this.fitCam;
+    const was = this.lastSize;
+    this.lastSize = { w: r.width, h: r.height };
     this.board.resize(r.width, r.height, window.devicePixelRatio || 1);
     // Teach keeps the slide fitted to the screen (window resize, fullscreen).
+    // Elsewhere the slide re-fits when the screen turns (portrait ⇄ landscape)
+    // or when it was still fitted, but never while text is being typed (an
+    // on-screen keyboard resizing the window must not move the page).
+    const turned = was.w > 0 && was.w > was.h !== r.width > r.height;
     if (mode() === "teach") this.updateInsets(true);
+    else if (was.w > 0 && (turned || wasFit) && !editingText()) this.updateInsets(true);
   }
 
   // ----------------------------------------------------------------- modes
@@ -593,22 +612,34 @@ export class Controller {
 
   /** Screen margins covered by chrome: top, right, bottom, left (CSS px). */
   insets: [number, number, number, number] = [0, 0, 0, 0];
+  /** Width taken by the docked AI chat panel (ChatPanel.tsx), and its side. */
+  chatInset = 0;
+  chatSide: "left" | "right" = "right";
 
   /** Screen margins covered by chrome, so fit/placement use the visible area. */
   updateInsets(fit = false) {
     const p = prefs();
-    const tb = p.density === "compact" ? 48 : p.density === "large" ? 72 : 60; // cell + 2 × padding
-    const inset = 12, gap = 12;
+    // Chrome sizes come from the CSS (phones use larger cells: viewport.ts).
+    const tb = cssPx("--tb", p.density === "compact" ? 40 : p.density === "large" ? 56 : 48) + 2 * cssPx("--tb-pad", 6); // cell + 2 × padding
+    const bar = cssPx("--bar", 48);
+    const phone = isPhone();
+    const safe = safeArea();
+    const inset = phone ? 8 : 12, gap = phone ? 8 : 12;
     const cfg = modeConfig();
-    let top = inset + (hasTopBar(cfg) ? 48 + gap : 0), bottom = inset + gap, left = inset, right = inset;
-    // The student viewer bar always sits at the bottom.
-    const side = isView() ? "bottom" : p.toolbar;
-    const bar = cfg.tools.length > 0;
-    if (!bar) bottom = inset;
+    let top = safe.top + inset + (hasTopBar(cfg) ? bar + gap : 0), bottom = safe.bottom + inset + gap, left = safe.left + inset, right = safe.right + inset;
+    // The edge the Smart Dock is docked to (dock.ts); "none" when it floats or is minimised.
+    const side = dockSide();
+    const dock = cfg.tools.length > 0;
+    if (!dock || side === "none") bottom = safe.bottom + inset;
     else if (side === "bottom") bottom += tb;
+    else if (side === "top") top += tb + gap;
     else if (side === "left") left += tb + gap;
     else if (side === "right") right += tb + gap;
-    if (p.showPages && cfg.chrome.pages) left = Math.max(left, inset + 176 + gap) + (bar && side === "left" ? tb + gap : 0);
+    // On a phone the pages panel is a drawer over the board: no room kept for it.
+    if (p.showPages && cfg.chrome.pages && !phone) left = Math.max(left, inset + 176 + gap) + (dock && side === "left" ? tb + gap : 0);
+    // The docked chat panel (Prepare only; it is an overlay in Teach).
+    if (this.chatInset > 0 && this.chatSide === "right") right = Math.max(right, inset + this.chatInset);
+    if (this.chatInset > 0 && this.chatSide === "left") left += this.chatInset;
     // Teach: chrome floats over the slide, which fills the screen.
     if (mode() === "teach") top = right = bottom = left = 0;
     this.insets = [top, right, bottom, left];
@@ -619,8 +650,13 @@ export class Controller {
     }
   }
 
+  /** Run before the presenter's Next; one returning true consumes it (e.g.
+   * writing the next line of an AI solution, solve/index.ts). */
+  nextHooks: (() => boolean)[] = [];
+
   /** Presenter "next": advance the topmost unfinished Smart Object, else next page. */
   next() {
+    if (this.nextHooks.some((h) => h())) return;
     this.sync(false);
     // Student view cannot change object steps (read-only): pages only.
     const objs = isView() ? [] : [...items].filter((i) => i.kind === "object" && (i.steps ?? 0) > (i.step ?? 0));
@@ -656,6 +692,7 @@ export class Controller {
       const bytes = this.board.save();
       await autosaveStore(bytes);
       this.savedAutosaveRev = rev;
+      this.libraryHooks.saved?.(bytes, rev);
     } catch (e) {
       console.warn("autosave failed", e);
     }
@@ -687,10 +724,13 @@ export class Controller {
       const name = f.name.toLowerCase();
       try {
         if (name.endsWith(`.${FILE_EXT}`)) {
-          this.board.load(new Uint8Array(await f.arrayBuffer()));
+          const bytes = new Uint8Array(await f.arrayBuffer());
+          await this.libraryHooks.beforeLoad?.();
+          this.board.load(bytes);
           this.fileHandle = null;
           setLessonOpened(true);
           showToast(`Opened ${f.name}`);
+          this.libraryHooks.loaded?.(f, bytes);
         } else if (isView()) {
           showToast(`Open a .${FILE_EXT} lesson file to view it`);
         } else if (name.endsWith(".pdf")) {
@@ -715,6 +755,20 @@ export class Controller {
       const id = this.board.add_object_html(html, title, w, h, steps);
       this.setTool("interact");
       showToast(`Added “${title}”. Press I to use it, P to write on it.`);
+      return id;
+    } catch (e: any) {
+      showToast(`Smart Object rejected:\n${e}`, 7000);
+      return null;
+    }
+  }
+
+  /** Replace items with a Smart Object at build step `step` with saved
+   * `state`, as one undo step. */
+  replaceWithObject(ids: string[], html: string, title: string, w: number, h: number, steps: number, step: number, state?: unknown): string | null {
+    try {
+      const id = this.board.replace_with_object_html(ids, html, title, w, h, steps, step, state === undefined ? undefined : JSON.stringify(state));
+      this.setTool("interact");
+      showToast(`“${title}” is live. Drag the curve or the sliders; Undo brings your sketch back.`);
       return id;
     } catch (e: any) {
       showToast(`Smart Object rejected:\n${e}`, 7000);

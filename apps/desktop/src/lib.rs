@@ -10,6 +10,9 @@
 
 pub mod files;
 pub mod geometry;
+pub mod library;
+pub mod cloud_auth;
+pub mod voice;
 
 #[cfg(feature = "capture")]
 pub mod capture;
@@ -17,7 +20,16 @@ pub mod capture;
 #[cfg(feature = "app")]
 mod app;
 #[cfg(feature = "app")]
+mod library_cmd;
+#[cfg(feature = "app")]
+mod cloud_cmd;
+
+#[cfg(feature = "app")]
+mod agent_cmd;
+#[cfg(feature = "app")]
 mod overlay;
+#[cfg(feature = "app")]
+mod voice_cmd;
 
 #[cfg(feature = "app")]
 pub use app::run;

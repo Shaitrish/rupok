@@ -1,4 +1,4 @@
-# The `.rpk` lesson package format
+# Rupok Rich Presentation Kit (`.rpk`) lesson package format
 
 | | |
 |---|---|
@@ -9,7 +9,7 @@
 | **License** | This specification is Apache-2.0 (see `spec/LICENSE`). Anyone may build compatible readers and writers. |
 | **Reference implementation** | `crates/rupok-format` (package), `crates/rupok-core` (document), `crates/rupok-ink` (point codec) |
 
-A `.rpk` file is one lesson: its pages, every ink stroke with timing, text,
+RPK stands for **Rich Presentation Kit**. A `.rpk` file is one Rupok lesson: its pages, every ink stroke with timing, text,
 images and live Smart Objects. The document inside is a
 [Loro](https://loro.dev) CRDT snapshot that keeps its full edit history, so
 one file is the lesson, its undo history and its class recording.
@@ -29,6 +29,7 @@ only when, they appear in all capitals.
 - [Assets](#assets)
 - [Smart Object bundles](#smart-object-bundles)
 - [Thumbnails and layers](#thumbnails-and-layers)
+- [Readable entries](#readable-entries)
 - [Reader limits and safety](#reader-limits-and-safety)
 - [Versioning and forward compatibility](#versioning-and-forward-compatibility)
 - [Change process](#change-process)
@@ -52,6 +53,9 @@ A package is a ZIP archive (PKWARE APPNOTE). Entries use the *Stored* or
 ```text
 mimetype                    REQUIRED  first entry, Stored, exact media type bytes
 manifest.json               REQUIRED  package metadata (JSON)
+README.md                   optional  what this file is + readable outline (derived)
+content.md                  optional  readable outline of the lesson (derived)
+content.json                optional  the same outline, structured (derived)
 doc.loro                    REQUIRED  Loro snapshot with full history
 assets/<blake3>.<ext>       optional  content-addressed media
 objects/<bundle>/...        optional  Smart Object bundles, one directory each
@@ -63,7 +67,7 @@ layers/<peer>.loro          optional  student annotation layers (reserved)
 
 - Writers MUST write `mimetype` as the **first** entry, with the *Stored*
   method, no extra field, and content exactly
-  `application/vnd.rupok.lesson+zip` (34 bytes, ASCII, no trailing newline).
+  `application/vnd.rupok.lesson+zip` (32 bytes, ASCII, no trailing newline).
   The media type then sits at byte offset 38 of the file, so tools can sniff
   it without a ZIP library, as with EPUB and ODF.
 - Readers MUST reject a package with no `mimetype` entry or with any other
@@ -263,6 +267,43 @@ readers that don't know it just draw `pts`.
   an odd or oversized `v`, an unknown `kind`) as absent, and MUST ignore
   unknown keys inside it.
 
+###### Templates (Smart Ink)
+
+Smart Ink also writes *template* kinds. They use the box like `rect` (the
+unrotated box, turned by `rot` about its centre) unless noted, with the
+numbers below in `v`. `pts` is always the drawn template, so a reader that
+knows none of them still shows it. A part a single polyline cannot draw
+(a cell's second plate) is a second stroke with the same `kind` and box,
+told apart by `v`; related strokes and their text labels share a `group`.
+
+| `kind` | `shape` | `v` |
+|---|---|---|
+| `axes` | `axes` | `[ox, oy, ux, uy]`: origin and tick spacing as fractions of `w` / `h`. Arrows on +x (right) and +y (up). |
+| `numberline` | `numberline` | Pairs `[t, n]`: a tick at fraction `t` of `w`, labelled `n` (−16…16). The line is at `y + h/2`; `h` may be 0. |
+| `stadium` | `terminator` | none. Straight sides joined by half circles. |
+| `arc` | `angle` | `[a0, sweep]`: radians, from `a0` (clockwise on screen) through `sweep`, on the ellipse inscribed in the box. |
+| `table` | `table` | Pairs `[axis, f]`: a divider across the box, upright at fraction `f` of `w` (`axis` 0) or level at fraction `f` of `h` (`axis` 1). |
+| `gate-and`, `gate-nand`, `gate-or`, `gate-nor`, `gate-xor`, `gate-xnor`, `gate-not` | `and-gate`, … | `[inputs, part]`. Facing +x before `rot`; pins at the box's left (inputs) and right (output). XOR/XNOR: part 1 is the back curve with the input pins. |
+| `resistor` | `resistor` | `[lead, teeth]`: lead length as a fraction of `w`, number of zig-zag points. |
+| `cell` | `cell` | `[part, lead]`: part 0 is the left lead and long plate, part 1 the short plate and right lead. |
+| `bulb` | `bulb` | none. A circle of radius `h/2` with an X and leads to both sides. |
+| `switch` | `switch` | `[part, pivot, contact, flip]`: fractions of `w`; the wire is at the bottom (`flip` 0) or top. Part 1 is the right lead. |
+| `harpoon` | `equilibrium` | none. A segment like `arrow` with one barb on the left of travel; ⇌ is two of them in a group. |
+| `path` | `graph-quad`, `graph-sine`, `graph-exp` | Points normalised to the box, like `poly`, drawn as an open smooth curve (uniform Catmull–Rom). |
+| `polyline` | `right-angle` | Points normalised to the box, drawn as an open polyline. |
+
+Smart Ink also stores `shape` values `parallelogram` (a `poly`),
+`graph-line` (a `line` grouped with `axes`), `venn` (`ellipse` circles in a
+group) and `benzene` (a `poly` hexagon with an `ellipse` or `line` strokes
+in a group).
+
+`from`, `to` (`String`, optional): on a `line` or `arrow`, the ids of the
+items its first and second end are attached to (a *connector*). An editor
+that moves or resizes one of those items SHOULD move the attached end with
+it, in the same change; a connector moved without its items SHOULD drop
+the links. Readers MUST treat an id that names no item as no link, and
+copies of a connector start without links.
+
 #### `kind: "text"`
 
 Box geometry, plus:
@@ -272,6 +313,7 @@ Box geometry, plus:
 | `text` | `String` | yes | `""` | Plain text. `\n` is a line break. |
 | `size` | `f64` | yes | `32.0` | Font size in world units. |
 | `color` | `i64` (colour) | yes | `0x000000ff` | Text colour. |
+| `latex` | `bool` | no | `false` | `text` is LaTeX maths (no delimiters), shown typeset (KaTeX subset). Readers that can't typeset show `text` as is. Writers omit it when false. |
 
 #### `kind: "image"`
 
@@ -526,6 +568,63 @@ is defined in [`spec/smart-object.md`](smart-object.md).
   document). Each is a Loro snapshot. Its internal layout will be defined by a
   future revision. Readers MUST NOT fail because of layers. Writers MUST
   preserve layers they read.
+
+## Readable entries
+
+> **Status: proposed, pending RFC.** These entries are additive and
+> optional; the reference writer emits them today. The normative wording
+> below is a draft for the format RFC (see ROADMAP).
+
+A package MAY carry three plain-text entries at the top level so that
+people, file browsers, search tools and language models can understand a
+lesson without a Loro library:
+
+| Entry | Content |
+|---|---|
+| `README.md` | UTF-8 Markdown. Starts with: *This is a Rupok lesson (Rich Presentation Kit, `.rpk`).* followed by links to the format (`https://rupok.app/rpk/`) and the agent skill (`https://rupok.app/skills/read-rpk.md`), then the outline (cut at about 24 KiB with a pointer to `content.md`). |
+| `content.md` | UTF-8 Markdown outline of the lesson (below). At most about 128 KiB. |
+| `content.json` | The same outline as JSON (below). At most 128 KiB. |
+
+The name `README.md` is chosen over `LLM.md` because every person, file
+manager, code host and model already treats a README as "read this first".
+
+**Derived, never authoritative.** They are generated from `doc.loro` (plus
+`manifest.json` and the object bundles) every time a package is written.
+
+- Writers that emit them MUST regenerate all three on every write and MUST
+  NOT copy them unchanged from a package they read. The reference writer
+  places them right after `manifest.json`, deflated.
+- Readers MUST NOT treat them as content: where they disagree with
+  `doc.loro`, `doc.loro` wins. A reader MAY ignore them entirely, and MUST
+  accept packages without them.
+- They MUST NOT contain personal data beyond what `manifest.json` and the
+  lesson's visible content hold: no object `state`, no Loro peer ids or
+  history, no author identity.
+- Writers SHOULD cap text (the reference keeps 1000 bytes per text item, 80
+  entries of each kind per page, 300 pages) and mark the outline as
+  truncated when they do.
+
+**Outline.** In reading order per page (top to bottom, then left to right):
+
+- typed `text` (LaTeX text as display maths);
+- handwriting as a count of freehand pen strokes and highlighter strokes,
+  plus, where an offline recogniser read a cluster of ink as maths with
+  high confidence, the LaTeX it read, marked as a machine reading;
+- shapes and Smart Ink templates by `shape` value and plain-English name
+  (`axes` → "coordinate axes", `and-gate` → "AND gate"), in stacking order;
+- images by entry path (`assets/<asset>`) and size;
+- Smart Objects by title, step count, the bundle's `description` and the
+  entry HTML path (`objects/<bundle>/<entry>`).
+
+**`content.json`** is an object with `format` (`"rupok-lesson-content"`),
+`version` (`1`), `about`, `spec`, `title`, `created` and `modified` (ISO
+8601 UTC, from the manifest), `generator`, optional `course`, `page_count`,
+`truncated` and `pages`. Each page has `number` (1-based), optional `title`,
+`layout` (`slide` with `width`/`height`, or `board`), `background`, `text`
+(`[{text, latex?}]`), `ink` (`{strokes, highlighter?, recognized?:
+[{latex, confidence, strokes}]}`), `shapes` (`[{kind, name, count}]`),
+`images` (`[{file, width, height}]`) and `objects` (`[{title, bundle,
+steps, description?, html?}]`). Readers MUST ignore unknown keys.
 
 ## Reader limits and safety
 
