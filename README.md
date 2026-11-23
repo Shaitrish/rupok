@@ -10,10 +10,12 @@ Write on slides with a pen. Drop in live, interactive lessons your AI made. Repl
 
 <p align="center"><a href="https://rupok.app"><b>rupok.app</b></a> · works in Chrome and Edge, installable as an app</p>
 
-> **Status: Phase 0 (pre-alpha).** The engine, file format, AI tooling and
-> a first browser board exist. There is no installable app yet. Follow
-> [ROADMAP.md](ROADMAP.md) to see what is done, what is in progress, and
-> what you can help build.
+> **Status: early alpha (v0.1).** The board works in the browser today at
+> [rupok.app](https://rupok.app): pen and highlighter, slides and PDFs,
+> Smart Objects with presets, Teach mode, replay and `.rpk` lesson files.
+> Windows and Linux installers are built by CI. Much more is in active
+> development. See [ROADMAP.md](ROADMAP.md) for what is done, what is in
+> progress, and what you can help build.
 
 ---
 
