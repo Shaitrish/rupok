@@ -57,11 +57,11 @@ const EXAMPLES: &[(&str, &str, f64, f64, u32)] = &[
 
 /// The rupoklib libraries each example uses (detected from `rupoklib://`).
 const EXAMPLE_LIBS: &[(&str, &[&str])] = &[
-    ("physics-projectile.html", &["katex"]),
-    ("physics-circuit.html", &["katex"]),
+    ("physics-projectile.html", &[]),
+    ("physics-circuit.html", &[]),
     ("chemistry-molecules-3d.html", &["katex", "three"]),
-    ("chemistry-reaction.html", &["katex"]),
-    ("math-graph.html", &["katex"]),
+    ("chemistry-reaction.html", &[]),
+    ("math-graph.html", &[]),
 ];
 
 fn examples_dir() -> PathBuf {
