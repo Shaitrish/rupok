@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use super::geom::{BBox, Pt, resample_into};
 use super::symbols::{Cat, SymId, id, sym};
 use super::templates::{Glyph, builtin_glyphs};
-use super::tree::{Atom, Base, Row, parse_latex, to_latex};
+use super::tree::{Atom, Base, Row, display_latex, parse_latex};
 use super::{Candidate, MathRecognizer};
 use crate::StrokePoint;
 
@@ -193,7 +193,7 @@ impl Synth {
             scripts: 0,
         };
         r.row(&row, 0.0, 0.0, 1.0, None);
-        r.finish(to_latex(&row))
+        r.finish(display_latex(&row))
     }
 }
 

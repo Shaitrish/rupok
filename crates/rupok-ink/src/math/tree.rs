@@ -1,7 +1,7 @@
 //! Expression tree, its LaTeX form, and a parser for the LaTeX subset the
 //! recognizer produces (used by the synthesiser and the tests).
 
-use super::symbols::{SymId, find, id, sym};
+use super::symbols::{Cat, SymId, find, id, sym};
 
 /// Function names written as letters and typeset upright (`\sin`).
 pub const FUNCS: &[&str] = &["sin", "cos", "tan", "log", "ln"];
@@ -72,6 +72,103 @@ pub fn to_latex(row: &[Atom]) -> String {
         toks.push(t);
     }
     join(&toks)
+}
+
+/// The LaTeX shown for a recognised row: chemistry upright (see
+/// [`chem_latex`]), everything else as [`to_latex`].
+pub fn display_latex(row: &[Atom]) -> String {
+    chem_latex(row).unwrap_or_else(|| to_latex(row))
+}
+
+/// Element symbols (IUPAC, 1–118).
+const ELEMENTS: &[&str] = &[
+    "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl",
+    "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As",
+    "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In",
+    "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb",
+    "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl",
+    "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk",
+    "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn", "Nh",
+    "Fl", "Mc", "Lv", "Ts", "Og",
+];
+
+/// A chemical formula or equation (`H_2O`, `NaCl`, `2H_2+O_2→2H_2O`) with
+/// its element symbols upright: `\mathrm{H}_2\mathrm{O}`. A row reads as
+/// chemistry when it is only element symbols (a capital and an optional
+/// lowercase letter) with digit subscripts, optional charges, leading
+/// coefficients, `+`, `→` and `⇌`, and it has a subscript, a two-letter
+/// element, two elements in a row or an arrow (a lone `C` or `P+S` stays
+/// algebra). `None` otherwise, so `x_2` or `F=ma` are untouched.
+pub fn chem_latex(row: &[Atom]) -> Option<String> {
+    let name = |a: &Atom| match a.base {
+        Base::Sym(s) => Some(sym(s)),
+        _ => None,
+    };
+    let plain = |a: &Atom| a.sub.is_empty() && a.sup.is_empty();
+    let digits = |r: &[Atom]| {
+        !r.is_empty()
+            && r.iter()
+                .all(|a| plain(a) && name(a).is_some_and(|s| s.cat == Cat::Digit))
+    };
+    let charge = |r: &[Atom]| {
+        r.is_empty()
+            || r.iter().all(|a| {
+                plain(a)
+                    && name(a)
+                        .is_some_and(|s| s.cat == Cat::Digit || s.name == "+" || s.name == "−")
+            })
+    };
+    let (mut toks, mut strong, mut term_start, mut prev_elem) = (Vec::new(), false, true, false);
+    let mut i = 0;
+    while i < row.len() {
+        let a = &row[i];
+        let s = name(a)?;
+        match s.cat {
+            Cat::Upper => {
+                // A lowercase letter right after a bare capital may finish it.
+                let two = row.get(i + 1).filter(|b| {
+                    plain(a)
+                        && name(b).is_some_and(|t| {
+                            t.cat == Cat::Letter
+                                && ELEMENTS.contains(&format!("{}{}", s.name, t.name).as_str())
+                        })
+                });
+                let (el, last) = match two {
+                    Some(b) => (format!("{}{}", s.name, name(b)?.name), b),
+                    None if ELEMENTS.contains(&s.name) => (s.name.to_string(), a),
+                    None => return None,
+                };
+                if !(last.sub.is_empty() || digits(&last.sub)) || !charge(&last.sup) {
+                    return None;
+                }
+                strong |= two.is_some() || !last.sub.is_empty() || prev_elem;
+                let mut t = format!("\\mathrm{{{el}}}");
+                if !last.sub.is_empty() {
+                    t.push('_');
+                    t.push_str(&group(&last.sub));
+                }
+                if !last.sup.is_empty() {
+                    t.push('^');
+                    t.push_str(&group(&last.sup));
+                }
+                toks.push(t);
+                i += if two.is_some() { 2 } else { 1 };
+                (term_start, prev_elem) = (false, true);
+                continue;
+            }
+            // Coefficients lead a term.
+            Cat::Digit if term_start && plain(a) => {}
+            _ if plain(a) && s.name == "+" && !term_start => term_start = true,
+            _ if plain(a) && (s.name == "→" || s.name == "⇌") && !term_start => {
+                (term_start, strong) = (true, true);
+            }
+            _ => return None,
+        }
+        prev_elem = false;
+        toks.push(s.latex.to_string());
+        i += 1;
+    }
+    (strong && !term_start).then(|| join(&toks))
 }
 
 fn group(row: &[Atom]) -> String {
@@ -227,6 +324,12 @@ impl Parser {
                     let last = row.last_mut().ok_or("prime without a base")?;
                     last.sup.push(Atom::new(Base::Sym(id("′"))));
                 }
+                // Upright text (chemistry): the letters themselves.
+                Tok::Cmd(ref c) if c == "mathrm" => {
+                    self.at += 1;
+                    let inner = self.group()?;
+                    row.extend(inner);
+                }
                 Tok::Open => {
                     self.at += 1;
                     let inner = self.row()?;
@@ -327,6 +430,49 @@ mod tests {
             ("3\\times 4", "3\\times 4"),
         ] {
             assert_eq!(round(src), want, "{src}");
+        }
+    }
+
+    #[test]
+    fn chemistry_is_upright() {
+        let shown = |s: &str| display_latex(&parse_latex(s).unwrap());
+        for (src, want) in [
+            ("H_2O", "\\mathrm{H}_2\\mathrm{O}"),
+            ("CO_2", "\\mathrm{C}\\mathrm{O}_2"),
+            (
+                "2H_2+O_2\\to 2H_2O",
+                "2\\mathrm{H}_2+\\mathrm{O}_2\\rightarrow 2\\mathrm{H}_2\\mathrm{O}",
+            ),
+            ("NaCl", "\\mathrm{Na}\\mathrm{Cl}"),
+            ("CH_4", "\\mathrm{C}\\mathrm{H}_4"),
+            ("SO_4^{2-}", "\\mathrm{S}\\mathrm{O}_4^{2-}"),
+        ] {
+            assert_eq!(shown(src), want, "{src}");
+            // The upright form reads back as the same formula.
+            assert_eq!(shown(want), want, "{want}");
+            assert_eq!(round(want), round(src), "{want}");
+        }
+        // Algebra is untouched: subscripted variables, equations, a lone
+        // capital, capitals that are not elements, lowercase-led terms.
+        for src in [
+            "x_2",
+            "x_1",
+            "y_2-y_1",
+            "a_n=a_1+d",
+            "F=ma",
+            "E=mc^2",
+            "V",
+            "C",
+            "P+S",
+            "R=8.3",
+            "2x+3=7",
+            "A+B",
+            "x\\to\\infty",
+            "H_2O=x",
+            "Hx",
+        ] {
+            assert_eq!(shown(src), round(src), "{src}");
+            assert!(!shown(src).contains("mathrm"), "{src}");
         }
     }
 

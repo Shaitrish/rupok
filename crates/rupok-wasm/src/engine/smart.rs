@@ -115,12 +115,21 @@ pub(super) struct LastInk {
     bounds: [f32; 4],
     size_px: f32,
     snapped: bool,
+    /// The stroke as drawn, when it snapped to a line: a small "+" crossing
+    /// it next puts it back (see [`recognize::small_cross`]).
+    raw: Option<(ItemId, StrokeData)>,
 }
 
 /// A fading flash in the wet layer.
 pub(super) struct Flash {
     strokes: Vec<WetStroke>,
     start: f64,
+}
+
+/// A stroke that is a line shape, not moved since it snapped.
+fn stroke_is_line(it: Option<&Item>) -> bool {
+    matches!(it, Some(Item { data: ItemData::Stroke(s), .. })
+        if s.shape.as_deref() == Some("line") && s.offset == [0.0, 0.0])
 }
 
 fn median_pressure(pts: &[StrokePoint]) -> f32 {
@@ -368,9 +377,17 @@ impl<S: InkSink> Engine<S> {
             None => Registry::standard().recognize(&stroke.points, &ctx, standalone),
         };
         let bounds = stroke.aabb();
+        let unsnap = if prop.is_none() {
+            self.unsnap_for_plus(&stroke, &ctx)
+        } else {
+            None
+        };
         let Some(id) = self.commit_stroke(stroke.clone(), started) else {
             return;
         };
+        if let Some((rid, raw)) = unsnap {
+            self.replace_stroke(&rid, raw, &[]);
+        }
         let (snapped, composite) = match (held, prop) {
             (Some(h), _) => {
                 let geom = self.connect(h.current, &id);
@@ -390,10 +407,22 @@ impl<S: InkSink> Engine<S> {
             bounds,
             size_px: (bounds[2] - bounds[0]).max(bounds[3] - bounds[1]) * self.camera.zoom,
             snapped,
+            raw: (snapped && stroke_is_line(self.scene.get(&id)))
+                .then(|| (id.clone(), stroke.clone())),
         });
         // Read it again once the pen rests (number lines).
         self.pending = (!snapped && Registry::standard().has_deferred(&opts))
             .then_some((id, now_ms + DEFER_MS));
+    }
+
+    /// The second stroke of a small "+" (`s`, not yet committed): the line
+    /// its first stroke snapped to a moment ago goes back to ink, so the
+    /// whole "+" stays writing.
+    fn unsnap_for_plus(&self, s: &StrokeData, ctx: &Context) -> Option<(ItemId, StrokeData)> {
+        let (rid, raw) = self.last_ink.as_ref()?.raw.clone()?;
+        let xy: Vec<[f32; 2]> = s.points.iter().map(|q| [q.x, q.y]).collect();
+        let i = recognize::small_cross(&xy, ctx)?;
+        (ctx.neighbours[i].id == rid && stroke_is_line(self.scene.get(&rid))).then_some((rid, raw))
     }
 
     /// Per frame: run the deferred recognisers once the pen has rested.
@@ -2259,5 +2288,36 @@ mod tests {
         assert_eq!(dom[0]["latex"], true);
         assert!(e.undo());
         assert_eq!(strokes(&e).len(), 4, "one undo brings the ink back");
+    }
+    #[test]
+    fn a_small_plus_stays_ink() {
+        let mut e = engine(SmartMode::Auto);
+        let end = draw(
+            &mut e,
+            &densify(&[[350.0, 400.0], [450.0, 401.0]], 3.0),
+            1000.0,
+        );
+        assert_eq!(strokes(&e)[0].shape.as_deref(), Some("line"));
+        draw(
+            &mut e,
+            &densify(&[[401.0, 350.0], [399.0, 450.0], [409.0, 440.0]], 3.0),
+            end + 250.0,
+        );
+        let s = strokes(&e);
+        assert_eq!(s.len(), 2);
+        assert!(s.iter().all(|s| s.shape.is_none()), "both strokes are ink");
+        assert!(s.iter().all(|s| s.geom.is_none()));
+        // A short arrow still works.
+        let end = draw(
+            &mut e,
+            &densify(&[[600.0, 400.0], [700.0, 400.0]], 3.0),
+            end + 5000.0,
+        );
+        draw(
+            &mut e,
+            &densify(&[[665.0, 370.0], [701.0, 400.0], [665.0, 430.0]], 3.0),
+            end + 250.0,
+        );
+        assert_eq!(strokes(&e).last().unwrap().shape.as_deref(), Some("arrow"));
     }
 }

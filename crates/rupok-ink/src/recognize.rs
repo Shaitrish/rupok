@@ -1520,7 +1520,7 @@ fn snap_segment(a: P, b: P) -> (P, P) {
 }
 
 pub mod registry;
-pub use registry::{Context, Label, Neighbour, Proposal, Recognizer, Registry};
+pub use registry::{Context, Label, Neighbour, Proposal, Recognizer, Registry, small_cross};
 
 pub mod diagram;
 pub mod geometry;
