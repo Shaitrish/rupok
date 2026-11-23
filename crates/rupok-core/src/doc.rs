@@ -733,6 +733,31 @@ impl Lesson {
         Ok(())
     }
 
+    /// Change what a media item plays (its `media` map) and, when `poster`
+    /// is given, its poster asset, as one change. Errors if `id` is not an
+    /// image item or `media` is invalid.
+    pub fn set_media(
+        &mut self,
+        page_id: &str,
+        id: &str,
+        media: &MediaData,
+        poster: Option<&str>,
+    ) -> Result<()> {
+        if !matches!(self.item(page_id, id)?.data, ItemData::Image(_)) {
+            return Err(CoreError::ItemNotFound(id.to_string()));
+        }
+        if !media.is_valid() {
+            return Err(CoreError::Corrupt(format!("item {id}: invalid media")));
+        }
+        let m = item_map(&self.items_map(page_id)?, id)?;
+        m.insert("media", media_value(media))?;
+        if let Some(asset) = poster {
+            m.insert("asset", asset)?;
+        }
+        self.doc.commit();
+        Ok(())
+    }
+
     pub fn set_object_step(&mut self, page_id: &str, id: &str, step: u32) -> Result<()> {
         item_map(&self.items_map(page_id)?, id)?.insert("step", i64::from(step))?;
         self.doc.commit();
@@ -992,6 +1017,9 @@ fn write_item_data(m: &mut impl FieldsMut, data: &ItemData) -> loro::LoroResult<
         ItemData::Image(i) => {
             write_geom_to(m, &i.geom)?;
             m.insert("asset", i.asset.as_str())?;
+            if let Some(media) = i.media.as_ref().filter(|x| x.is_valid()) {
+                m.insert("media", media_value(media))?;
+            }
         }
         ItemData::Object(o) => {
             write_geom_to(m, &o.geom)?;
@@ -1034,6 +1062,62 @@ fn shape_geom_value(g: &ShapeGeom) -> LoroValue {
         f.set("to", id.as_str());
     }
     f.into_value()
+}
+
+/// The `media` map of a media item (an image item that is a poster).
+fn media_value(x: &MediaData) -> LoroValue {
+    let mut f = ValueFields::default();
+    f.set("type", x.kind.as_str());
+    f.set("src", x.src.as_str());
+    if !x.title.is_empty() {
+        f.set("title", x.title.as_str());
+    }
+    if !x.site.is_empty() {
+        f.set("site", x.site.as_str());
+    }
+    if let Some(t) = x.start {
+        f.set("start", t);
+    }
+    if let Some(t) = x.end {
+        f.set("end", t);
+    }
+    for (key, on) in [
+        ("muted", x.muted),
+        ("loop", x.looped),
+        ("autoplay", x.autoplay),
+    ] {
+        if on {
+            f.set(key, true);
+        }
+    }
+    f.into_value()
+}
+
+/// Read `media`; anything malformed (or a kind this build does not play)
+/// reads as absent, so the item is shown as its poster image.
+fn read_media(m: &impl Fields) -> Option<MediaData> {
+    media_from_value(&value_of(m, "media")?)
+}
+
+/// Parse an item's `media` value (see [`MediaData`]); `None` when it is
+/// malformed or names a kind this build does not play.
+pub fn media_from_value(v: &LoroValue) -> Option<MediaData> {
+    let LoroValue::Map(g) = v else {
+        return None;
+    };
+    let flag = |k: &str| matches!(g.get(k), Some(LoroValue::Bool(true)));
+    let media = MediaData {
+        kind: str_of(g, "type")?,
+        src: str_of(g, "src")?,
+        title: str_of(g, "title").unwrap_or_default(),
+        site: str_of(g, "site").unwrap_or_default(),
+        start: f64_of(g, "start"),
+        end: f64_of(g, "end"),
+        muted: flag("muted"),
+        looped: flag("loop"),
+        autoplay: flag("autoplay"),
+    };
+    media.is_valid().then_some(media)
 }
 
 /// Read `geom`; anything malformed reads as absent (the points still draw).
@@ -1103,6 +1187,7 @@ fn read_item(id: &str, m: &impl Fields) -> Result<Item> {
         "image" => ItemData::Image(ImageData {
             geom: read_geom(m),
             asset: str_of(m, "asset").unwrap_or_default(),
+            media: read_media(m),
         }),
         "object" => ItemData::Object(ObjectData {
             geom: read_geom(m),
@@ -1793,5 +1878,144 @@ mod tests {
         doc.get_map("meta").insert("format", 999).unwrap();
         doc.commit();
         assert!(Lesson::load(&doc.export(ExportMode::Snapshot).unwrap()).is_err());
+    }
+
+    fn youtube() -> MediaData {
+        MediaData {
+            kind: "youtube".into(),
+            src: "https://www.youtube.com/watch?v=dQw4w9WgXcQ".into(),
+            title: "Photosynthesis".into(),
+            start: Some(30.0),
+            end: Some(95.5),
+            muted: true,
+            looped: true,
+            ..MediaData::default()
+        }
+    }
+
+    fn media_item(media: Option<MediaData>) -> ItemData {
+        ItemData::Image(ImageData {
+            geom: BoxGeom {
+                x: 100.0,
+                y: 50.0,
+                w: 1280.0,
+                h: 720.0,
+                rot: 0.0,
+            },
+            asset: "ab.png".into(),
+            media,
+        })
+    }
+
+    #[test]
+    fn media_round_trips_through_snapshot() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let a = l.add_item(&p, &media_item(Some(youtube())), 1.0).unwrap();
+        let clip = MediaData {
+            kind: "video".into(),
+            src: "cd.mp4".into(),
+            autoplay: true,
+            ..MediaData::default()
+        };
+        let b = l
+            .add_item(&p, &media_item(Some(clip.clone())), 2.0)
+            .unwrap();
+        let back = Lesson::load(&l.save()).unwrap();
+        let ItemData::Image(i) = back.item(&p, &a).unwrap().data else {
+            panic!("not an image")
+        };
+        assert_eq!(i.media, Some(youtube()));
+        assert_eq!(i.asset, "ab.png");
+        let ItemData::Image(i) = back.item(&p, &b).unwrap().data else {
+            panic!("not an image")
+        };
+        assert_eq!(i.media, Some(clip));
+        assert_eq!(i.media.as_ref().unwrap().src_asset(), Some("cd.mp4"));
+        // Flags that are off and empty strings are not written.
+        let items = l.items_map(&p).unwrap();
+        let LoroValue::Map(raw) = item_map(&items, &b).unwrap().get_deep_value() else {
+            panic!()
+        };
+        let Some(LoroValue::Map(m)) = raw.get("media") else {
+            panic!("no media map")
+        };
+        assert_eq!(m.get("type"), Some(&LoroValue::from("video")));
+        assert!(m.get("muted").is_none() && m.get("title").is_none());
+        assert_eq!(raw.get("kind"), Some(&LoroValue::from("image")));
+    }
+
+    #[test]
+    fn image_without_media_reads_as_plain_image() {
+        // A file from before media items: no `media` key.
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let a = l.add_item(&p, &media_item(None), 1.0).unwrap();
+        let back = Lesson::load(&l.save()).unwrap();
+        assert_eq!(back.item(&p, &a).unwrap().data, media_item(None));
+    }
+
+    #[test]
+    fn malformed_or_unknown_media_reads_as_poster() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let a = l.add_item(&p, &media_item(None), 1.0).unwrap();
+        let items = l.items_map(&p).unwrap();
+        let m = item_map(&items, &a).unwrap();
+        let cases: Vec<LoroValue> = vec![
+            LoroValue::from("not a map"),
+            LoroValue::from(std::collections::HashMap::from([
+                ("type".to_string(), LoroValue::from("hologram")),
+                ("src".to_string(), LoroValue::from("x")),
+            ])),
+            LoroValue::from(std::collections::HashMap::from([(
+                "type".to_string(),
+                LoroValue::from("youtube"),
+            )])),
+            LoroValue::from(std::collections::HashMap::from([
+                ("type".to_string(), LoroValue::from("video")),
+                ("src".to_string(), LoroValue::from("a.mp4")),
+                ("start".to_string(), LoroValue::Double(f64::NAN)),
+            ])),
+            LoroValue::from(std::collections::HashMap::from([
+                ("type".to_string(), LoroValue::from("video")),
+                ("src".to_string(), LoroValue::from("a.mp4")),
+                ("start".to_string(), LoroValue::Double(9.0)),
+                ("end".to_string(), LoroValue::Double(3.0)),
+            ])),
+        ];
+        for v in cases {
+            m.insert("media", v).unwrap();
+            l.doc.commit();
+            let ItemData::Image(i) = l.item(&p, &a).unwrap().data else {
+                panic!("not an image")
+            };
+            assert_eq!(i.media, None);
+            assert_eq!(i.asset, "ab.png");
+        }
+    }
+
+    #[test]
+    fn set_media_is_one_undo_step() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let a = l.add_item(&p, &media_item(Some(youtube())), 1.0).unwrap();
+        let mut next = youtube();
+        next.muted = false;
+        next.start = None;
+        l.set_media(&p, &a, &next, Some("ef.jpg")).unwrap();
+        let ItemData::Image(i) = l.item(&p, &a).unwrap().data else {
+            panic!()
+        };
+        assert_eq!((i.media, i.asset.as_str()), (Some(next), "ef.jpg"));
+        assert!(l.undo().unwrap());
+        assert_eq!(l.item(&p, &a).unwrap().data, media_item(Some(youtube())));
+        let bad = MediaData {
+            kind: "web".into(),
+            ..MediaData::default()
+        };
+        assert!(l.set_media(&p, &a, &bad, None).is_err());
+        let s = l.add_item(&p, &stroke(0.0), 3.0).unwrap();
+        assert!(l.set_media(&p, &s, &youtube(), None).is_err());
     }
 }

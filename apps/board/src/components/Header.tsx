@@ -32,6 +32,7 @@ import { AiStatus, aiConnected, aiStatusText, toggleAi } from "./AiStatus";
 import { pagesShown, togglePages } from "../viewport";
 import "./Header.css";
 import { MicButton } from "./MicButton";
+import { insertVideo, insertWebEmbed, pickMedia, pickModel } from "./MediaDialog";
 
 function pickFiles(accept: string, multiple = false): Promise<File[]> {
   return new Promise((resolve) => {
@@ -175,6 +176,10 @@ export function Header(props: { onObject: () => void; onSettings: () => void }) 
     { id: "insert-image", label: "Image…", icon: "image", run: () => void pickImage() },
     { id: "insert-pdf", label: "PDF…", icon: "pdf", run: () => void pickPdf() },
     { id: "insert-object", label: "Smart Object…", icon: "object", run: props.onObject },
+    { id: "insert-video", label: "Video / YouTube…", icon: "video", run: insertVideo },
+    { id: "insert-audio", label: "Audio…", icon: "audio", run: () => void pickMedia("audio") },
+    { id: "insert-model", label: "3D model (GLB)…", icon: "cube", run: () => void pickModel() },
+    { id: "insert-web", label: "Web embed…", icon: "globe", run: insertWebEmbed },
     { id: "insert-text", label: "Text", icon: "text", key: "T", run: () => controller.setTool("text") },
   ];
 

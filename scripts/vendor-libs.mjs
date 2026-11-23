@@ -37,12 +37,17 @@ const FONTS = [
 
 /** three.js addons vendored under rupoklib://three/addons/. Their bare
  * `from "three"` imports are rewritten to a relative path, so they work in a
- * sandboxed object without an import map. Only files without other imports. */
+ * sandboxed object without an import map. Only files whose other imports are
+ * relative (and vendored here too). */
 const THREE_ADDONS = [
   "controls/OrbitControls.js",
   "controls/TrackballControls.js",
   "renderers/CSS2DRenderer.js",
   "environments/RoomEnvironment.js",
+  // The built-in 3D model viewer (crates/rupok-format/src/model-viewer.html).
+  "loaders/GLTFLoader.js",
+  "utils/BufferGeometryUtils.js", // imported by GLTFLoader
+  "utils/SkeletonUtils.js", // imported by GLTFLoader
 ];
 
 /**

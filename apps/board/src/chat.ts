@@ -419,6 +419,8 @@ export function describeChange(e: OpDone): BoardChange {
   switch (op.op) {
     case "add_smart_object": return { label: `Added Smart Object '${op.title ?? "Untitled"}'${on}`, page, itemId: r.item_id };
     case "update_smart_object": return { label: `Updated Smart Object${on}`, page, itemId: r.item_id };
+    case "add_media": return { label: `Added ${r.kind === "youtube" ? "a YouTube video" : r.kind === "web" ? "a web embed" : r.kind === "audio" ? "audio" : "a video"}${on}`, page, itemId: r.item_id };
+    case "add_model": return { label: `Added a 3D model${on}`, page, itemId: r.item_id };
     case "add_text": {
       const t = String(op.text ?? "").split("\n")[0];
       return { label: `Added text '${t.length > 40 ? t.slice(0, 39) + "…" : t}'${on}`, page, itemId: r.item_id };

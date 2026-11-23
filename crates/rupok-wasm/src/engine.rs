@@ -8,8 +8,8 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use rupok_core::{
-    BoxGeom, Frame, ImageData, Item, ItemData, ItemId, Lesson, NewItem, ObjectData, PageId,
-    PageSpec, Pattern, Scene, ShapeGeom, StrokeData, TextData,
+    BoxGeom, Frame, ImageData, Item, ItemData, ItemId, Lesson, MediaData, NewItem, ObjectData,
+    PageId, PageSpec, Pattern, Scene, ShapeGeom, StrokeData, TextData,
 };
 use rupok_format::package::OUTLINE_MAX_AGE_MS;
 use rupok_format::{ObjectBundle, ObjectManifest, Package};
@@ -229,6 +229,9 @@ pub struct DomItem<'a> {
     /// A text item whose text is LaTeX maths.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latex: Option<bool>,
+    /// An image item that is the poster of a video, audio clip or embed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media: Option<&'a MediaData>,
     pub selected: bool,
 }
 
@@ -1855,8 +1858,11 @@ impl<S: InkSink> Engine<S> {
                     }
                 }
                 ItemData::Image(i) => {
-                    if let Some(a) = self.pkg.assets.get(&i.asset) {
-                        clip.assets.insert(i.asset.clone(), a.clone());
+                    let src = i.media.as_ref().and_then(MediaData::src_asset);
+                    for name in std::iter::once(i.asset.as_str()).chain(src) {
+                        if let Some(a) = self.pkg.assets.get(name) {
+                            clip.assets.insert(name.to_string(), a.clone());
+                        }
                     }
                 }
                 _ => {}
@@ -1942,6 +1948,14 @@ impl<S: InkSink> Engine<S> {
                     img.geom.y += dy;
                     if let Some(n) = asset_names.get(&img.asset) {
                         img.asset = n.clone();
+                    }
+                    if let Some(m) = img.media.as_mut().filter(|m| m.src_asset().is_some()) {
+                        if let Some(n) = asset_names.get(&m.src) {
+                            m.src = n.clone();
+                        }
+                        if !self.pkg.assets.contains_key(&m.src) {
+                            img.media = None;
+                        }
                     }
                     self.pkg.assets.contains_key(&img.asset)
                 }
@@ -2152,8 +2166,180 @@ impl<S: InkSink> Engine<S> {
         }
         let asset = self.pkg.add_asset(bytes, ext);
         let geom = self.centered_geom(w, h);
-        self.add_box_item(ItemData::Image(ImageData { geom, asset }), now_ms)
-            .ok()
+        self.add_box_item(
+            ItemData::Image(ImageData {
+                geom,
+                asset,
+                media: None,
+            }),
+            now_ms,
+        )
+        .ok()
+    }
+
+    /// Place a media item (video, audio clip, YouTube video or web embed)
+    /// centred in the view, as one undo step. `poster` is the picture shown
+    /// until it plays (and in exports); `file` is the clip for `video` and
+    /// `audio`, stored in the package (its asset name becomes `src`).
+    pub fn add_media(
+        &mut self,
+        mut media: MediaData,
+        poster: (Vec<u8>, &str),
+        file: Option<(Vec<u8>, &str)>,
+        w: f64,
+        h: f64,
+        now_ms: f64,
+    ) -> Result<ItemId, String> {
+        if self.read_only {
+            return Err(READ_ONLY.into());
+        }
+        if media.src_asset().is_some() && file.is_none() {
+            return Err("a video or audio item needs its file".into());
+        }
+        self.check_media(&mut media, file.as_ref().map(|f| f.0.as_slice()))?;
+        if !(w.is_finite() && h.is_finite() && w >= 1.0 && h >= 1.0) {
+            return Err("invalid size".into());
+        }
+        if let Some((bytes, ext)) = file {
+            media.src = self.pkg.add_asset(bytes, ext);
+        }
+        let asset = self.pkg.add_asset(poster.0, poster.1);
+        let geom = self.centered_geom(w, h);
+        self.add_box_item(
+            ItemData::Image(ImageData {
+                geom,
+                asset,
+                media: Some(media),
+            }),
+            now_ms,
+        )
+        .map_err(|e| e.to_string())
+    }
+
+    /// Change what a media item plays (title, times, mute, loop, autoplay,
+    /// or a new link), and optionally its poster or clip, as one undo step.
+    pub fn set_media(
+        &mut self,
+        id: &str,
+        mut media: MediaData,
+        poster: Option<(Vec<u8>, &str)>,
+        file: Option<(Vec<u8>, &str)>,
+    ) -> Result<(), String> {
+        if self.read_only {
+            return Err(READ_ONLY.into());
+        }
+        let page = self.page.clone();
+        let Ok(Item {
+            data: ItemData::Image(old),
+            ..
+        }) = self.lesson.item(&page, id)
+        else {
+            return Err("not a media item".into());
+        };
+        let has_file = file.is_some();
+        self.check_media(&mut media, file.as_ref().map(|f| f.0.as_slice()))?;
+        if let Some((bytes, ext)) = file {
+            media.src = self.pkg.add_asset(bytes, ext);
+        } else if media.src_asset().is_some() {
+            // Same clip as before unless a new file came with the change.
+            match old.media.as_ref().and_then(MediaData::src_asset) {
+                Some(src) if !has_file => media.src = src.to_string(),
+                _ => return Err("a video or audio item needs its file".into()),
+            }
+        }
+        let poster = poster.map(|(b, ext)| self.pkg.add_asset(b, ext));
+        self.lesson
+            .set_media(&page, id, &media, poster.as_deref())
+            .map_err(|e| e.to_string())?;
+        self.resync();
+        Ok(())
+    }
+
+    /// Validate a media item before it is stored: a known kind, links only
+    /// from the allowlist (stored in canonical form), files that really are
+    /// video or audio and not too big.
+    fn check_media(&self, media: &mut MediaData, file: Option<&[u8]>) -> Result<(), String> {
+        use rupok_format::media;
+        media.title = media
+            .title
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(200)
+            .collect();
+        match media.kind.as_str() {
+            "youtube" | "web" => {
+                let link = media::parse_link(&media.src)
+                    .filter(|l| l.kind == media.kind)
+                    .ok_or("this link is not on the list of sites Rupok can embed")?;
+                media.src = link.url;
+                media.site = link.site.into();
+            }
+            "video" | "audio" => {
+                media.site.clear();
+                if let Some(bytes) = file {
+                    if bytes.len() > media::MAX_MEDIA_BYTES {
+                        return Err(format!(
+                            "the file is too big (limit {} MB)",
+                            media::MAX_MEDIA_BYTES >> 20
+                        ));
+                    }
+                    let (kind, _) = media::sniff_media(bytes).ok_or("not a video or audio file")?;
+                    // A video file may carry only sound (e.g. .webm audio).
+                    if kind == "audio" && media.kind == "video" {
+                        media.kind = "audio".into();
+                    }
+                }
+                media.src = "pending".into();
+            }
+            _ => return Err(format!("unknown media type `{}`", media.kind)),
+        }
+        if media
+            .end
+            .is_some_and(|e| media.start.is_some_and(|s| e <= s))
+        {
+            media.end = None;
+        }
+        if media.is_valid() {
+            Ok(())
+        } else {
+            Err("invalid media settings".into())
+        }
+    }
+
+    /// Place a 3D model (glTF 2.0: `.glb`, or `.gltf` with everything
+    /// embedded) as a built-in viewer Smart Object. Returns the item id.
+    pub fn add_model(
+        &mut self,
+        bytes: &[u8],
+        name: &str,
+        title: &str,
+        w: f64,
+        h: f64,
+        now_ms: f64,
+    ) -> Result<ItemId, String> {
+        if self.read_only {
+            return Err(READ_ONLY.into());
+        }
+        let bundle = rupok_format::model3d::model_bundle(bytes, name, title, w, h)
+            .map_err(|e| e.to_string())?;
+        let title = bundle.manifest.title.clone();
+        let base = slug(&title, "model");
+        let mut bundle_id = base.clone();
+        let mut n = 2;
+        while self.pkg.objects.contains_key(&bundle_id) {
+            bundle_id = format!("{base}-{n}");
+            n += 1;
+        }
+        self.pkg.objects.insert(bundle_id.clone(), bundle);
+        let geom = self.centered_geom(w, h);
+        let data = ItemData::Object(ObjectData {
+            geom,
+            bundle: bundle_id,
+            title,
+            step: 0,
+            state: None,
+        });
+        self.add_box_item(data, now_ms).map_err(|e| e.to_string())
     }
 
     pub fn set_object_step(&mut self, id: &str, step: u32) {
@@ -2221,17 +2407,33 @@ impl<S: InkSink> Engine<S> {
                         used.insert(o.bundle);
                     }
                     ItemData::Image(i) => {
+                        if let Some(src) = i.media.as_ref().and_then(MediaData::src_asset) {
+                            used.insert(src.to_string());
+                        }
                         used.insert(i.asset);
                     }
                     _ => {}
                 }
             }
         }
-        self.pkg.objects.retain(|k, _| used.contains(k));
-        self.pkg.assets.retain(|k, _| used.contains(k));
+        // Leave out what no page uses, but keep it in memory: an undo or redo
+        // after this save can bring its item back (a deleted video, an
+        // undone Smart Object), and the item would be missing its bundle or
+        // clip otherwise.
+        let objects = std::mem::take(&mut self.pkg.objects);
+        let assets = std::mem::take(&mut self.pkg.assets);
+        let (keep_o, drop_o): (BTreeMap<_, _>, BTreeMap<_, _>) =
+            objects.into_iter().partition(|(k, _)| used.contains(k));
+        let (keep_a, drop_a): (BTreeMap<_, _>, BTreeMap<_, _>) =
+            assets.into_iter().partition(|(k, _)| used.contains(k));
+        self.pkg.objects = keep_o;
+        self.pkg.assets = keep_a;
         self.pkg
             .update_lesson_throttled(&self.lesson, GENERATOR, now_ms, outline_max_age_ms);
-        self.pkg.write().map_err(|e| e.to_string())
+        let out = self.pkg.write().map_err(|e| e.to_string());
+        self.pkg.objects.extend(drop_o);
+        self.pkg.assets.extend(drop_a);
+        out
     }
 
     pub fn load(&mut self, bytes: &[u8]) -> Result<(), String> {
@@ -2293,6 +2495,7 @@ impl<S: InkSink> Engine<S> {
                     color: None,
                     asset: None,
                     latex: None,
+                    media: None,
                     selected,
                 };
                 match &it.data {
@@ -2313,6 +2516,7 @@ impl<S: InkSink> Engine<S> {
                     },
                     ItemData::Image(i) => DomItem {
                         asset: Some(&i.asset),
+                        media: i.media.as_ref(),
                         ..base(&i.geom, "image")
                     },
                     ItemData::Stroke(_) => unreachable!(),
@@ -3145,6 +3349,150 @@ pub(crate) mod tests {
         assert_eq!(items[2]["title"], "Lab");
         assert!(v["bounds"].is_array());
         assert_eq!(e.page_preview_json(7, 4), "null");
+    }
+
+    fn mp4() -> Vec<u8> {
+        let mut v = vec![0, 0, 0, 0x18];
+        v.extend_from_slice(b"ftypisom-some-video-bytes");
+        v
+    }
+
+    #[test]
+    fn media_items_add_save_copy_and_undo() {
+        let mut e = engine();
+        let yt = MediaData {
+            kind: "youtube".into(),
+            src: "https://youtu.be/dQw4w9WgXcQ".into(),
+            title: "Plants".into(),
+            start: Some(30.0),
+            ..MediaData::default()
+        };
+        let a = e
+            .add_media(yt, (PNG.to_vec(), "png"), None, 640.0, 360.0, 1.0)
+            .unwrap();
+        let clip = MediaData {
+            kind: "video".into(),
+            ..MediaData::default()
+        };
+        let b = e
+            .add_media(
+                clip.clone(),
+                (PNG.to_vec(), "png"),
+                Some((mp4(), "mp4")),
+                640.0,
+                360.0,
+                2.0,
+            )
+            .unwrap();
+        let dom: serde_json::Value = serde_json::from_str(&e.dom_items_json()).unwrap();
+        assert_eq!(dom[0]["media"]["type"], "youtube");
+        assert_eq!(
+            dom[0]["media"]["src"], "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "stored canonical"
+        );
+        assert_eq!(dom[0]["media"]["site"], "youtube");
+        let src = dom[1]["media"]["src"].as_str().unwrap().to_string();
+        assert!(src.ends_with(".mp4") && e.asset(&src).is_some());
+        // Links off the allowlist, and files that are not media, are refused.
+        let bad = MediaData {
+            kind: "web".into(),
+            src: "https://evil.example/".into(),
+            ..MediaData::default()
+        };
+        assert!(
+            e.add_media(bad, (PNG.to_vec(), "png"), None, 9.0, 9.0, 3.0)
+                .is_err()
+        );
+        assert!(
+            e.add_media(
+                clip.clone(),
+                (PNG.to_vec(), "png"),
+                Some((b"<html>".to_vec(), "mp4")),
+                9.0,
+                9.0,
+                3.0
+            )
+            .is_err()
+        );
+        assert!(
+            e.add_media(clip, (PNG.to_vec(), "png"), None, 9.0, 9.0, 3.0)
+                .is_err()
+        );
+        // Settings change in one undo step and keep the clip.
+        let mut m: MediaData = serde_json::from_value(dom[1]["media"].clone()).unwrap();
+        m.looped = true;
+        m.src = "ignored".into();
+        e.set_media(&b, m, None, None).unwrap();
+        let dom: serde_json::Value = serde_json::from_str(&e.dom_items_json()).unwrap();
+        assert_eq!(dom[1]["media"]["loop"], true);
+        assert_eq!(dom[1]["media"]["src"], src.as_str());
+        assert!(e.undo());
+        let dom: serde_json::Value = serde_json::from_str(&e.dom_items_json()).unwrap();
+        assert!(dom[1]["media"].get("loop").is_none());
+        // Save keeps the clip (it is referenced by `media.src`, not `asset`).
+        let mut f = engine();
+        f.load(&e.save(10.0).unwrap()).unwrap();
+        assert!(f.asset(&src).is_some());
+        // Copy and paste into another lesson brings the clip along.
+        let clip_json = e.export_items_json(&[a.clone(), b.clone()]);
+        let mut g = engine();
+        let ids = g
+            .import_items(Clip::from_json(&clip_json).unwrap(), 10.0, 10.0, 11.0)
+            .unwrap();
+        assert_eq!(ids.len(), 2);
+        assert!(g.asset(&src).is_some());
+    }
+
+    #[test]
+    fn undo_save_redo_keeps_bundles_and_clips() {
+        // Regression: a save while an item was undone dropped its bundle (or
+        // its video) from memory, so redo brought back a broken item.
+        let mut e = engine();
+        e.add_object_html("<p>x</p>", "X", 400.0, 300.0, 0, 1.0)
+            .unwrap();
+        let clip = MediaData {
+            kind: "video".into(),
+            ..MediaData::default()
+        };
+        e.add_media(
+            clip,
+            (PNG.to_vec(), "png"),
+            Some((mp4(), "mp4")),
+            64.0,
+            36.0,
+            2.0,
+        )
+        .unwrap();
+        assert!(e.undo() && e.undo());
+        let saved = e.save(3.0).unwrap();
+        let mut f = engine();
+        f.load(&saved).unwrap();
+        assert!(
+            f.pkg.objects.is_empty() && f.pkg.assets.is_empty(),
+            "unused things are not saved"
+        );
+        assert!(e.redo() && e.redo());
+        let mut g = engine();
+        g.load(&e.save(4.0).unwrap()).unwrap();
+        assert_eq!(g.object_html("x").as_deref(), Some("<p>x</p>"));
+        assert_eq!(g.pkg.assets.len(), 2, "poster and clip");
+    }
+
+    #[test]
+    fn model_becomes_a_viewer_object() {
+        let mut e = engine();
+        let mut glb = b"glTF".to_vec();
+        glb.extend_from_slice(&2u32.to_le_bytes());
+        glb.extend_from_slice(&[0; 12]);
+        let id = e
+            .add_model(&glb, "cell.glb", "", 1280.0, 720.0, 1.0)
+            .unwrap();
+        let dom: serde_json::Value = serde_json::from_str(&e.dom_items_json()).unwrap();
+        assert_eq!(dom[0]["id"], id.as_str());
+        assert_eq!(dom[0]["title"], "Cell");
+        let html = e.object_html(dom[0]["bundle"].as_str().unwrap()).unwrap();
+        assert!(html.contains("GLTFLoader"));
+        assert!(e.add_model(b"nope", "x.glb", "", 9.0, 9.0, 2.0).is_err());
     }
 
     #[test]

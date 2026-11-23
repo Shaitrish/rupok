@@ -212,7 +212,80 @@ pub struct TextData {
 pub struct ImageData {
     pub geom: BoxGeom,
     /// Content address: `<blake3-hex>.<ext>` inside the package `assets/`.
+    /// For a media item this is its poster.
     pub asset: String,
+    /// Set when the image is the poster of a video, audio clip or web embed
+    /// (the optional `media` key). Readers that don't know the key show the
+    /// poster as a plain image.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media: Option<MediaData>,
+}
+
+/// What a media item plays (the `media` map of an image item; proposed,
+/// pending RFC). The image `asset` is the poster.
+///
+/// - `youtube`: `src` is a canonical `https://www.youtube.com/watch?v=<id>`
+///   link; the board plays it from `youtube-nocookie.com`.
+/// - `web`: `src` is an `https` link on a trusted site (see
+///   `rupok_format::media`); `site` names it.
+/// - `video`, `audio`: `src` is an asset name (`<blake3>.<ext>`) in the
+///   package, so the clip plays offline.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct MediaData {
+    /// `youtube`, `video`, `audio` or `web`. Readers MUST treat other values
+    /// as a plain image (show the poster).
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub src: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub title: String,
+    /// Trusted site id of a `web` embed (`phet`, `geogebra`, …).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub site: String,
+    /// Play from / to, in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<f64>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub muted: bool,
+    #[serde(default, rename = "loop", skip_serializing_if = "std::ops::Not::not")]
+    pub looped: bool,
+    /// Start playing when the page is shown.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub autoplay: bool,
+}
+
+impl MediaData {
+    /// The kinds this build plays.
+    pub const KINDS: &'static [&'static str] = &["youtube", "video", "audio", "web"];
+    /// Longest `src` (a URL or an asset name) a reader accepts.
+    pub const MAX_SRC: usize = 2048;
+    pub const MAX_TITLE: usize = 300;
+
+    /// A known kind, a sane `src` and finite, ordered times. Anything else
+    /// is treated as absent: the item is then just its poster image.
+    pub fn is_valid(&self) -> bool {
+        let time_ok =
+            |t: Option<f64>| t.is_none_or(|v| v.is_finite() && (0.0..=86_400.0).contains(&v));
+        Self::KINDS.contains(&self.kind.as_str())
+            && !self.src.is_empty()
+            && self.src.len() <= Self::MAX_SRC
+            && !self.src.chars().any(char::is_control)
+            && self.title.len() <= Self::MAX_TITLE
+            && self.site.len() <= 32
+            && time_ok(self.start)
+            && time_ok(self.end)
+            && match (self.start, self.end) {
+                (Some(s), Some(e)) => e > s,
+                _ => true,
+            }
+    }
+
+    /// The asset `src` names, for `video` and `audio`.
+    pub fn src_asset(&self) -> Option<&str> {
+        matches!(self.kind.as_str(), "video" | "audio").then_some(self.src.as_str())
+    }
 }
 
 /// A live Smart Object placed on a page. The bundle itself lives in the

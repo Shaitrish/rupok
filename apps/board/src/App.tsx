@@ -7,7 +7,8 @@ import { PagesPanel, StatusChips, TopBar } from "./components/Chrome";
 import { ObjectDialog } from "./components/Dialogs";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
 import { closeSettings, openSettings, settingsRequest } from "./settings/open";
-import { prefs, sizes, toast, tool } from "./state";
+import { isView, prefs, sizes, toast, tool } from "./state";
+import { handleLink } from "./components/MediaDialog";
 import { Icon, Mark } from "./components/Icon";
 import { APP_NAME, FILE_EXT, TAGLINE, WORDMARK } from "./brand";
 import { Suspense, lazy } from "solid-js";
@@ -103,6 +104,7 @@ export default function App() {
       e.preventDefault();
       setDragging(false);
       if (e.dataTransfer?.files.length) controller.importFiles(Array.from(e.dataTransfer.files));
+      else if (!isView()) handleLink(e.dataTransfer?.getData("text/uri-list").split("\n")[0] || e.dataTransfer?.getData("text/plain") || "");
     });
     window.addEventListener("paste", (e) => {
       const t = e.target as HTMLElement;
@@ -113,6 +115,7 @@ export default function App() {
         return;
       }
       const text = e.clipboardData?.getData("text/plain") ?? "";
+      if (!isView() && handleLink(text)) return; // YouTube and trusted embeds (media/)
       if (/^\s*(<!doctype html|<html|<svg|<div|<canvas|<style|<script)/i.test(text)) {
         const title = text.match(/<title>([^<]*)<\/title>/i)?.[1]?.trim() || "Pasted Smart Object";
         controller.addObject(text, title, 1280, 720, 0);

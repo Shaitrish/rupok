@@ -17,8 +17,8 @@ use serde_json::{Value, json};
 
 use crate::mcp::McpServer;
 use crate::tools::{
-    AddPageParams, AddSmartObjectParams, AddTextParams, DeleteItemParams, PatternArg,
-    SetPageBackgroundParams, UpdateSmartObjectParams,
+    AddMediaParams, AddModelParams, AddPageParams, AddSmartObjectParams, AddTextParams,
+    DeleteItemParams, PatternArg, SetPageBackgroundParams, UpdateSmartObjectParams,
 };
 
 /// The `path` value that sends a lesson tool to the paired board.
@@ -60,6 +60,42 @@ pub fn op_add_smart_object(p: &AddSmartObjectParams) -> Op {
         x: p.x,
         y: p.y,
         network_hosts: p.network_hosts.clone(),
+    }
+}
+
+/// `add_media` on the board: the file (already read from the workspace) goes
+/// over the pairing as base64.
+pub fn op_add_media(p: &AddMediaParams, input: rupok_format::media::MediaInput) -> Op {
+    Op::AddMedia {
+        page: Some(p.page),
+        url: input.url,
+        file_base64: input
+            .file
+            .map(|b| base64::engine::general_purpose::STANDARD.encode(b)),
+        file_name: input.file_name,
+        title: input.title,
+        start: input.start,
+        end: input.end,
+        muted: Some(input.muted),
+        looped: Some(input.looped),
+        autoplay: Some(input.autoplay),
+        x: p.x,
+        y: p.y,
+        width: p.width,
+        height: p.height,
+    }
+}
+
+pub fn op_add_model(p: &AddModelParams, bytes: &[u8], name: String) -> Op {
+    Op::AddModel {
+        page: Some(p.page),
+        file_base64: base64::engine::general_purpose::STANDARD.encode(bytes),
+        file_name: Some(name),
+        title: p.title.clone(),
+        x: p.x,
+        y: p.y,
+        width: p.width,
+        height: p.height,
     }
 }
 

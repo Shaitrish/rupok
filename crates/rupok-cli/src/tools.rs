@@ -126,6 +126,145 @@ pub struct AddSmartObjectParams {
     pub network_hosts: Option<Vec<String>>,
 }
 
+/// Common options of a media item.
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddMediaParams {
+    /// Lesson file path relative to the workspace, or `"live"` for the lesson
+    /// open on the paired board (the class sees the change at once).
+    pub path: String,
+    /// 1-based page number.
+    #[schemars(range(min = 1))]
+    pub page: u32,
+    /// A YouTube link (watch, youtu.be, shorts, embed) or a page on a trusted
+    /// education site: PhET, GeoGebra, Desmos, published Google Slides/Docs/
+    /// Sheets/Forms, Wikipedia, Khan Academy. Other sites are refused. Give
+    /// either `url` or `file`.
+    #[serde(default)]
+    pub url: Option<String>,
+    /// A video or audio file in the workspace (mp4, webm, mp3, m4a, ogg,
+    /// wav; at most 200 MB). It is stored inside the lesson, so it plays
+    /// offline. Give either `url` or `file`.
+    #[serde(default)]
+    pub file: Option<String>,
+    /// Title shown to the teacher and in the lesson outline. Default: from
+    /// the link or the file name.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// Start playing at this second (also read from a YouTube `t=` link).
+    #[serde(default)]
+    pub start: Option<f64>,
+    /// Stop at this second.
+    #[serde(default)]
+    pub end: Option<f64>,
+    #[serde(default)]
+    pub muted: Option<bool>,
+    #[serde(default, rename = "loop")]
+    pub looped: Option<bool>,
+    /// Start playing when the page is shown.
+    #[serde(default)]
+    pub autoplay: Option<bool>,
+    /// Left edge in slide pixels. Default: centred.
+    #[serde(default)]
+    pub x: Option<f64>,
+    /// Top edge in slide pixels. Default: centred.
+    #[serde(default)]
+    pub y: Option<f64>,
+    /// Width in slide pixels. Default 1280 (audio 800).
+    #[serde(default)]
+    pub width: Option<f64>,
+    /// Height in slide pixels. Default 720 (audio 450).
+    #[serde(default)]
+    pub height: Option<f64>,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddYoutubeParams {
+    /// Lesson file path relative to the workspace, or `"live"` for the lesson
+    /// open on the paired board.
+    pub path: String,
+    /// 1-based page number.
+    #[schemars(range(min = 1))]
+    pub page: u32,
+    /// The YouTube link (watch, youtu.be, shorts or embed; `t=` sets the start).
+    pub url: String,
+    /// Title. Default: "YouTube video" (the board looks up the real title).
+    #[serde(default)]
+    pub title: Option<String>,
+    /// Start at this second.
+    #[serde(default)]
+    pub start: Option<f64>,
+    /// Stop at this second.
+    #[serde(default)]
+    pub end: Option<f64>,
+    #[serde(default)]
+    pub muted: Option<bool>,
+    #[serde(default, rename = "loop")]
+    pub looped: Option<bool>,
+    /// Start playing when the page is shown.
+    #[serde(default)]
+    pub autoplay: Option<bool>,
+    #[serde(default)]
+    pub x: Option<f64>,
+    #[serde(default)]
+    pub y: Option<f64>,
+    /// Width in slide pixels. Default 1280.
+    #[serde(default)]
+    pub width: Option<f64>,
+    /// Height in slide pixels. Default 720.
+    #[serde(default)]
+    pub height: Option<f64>,
+}
+
+impl From<AddYoutubeParams> for AddMediaParams {
+    fn from(p: AddYoutubeParams) -> Self {
+        Self {
+            path: p.path,
+            page: p.page,
+            url: Some(p.url),
+            file: None,
+            title: p.title,
+            start: p.start,
+            end: p.end,
+            muted: p.muted,
+            looped: p.looped,
+            autoplay: p.autoplay,
+            x: p.x,
+            y: p.y,
+            width: p.width,
+            height: p.height,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddModelParams {
+    /// Lesson file path relative to the workspace, or `"live"` for the lesson
+    /// open on the paired board.
+    pub path: String,
+    /// 1-based page number.
+    #[schemars(range(min = 1))]
+    pub page: u32,
+    /// A glTF 2.0 model in the workspace: `.glb`, or `.gltf` with every
+    /// buffer and texture embedded. At most 18 MB.
+    pub file: String,
+    /// Title. Default: from the file name.
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub x: Option<f64>,
+    #[serde(default)]
+    pub y: Option<f64>,
+    /// Width in slide pixels. Default 1280.
+    #[serde(default)]
+    pub width: Option<f64>,
+    /// Height in slide pixels. Default 720.
+    #[serde(default)]
+    pub height: Option<f64>,
+}
+
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpdateSmartObjectParams {
@@ -328,6 +467,88 @@ impl Tools {
                 title: p.title,
                 index: p.index.map(|i| i as usize),
                 pattern: p.pattern.map(Into::into),
+            },
+        )
+    }
+
+    /// Read a media or model file from the workspace (never outside it).
+    pub fn read_workspace_file(&self, user: &str, max: usize) -> Result<(Vec<u8>, String)> {
+        let abs = self.ws.resolve_existing(user)?;
+        let len = std::fs::metadata(&abs).map(|m| m.len()).unwrap_or(0);
+        if len > max as u64 {
+            return Err(OpError::Invalid(format!(
+                "{user} is {:.1} MB; the limit is {} MB",
+                len as f64 / 1_048_576.0,
+                max >> 20
+            )));
+        }
+        let bytes = std::fs::read(&abs).map_err(|err| OpError::Io {
+            path: user.to_string(),
+            err,
+        })?;
+        let name = abs
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        Ok((bytes, name))
+    }
+
+    /// The media request of `p`, with the file read from the workspace.
+    pub fn media_input(&self, p: &AddMediaParams) -> Result<rupok_format::media::MediaInput> {
+        let (file, file_name) = match &p.file {
+            Some(f) => {
+                let (bytes, name) =
+                    self.read_workspace_file(f, rupok_format::media::MAX_MEDIA_BYTES)?;
+                (Some(bytes), Some(name))
+            }
+            None => (None, None),
+        };
+        Ok(rupok_format::media::MediaInput {
+            url: p.url.clone(),
+            file,
+            file_name,
+            title: p.title.clone().filter(|t| !t.trim().is_empty()),
+            start: p.start,
+            end: p.end,
+            muted: p.muted.unwrap_or(false),
+            looped: p.looped.unwrap_or(false),
+            autoplay: p.autoplay.unwrap_or(false),
+        })
+    }
+
+    pub fn add_media(&self, p: AddMediaParams) -> Result<ops::AddedMedia> {
+        let _g = self.guard();
+        let abs = self.lesson(&p.path)?;
+        let input = self.media_input(&p)?;
+        ops::add_media(
+            &abs,
+            input,
+            ops::Placement {
+                page: Some(p.page as usize),
+                x: p.x,
+                y: p.y,
+                w: p.width,
+                h: p.height,
+            },
+        )
+    }
+
+    pub fn add_model(&self, p: AddModelParams) -> Result<ops::AddedObject> {
+        let _g = self.guard();
+        let abs = self.lesson(&p.path)?;
+        let (bytes, name) =
+            self.read_workspace_file(&p.file, rupok_format::model3d::MAX_MODEL_BYTES)?;
+        ops::add_model(
+            &abs,
+            &bytes,
+            &name,
+            p.title.as_deref().unwrap_or(""),
+            ops::Placement {
+                page: Some(p.page as usize),
+                x: p.x,
+                y: p.y,
+                w: p.width,
+                h: p.height,
             },
         )
     }
@@ -853,6 +1074,95 @@ rupok.steps.onChange(step => { document.getElementById("bars").textContent = "St
         assert!(!bad.valid && bad.errors >= 1);
         let spec = t.read_object_spec();
         assert!(spec.text.contains("rupoklib://"));
+    }
+
+    #[test]
+    fn media_and_model_tools() {
+        let (dir, t) = tools();
+        let path = "bio.rpk";
+        t.create_lesson(CreateLessonParams {
+            path: path.into(),
+            title: "Bio".into(),
+            pages: Some(1),
+        })
+        .unwrap();
+        let yt = t
+            .add_media(
+                AddYoutubeParams {
+                    path: path.into(),
+                    page: 1,
+                    url: "https://youtu.be/dQw4w9WgXcQ?t=30".into(),
+                    title: Some("Cells".into()),
+                    start: None,
+                    end: Some(90.0),
+                    muted: None,
+                    looped: None,
+                    autoplay: Some(true),
+                    x: None,
+                    y: None,
+                    width: None,
+                    height: None,
+                }
+                .into(),
+            )
+            .unwrap();
+        assert_eq!(
+            (yt.kind.as_str(), yt.src.as_str()),
+            ("youtube", "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        );
+        let mut mp4 = vec![0, 0, 0, 0x18];
+        mp4.extend_from_slice(b"ftypisom-video");
+        std::fs::write(dir.path().join("clip.mp4"), &mp4).unwrap();
+        let clip = t
+            .add_media(AddMediaParams {
+                path: path.into(),
+                page: 1,
+                file: Some("clip.mp4".into()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!((clip.kind.as_str(), clip.title.as_str()), ("video", "Clip"));
+        let bad = t.add_media(AddMediaParams {
+            path: path.into(),
+            page: 1,
+            url: Some("https://example.com/x".into()),
+            ..Default::default()
+        });
+        assert!(bad.is_err());
+        // Files outside the workspace are refused.
+        assert!(
+            t.add_media(AddMediaParams {
+                path: path.into(),
+                page: 1,
+                file: Some("../x.mp4".into()),
+                ..Default::default()
+            })
+            .is_err()
+        );
+        let mut glb = b"glTF".to_vec();
+        glb.extend_from_slice(&2u32.to_le_bytes());
+        glb.extend_from_slice(&[0; 12]);
+        std::fs::write(dir.path().join("heart.glb"), &glb).unwrap();
+        let m = t
+            .add_model(AddModelParams {
+                path: path.into(),
+                page: 1,
+                file: "heart.glb".into(),
+                title: None,
+                x: None,
+                y: None,
+                width: None,
+                height: None,
+            })
+            .unwrap();
+        assert!(m.bundle_id.starts_with("heart"));
+        let o = t.get_lesson_outline(lp(path)).unwrap();
+        let items = &o.pages[0].items;
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].media.as_ref().unwrap().end, Some(90.0));
+        assert_eq!(items[0].title.as_deref(), Some("Cells"));
+        assert!(items[1].media.as_ref().unwrap().src.ends_with(".mp4"));
+        assert_eq!(items[2].title.as_deref(), Some("Heart"));
     }
 
     #[test]

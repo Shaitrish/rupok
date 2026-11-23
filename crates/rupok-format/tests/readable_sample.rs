@@ -162,7 +162,11 @@ fn sample() -> Vec<u8> {
     lesson
         .add_item(
             &p3,
-            &ItemData::Image(ImageData { geom: g, asset }),
+            &ItemData::Image(ImageData {
+                geom: g,
+                asset,
+                media: None,
+            }),
             t0 + 40.0,
         )
         .unwrap();

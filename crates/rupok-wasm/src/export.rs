@@ -330,6 +330,9 @@ enum ExportItem<'a> {
     Image {
         rect: [f64; 4],
         asset: &'a str,
+        /// A media item's poster: what plays, and the link to print.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        media: Option<ExportMedia<'a>>,
     },
     Object {
         id: &'a str,
@@ -340,6 +343,15 @@ enum ExportItem<'a> {
         steps: u32,
         state: Option<&'a str>,
     },
+}
+
+#[derive(Serialize)]
+struct ExportMedia<'a> {
+    kind: &'a str,
+    title: &'a str,
+    /// The link (YouTube, web embeds), for a caption and a QR code.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<String>,
 }
 
 fn rect(g: &BoxGeom) -> [f64; 4] {
@@ -392,6 +404,11 @@ pub fn page_export_json(lesson: &Lesson, pkg: &Package, index: usize, strokes: b
             ItemData::Image(i) => ExportItem::Image {
                 rect: rect(&i.geom),
                 asset: &i.asset,
+                media: i.media.as_ref().map(|m| ExportMedia {
+                    kind: &m.kind,
+                    title: &m.title,
+                    url: rupok_format::media::media_link(m).map(|l| l.url),
+                }),
             },
             ItemData::Object(o) => ExportItem::Object {
                 id: &it.id,

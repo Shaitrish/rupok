@@ -89,6 +89,14 @@ export class ObjectHost {
   frames = new Map<string, Frame>();
   srcCache = new Map<string, string>();
   quizLog: QuizAnswer[] = [];
+  /** Step counts objects declared at run time (`steps`), e.g. the 3D
+   * viewer's saved views; they outlive item syncs. */
+  runtimeSteps = new Map<string, number>();
+
+  /** An object's step count: what it declared at run time, else its manifest's. */
+  stepsOf(it: DomItem): number {
+    return this.runtimeSteps.get(it.id) ?? it.steps ?? 0;
+  }
 
   constructor(private c: Controller) {
     window.addEventListener("message", (e) => this.onMessage(e));
@@ -195,7 +203,7 @@ export class ObjectHost {
         break;
       case "steps":
         // Runtime step count: remembered for presenter navigation.
-        if (typeof msg.count === "number") f.item = { ...f.item, steps: Math.max(0, Math.min(500, msg.count | 0)) };
+        if (typeof msg.count === "number") this.runtimeSteps.set(id, Math.max(0, Math.min(500, msg.count | 0)));
         break;
       case "resize":
         if (typeof msg.w === "number" && typeof msg.h === "number") {
@@ -228,7 +236,7 @@ export class ObjectHost {
 
   setStep(id: string, step: number) {
     const f = this.frames.get(id);
-    const max = f?.item.steps ?? 500;
+    const max = f ? this.stepsOf(f.item) : 500;
     const s = Math.max(0, Math.min(max, step | 0));
     this.c.board.set_object_step(id, s);
     if (f?.ready) this.post(f, { type: "step", step: s });

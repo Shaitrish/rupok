@@ -29,6 +29,7 @@ import { renderTex } from "./katex";
 import { PDFDocument, PDFHexString, type PDFRef, StandardFonts, rgb } from "pdf-lib";
 import type { Controller } from "./controller";
 import { theme as objectTheme } from "./objects";
+import { type ExportMedia, mediaCaption } from "./media/pdf";
 import { BOARD_COLORS } from "./state";
 import { APP_NAME, FILE_EXT, SITE_URL } from "./brand";
 
@@ -62,7 +63,7 @@ export class ExportCancelled extends Error {
 type Rect = [number, number, number, number];
 interface StrokeItem { kind: "stroke"; color: number; opacity: number; tool: string; shape: string | null; outline: number[][] }
 interface TextItem { kind: "text"; rect: Rect; text: string; size: number; color: number; latex?: boolean }
-interface ImageItem { kind: "image"; rect: Rect; asset: string }
+interface ImageItem { kind: "image"; rect: Rect; asset: string; media?: ExportMedia }
 interface ObjectItem { kind: "object"; id: string; rect: Rect; title: string; bundle: string; step: number; steps: number; state: string | null }
 type Item = StrokeItem | TextItem | ImageItem | ObjectItem;
 interface PageData {
@@ -525,6 +526,9 @@ class Exporter {
       if (it.kind === "image") {
         const img = await this.asset(it.asset);
         if (img) this.placeImage(ops, this.xobject(img.ref, res), ...it.rect);
+        // A video or embed: its poster plus what it is, the link and a QR code.
+        const cap = it.media && mediaCaption(it.media, it.rect);
+        if (cap) this.placeImage(ops, this.xobject(await this.embedPixels(cap.canvas, false), res), ...cap.rect);
       } else if (it.kind === "text") {
         await this.drawText(ops, res, it, paper);
       } else if (it.kind === "object") {

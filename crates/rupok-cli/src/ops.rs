@@ -136,6 +136,10 @@ pub struct ItemOutline {
     pub step: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub asset: Option<String>,
+    /// A media item (video, audio, YouTube, web embed): what it plays.
+    /// `asset` is then its poster.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media: Option<rupok_core::MediaData>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -558,6 +562,7 @@ fn item_outline(item: &Item, pkg: &Package) -> ItemOutline {
         steps: None,
         step: None,
         asset: None,
+        media: None,
         tool: None,
         shape: None,
         points: None,
@@ -586,6 +591,10 @@ fn item_outline(item: &Item, pkg: &Package) -> ItemOutline {
         ItemData::Image(i) => {
             o.geometry = i.geom.into();
             o.asset = Some(i.asset.clone());
+            if let Some(m) = &i.media {
+                o.title = Some(m.title.clone()).filter(|t| !t.is_empty());
+                o.media = Some(m.clone());
+            }
         }
         ItemData::Object(ob) => {
             o.geometry = ob.geom.into();
@@ -900,6 +909,88 @@ pub fn add_object(path: &Path, bundle: ObjectBundle, place: Placement) -> Result
         steps,
         warnings,
     })
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct AddedMedia {
+    pub item_id: String,
+    /// `youtube`, `video`, `audio` or `web`.
+    pub kind: String,
+    /// The stored link, or the clip's asset name.
+    pub src: String,
+    pub title: String,
+    pub page: usize,
+    pub geometry: Geometry,
+    pub warnings: Vec<Diagnostic>,
+}
+
+/// Place a media item: a YouTube video or a trusted web embed by link, or a
+/// video or audio file stored in the lesson (spec: Media items).
+pub fn add_media(
+    path: &Path,
+    input: rupok_format::media::MediaInput,
+    place: Placement,
+) -> Result<AddedMedia> {
+    let (mut pkg, mut lesson) = load(path)?;
+    let page_no = place.page.unwrap_or(lesson.page_count());
+    let page = page_at(&lesson, page_no)?;
+    let (media, poster) =
+        rupok_format::media::prepare(&mut pkg, input).map_err(OpError::Invalid)?;
+    let frame = page.frame.unwrap_or(Frame::SLIDE_16_9);
+    let (dw, dh) = if media.kind == "audio" {
+        (800.0, 450.0)
+    } else {
+        (DEFAULT_OBJECT_W, DEFAULT_OBJECT_H)
+    };
+    let w = positive("width", place.w.unwrap_or(dw))?;
+    let h = positive("height", place.h.unwrap_or(dh))?;
+    let geom = BoxGeom {
+        x: finite("x", place.x.unwrap_or((frame.w - w) / 2.0))?,
+        y: finite("y", place.y.unwrap_or((frame.h - h) / 2.0))?,
+        w,
+        h,
+        rot: 0.0,
+    };
+    let warnings = placement_warning(&geom, page.frame).into_iter().collect();
+    let (kind, src, title) = (media.kind.clone(), media.src.clone(), media.title.clone());
+    let data = ItemData::Image(rupok_core::ImageData {
+        geom,
+        asset: poster,
+        media: Some(media),
+    });
+    let item_id = lesson.add_item(&page.id, &data, now_ms())?;
+    save(path, &mut pkg, &lesson)?;
+    Ok(AddedMedia {
+        item_id,
+        kind,
+        src,
+        title,
+        page: page_no,
+        geometry: geom.into(),
+        warnings,
+    })
+}
+
+/// Place a 3D model (`.glb`, or `.gltf` with everything embedded) as the
+/// built-in viewer Smart Object.
+pub fn add_model(
+    path: &Path,
+    bytes: &[u8],
+    name: &str,
+    title: &str,
+    place: Placement,
+) -> Result<AddedObject> {
+    let w = place.w.unwrap_or(DEFAULT_OBJECT_W);
+    let h = place.h.unwrap_or(DEFAULT_OBJECT_H);
+    let bundle = rupok_format::model3d::model_bundle(
+        bytes,
+        name,
+        title,
+        positive("width", w)?,
+        positive("height", h)?,
+    )
+    .map_err(|e| OpError::Invalid(e.to_string()))?;
+    add_object(path, bundle, place)
 }
 
 /// Replace the entry HTML of an existing bundle (and optionally its step

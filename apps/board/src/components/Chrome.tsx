@@ -7,6 +7,8 @@ import { hasTopBar } from "../modes";
 import LatencyOverlay from "./LatencyOverlay";
 import { Icon } from "./Icon";
 import { SelectionOverlay } from "./Selection";
+import { MediaControls } from "./MediaControls";
+import { MediaDialogHost } from "./MediaDialog";
 import { MathPreview } from "./MathPreview";
 import { ThumbCanvas } from "./PageThumb";
 import { ExportHost } from "./ExportDialog";
@@ -29,7 +31,9 @@ export function TopBar(props: { onObject: () => void; onSettings: () => void }) 
       </Show>
       {/* Mounted here because the top bar component is always rendered; the
           overlay itself is a full-screen layer. */}
+      <MediaControls />
       <SelectionOverlay />
+      <MediaDialogHost />
       <MathPreview />
       <ExportHost />
     </>
