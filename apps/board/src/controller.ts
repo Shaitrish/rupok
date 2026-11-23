@@ -19,6 +19,7 @@ import { attachTrackpadPinch } from "./pinch";
 import { autosaveLoad, autosaveStore } from "./storage";
 import { APP_NAME, FILE_EXT, LESSON_MIME } from "./brand";
 import { forgetLessonPath, openLessonFiles, openLessonInto, saveLessonBytes } from "./platform";
+import { onPresentFullscreenLost, presentFullscreen, toggleFullscreen } from "./fullscreen";
 
 /** Clipboard JSON from `Board.export_items_json` starts with this. */
 const CLIP_RE = /^\s*\{"rupok":"clipboard\/v1"/;
@@ -75,6 +76,8 @@ export class Controller {
     }
     this.board.set_read_only(isView());
     document.documentElement.dataset.mode = mode();
+    // Full screen ended by the browser (held Esc, its own UI): Teach ends too.
+    onPresentFullscreenLost(() => mode() === "teach" && this.exitMode());
     this.setTool(isView() ? "hand" : tool());
     this.sync(true);
     setSavedRevision(this.board.revision());
@@ -100,6 +103,8 @@ export class Controller {
     this.board.set_pressure_gamma(p.pressure);
     this.board.set_smart_ink(p.smartShapes, p.scratchOut);
     this.board.set_smart_families(smartFamilies(p));
+    this.board.set_eraser_mode(p.eraserMode);
+    this.board.set_clip_ink(p.keepInkOnPage);
   }
 
   /** Toolbar / M key: Smart shapes off, or back to the last on-mode. */
@@ -143,6 +148,8 @@ export class Controller {
     const prev = mode();
     if (m === prev) return;
     if (m === "teach") this.modeBeforeTeach = prev;
+    // Teach is truly full screen: no title bar, no browser chrome.
+    void presentFullscreen(m === "teach");
     setModeSignal(m);
     document.documentElement.dataset.mode = m;
     this.board.set_read_only(m === "view");
@@ -614,8 +621,7 @@ export class Controller {
   }
 
   toggleFullscreen() {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else document.documentElement.requestFullscreen().catch(() => {});
+    void toggleFullscreen();
   }
 
   /** Screen margins covered by chrome: top, right, bottom, left (CSS px). */

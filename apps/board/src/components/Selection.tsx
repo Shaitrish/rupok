@@ -9,11 +9,19 @@
 // locally, then committed once on release with `set_geom` / `resize_text`.
 // A single shape stroke (shape tools, Smart Ink) resizes too: the engine
 // regenerates its points from the stored geometry (`resize_shape`), so the
-// line width stays the same.
+// line width stays the same. Any other selection (handwriting, or ink with
+// boxes) scales from its corners (`scale_selection`): ink is previewed by the
+// engine, boxes here, and the release commits one undo step.
+//
+// The toolbar is built for a finger on a board (44px targets): recolour,
+// thinner / thicker ink, smaller / bigger, To text, duplicate, group and
+// delete. Each change is one undo step in the engine (`restyle.rs`).
 
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { controller } from "../controller";
-import { type DomItem, camera, editingText, items, replay, selection, selectionIds, selectionMeta, setItems, isView } from "../state";
+import {
+  type DomItem, HL_COLORS, PEN_COLORS, camera, editingText, hex, items, replay, selection, selectionIds, selectionMeta, setItems, isView,
+} from "../state";
 import { Icon } from "./Icon";
 import { ToTextButton } from "./ToText";
 import { makeItLive } from "./MakeItLive";
@@ -32,6 +40,11 @@ export interface Geom { x: number; y: number; w: number; h: number }
 const BOX_HANDLES: Handle[] = ["n", "e", "s", "w", "nw", "ne", "se", "sw"];
 // Text height follows its content: corners scale the text, sides set the wrap width.
 const TEXT_HANDLES: Handle[] = ["e", "w", "nw", "ne", "se", "sw"];
+/** Handwriting and mixed selections scale from their corners, keeping shape. */
+const SCALE_HANDLES: Handle[] = ["nw", "ne", "se", "sw"];
+/** Thicker / thinner multiplies stroke widths by this; bigger / smaller scales by it. */
+const WIDTH_STEP = 1.5;
+const SIZE_STEP = 1.25;
 /** Smallest box a resize can produce, world units. */
 const MIN_SIZE = 16;
 /** Frame padding around strokes and mixed selections, screen px. */
@@ -110,6 +123,22 @@ export function SelectionOverlay() {
   });
   /** Live geometry while a shape is being resized. */
   const [shapeDrag, setShapeDrag] = createSignal<Geom | null>(null);
+  /** Live bounds while handwriting or a mixed selection is being scaled. */
+  const [scaleDrag, setScaleDrag] = createSignal<Geom | null>(null);
+  /** The colour row of the toolbar is open. */
+  const [palette, setPalette] = createSignal(false);
+  createEffect(() => {
+    selectionIds();
+    setPalette(false);
+  });
+  /** Selected text items (they take a colour and scale their font). */
+  const texts = () => {
+    const ids = new Set(selectionIds());
+    return items.filter((i) => ids.has(i.id) && i.kind === "text").length;
+  };
+  const colorable = () => selectionMeta().strokes > 0 || texts() > 0;
+  const currentColor = () => selectionMeta().style?.color ?? null;
+  const swatches = () => (selectionMeta().style?.highlighter ? HL_COLORS : PEN_COLORS);
 
   // A text box is as wide as its longest word and as tall as its lines, so
   // measure it rather than trusting the stored size.
@@ -142,7 +171,8 @@ export function SelectionOverlay() {
       b = g ? [g.x, g.y, g.x + g.w, g.y + g.h] : shapeSel()!.box;
       pad = LOOSE_PAD;
     } else {
-      b = selection();
+      const g = scaleDrag();
+      b = g ? [g.x, g.y, g.x + g.w, g.y + g.h] : selection();
       pad = LOOSE_PAD;
     }
     if (!b) return null;
@@ -164,7 +194,7 @@ export function SelectionOverlay() {
       const r = rect();
       return BOX_HANDLES.filter((h) => h.length === 2 || !r || (h === "n" || h === "s" ? r.w >= EDGE_HANDLE_MIN : r.h >= EDGE_HANDLE_MIN));
     }
-    if (!it) return [];
+    if (!it) return selectionIds().length ? SCALE_HANDLES : [];
     const r = rect();
     const all = it.kind === "text" ? TEXT_HANDLES : BOX_HANDLES;
     return all.filter((h) => {
@@ -240,10 +270,63 @@ export function SelectionOverlay() {
     el.addEventListener("pointercancel", cancel);
   };
 
+  /** Scale handwriting (or ink with boxes) from a corner, keeping its shape:
+   * the engine previews the ink, the boxes are previewed here, and the
+   * release commits one undo step. */
+  const startScale = (h: Handle, e: PointerEvent) => {
+    const b = selection();
+    if (!b || e.button > 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const start: Geom = { x: b[0], y: b[1], w: b[2] - b[0], h: b[3] - b[1] };
+    const boxes = items.filter((i) => selectionIds().includes(i.id)).map((i) => ({ ...i }));
+    const z = camera()[2];
+    const p0 = [e.clientX, e.clientY];
+    let g = start;
+    let moved = false;
+    setResizing(true);
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      if (!moved && Math.hypot(ev.clientX - p0[0], ev.clientY - p0[1]) < 2) return;
+      moved = true;
+      g = resizeGeom(start, h, (ev.clientX - p0[0]) / z, (ev.clientY - p0[1]) / z, true, 8);
+      setScaleDrag(g);
+      controller.board.scale_selection(g.x, g.y, g.x + g.w, g.y + g.h, false);
+      const sx = start.w > 0 ? g.w / start.w : 1, sy = start.h > 0 ? g.h / start.h : 1;
+      const k = Math.sqrt(sx * sy);
+      for (const it of boxes) {
+        const x = g.x + (it.x - start.x) * sx, y = g.y + (it.y - start.y) * sy;
+        if (it.kind === "text") setItems((i) => i.id === it.id, { x: r1(x), y: r1(y), w: r1(it.w * k), size: r1((it.size ?? 40) * k) });
+        else setItems((i) => i.id === it.id, { x: r1(x), y: r1(y), w: r1(it.w * sx), h: r1(it.h * sy) });
+      }
+    };
+    const finish = (commit: boolean) => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", cancel);
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      setResizing(false);
+      setScaleDrag(null);
+      if (!moved) return;
+      if (!commit || !controller.board.scale_selection(g.x, g.y, g.x + g.w, g.y + g.h, true)) {
+        controller.board.scale_cancel();
+        controller.sync(true);
+      }
+    };
+    const up = (ev: PointerEvent) => ev.pointerId === e.pointerId && finish(true);
+    const cancel = (ev: PointerEvent) => ev.pointerId === e.pointerId && finish(false);
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", cancel);
+  };
+
   const startResize = (h: Handle, e: PointerEvent) => {
     if (shapeSel()) return startShapeResize(h, e);
     const it = single();
-    if (!it || e.button > 0) return;
+    if (!it) return startScale(h, e);
+    if (e.button > 0) return;
     e.preventDefault();
     e.stopPropagation();
     const el = e.currentTarget as HTMLElement;
@@ -352,6 +435,37 @@ export function SelectionOverlay() {
                   </button>
                   <div class="vsep" />
                 </Show>
+                <Show when={colorable()}>
+                  <button
+                    class="btn icon sel-color"
+                    classList={{ on: palette() }}
+                    title="Colour"
+                    aria-label="Colour"
+                    aria-expanded={palette()}
+                    onClick={() => setPalette(!palette())}
+                  >
+                    <span
+                      class="swatch-dot"
+                      classList={{ mixed: !currentColor() }}
+                      style={{ background: currentColor() ? currentColor()!.slice(0, 7) : undefined }}
+                    />
+                  </button>
+                </Show>
+                <Show when={selectionMeta().strokes > 0}>
+                  <button class="btn icon" title="Thinner" aria-label="Thinner" onClick={() => controller.board.restyle_selection(undefined, undefined, 1 / WIDTH_STEP)}>
+                    <span class="sel-line thin" aria-hidden="true" />
+                  </button>
+                  <button class="btn icon" title="Thicker" aria-label="Thicker" onClick={() => controller.board.restyle_selection(undefined, undefined, WIDTH_STEP)}>
+                    <span class="sel-line thick" aria-hidden="true" />
+                  </button>
+                </Show>
+                <button class="btn icon" title="Smaller" aria-label="Smaller" onClick={() => controller.board.scale_selection_by(1 / SIZE_STEP)}>
+                  <Icon name="shrink" />
+                </button>
+                <button class="btn icon" title="Bigger" aria-label="Bigger" onClick={() => controller.board.scale_selection_by(SIZE_STEP)}>
+                  <Icon name="grow" />
+                </button>
+                <div class="vsep" />
                 <button class="btn icon" title="Duplicate  ·  Ctrl D" aria-label="Duplicate" onClick={() => controller.duplicateSelection()}>
                   <Icon name="duplicate" />
                 </button>
@@ -382,6 +496,23 @@ export function SelectionOverlay() {
                 <button class="btn icon sel-del" title="Delete  ·  Del" aria-label="Delete" onClick={() => controller.deleteSelection()}>
                   <Icon name="trash" />
                 </button>
+                <Show when={palette() && colorable()}>
+                  <div class="sel-palette" classList={{ up: (barPos()?.top ?? 0) < (rect()?.y ?? 0) }} role="group" aria-label="Colours">
+                    <For each={swatches()}>
+                      {(c) => (
+                        <button
+                          class="btn icon sel-swatch"
+                          classList={{ on: !!currentColor() && currentColor()!.slice(1, 7) === hex(c).slice(1) }}
+                          title={hex(c)}
+                          aria-label={`Colour ${hex(c)}`}
+                          onClick={() => controller.board.restyle_selection(c, undefined, undefined)}
+                        >
+                          <span class="swatch-dot" style={{ background: hex(c) }} />
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
               </div>
             </Show>
           </>

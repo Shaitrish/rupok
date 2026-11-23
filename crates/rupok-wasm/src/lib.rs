@@ -20,7 +20,9 @@ mod web {
     use rupok_render::{Gpu, InkRenderer};
     use wasm_bindgen::prelude::*;
 
-    use crate::engine::{Engine, PointerKind, SmartInk, SmartMode, ToolKind, TouchMode};
+    use crate::engine::{
+        Engine, EraserMode, PointerKind, SmartInk, SmartMode, ToolKind, TouchMode,
+    };
 
     fn now() -> f64 {
         js_sys::Date::now()
@@ -207,6 +209,17 @@ mod web {
 
         pub fn set_width(&mut self, w: f32) {
             self.engine.set_width(w);
+        }
+
+        /// Eraser tool and palm duster: "partial" rubs out only the ink
+        /// under the eraser (strokes split), "stroke" erases whole strokes.
+        pub fn set_eraser_mode(&mut self, mode: &str) {
+            self.engine.set_eraser_mode(EraserMode::parse(mode));
+        }
+
+        /// Keep ink, shapes and placed items on slide pages (on by default).
+        pub fn set_clip_ink(&mut self, on: bool) {
+            self.engine.set_clip_ink(on);
         }
 
         pub fn set_smoothing(&mut self, s: f32) {
@@ -495,6 +508,42 @@ mod web {
             commit: bool,
         ) -> bool {
             self.engine.resize_shape(id, [x0, y0, x1, y1], commit)
+        }
+
+        /// Recolour (0xRRGGBBAA) and/or re-thicken the selection: `width`
+        /// sets every stroke's width, `width_scale` multiplies it. Text takes
+        /// the colour. One undo step; false when nothing changed.
+        pub fn restyle_selection(
+            &mut self,
+            color: Option<u32>,
+            width: Option<f32>,
+            width_scale: Option<f32>,
+        ) -> bool {
+            self.engine.restyle_selection(color, width, width_scale)
+        }
+
+        /// Scale the selection so its bounds become the box: ink, shapes
+        /// (regenerated), text (font) and boxes. `commit: false` previews the
+        /// ink only; `true` is one undo step.
+        pub fn scale_selection(
+            &mut self,
+            x0: f64,
+            y0: f64,
+            x1: f64,
+            y1: f64,
+            commit: bool,
+        ) -> bool {
+            self.engine.scale_selection([x0, y0, x1, y1], commit)
+        }
+
+        /// Scale the selection about its centre (one undo step).
+        pub fn scale_selection_by(&mut self, factor: f64) -> bool {
+            self.engine.scale_selection_by(factor)
+        }
+
+        /// Drop a `scale_selection` preview.
+        pub fn scale_cancel(&mut self) {
+            self.engine.scale_cancel();
         }
 
         /// Resize the selected shapes and labels to the box (preview, or one

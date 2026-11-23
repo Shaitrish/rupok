@@ -147,7 +147,13 @@ svg.icon { display: block; flex: none; }
   font: 650 13px/1 var(--font); font-variant-numeric: tabular-nums; background: rgba(28, 32, 36, 0.78); color: #fff; pointer-events: none;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-.eraser-cursor { position: absolute; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); box-shadow: 0 0 0 1.5px var(--gray-11), inset 0 0 0 1.5px rgba(255, 255, 255, 0.8); }
+/* The eraser: a clear circle the size of what it rubs out, readable on white
+ * and on chalkboards (dark ring, light ring, a light wash inside). */
+.eraser-cursor {
+  position: absolute; z-index: 5; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.28); box-shadow: 0 0 0 2px var(--gray-12), 0 0 0 3.5px rgba(255, 255, 255, 0.9), inset 0 0 0 1.5px rgba(255, 255, 255, 0.9);
+}
+.eraser-cursor.rubbing { background: rgba(255, 255, 255, 0.42); }
 
 /* --------------------------------------------------------------- surfaces */
 .surface {
@@ -357,6 +363,27 @@ kbd { font: 600 11px/1 var(--font); min-width: 22px; height: 22px; padding: 0 6p
 .sel-bar { position: absolute; animation: fade 120ms var(--ease); }
 .sel-bar .vsep { margin: 0 var(--s1); }
 .sel-del:hover { color: var(--danger); }
+/* Used with a finger at the board: 44px targets, and the colour row wraps
+ * under the actions. */
+.sel-bar { height: auto; min-height: 52px; flex-wrap: wrap; justify-content: center; row-gap: var(--s1); max-width: calc(100vw - 2 * var(--inset)); overflow: visible; }
+.sel-bar .btn { height: 44px; }
+.sel-bar .btn.icon { width: 44px; min-width: 44px; }
+.sel-bar .swatch-dot { width: 24px; height: 24px; }
+.sel-bar .btn.on { background: var(--accent-3); color: var(--accent-11); }
+.sel-bar .swatch-dot.mixed { background: transparent; box-shadow: inset 0 0 0 2px var(--text-3); }
+.sel-line { width: 20px; border-radius: 4px; background: currentColor; transform: rotate(-35deg); }
+.sel-line.thin { height: 2px; }
+.sel-line.thick { height: 7px; }
+/* The colour row floats on the side away from the selection, so it never
+ * covers what is being recoloured. */
+.sel-palette {
+  position: absolute; left: 50%; top: calc(100% + var(--s2)); transform: translateX(-50%);
+  display: flex; gap: 2px; padding: 4px; border-radius: 14px; background: var(--surface-solid); box-shadow: var(--shadow-1);
+}
+.sel-palette.up { top: auto; bottom: calc(100% + var(--s2)); }
+.sel-swatch.on .swatch-dot { box-shadow: inset 0 0 0 1px rgba(0, 0, 40, 0.14), 0 0 0 2px var(--surface-solid), 0 0 0 4px var(--accent-9); }
+:root[data-theme="dark"] .sel-swatch.on .swatch-dot { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), 0 0 0 2px var(--surface-solid), 0 0 0 4px var(--accent-9); }
+.sel-bar .sel-swatch.on { background: transparent; }
 
 /* Page thumbnails: a canvas under the number chip and the actions. */
 .pages-list { position: relative; }

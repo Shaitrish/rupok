@@ -283,8 +283,10 @@ pub struct Edits {
     /// Set (`Some`) or clear (`None`) items' group.
     pub groups: Vec<(ItemId, Option<String>)>,
     pub remove: Vec<ItemId>,
-    /// Added on top, in order.
+    /// Added on top, in order (unless an item sets its own `z`).
     pub add: Vec<NewItem>,
+    /// Recolour text items (0xRRGGBBAA); other kinds are skipped.
+    pub text_colors: Vec<(ItemId, u32)>,
 }
 
 impl Edits {
@@ -295,6 +297,7 @@ impl Edits {
             && self.groups.is_empty()
             && self.remove.is_empty()
             && self.add.is_empty()
+            && self.text_colors.is_empty()
     }
 }
 
@@ -304,4 +307,7 @@ pub struct NewItem {
     pub data: ItemData,
     pub created: f64,
     pub group: Option<String>,
+    /// Stacking order to keep (a piece of a cut stroke stays where the
+    /// stroke was); `None` puts the item on top.
+    pub z: Option<f64>,
 }

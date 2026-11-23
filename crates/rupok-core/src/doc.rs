@@ -369,7 +369,7 @@ impl Lesson {
     /// independently.
     pub fn add_item(&mut self, page_id: &str, data: &ItemData, now_ms: f64) -> Result<ItemId> {
         let items = self.items_map(page_id)?;
-        let id = self.insert_item(page_id, &items, data, now_ms, None)?;
+        let id = self.insert_item(page_id, &items, data, now_ms, None, None)?;
         self.doc.commit();
         Ok(id)
     }
@@ -387,6 +387,7 @@ impl Lesson {
                 &it.data,
                 it.created,
                 it.group.as_deref(),
+                it.z,
             )?);
         }
         if !ids.is_empty() {
@@ -403,9 +404,13 @@ impl Lesson {
         data: &ItemData,
         created: f64,
         group: Option<&str>,
+        z: Option<f64>,
     ) -> Result<ItemId> {
         let id = self.new_id();
-        let z = self.next_z(page_id, items);
+        let z = match z {
+            Some(z) if z.is_finite() => z,
+            _ => self.next_z(page_id, items),
+        };
         match data {
             ItemData::Stroke(_) => {
                 let mut f = ValueFields::default();
@@ -542,7 +547,8 @@ impl Lesson {
     }
 
     /// Apply several edits as **one** change (one undo step). Order:
-    /// translate, rewrite strokes, box geometry, groups, remove, add.
+    /// translate, rewrite strokes, box geometry, groups, text colours,
+    /// remove, add.
     /// Returns the ids of the added items. Nothing is committed when an id
     /// is missing (the error is returned and the edit is rolled back by the
     /// caller's next undo-free commit; callers pass ids from the scene).
@@ -566,6 +572,12 @@ impl Lesson {
         for (id, g) in &e.groups {
             Self::write_group(&items, id, g.as_deref())?;
         }
+        for (id, rgba) in &e.text_colors {
+            let m = item_map(&items, id)?;
+            if str_of(&m, "kind").as_deref() == Some("text") {
+                m.insert("color", i64::from(*rgba))?;
+            }
+        }
         for id in &e.remove {
             if items.get(id).is_some() {
                 items.delete(id)?;
@@ -579,6 +591,7 @@ impl Lesson {
                 &it.data,
                 it.created,
                 it.group.as_deref(),
+                it.z,
             )?);
         }
         if !e.is_empty() {
@@ -699,7 +712,7 @@ impl Lesson {
                 items.delete(id)?;
             }
         }
-        let id = self.insert_item(page_id, &items, add, created, None)?;
+        let id = self.insert_item(page_id, &items, add, created, None, None)?;
         self.doc.commit();
         Ok(id)
     }
@@ -1321,7 +1334,9 @@ mod tests {
                         data: text.clone(),
                         created: 4.0,
                         group: Some("g1".into()),
+                        z: None,
                     }],
+                    text_colors: vec![],
                 },
             )
             .unwrap();
@@ -1351,6 +1366,51 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn apply_edits_keeps_a_given_z_and_recolours_text_in_one_step() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let a = l.add_item(&p, &stroke(0.0), 1.0).unwrap();
+        let t = l.add_item(&p, &text_item(0.0), 2.0).unwrap();
+        let z = l.item(&p, &a).unwrap().z;
+        let ids = l
+            .apply_edits(
+                &p,
+                &Edits {
+                    remove: vec![a.clone()],
+                    add: vec![
+                        NewItem {
+                            data: stroke(1.0),
+                            created: 1.0,
+                            group: None,
+                            z: Some(z),
+                        },
+                        NewItem {
+                            data: stroke(2.0),
+                            created: 1.0,
+                            group: None,
+                            z: None,
+                        },
+                    ],
+                    text_colors: vec![(t.clone(), 0xe5484dff)],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            l.item(&p, &ids[0]).unwrap().z,
+            z,
+            "the piece keeps its place"
+        );
+        assert!(l.item(&p, &ids[1]).unwrap().z > z, "no z: on top");
+        let ItemData::Text(td) = l.item(&p, &t).unwrap().data else {
+            panic!("text")
+        };
+        assert_eq!(td.color, 0xe5484dff);
+        assert!(l.undo().unwrap());
+        assert!(l.item(&p, &a).is_ok(), "one undo step");
     }
 
     #[test]
@@ -1544,6 +1604,7 @@ mod tests {
             data,
             created,
             group: None,
+            z: None,
         };
         let ids = l
             .add_items(&p, &[new(stroke(10.0), 5.0), new(text_item(0.0), 6.0)])
@@ -1718,6 +1779,7 @@ mod tests {
                     data: stroke(1.0),
                     created: 9.0,
                     group: Some("gx".into()),
+                    z: None,
                 }],
             )
             .unwrap();

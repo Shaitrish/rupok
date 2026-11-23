@@ -682,11 +682,13 @@ mod tests {
                         }),
                         created: 2.0,
                         group: None,
+                        z: None,
                     },
                     rupok_core::NewItem {
                         data: ItemData::Stroke(stroke),
                         created: 3.0,
                         group: None,
+                        z: None,
                     },
                 ],
             )

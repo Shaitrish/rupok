@@ -5,6 +5,41 @@ notes come after each list. Downloads are on
 [rupok.app/download](https://rupok.app/download/) and on
 [GitHub Releases](https://github.com/Shaitrish/rupok/releases).
 
+## Unreleased
+
+### For teachers
+
+- **Teach is truly full screen:** F5 or the mode switcher fills the whole
+  screen, with no title bar in the desktop app. Esc or the exit button on
+  the dock leaves Teach and full screen together.
+- **The page is the board:** on slide pages, ink that starts outside the
+  page does not draw, ink stops at the page edge, and shapes, text and moved
+  items stay on the page. Turn it off in Settings → Pen & ink → Keep ink on
+  the page. Infinite pages are never limited.
+- **A real duster:** the eraser now rubs out only what it covers and splits
+  strokes, like a board duster (Whole strokes is still one tap away). It has
+  a duster size, a clear circle shows where it rubs, a finger erases with it
+  even after you used a pen, and Clear page asks for a second tap.
+- **Palm eraser** also works on boards that report every touch as a dot: a
+  palm seen as two touches rubbing back and forth now erases.
+- **Select in Teach:** Select & move is on the Teach dock. A finger tap
+  picks handwriting more easily, and the selection toolbar can recolour,
+  make ink thinner or thicker, make anything smaller or bigger (or drag a
+  corner), duplicate, group, turn ink into text and delete, with big
+  buttons. Each change is one undo step.
+- On a touch board the Teach dock keeps finger-sized buttons.
+
+### For developers
+
+- Board engine: the partial eraser (`engine/duster.rs`, `set_eraser_mode`),
+  ink kept on the page (`engine/clip.rs`, `set_clip_ink`) and selection
+  editing (`engine/restyle.rs`: `restyle_selection`, `scale_selection`,
+  `scale_selection_by`, `scale_cancel`).
+- `rupok_core::NewItem` has a `z` (a cut stroke's pieces keep its place)
+  and `Edits` has `text_colors`. The file format does not change.
+- The desktop main window may set full screen
+  (`core:window:allow-set-fullscreen`).
+
 ## v0.2.1 (23 November 2026)
 
 ### For teachers

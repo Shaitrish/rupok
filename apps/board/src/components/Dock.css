@@ -39,6 +39,11 @@
 
 .dock-shell.teach { --tb: 40px; --tb-pad: 4px; --tb-icon: 20px; --r-tb: 10px; }
 :root[data-density="large"] .dock-shell.teach { --tb: 48px; --tb-pad: 6px; --tb-icon: 24px; --r-tb: 12px; }
+/* On a touch board Teach keeps finger-sized cells: 40px is a mouse size. */
+@media (any-pointer: coarse) {
+  :root .dock-shell.teach { --tb: 48px; --tb-pad: 6px; --tb-icon: 24px; --r-tb: 12px; }
+  :root[data-density="large"] .dock-shell.teach { --tb: 56px; --tb-pad: 8px; --tb-icon: 28px; --r-tb: 14px; }
+}
 
 .dock-sep { width: 1px; height: 24px; background: var(--hairline); margin: 0 6px; flex: none; }
 .dock-shell.vertical .dock-sep { width: 24px; height: 1px; margin: 6px 0; }
@@ -172,6 +177,10 @@
 .dock-row.on .icon { color: var(--accent-11); }
 .dock-row .grow { flex: 1; }
 .dock-row.danger, .dock-row.danger .icon { color: var(--danger); }
+.dock-row.danger.armed, .dock-row.danger.armed:hover { background: var(--danger); color: var(--surface-solid); }
+.dock-row.danger.armed .icon { color: var(--surface-solid); }
+.dock-seg { display: flex; height: 44px; margin: 0 var(--s1); }
+.dock-seg button { flex: 1; height: 40px; justify-content: center; white-space: nowrap; }
 .dock-state { font: 550 12px/16px var(--font); color: var(--text-2); }
 .dock-row.on .dock-state { color: var(--accent-11); }
 .dock-menu { display: flex; flex-direction: column; min-width: 232px; }

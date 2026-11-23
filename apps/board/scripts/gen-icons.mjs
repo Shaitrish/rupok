@@ -65,6 +65,9 @@ const MAP = {
   overlay: ["layers-minimalistic", "layers"],
   smartink: ["ruler-cross-pen", "ruler-pen"],
   totext: ["text-field-focus", "text-field"],
+  grow: ["maximize-square-minimalistic", "maximize-square"],
+  shrink: ["minimize-square-minimalistic", "minimize-square"],
+  broom: ["broom"],
 };
 
 function body(name) {

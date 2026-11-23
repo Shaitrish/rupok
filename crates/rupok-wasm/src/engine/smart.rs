@@ -635,6 +635,7 @@ impl<S: InkSink> Engine<S> {
                     data: ItemData::Stroke(d),
                     created: t,
                     group: group.clone(),
+                    z: None,
                 });
             }
         }
@@ -659,6 +660,7 @@ impl<S: InkSink> Engine<S> {
                 }),
                 created: t,
                 group: group.clone(),
+                z: None,
             });
         }
         let page = self.page.clone();
@@ -707,7 +709,7 @@ impl<S: InkSink> Engine<S> {
     // --------------------------------------------------------- connectors
 
     /// World geometry of a stroke's shape, if it has one.
-    fn world_geom(&self, id: &str) -> Option<ShapeGeom> {
+    pub(super) fn world_geom(&self, id: &str) -> Option<ShapeGeom> {
         let ItemData::Stroke(s) = &self.scene.get(id)?.data else {
             return None;
         };
