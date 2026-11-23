@@ -48,6 +48,9 @@ top-left of the 1920 × 1080 frame.
 | `add_page` | `path`, `title?`, `index?` (1-based), `pattern?` | Add a blank slide. |
 | `add_smart_object` | `path`, `page`, `html`, `title`, `width?` (1280), `height?` (720), `steps?` (0), `x?`, `y?` (centred), `network_hosts?` | Validate and place an object. Returns `item_id` and `bundle_id`. |
 | `update_smart_object` | `path`, `bundle_id`, `html`, `steps?`, `network_hosts?` | Replace an object's HTML (all placements update). |
+| `add_youtube` | `path`, `page`, `url`, `title?`, `start?`, `end?` (seconds), `muted?`, `loop?`, `autoplay?`, `x?`, `y?`, `width?`, `height?` | A YouTube video (youtube-nocookie.com, poster offline). Don't build a Smart Object for this: objects have no network. |
+| `add_media` | `path`, `page`, `url?` or `file?`, same options | A YouTube link, a trusted embed (PhET, GeoGebra, Desmos, published Google Slides/Docs, Wikipedia, Khan Academy), or a video/audio file from the workspace (stored in the lesson, plays offline). Other sites are refused. |
+| `add_3d_model` | `path`, `page`, `file` (`.glb`, ≤ 18 MB), `title?`, `x?`, `y?`, `width?`, `height?` | A built-in 3D viewer object (orbit, zoom, animations, saved views as steps). Prefer it to hand-writing a three.js loader. |
 | `add_text` | `path`, `page`, `text`, `x`, `y`, `w?`, `size?` (32), `color?` (`#rrggbb`) | Text box. Keep `size` ≥ 24, titles 48–72. |
 | `delete_item` | `path`, `page`, `item_id` | Remove one item. |
 | `set_page_background` | `path`, `page`, `pattern` (`plain`/`grid`/`dots`/`lines`), `color?` | Page background. |

@@ -139,6 +139,7 @@ offline recogniser read (n-best LaTeX). Then:
 | `get_current_page(page?)`, `get_selection()`, `get_page_snapshot(page?, item_ids?, region?, width?)` | Read and see. |
 | `add_page_after_current(title?, pattern?, color?, show?)`, `go_to_page(page)` | Pages. |
 | `add_text`, `add_smart_object`, `update_smart_object`, `delete_item`, `set_page_background`, `add_page`, `get_lesson_outline` with `path: "live"` | Edit the open lesson. |
+| `add_youtube`, `add_media`, `add_3d_model` with `path: "live"` | A YouTube video or trusted web embed by link, a video/audio file, or a `.glb` 3D model from the workspace (files are sent to the board). |
 | `replace_items_with_text(item_ids, text, …)` | Ink to text (confirm first). |
 | `step_object(item_id?, step?, delta?)` | Next / back inside a Smart Object. |
 | `point_at(x, y, w?, h?, label?, seconds?)` | Show the class where to look. |

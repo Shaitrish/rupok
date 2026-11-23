@@ -487,8 +487,12 @@ An operation is `{"op": "<name>", …fields}`; the names and fields are the
 `Op` enum in `crates/rupok-live/src/op.rs` (`get_page`, `get_outline`,
 `get_selection`, `snapshot`, `go_to_page`, `point_at`, `set_board_theme`,
 `add_page`, `add_page_after_current`, `add_text`, `add_smart_object`,
-`update_smart_object`, `delete_item`, `set_page_background`,
-`replace_items_with_text`, `step_object`, `write_handwriting`). Pages are 1-based and `page`
+`update_smart_object`, `add_media`, `add_model`, `delete_item`, `set_page_background`,
+`replace_items_with_text`, `step_object`, `write_handwriting`). `add_media`
+carries a `url` (YouTube or a trusted embed) or a base64 `file_base64` (video
+or audio); `add_model` a base64 `.glb` as `file_base64`. The MCP tools
+`add_youtube`, `add_media` and `add_3d_model` read files from the workspace and
+send these ops when called with `path: "live"`. Pages are 1-based and `page`
 omitted means the page on screen; coordinates are slide pixels in the
 1920 × 1080 frame.
 

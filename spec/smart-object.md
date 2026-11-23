@@ -188,6 +188,20 @@ connect-src 'none';
 - **Validate first.** Hosts MUST run validation before placing a bundle.
   Errors block placement; warnings are shown to the teacher or agent.
 
+### Built-in objects
+
+Some objects are made by the host rather than written by an author. They are
+ordinary bundles with the same sandbox and no network.
+
+- **3D model viewer** (`generator: "rupok-3d-viewer"`, reference:
+  `crates/rupok-format/src/model3d.rs`). The entry HTML is a three.js viewer
+  loaded from `rupoklib://three/` with the glTF 2.0 model inlined as base64
+  in `<script type="application/octet-stream" id="rupok-model"
+  data-format="glb|gltf">`, so it works offline and fits the 25 MiB bundle
+  limit (models up to 18 MiB). Its state is `{views: [{pos, target}], bg,
+  spin}`; each saved view is a build step, so the presenter's clicker steps
+  through camera angles.
+
 ## Offline libraries (`rupoklib://`)
 
 Classrooms often have bad internet, so popular libraries ship with rupok.
@@ -196,7 +210,7 @@ Reference them as `rupoklib://<name>/<file>`. Library names are exactly the
 
 | Name | Entry file(s) | Use as |
 |---|---|---|
-| `three` | `rupoklib://three/three.module.js` | ES module: `import * as THREE from "rupoklib://three/three.module.js"` (it imports its sibling `three.core.js`). Extras, not guaranteed: addons under `rupoklib://three/addons/` (`controls/OrbitControls.js`, `controls/TrackballControls.js`, `renderers/CSS2DRenderer.js`, `environments/RoomEnvironment.js`) with their `three` import rewritten to a relative path, so they need no import map |
+| `three` | `rupoklib://three/three.module.js` | ES module: `import * as THREE from "rupoklib://three/three.module.js"` (it imports its sibling `three.core.js`). Extras, not guaranteed: addons under `rupoklib://three/addons/` (`controls/OrbitControls.js`, `controls/TrackballControls.js`, `renderers/CSS2DRenderer.js`, `environments/RoomEnvironment.js`, `loaders/GLTFLoader.js` with the `utils/BufferGeometryUtils.js` and `utils/SkeletonUtils.js` it imports) with their `three` import rewritten to a relative path, so they need no import map |
 | `d3` | `rupoklib://d3/d3.min.js` | classic script, global `d3` |
 | `katex` | `rupoklib://katex/katex.min.js` + `rupoklib://katex/katex.min.css` | global `katex`; the CSS loads fonts from `rupoklib://katex/fonts/`. Extra: `auto-render.min.js` |
 | `mermaid` | `rupoklib://mermaid/mermaid.min.js` | global `mermaid` |

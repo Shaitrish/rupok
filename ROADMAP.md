@@ -74,6 +74,7 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 | 📋 | Student annotation layers | [student-layers](docs/roadmap/student-layers.md) | advanced |
 | 📋 | Browser panel with clip-to-board | [browser-panel](docs/roadmap/browser-panel.md) | intermediate |
 | 📋 | Standalone HTML export: one file students can open anywhere | [standalone-html-export](docs/roadmap/standalone-html-export.md) | intermediate |
+| 🚧 | Rich media for class: YouTube by link (youtube-nocookie, poster offline), video and audio files in the lesson, 3D models (GLB viewer object), trusted web embeds (PhET, GeoGebra, Desmos, Google Slides/Docs, Wikipedia, Khan Academy); AI tools `add_youtube`, `add_media`, `add_3d_model`. Format: the `media` key on image items is **proposed, pending RFC** | [media](docs/roadmap/media.md) | intermediate |
 
 ## Phase 3: the classroom
 

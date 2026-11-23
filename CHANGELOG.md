@@ -28,6 +28,19 @@ notes come after each list. Downloads are on
   corner), duplicate, group, turn ink into text and delete, with big
   buttons. Each change is one undo step.
 - On a touch board the Teach dock keeps finger-sized buttons.
+- **Videos, audio and 3D models in class:** paste a YouTube link on the
+  board (or Insert ▾ → Video / YouTube…) and it plays from
+  youtube-nocookie.com with start and end times, mute, loop and autoplay.
+  Drop an mp4, webm, mp3, m4a, ogg or wav file and it is saved in the lesson,
+  so it plays offline. Drop a `.glb` 3D model to turn, zoom and animate it,
+  and save camera views that the clicker steps through. In Teach, big
+  buttons and Space or K play and pause; you can always write over a paused
+  video. Offline, a video shows its poster and says it needs internet; PDFs
+  show the poster with the link and a QR code.
+- **Trusted web embeds:** PhET, GeoGebra, Desmos, published Google Slides
+  and Docs, Wikipedia and Khan Academy links embed live. Other links are not
+  embedded; Rupok offers to open them in the browser.
+- The Smart Object library has a **Media** tab.
 
 ### For developers
 
@@ -39,6 +52,15 @@ notes come after each list. Downloads are on
   and `Edits` has `text_colors`. The file format does not change.
 - The desktop main window may set full screen
   (`core:window:allow-set-fullscreen`).
+- Media items: an optional `media` map on `image` items (proposed, pending
+  RFC; spec/rupok-format.md "Media items"). Older readers show the poster.
+  `rupok_format::media` is the embed allowlist; `rupok_format::model3d`
+  builds the 3D viewer object. New MCP tools `add_youtube`, `add_media`,
+  `add_3d_model`; live ops `add_media`, `add_model`. The desktop CSP allows
+  frames from the trusted sites only. `rupoklib://three/addons/` adds
+  `GLTFLoader`.
+- Fixed: saving while an item was undone dropped its Smart Object bundle or
+  image from memory, so redo brought it back broken.
 
 ## v0.2.1 (23 November 2026)
 
