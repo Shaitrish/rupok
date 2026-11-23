@@ -92,7 +92,9 @@
 .ds-hint {
   position: absolute; right: var(--s2); bottom: var(--s2); height: 24px; padding: 0 var(--s2); border-radius: 8px; display: grid; place-items: center;
   font: 550 11px/12px var(--font); color: var(--text-2); background: var(--surface); box-shadow: 0 0 0 1px var(--hairline); pointer-events: none;
+  animation: hint-out 400ms var(--ease) 4s forwards; /* says it once, then leaves the footer line in view */
 }
+@keyframes hint-out { to { opacity: 0; } }
 .ds-sec { display: flex; flex-direction: column; gap: var(--s2); padding-top: var(--s3); box-shadow: 0 -1px 0 var(--hairline); }
 .ds-sec-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); min-height: 36px; }
 .ds-sec-head h3 { margin: 0; font: 650 12px/16px var(--font); letter-spacing: 0.02em; text-transform: uppercase; color: var(--text-2); }
@@ -159,6 +161,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pages.drawer, .design-sheet, .page-menu, .pages-scrim { animation: none; }
+  .ds-hint { animation: none; }
 }
 
 /* --------------------------------------------------- selecting pages */
