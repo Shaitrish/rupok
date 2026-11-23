@@ -32,12 +32,11 @@ Being honest about this saves you time.
 - **Deep authoring tools** in Professional: actions, the question manager and self-paced learning[^1].
 - **Learner-response hardware** (ActivVote, ActivExpression) and Express Poll[^1].
 - **Imports SMART Notebook files**[^1] and exports IWB files[^6].
-- **A Linux build**, alongside Windows and macOS[^1][^3].
 
 ## Where Rupok is stronger
 
-- **Every feature is free.** Recording, PDF import and export aren’t locked behind a paid edition.
-- **Runs in the browser**, on Windows, macOS, Linux and ChromeOS, with nothing to install.
+- **Every feature is free.** Replay, PDF import and PDF export (including handouts) aren’t locked behind a paid edition.
+- **Runs in the browser**, on Windows, macOS, Linux and ChromeOS, with nothing to install, or as a desktop app for Windows, Mac and Linux.
 - **AI Smart Objects:** live simulations and quizzes from the AI you already use.
 - **Replay for every student:** a small `.rpk` file they open in any browser.
 - **Bangla text in lessons** and an open file format, so lessons aren’t locked to one vendor.
@@ -52,7 +51,7 @@ Being honest about this saves you time.
 ## Switching from ActivInspire
 
 1. **Export from ActivInspire.** Professional exports flipcharts to PDF[^1]; with Personal Edition, print to PDF.
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account. Prefer an app? [Download it](https://rupok.app/download/) for Windows, Mac or Linux.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).

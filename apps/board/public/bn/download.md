@@ -10,11 +10,11 @@ Canonical: https://rupok.app/bn/download/ · Language: bn · Updated: 2026-11-23
 
 ## অ্যাপ হিসেবে ইনস্টল করুন
 
-ফোন, ট্যাবলেট বা Chromebook-এ ওয়েব অ্যাপ ইনস্টল করা অ্যাপের মতোই চলে: নিজের উইন্ডো, অফলাইন, হোম স্ক্রিনে।
+ফোন, ট্যাবলেট বা Chromebook-এ ওয়েব অ্যাপ ইনস্টল করা অ্যাপের মতোই চলে: নিজের উইন্ডো, হোম স্ক্রিনে। (চালু হতে ইন্টারনেট লাগে; পুরোপুরি অফলাইনে চালাতে ডেস্কটপ অ্যাপ নিন।)
 
 ### Android, Chromebook, Windows
 
-Chrome বা Edge-এ [rupok.app/board](https://rupok.app/board/) খুলুন, ব্রাউজারের মেনু থেকে **Install app** (বা **Add to Home screen**) বেছে নিন।
+Chrome, Edge বা Safari-তে [rupok.app/board](https://rupok.app/board/) খুলুন, ব্রাউজারের মেনু থেকে **Install app** (বা **Add to Home screen**) বেছে নিন।
 
 ### iPhone ও iPad
 
@@ -22,7 +22,7 @@ Safari-তে [rupok.app/board](https://rupok.app/board/) খুলুন, **Sha
 
 ## সতর্কবার্তা নিয়ে একটি কথা
 
-ইনস্টলারগুলো এখনো কোড-সাইন করা নয়, তাই প্রথমবার কম্পিউটার একবার জিজ্ঞেস করতে পারে। এটা স্বাভাবিক; সাইনিং রোডম্যাপে আছে।
+ইনস্টলারগুলো এখনো কোড-সাইন করা নয়, তাই প্রথমবার কম্পিউটার একবার জিজ্ঞেস করতে পারে। এটা স্বাভাবিক; সাইন করা ইনস্টলার শিগগিরই আসছে।
 
 - **Windows:** SmartScreen “Windows protected your PC” দেখালে **More info**, তারপর **Run anyway** বেছে নিন।
 - **Mac:** Applications-এ Rupok-এ রাইট-ক্লিক করে **Open**, তারপর আবার **Open**। অথবা **System Settings → Privacy & Security** খুলে **Open Anyway** বেছে নিন।

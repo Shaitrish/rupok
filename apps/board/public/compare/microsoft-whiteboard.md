@@ -38,7 +38,7 @@ Being honest about this saves you time.
 - **Made for presenting lessons:** write on PDF slides, Teach mode for the board, clicker support.
 - **AI Smart Objects:** live simulations and quizzes on your slide.
 - **Class replay** students open from a `.rpk` file.
-- **PDF in and out:** import a PDF to teach from, and download your lesson as a PDF.
+- **PDF in and out:** import a PDF to teach from, and export your lesson as PDF slides or note-taking handouts.
 - **Open source, with Bangla text in lessons.**
 
 ## Which one should you pick?
@@ -50,7 +50,7 @@ Being honest about this saves you time.
 ## Moving your boards to Rupok
 
 1. **Export your board.** Whiteboard exports boards as images[^4]; drop the images into Rupok, or print the board to PDF.
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account. Prefer an app? [Download it](https://rupok.app/download/) for Windows, Mac or Linux.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).

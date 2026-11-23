@@ -69,7 +69,7 @@ const en = {
     {
       id: "install",
       h2: "Install as an app",
-      lede: "On a phone, tablet or Chromebook, the web app works like an installed one: its own window, offline, on the home screen.",
+      lede: "On a phone, tablet or Chromebook, the web app works like an installed one: its own window, on the home screen. (It still needs internet to start; for fully offline use, get the desktop app.)",
       blocks: [{ cols: [
         [{ h3: "Android, Chromebook, Windows" }, "Open [rupok.app/board](/board/) in Chrome, Edge or Safari, open the browser menu and choose **Install app** (or **Add to Home screen**)."],
         [{ h3: "iPhone and iPad" }, "Open [rupok.app/board](/board/) in Safari, tap **Share**, then **Add to Home Screen**."],
@@ -79,7 +79,7 @@ const en = {
       id: "unsigned",
       h2: "A note on the warnings",
       blocks: [
-        "The installers aren’t code-signed yet, so your computer may ask once before it opens Rupok. That’s expected; signing is on the roadmap.",
+        "The installers aren’t code-signed yet, so your computer may ask once before it opens Rupok. That’s expected; signed installers are coming soon.",
         { ul: [
           "**Windows:** if SmartScreen says “Windows protected your PC”, choose **More info**, then **Run anyway**.",
           "**Mac:** right-click Rupok in Applications, choose **Open**, then **Open** again. Or open **System Settings → Privacy & Security** and choose **Open Anyway**.",
@@ -131,9 +131,9 @@ const bn = {
     {
       id: "install",
       h2: "অ্যাপ হিসেবে ইনস্টল করুন",
-      lede: "ফোন, ট্যাবলেট বা Chromebook-এ ওয়েব অ্যাপ ইনস্টল করা অ্যাপের মতোই চলে: নিজের উইন্ডো, অফলাইন, হোম স্ক্রিনে।",
+      lede: "ফোন, ট্যাবলেট বা Chromebook-এ ওয়েব অ্যাপ ইনস্টল করা অ্যাপের মতোই চলে: নিজের উইন্ডো, হোম স্ক্রিনে। (চালু হতে ইন্টারনেট লাগে; পুরোপুরি অফলাইনে চালাতে ডেস্কটপ অ্যাপ নিন।)",
       blocks: [{ cols: [
-        [{ h3: "Android, Chromebook, Windows" }, "Chrome বা Edge-এ [rupok.app/board](/board/) খুলুন, ব্রাউজারের মেনু থেকে **Install app** (বা **Add to Home screen**) বেছে নিন।"],
+        [{ h3: "Android, Chromebook, Windows" }, "Chrome, Edge বা Safari-তে [rupok.app/board](/board/) খুলুন, ব্রাউজারের মেনু থেকে **Install app** (বা **Add to Home screen**) বেছে নিন।"],
         [{ h3: "iPhone ও iPad" }, "Safari-তে [rupok.app/board](/board/) খুলুন, **Share** চাপুন, তারপর **Add to Home Screen**।"],
       ] }],
     },
@@ -141,7 +141,7 @@ const bn = {
       id: "unsigned",
       h2: "সতর্কবার্তা নিয়ে একটি কথা",
       blocks: [
-        "ইনস্টলারগুলো এখনো কোড-সাইন করা নয়, তাই প্রথমবার কম্পিউটার একবার জিজ্ঞেস করতে পারে। এটা স্বাভাবিক; সাইনিং রোডম্যাপে আছে।",
+        "ইনস্টলারগুলো এখনো কোড-সাইন করা নয়, তাই প্রথমবার কম্পিউটার একবার জিজ্ঞেস করতে পারে। এটা স্বাভাবিক; সাইন করা ইনস্টলার শিগগিরই আসছে।",
         { ul: [
           "**Windows:** SmartScreen “Windows protected your PC” দেখালে **More info**, তারপর **Run anyway** বেছে নিন।",
           "**Mac:** Applications-এ Rupok-এ রাইট-ক্লিক করে **Open**, তারপর আবার **Open**। অথবা **System Settings → Privacy & Security** খুলে **Open Anyway** বেছে নিন।",

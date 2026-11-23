@@ -1,10 +1,10 @@
 # Rupok vs OpenBoard: two free, open-source whiteboards
 
-> Rupok and OpenBoard are both free, open-source whiteboard software for teachers. Compare desktop vs browser, AI, replay, recording and languages. Facts checked November 2026.
+> Rupok and OpenBoard are both free, open-source whiteboard software for teachers. Compare platforms, AI, replay, recording and languages. Facts checked November 2026.
 
 Canonical: https://rupok.app/compare/openboard/ · Language: en · Updated: 2026-11-23
 
-OpenBoard is a mature, free desktop whiteboard maintained in Geneva. Rupok is a newer free whiteboard that runs in the browser, with AI-made lessons and stroke-by-stroke replay. Both are open source, so this is about fit, not price.
+OpenBoard is a mature, free desktop whiteboard maintained in Geneva. Rupok is a newer free whiteboard that runs in the browser or as a desktop app, with AI-made lessons and stroke-by-stroke replay. Both are open source, so this is about fit, not price.
 
 ## Rupok vs OpenBoard at a glance
 
@@ -30,7 +30,7 @@ OpenBoard is a mature, free desktop whiteboard maintained in Geneva. Rupok is a 
 
 Being honest about this saves you time.
 
-- **A mature native desktop app** for Windows, macOS and Linux that works fully offline, with roots going back to 2003 (Uniboard, then Open-Sankoré)[^1].
+- **A mature desktop app** for Windows, macOS and Linux, with roots going back to 2003 (Uniboard, then Open-Sankoré)[^1]. Rupok’s desktop app is new: its installers aren’t code-signed yet and the Mac app is in beta.
 - **Video recording with sound** (Podcast mode)[^5]. Rupok replays strokes; audio is coming.
 - **IWB / Common File Format** import and export, for swapping lessons with other whiteboard software[^3].
 - **A library of widgets and activities**, and a widget API[^6].
@@ -41,22 +41,23 @@ Being honest about this saves you time.
 - **Nothing to install.** It runs in Chrome, Edge or Safari, so it also works on Chromebooks, Macs and locked-down school PCs. Prefer an app? The free desktop app runs on Windows, Mac and Linux.
 - **AI Smart Objects.** Live simulations, 3D models and quizzes made by Claude, ChatGPT, Codex or OpenCode, with an MCP server for agents.
 - **Stroke-by-stroke replay** in a small lesson file, instead of a large video. Students pause, zoom and still use the live objects.
+- **Smart shapes and maths, offline:** hand-drawn shapes, graphs, flowcharts and logic gates snap clean, and handwritten maths becomes typeset LaTeX.
 - **GPU ink** that stays smooth with 100,000 strokes.
 - **A student viewer** at [rupok.app/open](https://rupok.app/open/): no account, nothing uploaded.
 - **Bangla text and fonts** in lessons.
 
 ## Which one should you pick?
 
-**Pick OpenBoard** if you want a proven desktop app that works fully offline, records video with sound, or exchanges IWB files.
+**Pick OpenBoard** if you want a long-proven desktop app, video recording with sound, or IWB file exchange.
 
-**Pick Rupok** if you want to teach from any browser, add AI-made interactive lessons, or send students replayable classes.
+**Pick Rupok** if you want to teach from any browser or the desktop app, add AI-made interactive lessons, or send students replayable classes.
 
 Both are free, so try both on your board for a week.
 
 ## Switching from OpenBoard
 
 1. **Export from OpenBoard.** OpenBoard exports documents as PDF[^5].
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account. Prefer an app? [Download it](https://rupok.app/download/) for Windows, Mac or Linux.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).
@@ -65,7 +66,7 @@ Both are free, so try both on your board for a week.
 
 ### What is a good OpenBoard alternative?
 
-If you want to stay free and open source, Rupok is the closest: same price (free), plus AI Smart Objects and stroke replay, running in the browser instead of as a desktop app.
+If you want to stay free and open source, Rupok is the closest: same price (free), plus AI Smart Objects and stroke replay, running in the browser or as a desktop app for Windows, Mac and Linux.
 
 ### Is OpenBoard still maintained?
 

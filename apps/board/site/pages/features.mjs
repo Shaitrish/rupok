@@ -63,7 +63,7 @@ const smartboard = {
         { cards: [
           { b: "Any brand", t: "SMART, Promethean, BenQ, ViewSonic, Prestigio or no-name panels, projectors with a pen, laptops and tablets." },
           { b: "Every feature free", t: "No “Plus” or “Professional” edition. Recording, PDF and AI aren’t locked away." },
-          { b: "Nothing to install", t: "Open rupok.app/board in Chrome, Edge or Safari. Works on Windows, macOS, Linux and ChromeOS." },
+          { b: "Nothing to install", t: "Open rupok.app/board in Chrome, Edge or Safari. Works on Windows, macOS, Linux and ChromeOS. Prefer an app? There’s a desktop app for Windows, Mac and Linux." },
         ] },
       ],
     },
@@ -77,8 +77,9 @@ const smartboard = {
             { h3: "Write" },
             { ticks: [
               "GPU ink that draws a stroke in about a millisecond and stays smooth with 100,000 strokes.",
-              "Pressure, palm rejection, highlighter, shapes, laser pointer, eraser and lasso.",
-              "Big, touch-friendly toolbar for an 86-inch panel; keyboard shortcuts on a laptop.",
+              "Pressure, palm rejection, highlighter, laser pointer, eraser and lasso. Rub with your palm to erase; swipe to change slides; tap with two fingers to undo.",
+              "Smart shapes, offline: hand-drawn shapes, arrows, graphs, flowcharts, logic gates, number lines and tables snap clean. Handwritten maths turns into typeset LaTeX.",
+              "The Smart Dock: a big, touch-friendly toolbar you drag anywhere and shrink to a bubble; keyboard shortcuts on a laptop.",
             ] },
             { h3: "Present" },
             { ticks: [
@@ -97,7 +98,8 @@ const smartboard = {
             { ticks: [
               "Every stroke is saved with its timing: replay any page at 1–8×.",
               "Save the lesson as one `.rpk` file and share it; students open it at [rupok.app/open](/open/).",
-              "Download the lesson as a PDF for printing.",
+              "Export the lesson as PDF slides, or as handouts with 2 or 3 slides per page and lines for notes.",
+              "Keep every lesson in the Library, in folders by subject, course and chapter.",
             ] },
           ],
         ] },
@@ -150,7 +152,7 @@ const smartboard = {
     { q: "Is Rupok really free?", a: "Yes. The whole app is free and open source, with no paid edition of the software. A hosted add-on, Rupok Cloud (sync, share links and live classes), is coming with a free plan for every teacher." },
     { q: "Do I need to download smartboard software for my PC?", a: "No download is needed: Rupok runs in Chrome, Edge or Safari. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](/download/)." },
     { q: "Does it work with SMART, Promethean, BenQ, ViewSonic or Prestigio boards?", a: "Yes. Rupok runs on the computer connected to the board and uses its touch and pen like any browser app, so the brand doesn’t matter." },
-    { q: "Does Rupok work offline?", a: "Once the board is open, it runs on your device: drawing, slides and replay don’t need the internet. An offline install (PWA) is coming soon." },
+    { q: "Does Rupok work offline?", a: "Yes, with the [desktop app](/download/) for Windows, Mac and Linux: drawing, slides, replay, PDF export and handwritten-maths recognition work without internet (the AI features need it). In the browser, the board runs on your device once it’s open." },
     { q: "Can I use my PowerPoint slides?", a: "Save the presentation as a PDF (File → Save As → PDF in PowerPoint), then drop the PDF onto the board. Every slide becomes a page you can write on." },
     { q: "Does Rupok support Bangla?", a: "Yes, for lesson content: Bangla text and fonts work today. A Bangla interface is coming. [বাংলায় পড়ুন](/bn/)." },
   ],
@@ -208,6 +210,21 @@ const ai = {
       ],
     },
     {
+      id: "on-board",
+      band: "mint",
+      h2: "Your AI, on the board",
+      lede: "Rupok works with your own AI subscription. Nothing is sent to Rupok.",
+      blocks: [
+        { ticks: [
+          "**Chat inside Rupok** with your own Claude, Codex or OpenCode: pick the model, @mention pages, use /commands, and keep your chat history. In the desktop app there’s no terminal to open.",
+          "**Live edits.** Your AI sees the open page, points at things and edits the board while you teach. Every change can be undone.",
+          "**Solve this.** Select a problem and the AI writes a step-by-step solution in handwriting below it. By default you preview it before the class sees it.",
+          "**Handwriting to text.** Handwritten maths becomes LaTeX offline; other handwriting becomes text through Claude, with your own API key.",
+          "**Voice input** in text boxes, the chat and search, in English or Bangla.",
+        ] },
+      ],
+    },
+    {
       id: "mcp",
       band: "sun",
       h2: "Connect Claude, Codex or OpenCode (MCP)",
@@ -219,7 +236,7 @@ const ai = {
           "**OpenCode:** in `opencode.json`, add `\"mcp\": { \"rupok\": { \"type\": \"local\", \"command\": [\"rupok\", \"mcp\", \"--workspace\", \"/home/me/Lessons\"] } }`.",
           "**Any MCP client:** command `rupok`, arguments `mcp --workspace <folder>`, transport stdio.",
         ] },
-        "Then ask: *“Make me a 6-slide Rupok lesson on binary numbers for Grade 7, with an interactive counter.”* The [agent guide](https://github.com/Shaitrish/rupok/blob/main/skills/AGENTS.md) lists all 11 tools. You need [Rust](https://rustup.rs) to build the CLI today; release builds are coming.",
+        "Then ask: *“Make me a 6-slide Rupok lesson on binary numbers for Grade 7, with an interactive counter.”* The [agent guide](https://github.com/Shaitrish/rupok/blob/main/skills/AGENTS.md) lists all 12 tools. You need [Rust](https://rustup.rs) to build the CLI today; release builds are coming.",
       ],
     },
     {
@@ -238,7 +255,7 @@ const ai = {
   faq: [
     { q: "What is an AI whiteboard?", a: "A whiteboard where AI helps make the lesson. In Rupok, an AI writes interactive Smart Objects (simulations, 3D models, quizzes) that run live on your slide while you teach with the pen." },
     { q: "Do I need to buy an AI smartboard?", a: "No. Rupok runs on the board you already have, in Chrome, Edge or Safari. The AI is the assistant you already use." },
-    { q: "Which AI works with Rupok?", a: "Any AI that can write an HTML file: ChatGPT, Claude or Gemini (paste the file onto the board). Claude Code, Codex and OpenCode can build whole lessons through Rupok’s MCP server." },
+    { q: "Which AI works with Rupok?", a: "Any AI that can write an HTML file: ChatGPT, Claude or Gemini (paste the file onto the board). Claude Code, Codex and OpenCode can build whole lessons through Rupok’s MCP server, chat with you inside Rupok, and edit the open board live." },
     { q: "Does it cost anything?", a: "Rupok is free. You use your own AI subscription, or a free AI plan. Optional Rupok AI credits are planned for the paid Pro plan." },
     { q: "Can a Smart Object steal data or go online?", a: "No. Objects run in a sandboxed frame with no access to your files or the rest of the page, and network access is blocked unless the lesson allows a specific site." },
   ],
@@ -365,7 +382,7 @@ const teachers = {
         { cards: [
           { b: "Every page kept", t: "Add as many pages as the class needs; reorder and duplicate them." },
           { b: "Replay at 1–8×", t: "Students who missed class watch it unfold in order." },
-          { b: "Download PDF", t: "Print the pages with your ink on them for revision." },
+          { b: "PDF and handouts", t: "Print the slides with your ink, or handouts with lines for notes." },
         ] },
       ],
     },
@@ -384,14 +401,14 @@ const teachers = {
       band: "sun",
       h2: "Made in Bangladesh, for every classroom",
       blocks: [
-        "Rupok is made by Shaitrish in Bangladesh. Bangla text and fonts work in lessons today, and a full Bangla interface is on the roadmap. It runs on the multimedia-classroom PCs and interactive panels schools already have. [বাংলায় পড়ুন →](/bn/)",
+        "Rupok is made by Shaitrish in Bangladesh. Bangla text and fonts work in lessons today, voice typing works in Bangla, and a full Bangla interface is coming. It runs on the multimedia-classroom PCs and interactive panels schools already have. [বাংলায় পড়ুন →](/bn/)",
       ],
     },
   ],
   faq: [
     { q: "Is Rupok a note-taking app for teachers?", a: "It’s a whiteboard first, made for presenting at the board, but it keeps everything: pages, ink, live objects and the timing of every stroke. Many teachers use it as their teaching notebook." },
-    { q: "Can students edit my lesson?", a: "No. Students open lessons in Student mode, which is read-only. They can replay it and use the live objects." },
-    { q: "Where are my lessons saved?", a: "On your device: Rupok autosaves in your browser, and you save `.rpk` files wherever you like. Cloud sync is coming with Rupok Cloud." },
+    { q: "Can students edit my lesson?", a: "No. Students open lessons in Student mode, which is read-only. They can replay it, use the live objects, and save their own copy to their Library." },
+    { q: "Where are my lessons saved?", a: "On your device, in the Library: folders by subject, course and chapter. In the browser they’re kept in browser storage (or a folder you pick in Chrome or Edge); in the desktop app they’re plain `.rpk` files in a real folder, which Google Drive or OneDrive can sync. Cloud sync is coming with Rupok Cloud." },
     { q: "Does it work on a laptop without a smartboard?", a: "Yes. Use a mouse, touchscreen or pen tablet, and present through a projector or in an online class." },
   ],
   final: { h2: "Mind over matter.", p: "Open the board and write your first line in five seconds.", cta: [{ href: "/board/", label: "Open the board" }] },

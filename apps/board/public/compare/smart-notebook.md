@@ -40,8 +40,8 @@ Being honest about this saves you time.
 ## Where Rupok is stronger
 
 - **Every feature is free, on any brand.** SMART’s free version limits touch on non-SMART displays[^2]; Rupok works the same on a SMART, Promethean, BenQ, ViewSonic or Prestigio panel.
-- **Runs on Linux and ChromeOS too**, in Chrome, Edge or Safari. Nothing to install.
-- **AI that builds real simulations,** not only quizzes: projectile motion, 3D molecules, circuits. It works with the AI you already use, including Claude through MCP.
+- **Runs on Linux and ChromeOS too**, in Chrome, Edge or Safari with nothing to install, or as a desktop app for Windows, Mac and Linux.
+- **AI that builds real simulations,** not only quizzes: projectile motion, 3D molecules, circuits. It works with the AI you already use: chat with Claude, Codex or OpenCode inside Rupok, or connect them through MCP.
 - **Class replay students can open.** They replay every stroke from a small `.rpk` file, in the browser, with no account.
 - **Bangla text in lessons**, and an open-source codebase and file format.
 
@@ -54,7 +54,7 @@ Being honest about this saves you time.
 ## Switching from SMART Notebook
 
 1. **Save your Notebook lesson as a PDF.** Export or print it to PDF from SMART Notebook.
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account. Prefer an app? [Download it](https://rupok.app/download/) for Windows, Mac or Linux.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).
@@ -67,11 +67,11 @@ The basic desktop version is free. Notebook Plus with Lumio Standard costs US$59
 
 ### What is the best free alternative to SMART Notebook?
 
-For a free desktop app with a long history, OpenBoard. For a free browser app with AI-made interactive lessons and class replay, Rupok. Both are open source.
+For a free desktop app with a long history, OpenBoard. For a free app that runs in the browser or on the desktop, with AI-made interactive lessons and class replay, Rupok. Both are open source.
 
 ### Can Rupok open .notebook files?
 
-Not yet. Save the lesson as a PDF from SMART Notebook and drop it into Rupok to write on every page.
+No. Save the lesson as a PDF from SMART Notebook and drop it into Rupok to write on every page.
 
 ### Does Rupok work on a SMART Board?
 

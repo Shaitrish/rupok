@@ -31,6 +31,16 @@ These all ship with Rupok as examples. Try them on the [home page](https://rupok
 - **Agents over MCP**: Claude Code, Codex and OpenCode build whole lessons through Rupok’s MCP server, and check every object before saving it.
 - **Claude connector**: Manage lessons from Claude itself, with no install: coming soon with Rupok Cloud.
 
+## Your AI, on the board
+
+Rupok works with your own AI subscription. Nothing is sent to Rupok.
+
+- **Chat inside Rupok** with your own Claude, Codex or OpenCode: pick the model, @mention pages, use /commands, and keep your chat history. In the desktop app there’s no terminal to open.
+- **Live edits.** Your AI sees the open page, points at things and edits the board while you teach. Every change can be undone.
+- **Solve this.** Select a problem and the AI writes a step-by-step solution in handwriting below it. By default you preview it before the class sees it.
+- **Handwriting to text.** Handwritten maths becomes LaTeX offline; other handwriting becomes text through Claude, with your own API key.
+- **Voice input** in text boxes, the chat and search, in English or Bangla.
+
 ## Connect Claude, Codex or OpenCode (MCP)
 
 The `rupok` command-line tool includes an MCP server. Your agent can create lessons, add pages and add validated Smart Objects, but only inside the folder you choose.
@@ -45,7 +55,7 @@ claude mcp add rupok -- rupok mcp --workspace ~/Lessons   # Claude Code
 - **OpenCode:** in `opencode.json`, add `"mcp": { "rupok": { "type": "local", "command": ["rupok", "mcp", "--workspace", "/home/me/Lessons"] } }`.
 - **Any MCP client:** command `rupok`, arguments `mcp --workspace <folder>`, transport stdio.
 
-Then ask: *“Make me a 6-slide Rupok lesson on binary numbers for Grade 7, with an interactive counter.”* The [agent guide](https://github.com/Shaitrish/rupok/blob/main/skills/AGENTS.md) lists all 11 tools. You need [Rust](https://rustup.rs) to build the CLI today; release builds are coming.
+Then ask: *“Make me a 6-slide Rupok lesson on binary numbers for Grade 7, with an interactive counter.”* The [agent guide](https://github.com/Shaitrish/rupok/blob/main/skills/AGENTS.md) lists all 12 tools. You need [Rust](https://rustup.rs) to build the CLI today; release builds are coming.
 
 ## Safe in a classroom
 
@@ -66,7 +76,7 @@ No. Rupok runs on the board you already have, in Chrome, Edge or Safari. The AI 
 
 ### Which AI works with Rupok?
 
-Any AI that can write an HTML file: ChatGPT, Claude or Gemini (paste the file onto the board). Claude Code, Codex and OpenCode can build whole lessons through Rupok’s MCP server.
+Any AI that can write an HTML file: ChatGPT, Claude or Gemini (paste the file onto the board). Claude Code, Codex and OpenCode can build whole lessons through Rupok’s MCP server, chat with you inside Rupok, and edit the open board live.
 
 ### Does it cost anything?
 

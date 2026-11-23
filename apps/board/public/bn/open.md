@@ -19,6 +19,7 @@ Canonical: https://rupok.app/bn/open/ · Language: bn · Updated: 2026-11-23
 - **এক্সটেনশন**: `.rpk`
 - **ভেতরে যা থাকে**: একটি ZIP প্যাকেজ: পুরো ইতিহাসসহ লেসন, ছবি আর স্মার্ট অবজেক্ট
 - **যা দিয়ে খোলে**: Rupok, Chrome, Edge বা Safari ব্রাউজারে ফ্রি: এই পাতায় বা rupok.app/board-এ
+- **এআই পড়তে পারে?**: হ্যাঁ: প্রতিটি ফাইলে লেসনের একটি মার্কডাউন সারাংশ থাকে, যা ChatGPT বা Claude পড়তে পারে
 - **ফরম্যাট**: খোলা ও নথিভুক্ত ([আরপিকে ফাইল ফরম্যাট](https://rupok.app/bn/rpk/), [স্পেসিফিকেশন](https://github.com/Shaitrish/rupok/blob/main/spec/rupok-format.md))
 
 ## মোবাইল বা কম্পিউটারে .rpk ফাইল কীভাবে খুলবেন

@@ -29,7 +29,7 @@ site has impressions (see [launch-checklist.md](launch-checklist.md)).
 | Teacher workflow | note taking software for teachers (smartboard); whiteboard app for teachers; record / replay whiteboard lessons | Mixed | [`/for-teachers/`](https://rupok.app/for-teachers/) |
 | Alternatives | free SMART Notebook alternative; Jamboard alternative / replacement; OpenBoard alternative; Note3 (EasiNote) alternative; Microsoft Whiteboard alternative; ActivInspire alternative; Explain Everything alternative; OneNote alternative for teachers | Commercial investigation | [`/compare/`](https://rupok.app/compare/) hub + `/compare/<product>/` |
 | RPK file | rpk file; open rpk file; what is an rpk file; rpk viewer; rpk file opener; rpk to pdf; rupok file; .rpk | Informational / "how do I open it" | [`/open/`](https://rupok.app/open/) |
-| Bangla | স্মার্ট বোর্ড সফটওয়্যার / স্মার্টবোর্ড সফটওয়্যার; অনলাইন ক্লাসের জন্য হোয়াইটবোর্ড; ডিজিটাল হোয়াইটবোর্ড; ইন্টারঅ্যাকটিভ বোর্ড সফটওয়্যার; মাল্টিমিডিয়া ক্লাসরুম; ডিজিটাল কনটেন্ট | Mixed | [`/bn/`](https://rupok.app/bn/) |
+| Bangla | স্মার্ট বোর্ড সফটওয়্যার / স্মার্টবোর্ড সফটওয়্যার; ফ্রি স্মার্টবোর্ড সফটওয়্যার; শিক্ষকদের জন্য সফটওয়্যার; অনলাইন ক্লাসের হোয়াইটবোর্ড; মাল্টিমিডিয়া ক্লাসরুম; RPK ফাইল (secondary; `/bn/open/` owns it) | Mixed | [`/bn/`](https://rupok.app/bn/) |
 | Bangla RPK | rpk ফাইল খুলুন; আরপিকে ফাইল; rpk ফাইল কীভাবে খুলবো; rpk থেকে pdf | Informational | [`/bn/open/`](https://rupok.app/bn/open/) |
 | Bangla Note3 | Note3 বিকল্প; Note3 ফ্রি; EasiNote | Commercial | [`/bn/compare/note3/`](https://rupok.app/bn/compare/note3/) |
 
@@ -76,7 +76,7 @@ Decisions from the research:
   myViewBoard, a Microsoft Store app, OpenBoard. Used as an H2 on the pillar.
 - **smart board software free download for pc** (South Asian phrasing): covered
   by the FAQ "Do I need to download smartboard software for my PC?" (no:
-  browser; desktop app coming).
+  browser; a desktop app is also available).
 - Questions inferred: Is there free smart board software? Can I use SMART
   software on a non-SMART board? What is the best free interactive whiteboard
   software?
@@ -167,6 +167,16 @@ every six months: prices, editions and platforms change.
   `/bn/` uses both smartboard spellings naturally.
 - Government terms teachers know: "মাল্টিমিডিয়া ক্লাসরুম" and "ডিজিটাল কনটেন্ট".
   Both appear on `/bn/`.
+- `/bn/` (rebuilt 23 Nov 2026 as the full interactive home page): title
+  "Rupok: শিক্ষকদের জন্য ফ্রি স্মার্ট বোর্ড সফটওয়্যার ও অনলাইন ক্লাসের
+  হোয়াইটবোর্ড"; H1 kicker "শিক্ষকদের জন্য ফ্রি স্মার্ট বোর্ড সফটওয়্যার"; H2
+  "অনলাইন ক্লাসের হোয়াইটবোর্ড" (with the Zoom/Meet/Teams steps); the meta
+  description names "RPK ফাইল" and the Students section and FAQ explain it,
+  linking `/bn/open/` and `/bn/rpk/`. "ডিজিটাল হোয়াইটবোর্ড" and "ডিজিটাল
+  কনটেন্ট" were dropped as targets: thin intent, and the copy reads better
+  without them.
+- Subject terms teachers search with (SSC/HSC পদার্থবিজ্ঞান, রসায়ন, ICT লজিক
+  গেট) appear in the Smart shapes section and the FAQ.
 - Later: `/bn/online-class-whiteboard/` if Search Console shows demand.
 
 ## Listings and outreach targets

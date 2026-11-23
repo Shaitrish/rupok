@@ -69,7 +69,7 @@ Directories and lists rank for the alternative searches themselves, and AI
 assistants read them.
 
 - [ ] **AlternativeTo:** create a Rupok entry (free, open source, web,
-      Windows/Linux coming), then add it as an alternative on: SMART Notebook,
+      Windows, macOS and Linux), then add it as an alternative on: SMART Notebook,
       OpenBoard, Jamboard, Microsoft Whiteboard, ActivInspire, Explain
       Everything, IPEVO Whiteboard, LiveBoard. Create Note3 and EasiNote entries
       too (none exists).

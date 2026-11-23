@@ -14,7 +14,7 @@ Swipe sideways on a phone. ✓ yes · ◐ partly or paid · ✗ no · ◷ coming
 
 | Software | Price | Open source | Runs on | AI | Replay / recording | Bangla interface |
 |---|---|---|---|---|---|---|
-| **Rupok** | ✓ Free | ✓ AGPL-3.0 | Chrome/Edge on any OS | ✓ AI Smart Objects from your own AI | ✓ Stroke-by-stroke replay | ◐ Text yes; interface soon |
+| **Rupok** | ✓ Free | ✓ AGPL-3.0 | Chrome, Edge or Safari on any OS; Windows, macOS and Linux apps | ✓ Your own AI: chat, live board edits, Smart Objects | ✓ Stroke-by-stroke replay | ◐ Text yes; interface soon |
 | [Note3](https://rupok.app/compare/note3/) | ✗ €29 per device | ✗ No | Windows | ✗ None documented | ✗ None documented | ✗ No |
 | [SMART Notebook](https://rupok.app/compare/smart-notebook/) | ◐ Free basic; Plus US$59/yr | ✗ No | Windows, macOS | ◐ In Lumio (web) | ◐ Lesson Recorder (Plus) | ✗ No |
 | [OpenBoard](https://rupok.app/compare/openboard/) | ✓ Free | ✓ GPL-3.0 | Windows, macOS, Linux | ✗ None | ◐ Video podcast | ✗ No |
@@ -24,16 +24,16 @@ Swipe sideways on a phone. ✓ yes · ◐ partly or paid · ✗ no · ◷ coming
 | [OneNote](https://rupok.app/compare/onenote/) | ◐ Free; extras need Microsoft 365 | ✗ No | Every major OS, web | ◐ Copilot (paid) | ◐ Ink Replay (Windows) | ◐ Proofing only |
 | [Jamboard](https://rupok.app/compare/jamboard/) | ✗ Discontinued 31 Dec 2024 | ✗ No | — | — | — | — |
 
-*Sources for every row are on each product’s comparison page. Rupok’s Bangla interface, offline install and live class are coming soon; everything else in Rupok’s row ships today.*
+*Sources for every row are on each product’s comparison page. Rupok’s Bangla interface, replay with audio and live class are coming soon; everything else in Rupok’s row ships today.*
 
 ## Detailed comparisons
 
 - [Rupok vs Note3](https://rupok.app/compare/note3/): A free alternative to Prestigio’s Windows-only EasiNote successor.
 - [Rupok vs SMART Notebook](https://rupok.app/compare/smart-notebook/): Every feature free, on any brand of board.
-- [Rupok vs OpenBoard](https://rupok.app/compare/openboard/): Two free, open-source whiteboards: desktop vs browser.
+- [Rupok vs OpenBoard](https://rupok.app/compare/openboard/): Two free, open-source whiteboards, side by side.
 - [Jamboard alternative](https://rupok.app/compare/jamboard/): Jamboard shut down in 2024. Bring your Jams back as PDFs.
 - [Rupok vs Microsoft Whiteboard](https://rupok.app/compare/microsoft-whiteboard/): No account needed, after the 2026 app retirement.
-- [Rupok vs ActivInspire](https://rupok.app/compare/activinspire/): Free with every feature, in the browser.
+- [Rupok vs ActivInspire](https://rupok.app/compare/activinspire/): Free with every feature, in the browser or on the desktop.
 - [Rupok vs Explain Everything](https://rupok.app/compare/explain-everything/): Unlimited stroke replay instead of short videos.
 - [Rupok vs OneNote](https://rupok.app/compare/onenote/): A notebook vs a tool for presenting at the board.
 
@@ -41,7 +41,7 @@ Swipe sideways on a phone. ✓ yes · ◐ partly or paid · ✗ no · ◷ coming
 
 - We only use the other product’s own pages (pricing, release notes, help centre, app store listing), and say when a source is a mirror or a reseller copy.
 - Every claim has a date. Software changes; if we’re out of date, [tell us on GitHub](https://github.com/Shaitrish/rupok/issues) and we’ll fix it.
-- We say where the other product is stronger. Rupok is young: some features (live class, desktop app, Bangla interface) are still coming, and we label them that way.
+- We say where the other product is stronger. Rupok is young: some features (live class, Rupok Cloud, Bangla interface) are still coming, and we label them that way.
 - No logos, no made-up numbers.
 
 ## Questions people ask
@@ -56,7 +56,7 @@ The free options are Rupok and OpenBoard (both open source), plus the free basic
 
 ### Is there open-source smartboard software?
 
-Yes: Rupok (AGPL-3.0, runs in the browser) and OpenBoard (GPL-3.0, desktop app).
+Yes: Rupok (AGPL-3.0, runs in the browser and as a desktop app) and OpenBoard (GPL-3.0, desktop app).
 
 ### Which whiteboard software supports Bangla?
 

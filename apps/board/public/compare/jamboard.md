@@ -29,7 +29,7 @@ Being honest about this saves you time.
 
 - **Free, with no account.** Nothing to sign up for, for you or your students.
 - **Bring your Jams back.** Google converted Jams to PDFs in Drive[^3]. Download one and drop it into Rupok: every page becomes a slide you can write on.
-- **Fast pen ink** on any smartboard, panel, projector or laptop with Chrome, Edge or Safari, including the classroom panel that replaced your Jamboard.
+- **Fast pen ink** on any smartboard, panel, projector or laptop with Chrome, Edge or Safari (or the desktop app), including the classroom panel that replaced your Jamboard.
 - **AI Smart Objects:** live simulations and quizzes on the slide.
 - **Class replay:** students replay your lesson from a small `.rpk` file.
 - **Open source,** so it can’t be switched off the way Jamboard was.
@@ -43,7 +43,7 @@ Being honest about this saves you time.
 ## Bringing your Jams to Rupok
 
 1. **Find your old Jams in Google Drive.** Google converted them to PDF files[^3]. Download the ones you want.
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account. Prefer an app? [Download it](https://rupok.app/download/) for Windows, Mac or Linux.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).

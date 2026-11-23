@@ -68,8 +68,9 @@ online and classroom teaching.
 | ✅ | Desktop app for Windows, macOS (universal `.dmg`) and Linux ([download](https://rupok.app/download/)); draw over any app (overlay, beta) |
 | ✅ | Library, Smart Dock, Settings, gestures and palm eraser, PDF export with handouts (v0.2.0) |
 | ✅ | AI chat inside the app with your own Claude, Codex or OpenCode, and live AI editing of the open lesson (v0.2.0) |
-| 📋 | Rupok Cloud sync and student share links (coming soon), course library |
-| 📋 | Live broadcast to students, live quizzes, subject tools, Bangla |
+| ✅ | Smart Ink (shapes, graphs, flowcharts, logic gates), offline handwritten maths to LaTeX, "Solve this", voice input in English and Bangla (v0.2.0) |
+| 📋 | Rupok Cloud sync and student share links (coming soon) |
+| 📋 | Live broadcast to students, live quizzes, subject tools (ruler, protractor, compass), Bangla interface, Android app |
 
 The full list, with a plan for every item, is in **[ROADMAP.md](ROADMAP.md)**.
 

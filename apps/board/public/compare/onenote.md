@@ -32,7 +32,7 @@ Being honest about this saves you time.
 - **Notebooks on every device**, with offline work and sync[^1][^9].
 - **Class Notebook:** private student sections, a read-only content library, a collaboration space, page distribution and feedback, with rosters from Teams or an LMS[^3].
 - **Co-editing** and a huge Microsoft 365 ecosystem; Office 365 A1 is free for eligible schools[^7].
-- **Math Assistant and handwriting search** (Math Assistant needs a qualifying subscription).
+- **Math Assistant and handwriting search** (Math Assistant needs a qualifying subscription). Rupok reads handwritten maths offline, and Solve this writes worked solutions with your own AI.
 
 ## Where Rupok is stronger
 
@@ -54,7 +54,7 @@ Plenty of teachers use both: OneNote for the notebook, Rupok for the lesson.
 ## Moving a OneNote lesson to Rupok
 
 1. **Export the pages as PDF.** OneNote exports pages, sections or notebooks to PDF on Windows, and single pages on the web and Mac[^8].
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account. Prefer an app? [Download it](https://rupok.app/download/) for Windows, Mac or Linux.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).

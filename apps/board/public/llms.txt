@@ -6,10 +6,10 @@ Key facts (November 2026):
 
 - Price: free, every feature. An optional hosted service, Rupok Cloud (sync, share links, live classes), is coming with a free plan.
 - License: AGPL-3.0-or-later for the app; the `.rpk` format spec, the reference reader/writer, the Smart Object SDK and the agent skills are Apache-2.0.
-- Status: pre-alpha, actively developed. Open the app at https://rupok.app/board/
-- AI: works with the AI you already use. Any chatbot can write a Smart Object as one HTML file to paste onto the board; Claude Code, Codex CLI and OpenCode can build whole lessons through the `rupok mcp` server.
-- Shipped: GPU ink, PDF slides, Smart Objects, stroke replay, Prepare/Teach/Student modes, the student viewer, Bangla text in lessons, the MCP server.
-- Coming soon (not shipped): desktop app (Windows, Linux), offline install, Bangla interface, replay with audio, Rupok Cloud, a remote Claude connector, live classes.
+- Status: early alpha, actively developed (v0.2.0, 23 Nov 2026). Open the app at https://rupok.app/board/ or download the desktop app for Windows, macOS and Linux at https://rupok.app/download/
+- AI: works with the AI you already use. Any chatbot can write a Smart Object as one HTML file to paste onto the board; Claude Code, Codex CLI and OpenCode can build whole lessons through the `rupok mcp` server, chat with the teacher inside Rupok, edit the open board live, and write step-by-step handwritten solutions ("Solve this").
+- Shipped: GPU ink, PDF and image slides, Smart Objects with a presets gallery, stroke replay, Prepare/Teach/Student modes, the student viewer, the Library, PDF export with handouts, Smart Ink shapes and offline handwritten maths to LaTeX, in-app AI chat and live board editing, voice input (English and Bangla), palm eraser and gestures, Bangla text in lessons, the MCP server, desktop apps for Windows, Linux and macOS (unsigned; macOS beta).
+- Coming soon (not shipped): Rupok Cloud (sync, share links, 500 MB free plan, Pro and School plans), a remote Claude connector, live classes and live quizzes, Bangla interface, Bangla handwriting recognition, replay with audio, subject tools (ruler, protractor, compass), an Android app, signed installers.
 - Logo: the logo is a rounded square cut on the diagonal, with the mint half slid away. Tagline: "Mind over matter".
 
 ## Use Rupok from an AI agent (MCP)
@@ -25,7 +25,7 @@ claude mcp add rupok -- rupok mcp --workspace ~/Lessons    # Claude Code
 - Codex CLI, `~/.codex/config.toml`: `[mcp_servers.rupok]` with `command = "rupok"` and `args = ["mcp", "--workspace", "/home/me/Lessons"]`
 - OpenCode, `opencode.json`: `"mcp": { "rupok": { "type": "local", "command": ["rupok", "mcp", "--workspace", "/home/me/Lessons"] } }`
 - Any MCP client: command `rupok`, args `mcp --workspace <dir>`, transport stdio.
-- Tools: `list_lessons`, `create_lesson`, `get_lesson_outline`, `add_page`, `add_smart_object`, `update_smart_object`, `add_text`, `delete_item`, `set_page_background`, `validate_smart_object`, `read_object_spec`.
+- Tools: `list_lessons`, `create_lesson`, `get_lesson_outline`, `add_page`, `add_smart_object`, `update_smart_object`, `add_text`, `replace_strokes_with_text`, `delete_item`, `set_page_background`, `validate_smart_object`, `read_object_spec`.
 - Workflow: call `read_object_spec` once, plan one idea per page, write each object as self-contained HTML, then `validate_smart_object` and fix every error before `add_smart_object`.
 - [Agent guide (skills/AGENTS.md)](https://github.com/Shaitrish/rupok/blob/main/skills/AGENTS.md): setup for every agent and the full tool reference
 - [Smart Object skill](https://github.com/Shaitrish/rupok/blob/main/skills/rupok-smart-objects/SKILL.md): how to write good Smart Objects

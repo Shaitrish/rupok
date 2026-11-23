@@ -12,15 +12,16 @@ Most smartboard software is free only on its maker’s own hardware, or keeps th
 
 - **Any brand**: SMART, Promethean, BenQ, ViewSonic, Prestigio or no-name panels, projectors with a pen, laptops and tablets.
 - **Every feature free**: No “Plus” or “Professional” edition. Recording, PDF and AI aren’t locked away.
-- **Nothing to install**: Open rupok.app/board in Chrome, Edge or Safari. Works on Windows, macOS, Linux and ChromeOS.
+- **Nothing to install**: Open rupok.app/board in Chrome, Edge or Safari. Works on Windows, macOS, Linux and ChromeOS. Prefer an app? There’s a desktop app for Windows, Mac and Linux.
 
 ## Everything a smartboard lesson needs
 
 ### Write
 
 - GPU ink that draws a stroke in about a millisecond and stays smooth with 100,000 strokes.
-- Pressure, palm rejection, highlighter, shapes, laser pointer, eraser and lasso.
-- Big, touch-friendly toolbar for an 86-inch panel; keyboard shortcuts on a laptop.
+- Pressure, palm rejection, highlighter, laser pointer, eraser and lasso. Rub with your palm to erase; swipe to change slides; tap with two fingers to undo.
+- Smart shapes, offline: hand-drawn shapes, arrows, graphs, flowcharts, logic gates, number lines and tables snap clean. Handwritten maths turns into typeset LaTeX.
+- The Smart Dock: a big, touch-friendly toolbar you drag anywhere and shrink to a bubble; keyboard shortcuts on a laptop.
 
 ### Present
 
@@ -37,7 +38,8 @@ Most smartboard software is free only on its maker’s own hardware, or keeps th
 
 - Every stroke is saved with its timing: replay any page at 1–8×.
 - Save the lesson as one `.rpk` file and share it; students open it at [rupok.app/open](https://rupok.app/open/).
-- Download the lesson as a PDF for printing.
+- Export the lesson as PDF slides, or as handouts with 2 or 3 slides per page and lines for notes.
+- Keep every lesson in the Library, in folders by subject, course and chapter.
 
 ## Open-source smartboard software, so it stays free
 
@@ -88,7 +90,7 @@ Yes. Rupok runs on the computer connected to the board and uses its touch and pe
 
 ### Does Rupok work offline?
 
-Once the board is open, it runs on your device: drawing, slides and replay don’t need the internet. An offline install (PWA) is coming soon.
+Yes, with the [desktop app](https://rupok.app/download/) for Windows, Mac and Linux: drawing, slides, replay, PDF export and handwritten-maths recognition work without internet (the AI features need it). In the browser, the board runs on your device once it’s open.
 
 ### Can I use my PowerPoint slides?
 

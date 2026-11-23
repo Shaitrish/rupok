@@ -40,7 +40,7 @@ Being honest about this saves you time.
 
 - **No limits on the free plan:** unlimited lessons, pages and replay length.
 - **Replay, not video:** students get every stroke in a small file. They can pause, zoom and still use the live Smart Objects, which a video can’t do.
-- **AI from any assistant**, not tied to an Apple device or a paid plan: Claude, ChatGPT, Codex or OpenCode.
+- **AI from your own assistant**, not tied to an Apple device or a paid Explain Everything plan: chat with Claude, Codex or OpenCode inside Rupok, or paste a Smart Object from ChatGPT.
 - **Built for the classroom board:** fast GPU ink on smartboards and panels in Chrome, Edge or Safari.
 - **Bangla text in lessons**, and open source.
 
@@ -53,7 +53,7 @@ Being honest about this saves you time.
 ## Switching from Explain Everything
 
 1. **Export your project as PDF.** Explain Everything exports PDF[^2].
-2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account.
+2. **Open the board.** Go to [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari, on the panel's PC or your laptop. No install, no account. Prefer an app? [Download it](https://rupok.app/download/) for Windows, Mac or Linux.
 3. **Drop the PDF in.** Every page becomes a slide you can write on.
 4. **Add the live parts.** Ask your AI for a simulation or quiz and drop it on a slide as a Smart Object ([how](https://rupok.app/ai-whiteboard/)).
 5. **Save and share.** Save the lesson as a `.rpk` file and send it to students. They replay it at [rupok.app/open](https://rupok.app/open/).

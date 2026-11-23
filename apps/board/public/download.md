@@ -10,7 +10,7 @@ The free whiteboard for teachers, as a desktop app for Windows, Mac and Linux. O
 
 ## Install as an app
 
-On a phone, tablet or Chromebook, the web app works like an installed one: its own window, offline, on the home screen.
+On a phone, tablet or Chromebook, the web app works like an installed one: its own window, on the home screen. (It still needs internet to start; for fully offline use, get the desktop app.)
 
 ### Android, Chromebook, Windows
 
@@ -22,7 +22,7 @@ Open [rupok.app/board](https://rupok.app/board/) in Safari, tap **Share**, then 
 
 ## A note on the warnings
 
-The installers aren’t code-signed yet, so your computer may ask once before it opens Rupok. That’s expected; signing is on the roadmap.
+The installers aren’t code-signed yet, so your computer may ask once before it opens Rupok. That’s expected; signed installers are coming soon.
 
 - **Windows:** if SmartScreen says “Windows protected your PC”, choose **More info**, then **Run anyway**.
 - **Mac:** right-click Rupok in Applications, choose **Open**, then **Open** again. Or open **System Settings → Privacy & Security** and choose **Open Anyway**.

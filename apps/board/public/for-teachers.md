@@ -30,7 +30,7 @@ On a chalkboard, the best explanation of the year is gone by the next period. In
 
 - **Every page kept**: Add as many pages as the class needs; reorder and duplicate them.
 - **Replay at 1–8×**: Students who missed class watch it unfold in order.
-- **Download PDF**: Print the pages with your ink on them for revision.
+- **PDF and handouts**: Print the slides with your ink, or handouts with lines for notes.
 
 ## For every subject
 
@@ -44,7 +44,7 @@ On a chalkboard, the best explanation of the year is gone by the next period. In
 
 ## Made in Bangladesh, for every classroom
 
-Rupok is made by Shaitrish in Bangladesh. Bangla text and fonts work in lessons today, and a full Bangla interface is on the roadmap. It runs on the multimedia-classroom PCs and interactive panels schools already have. [বাংলায় পড়ুন →](https://rupok.app/bn/)
+Rupok is made by Shaitrish in Bangladesh. Bangla text and fonts work in lessons today, voice typing works in Bangla, and a full Bangla interface is coming. It runs on the multimedia-classroom PCs and interactive panels schools already have. [বাংলায় পড়ুন →](https://rupok.app/bn/)
 
 ## Questions people ask
 
@@ -54,11 +54,11 @@ It’s a whiteboard first, made for presenting at the board, but it keeps everyt
 
 ### Can students edit my lesson?
 
-No. Students open lessons in Student mode, which is read-only. They can replay it and use the live objects.
+No. Students open lessons in Student mode, which is read-only. They can replay it, use the live objects, and save their own copy to their Library.
 
 ### Where are my lessons saved?
 
-On your device: Rupok autosaves in your browser, and you save `.rpk` files wherever you like. Cloud sync is coming with Rupok Cloud.
+On your device, in the Library: folders by subject, course and chapter. In the browser they’re kept in browser storage (or a folder you pick in Chrome or Edge); in the desktop app they’re plain `.rpk` files in a real folder, which Google Drive or OneDrive can sync. Cloud sync is coming with Rupok Cloud.
 
 ### Does it work on a laptop without a smartboard?
 

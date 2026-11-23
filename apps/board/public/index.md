@@ -54,7 +54,7 @@ No. Open [rupok.app/board](https://rupok.app/board/) in Chrome, Edge or Safari. 
 
 ### How does the AI part work?
 
-Ask the AI you already use for a simulation, 3D model or quiz as a single HTML file, and paste it onto the board. Claude Code, Codex and OpenCode can build whole lessons through Rupok’s MCP server. [More about the AI whiteboard](https://rupok.app/ai-whiteboard/).
+Ask the AI you already use for a simulation, 3D model or quiz as a single HTML file, and paste it onto the board. Or chat with your own Claude, Codex or OpenCode inside Rupok: it can build whole lessons, edit the open board live, and write step-by-step solutions in handwriting that you check first. [More about the AI whiteboard](https://rupok.app/ai-whiteboard/).
 
 ### How do students open my lessons?
 
@@ -74,4 +74,4 @@ Bangla text and fonts work in lessons today, and a Bangla interface is coming. [
 
 ### How is Rupok different from SMART Notebook, OpenBoard or Note3?
 
-Rupok is free with every feature on any board, runs in the browser, and adds AI-made Smart Objects and class replay. Those apps are stronger in other ways, such as mature desktop tools and content libraries. See [the honest comparison](https://rupok.app/compare/).
+Rupok is free with every feature on any board, runs in the browser or as a desktop app, and adds AI-made Smart Objects and class replay. Those apps are stronger in other ways, such as mature desktop tools and content libraries. See [the honest comparison](https://rupok.app/compare/).
