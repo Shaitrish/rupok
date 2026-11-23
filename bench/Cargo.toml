@@ -14,5 +14,6 @@ rupok-ink.workspace = true
 rupok-core.workspace = true
 rupok-format.workspace = true
 rupok-render.workspace = true
+rupok-wasm = { path = "../crates/rupok-wasm" }
 wgpu = { workspace = true, features = ["wgsl", "std", "parking_lot", "vulkan", "metal", "dx12", "gles"] }
 pollster.workspace = true

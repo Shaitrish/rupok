@@ -390,7 +390,179 @@ fn main() {
         unit: "ms",
     });
 
+    // The pen path through the engine: a 10 s stroke at 240 Hz (2400
+    // samples), each pointer move rebuilding the wet stroke, then frames.
+    let (move_p99, wet_frame_p99) = pen_path(&gpu, &view, w, h, format);
+    println!(
+        "pen path, 10 s stroke  move p99 {move_p99:>6.3} ms   wet frame at the end p99 {wet_frame_p99:>6.2} ms"
+    );
+    budgets.push(Budget {
+        name: "pen move → wet update p99",
+        value: move_p99,
+        limit: 0.5,
+        unit: "ms",
+    });
+
+    // Wet and dry must look the same, or the stroke jumps at pen-up.
+    let changed = wet_dry_diff(&gpu, &target, &view, w, h, format);
+    println!("wet vs dry          {changed:>6.2} % of ink pixels differ");
+    budgets.push(Budget {
+        name: "wet vs dry pixels differ",
+        value: changed,
+        limit: 0.5,
+        unit: "%",
+    });
+
     report(&budgets, check);
+}
+
+/// A 10 s, 240 Hz pen stroke through the engine (rupok-wasm's `Engine`, the
+/// board's own pointer path). Returns (pointer_move p99, wet frame p99) in ms.
+fn pen_path(
+    gpu: &Gpu,
+    view: &wgpu::TextureView,
+    w: u32,
+    h: u32,
+    format: wgpu::TextureFormat,
+) -> (f64, f64) {
+    use rupok_wasm::engine::{Engine, PointerKind};
+    let mut e = Engine::new(InkRenderer::new(&gpu.device, format), "bench", 0.0);
+    e.set_view(w as f32, h as f32);
+    let at = |i: usize| {
+        let t = i as f64 * (1000.0 / 240.0);
+        let x = 100.0 + (i as f64 * 0.7) % 1600.0;
+        let y = 500.0 + (t * 0.02).sin() * 200.0;
+        [x, y, 0.6, t]
+    };
+    let s0 = at(0);
+    e.pointer_down(
+        1,
+        s0[0] as f32,
+        s0[1] as f32,
+        0.6,
+        s0[3],
+        PointerKind::Pen,
+        0,
+        0.0,
+    );
+    let mut moves = Vec::with_capacity(2400);
+    let mut frames = Vec::new();
+    for i in 1..2400 {
+        let s = at(i);
+        let t = Instant::now();
+        e.pointer_move(1, &s, &[], s[3]);
+        moves.push(ms(t.elapsed()));
+        if i > 2400 - 120 {
+            let t = Instant::now();
+            e.sink
+                .render(&gpu.device, &gpu.queue, view, w, h, e.camera, 1.0);
+            gpu.device
+                .poll(wgpu::PollType::wait_indefinitely())
+                .unwrap();
+            frames.push(ms(t.elapsed()));
+        }
+    }
+    e.pointer_up(1, 10_000.0);
+    (percentile(&mut moves, 0.99), percentile(&mut frames, 0.99))
+}
+
+/// Render a dense wet stroke, then the same stroke dry (simplified, as on
+/// pen-up), and return the % of ink pixels whose coverage differs.
+fn wet_dry_diff(
+    gpu: &Gpu,
+    target: &wgpu::Texture,
+    view: &wgpu::TextureView,
+    w: u32,
+    h: u32,
+    format: wgpu::TextureFormat,
+) -> f64 {
+    let pts: Vec<_> = (0..1200)
+        .map(|i| {
+            let x = 200.0 + i as f32 * 0.5;
+            rupok_ink::StrokePoint {
+                x,
+                y: 300.0 + (x * 0.05).sin() * 60.0,
+                p: 0.5 + 0.3 * (i as f32 * 0.01).sin(),
+                dt: i * 4,
+            }
+        })
+        .collect();
+    let cam = Camera::default();
+    let region = (180u32, 220u32, 640u32, 160u32);
+    let mut r = InkRenderer::new(&gpu.device, format);
+    r.set_wet(&pts, 4.0, 0x1c2024ff, 1.0);
+    r.render(&gpu.device, &gpu.queue, view, w, h, cam, 1.0);
+    let wet = read_region(gpu, target, region);
+    let mut r = InkRenderer::new(&gpu.device, format);
+    r.add_stroke(
+        "dry",
+        &StrokeData {
+            tool: "pen".into(),
+            color: 0x1c2024ff,
+            width: 4.0,
+            opacity: 1.0,
+            points: rupok_ink::simplify::simplify(&pts, 0.2, 0.06),
+            offset: [0.0, 0.0],
+            shape: None,
+            geom: None,
+        },
+    );
+    r.render(&gpu.device, &gpu.queue, view, w, h, cam, 1.0);
+    let dry = read_region(gpu, target, region);
+    let inked = wet
+        .iter()
+        .zip(&dry)
+        .filter(|(a, b)| **a > 0 || **b > 0)
+        .count();
+    let changed = wet
+        .iter()
+        .zip(&dry)
+        .filter(|(a, b)| a.abs_diff(**b) > 64)
+        .count();
+    100.0 * changed as f64 / inked.max(1) as f64
+}
+
+/// Alpha of a `(x, y, w, h)` region of an Rgba8 texture.
+fn read_region(gpu: &Gpu, tex: &wgpu::Texture, (x, y, w, h): (u32, u32, u32, u32)) -> Vec<u8> {
+    let row = (w * 4).div_ceil(256) * 256;
+    let buf = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("readback region"),
+        size: u64::from(row * h),
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    let mut enc = gpu.device.create_command_encoder(&Default::default());
+    enc.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo {
+            texture: tex,
+            mip_level: 0,
+            origin: wgpu::Origin3d { x, y, z: 0 },
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &buf,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(row),
+                rows_per_image: Some(h),
+            },
+        },
+        wgpu::Extent3d {
+            width: w,
+            height: h,
+            depth_or_array_layers: 1,
+        },
+    );
+    gpu.queue.submit(Some(enc.finish()));
+    buf.slice(..).map_async(wgpu::MapMode::Read, |_| {});
+    gpu.device
+        .poll(wgpu::PollType::wait_indefinitely())
+        .unwrap();
+    let data = buf.slice(..).get_mapped_range().expect("mapped");
+    (0..h)
+        .flat_map(|yy| (0..w).map(move |xx| (yy * row + xx * 4 + 3) as usize))
+        .map(|i| data[i])
+        .collect()
 }
 
 fn read_pixel(gpu: &Gpu, tex: &wgpu::Texture, x: u32, y: u32) -> [u8; 4] {

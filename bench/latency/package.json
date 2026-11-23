@@ -1,0 +1,14 @@
+{
+  "name": "@rupok/bench-latency",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "description": "Pen-to-pixel latency and smoothness harness for the board (docs/performance.md).",
+  "scripts": {
+    "latency": "node pen-latency.mjs",
+    "check": "node pen-latency.mjs --swiftshader --check"
+  },
+  "devDependencies": {
+    "playwright-core": "1.65.1"
+  }
+}

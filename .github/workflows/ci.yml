@@ -45,6 +45,56 @@ jobs:
       - name: Build wasm
         run: cargo build -p rupok-wasm --target wasm32-unknown-unknown --release
 
+  latency:
+    name: Pen latency (Chromium, bench/latency)
+    runs-on: ubuntu-latest
+    env:
+      WASM_BINDGEN_VERSION: 0.2.130
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust from rust-toolchain.toml
+        run: |
+          rustup toolchain install
+          rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: pen-latency
+      - name: Cache wasm-bindgen CLI
+        id: wasm-bindgen-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: wasm-bindgen-${{ runner.os }}-${{ env.WASM_BINDGEN_VERSION }}
+      - name: Install wasm-bindgen CLI
+        if: steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
+        run: cargo install wasm-bindgen-cli --version ${{ env.WASM_BINDGEN_VERSION }} --locked
+      - name: Build the board engine (wasm)
+        run: |
+          cargo build -p rupok-wasm --target wasm32-unknown-unknown --profile release-wasm
+          wasm-bindgen --target web --out-dir apps/board/src/wasm --out-name rupok \
+            target/wasm32-unknown-unknown/release-wasm/rupok_wasm.wasm
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Build the board
+        working-directory: apps/board
+        run: |
+          bun install --frozen-lockfile
+          bun run vendor
+          bun run build
+      # No GPU on the runner: SwiftShader. The budgets test the pipeline (ink
+      # reaches the pen, no pen-up jump, no dropped samples, a light pointer
+      # handler, nothing heavy after pen-up), not the GPU. See docs/performance.md.
+      - name: Pen latency budgets
+        working-directory: bench/latency
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: |
+          npm install --no-audit --no-fund
+          node pen-latency.mjs --swiftshader --check --smoothing 0 --label "CI, smoothing 0"
+          node pen-latency.mjs --swiftshader --check --label "CI, default smoothing"
+
   sdk:
     name: Object SDK (node --test)
     runs-on: ubuntu-latest
