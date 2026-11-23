@@ -55,7 +55,7 @@ jobs:
               target/release/bundle/appimage/*.AppImage
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install WebKitGTK and bundling dependencies
         if: runner.os == 'Linux'
