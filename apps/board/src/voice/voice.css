@@ -31,6 +31,11 @@
   font: 650 11px/1 var(--font); color: var(--accent-11); background: var(--accent-3);
 }
 .mic-lang:hover { background: var(--accent-4); }
+/* Phones and touch screens: 44px touch targets (min-* beats the inline size). */
+@media (pointer: coarse), (max-width: 520px) {
+  .mic-btn { min-width: 44px; min-height: 44px; }
+  .mic-lang { min-width: 44px; min-height: 44px; }
+}
 
 /* A mic placed inside a field (search boxes, the title). */
 .mic-in-field { margin-inline-start: auto; }
