@@ -42,6 +42,31 @@ fn clean_ink_reads_back_exactly() {
 }
 
 #[test]
+fn handwritten_chemistry_comes_out_upright() {
+    let rec = MathRecognizer::new();
+    let synth = Synth::new();
+    for (i, (e, want)) in [
+        ("H_2O", "\\mathrm{H}_2\\mathrm{O}"),
+        ("CO_2", "\\mathrm{C}\\mathrm{O}_2"),
+        (
+            "2H_2+O_2\\to 2H_2O",
+            "2\\mathrm{H}_2+\\mathrm{O}_2\\rightarrow 2\\mathrm{H}_2\\mathrm{O}",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let s = synth.render(e, i as u64, &SynthStyle::clean()).unwrap();
+        assert_eq!(s.latex, want);
+        let got = rec.recognize(&s.strokes);
+        assert_eq!(got.first().map(|c| c.latex.as_str()), Some(want), "{e}");
+    }
+    // Algebra keeps its italics.
+    let s = synth.render("x_2", 9, &SynthStyle::clean()).unwrap();
+    assert_eq!(rec.recognize(&s.strokes)[0].latex, "x_2");
+}
+
+#[test]
 fn hand_built_plus_and_equals() {
     let rec = MathRecognizer::new();
     // "1+1=2"-ish without a "2": 1 + 1 = 1

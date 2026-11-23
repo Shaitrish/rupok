@@ -1109,3 +1109,38 @@ fn stress_phase2() {
         );
     }
 }
+
+#[test]
+fn a_small_plus_stays_ink_and_never_becomes_an_arrow() {
+    let mut rng = Rng(23);
+    for k in 0..400 {
+        let sz = rng.range(50.0, 105.0);
+        let o = [400.0f32, 400.0];
+        let (cx, cy) = (rng.range(-0.2, 0.2) * sz, rng.range(-0.2, 0.2) * sz);
+        let hook = rng.range(-0.25, 0.25) * sz;
+        let slant = rng.range(-0.25, 0.25);
+        let hx = vec![[o[0] - sz / 2.0, o[1] + cy], [o[0] + sz / 2.0, o[1] + cy]];
+        let top = [o[0] + cx + slant * sz / 2.0, o[1] - sz / 2.0];
+        let bot = [o[0] + cx - slant * sz / 2.0, o[1] + sz / 2.0];
+        let vy = vec![top, bot];
+        // Vertical or horizontal first; the second ends in a little hook.
+        let (first, mut second) = if k % 2 == 0 { (hx, vy) } else { (vy, hx) };
+        let end = second[1];
+        second.push([end[0] + hook, end[1] - hook.abs()]);
+        let (first, second) = (h(&first, &mut rng), h(&second, &mut rng));
+        let (a, b) = (first[0], first[first.len() - 1]);
+        for n in [raw(first.clone(), 300.0), shaped(line_shape(a, b), 300.0)] {
+            assert_eq!(
+                by(&second, &ctx(vec![n])),
+                None,
+                "plus {k} of {sz:.0} px hook {hook:.0} slant {slant:.2}"
+            );
+        }
+    }
+    // A short arrow (a V at a line's end) still works, and so do big axes.
+    let line = shaped(line_shape([300.0, 400.0], [400.0, 400.0]), 300.0);
+    let v = h(&[[375.0, 380.0], [401.0, 400.0], [375.0, 420.0]], &mut rng);
+    assert_eq!(by(&v, &ctx(vec![line])), Some(ShapeKind::Arrow));
+    let (x, y) = axes_plus(&mut rng, [400.0, 400.0], 250.0, 250.0, 250.0, 250.0, 0.0);
+    assert_eq!(by(&y, &ctx(vec![raw(x, 300.0)])), Some(ShapeKind::Axes));
+}

@@ -6,7 +6,7 @@ use super::geom::{BBox, Pt};
 use super::layout::{LBase, LRow, Layout, Rel, SymNode};
 use super::segment::{self, GroupCache, TAU};
 use super::symbols::sym;
-use super::tree::to_latex;
+use super::tree::display_latex;
 use super::{Candidate, RecognizedSymbol};
 
 /// Segmentations kept by the dynamic programme.
@@ -120,7 +120,7 @@ fn parse_of(lrow: &LRow, syms: &[SymNode], dec: &context::Decoded, base: f32, se
     let mut labels = dec.labels.clone();
     let built = context::build(lrow, syms, &mut labels);
     Parse {
-        latex: to_latex(&built.row),
+        latex: display_latex(&built.row),
         cost: base
             + dec.cost
             + built.cost_adj

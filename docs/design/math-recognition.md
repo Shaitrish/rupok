@@ -165,7 +165,8 @@ few milliseconds.
 - Structures: superscripts, subscripts (nested), fractions (nested),
   radicals, functions `\sin \cos \tan \log \ln`, degrees, primes, decimal
   points, implicit multiplication (juxtaposition), chemistry
-  (`2H_2+O_2\rightarrow 2H_2O`).
+  (`2H_2+O_2\rightarrow 2H_2O`, output with upright element symbols:
+  `2\mathrm{H}_2+\mathrm{O}_2\rightarrow 2\mathrm{H}_2\mathrm{O}`).
 
 `supported_symbols()` lists them (text, LaTeX) for a calibration screen.
 

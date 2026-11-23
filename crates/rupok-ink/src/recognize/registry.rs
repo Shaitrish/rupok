@@ -181,6 +181,120 @@ impl Recognizer for ArrowHead {
     }
 }
 
+/// A small "+" is writing: strokes under this size, screen px, that cross a
+/// recent stroke of the same size, one level and one upright, stay ink.
+pub const SMALL_CROSS_PX: f32 = 110.0;
+/// The two strokes of a small cross come within this many ms.
+pub const SMALL_CROSS_WINDOW_MS: f64 = 4000.0;
+
+/// Does `stroke` cross a recent small neighbour through both their middles,
+/// one level and the other upright (a handwritten "+")? An arrow head's "V"
+/// meets its line only at the line's end, so it never counts; a "×" (a
+/// bulb's cross) is left to the recognisers. Returns the neighbour's index.
+pub fn small_cross(stroke: &[P], ctx: &Context) -> Option<usize> {
+    let px = ctx.opts.px();
+    let extent = |b: [f32; 4]| (b[2] - b[0]).max(b[3] - b[1]) * px;
+    if stroke.len() < 2 || extent(super::bbox(stroke)) >= SMALL_CROSS_PX {
+        return None;
+    }
+    ctx.neighbours.iter().position(|n| {
+        if !(0.0..=SMALL_CROSS_WINDOW_MS).contains(&n.gap_ms) || extent(n.bounds) >= SMALL_CROSS_PX
+        {
+            return false;
+        }
+        let seg;
+        let other: &[P] = match &n.geometry {
+            Some(Geometry::Segment { a, b }) => {
+                seg = [*a, *b];
+                &seg
+            }
+            Some(_) => return false,
+            None => &n.points,
+        };
+        if other.len() < 2 {
+            return false;
+        }
+        match (level_mid(other), level_mid(stroke)) {
+            (Some(x), Some(y)) if x != y => crosses_mid(stroke, other),
+            _ => false,
+        }
+    })
+}
+
+/// [`level`] of a polyline's middle (from 20 % to 80 % of its length), so a
+/// hook at either end doesn't tilt it.
+fn level_mid(p: &[P]) -> Option<bool> {
+    let total = super::path_len(p);
+    let at = |f: f32| {
+        let want = f * total;
+        let mut run = 0.0;
+        for w in p.windows(2) {
+            let l = super::dist(w[0], w[1]);
+            if run + l >= want && l > f32::EPSILON {
+                let t = (want - run) / l;
+                return [
+                    w[0][0] + t * (w[1][0] - w[0][0]),
+                    w[0][1] + t * (w[1][1] - w[0][1]),
+                ];
+            }
+            run += l;
+        }
+        p[p.len() - 1]
+    };
+    level(at(0.2), at(0.8))
+}
+
+/// Do polylines `p` and `q` cross somewhere in the middle 60 % of both?
+fn crosses_mid(p: &[P], q: &[P]) -> bool {
+    let (lp, lq) = (super::path_len(p), super::path_len(q));
+    if lp <= f32::EPSILON || lq <= f32::EPSILON {
+        return false;
+    }
+    let mid = |f: f32| (0.2..=0.8).contains(&f);
+    let mut rp = 0.0;
+    p.windows(2).any(|w| {
+        let l = super::dist(w[0], w[1]);
+        let mut rq = 0.0;
+        let hit = q.windows(2).any(|v| {
+            let m = super::dist(v[0], v[1]);
+            let hit = crossing(w[0], w[1], v[0], v[1])
+                .is_some_and(|(t, u)| mid((rp + t * l) / lp) && mid((rq + u * m) / lq));
+            rq += m;
+            hit
+        });
+        rp += l;
+        hit
+    })
+}
+
+/// `Some(true)` for a segment within 25° of level, `Some(false)` within 25°
+/// of upright (handwriting slants), `None` for a diagonal.
+fn level(a: P, b: P) -> Option<bool> {
+    let th = (b[1] - a[1]).atan2(b[0] - a[0]).abs();
+    let off = th.min(super::PI - th);
+    let tol = 25.0 * super::DEG;
+    if off <= tol {
+        Some(true)
+    } else if off >= super::PI / 2.0 - tol {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+/// Where segments `a`–`b` and `c`–`d` cross: the parameters along each.
+fn crossing(a: P, b: P, c: P, d: P) -> Option<(f32, f32)> {
+    let (r, s) = ([b[0] - a[0], b[1] - a[1]], [d[0] - c[0], d[1] - c[1]]);
+    let den = r[0] * s[1] - r[1] * s[0];
+    if den.abs() <= f32::EPSILON {
+        return None;
+    }
+    let q = [c[0] - a[0], c[1] - a[1]];
+    let t = (q[0] * s[1] - q[1] * s[0]) / den;
+    let u = (q[0] * r[1] - q[1] * r[0]) / den;
+    ((0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u)).then_some((t, u))
+}
+
 /// Recognisers in priority order.
 pub struct Registry {
     list: Vec<Box<dyn Recognizer>>,
@@ -245,6 +359,9 @@ impl Registry {
         standalone: bool,
     ) -> Option<Proposal> {
         let xy: Vec<P> = stroke.iter().map(|p| [p.x, p.y]).collect();
+        if small_cross(&xy, ctx).is_some() {
+            return None;
+        }
         self.list
             .iter()
             .filter(|r| !r.deferred() && (standalone || r.contextual()))
