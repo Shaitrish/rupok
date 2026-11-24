@@ -611,6 +611,29 @@ look-alikes).
 | `replay` | Playing back a recorded class. | Steps and state are driven by the recording. Avoid side effects. |
 | `student` | Running on a learner's own device (planned). | Interactive; quiz answers go to the teacher. |
 
+## Smart stamps
+
+> **Status: proposed, pending RFC.** Additive: a Smart stamp is an ordinary
+> Smart Object bundle; only its custom stamp definition is new
+> (rupok-format.md, Custom stamps).
+
+A **Smart stamp** is a stamp whose picture is a small Smart Object with its
+own logic (a dice that rolls on tap, a timer, a counter), usually written by
+the teacher's AI agent (`create_stamp` with `art: "smart"`). It is placed and
+sized like a stamp (default 200 × 200) and is otherwise exactly a Smart
+Object:
+
+- The bundle is validated like any bundle; it MUST NOT declare
+  `permissions.network` (the reference refuses network hosts for stamps).
+- It runs only in the sandbox described in [Sandbox](#sandbox), with the SDK;
+  hosts MUST NOT run a Smart stamp's code anywhere else (not in the palette,
+  not in a preview outside the sandbox). Palettes show an icon instead.
+- `rupok.state` keeps per-placement state (e.g. a tap count); steps are
+  usually `0`.
+
+Design: the whole body is the button (44 px targets or larger), large type,
+works offline, follows the theme variables.
+
 ## Validation
 
 `ObjectBundle::validate()` returns diagnostics with a severity and a stable

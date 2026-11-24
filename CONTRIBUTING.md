@@ -62,7 +62,16 @@ node --test "packages/object-sdk/test/*.test.mjs"
 6. If the change touches the file format, the Smart Object protocol or the
    SDK API, update `spec/` in the same PR. A non-editorial spec change needs
    an accepted RFC.
-7. Open the PR. On your first PR, sign the Contributor License Agreement
+7. **Agent-first.** A user-facing feature ships with its agent path: a live
+   op and an MCP tool (on a file and live where that makes sense), docs in
+   `docs/ai-agents.md` and the `rupok-live-board` skill, tests, and a row in
+   `docs/agent-capabilities.md` (CI checks settings, dock buttons and live
+   ops against it). Agent actions are one attributed undo step, respect
+   *Allow AI to edit live* and Student view, ask permission for settings and
+   mode changes, and run agent code only in the Smart Object sandbox. AI
+   keys, accounts, payments and permissions stay teacher only: mark such
+   rows *teacher only* with the reason. See AGENTS.md, rule 8.
+8. Open the PR. On your first PR, sign the Contributor License Agreement
    (CLA, below); a bot will ask. CI must be green.
 
 Commit messages: an imperative subject of 72 characters or fewer, with an area

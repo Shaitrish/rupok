@@ -1,6 +1,6 @@
 ---
 name: rupok-live-board
-description: Work on the Rupok board a teacher has open, live, during a class: read the current page and the teacher's handwriting, add quizzes, practice problems, Smart Object simulations and clean diagrams, convert ink to text, translate a slide, step through objects and point at things. Use whenever the teacher talks about "the board", "this page", "what I just wrote", "this slide", gives a Rupok pairing code, or asks for something to appear in Rupok while teaching.
+description: Work on the Rupok board a teacher has open, live, during a class: read the current page and the teacher's handwriting, add quizzes, practice problems, Smart Object simulations and clean diagrams, convert ink to text, translate a slide, step through objects and point at things, rearrange pages and items, restyle ink, make and place custom stamps (including Smart stamps with logic), switch modes, export PDFs, manage the Library, change settings and customise the Smart Dock. Use whenever the teacher talks about "the board", "this page", "what I just wrote", "this slide", gives a Rupok pairing code, or asks for something to appear in Rupok while teaching.
 ---
 
 # Live on the Rupok board
@@ -174,6 +174,73 @@ House rules (projectors in bright rooms, chalk-dusted fingers):
   (`href` only to `#id` or embedded PNG/JPEG data) or animation. A refused
   SVG changes nothing; fix it and call again.
 
+## Everything the teacher can do, you can do
+
+Rupok is agent-first. Besides building content you can run the board for
+the teacher (full list: `docs/agent-capabilities.md`; document tools take
+`path`, omitted = the board):
+
+- **Pages**: `list_pages`, `move_pages(pages, to)`, `duplicate_pages`,
+  `delete_pages` (confirm first), `set_page_title`.
+- **Items**: `select_items` (show the teacher what you mean), `move_items`,
+  `align_items` (align and distribute; groups move as one), `restyle_items`
+  (colour, width, pen style, shape fill, opacity, text size), `scale_items`,
+  `group_items` / `ungroup_items`, `bring_to_front` / `send_to_back`,
+  `delete_items` (confirm first), `draw_stroke` (underline, circle, tick),
+  `update_text`.
+- **Presenting**: `set_mode` (prepare, teach, student; never out of Student
+  view), `zoom_to` / `fit_page`, `start_replay`, `celebrate`, `set_tool`
+  ("give me a red chalk pen"), `undo_last_change` (only your own newest change).
+- **Files**: `export_pdf` (saved in the workspace), `library_list`,
+  `library_open`, `library_create_lesson`, `library_move`, `library_rename`,
+  `library_trash` (ask first).
+- **Settings**: `get_settings`, then `set_setting(key, value)`. Only the
+  listed keys; AI keys, accounts, payments, storage and permissions are the
+  teacher's alone, so don't try.
+
+Settings, dock and mode changes ask the teacher's permission like edits;
+the AI chip's Undo puts a settings change back. Say what you changed in one line.
+
+## Stamps
+
+"Put a star on that answer": `add_stamp(stamp: "star", x, y)` (built-in:
+star, tick, cross, heart, thumbs-up, hundred, trophy, excellent, good-job,
+try-again, important, question, badge (numbers itself), arrows, `emoji`
+with `text`). `list_stamps` shows the teacher's own too.
+
+"Make me a stamp…" (`/stamp` in Rupok's chat): `create_stamp`, then place
+one so they see it.
+
+- Artwork: bold, simple SVG (viewBox ~100×100, `fill="currentColor"`, no
+  text inside, no scripts or SMIL: refused), or an emoji, or a 1–3 word
+  label (`art: "text"`).
+- Behaviour: `animation` pop/sparkle/bounce/spin/fade-in, `burst`
+  stars/confetti/hearts/sparkles, `counter`, `sound`
+  chime/pop/ding/tada/clap/whoosh, `fade_after` seconds. Celebratory but
+  brief: one animation, at most one burst and one short sound.
+- Logic (a dice that rolls on tap, a timer, a tap counter): `art: "smart"`
+  with `html`, a tiny Smart Object (follow `rupok-smart-objects`; the whole
+  body is the button; offline; `rupok.state` to remember counts). It runs
+  in the Smart Object sandbox, never elsewhere.
+- Readable from the back row at 96 px; `update_stamp` changes only the given
+  fields; `delete_stamp` only when asked.
+
+## The Smart Dock
+
+"Ask Claude: put pen, highlighter and eraser on the left, undo and next
+page on the right, bigger buttons." (`/dock` in Rupok's chat):
+
+1. `list_dock_items` and `get_dock_layout(mode)` (teach or prepare; both
+   when the teacher didn't say).
+2. `set_dock_layout(mode, layout: {position: "left", size: "l", groups:
+   [{items: ["pen", "highlighter", "eraser"]}], split: {position: "right",
+   groups: [{items: ["undo"]}, {items: ["pager"]}]}})`. Groups are separated
+   on the dock; `split` is a second dock; `sizes` sets one button; `large`
+   is large icons for low vision.
+3. Pen, highlighter, eraser, laser and undo always stay. Relay any
+   `warnings`. Offer `save_dock_preset(name)`; `apply_dock_preset` switches
+   to Left-handed, Minimal teaching, Maths class, Default or a saved one.
+
 ## Tools
 
 | Tool | Use |
@@ -192,5 +259,11 @@ House rules (projectors in bright rooms, chalk-dusted fingers):
 | `set_board_theme(page_color?, pattern?, ui?)` | Chalkboard, grid, dark mode. |
 | `set_page_design(path, page?, all_pages?, color?, pattern?, background_svg?, background_image?, background_fit?, background_opacity?, background_dim?, remove_background?)` | Page colour, pattern and background image (see Page design). |
 | `set_branding(path, scope?, page?, logo_svg?, logo_image?, logo_corner?, logo_width?, …, school?, teacher?, class?, date?, text_position?, text_align?, hidden?, remove?)` | Logo and header/footer on every page or one. |
+| `list_pages`, `move_pages`, `duplicate_pages`, `delete_pages`, `set_page_title` | Pages (file or live). |
+| `select_items`, `move_items`, `align_items`, `restyle_items`, `scale_items`, `group_items`, `ungroup_items`, `bring_to_front`, `send_to_back`, `delete_items`, `draw_stroke`, `update_text` | Items (file or live; `select_items` live). |
+| `list_stamps`, `add_stamp`, `create_stamp`, `update_stamp`, `delete_stamp`, `celebrate` | Stamps and celebrations. |
+| `set_mode`, `zoom_to`, `fit_page`, `start_replay`, `stop_replay`, `set_tool`, `undo_last_change` | Presenting (live). |
+| `export_pdf`, `library_list`, `library_open`, `library_create_lesson`, `library_move`, `library_rename`, `library_trash` | Files and the Library (live). |
+| `get_settings`, `set_setting`, `list_dock_items`, `get_dock_layout`, `set_dock_layout`, `save_dock_preset`, `apply_dock_preset` | Settings and the Smart Dock (live). |
 
 Setup for each agent: `docs/ai-agents.md` in the Rupok repository.
