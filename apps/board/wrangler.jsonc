@@ -6,7 +6,7 @@
   "compatibility_date": "2026-11-01",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "404-page"
   },
   // www.rupok.app and the old rupok.shaitrish.com redirect here (see redirect/).
   "routes": [{ "pattern": "rupok.app", "custom_domain": true }]
