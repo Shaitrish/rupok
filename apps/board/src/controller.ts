@@ -63,6 +63,10 @@ export class Controller {
     this.world = world;
     await init({ module_or_path: wasmUrl });
     this.board = await Board.create(canvas, prefs().forceWebgl);
+    // A pinch released below fit springs back; instantly with reduced motion.
+    const still = matchMedia("(prefers-reduced-motion: reduce)");
+    this.board.set_reduced_motion(still.matches);
+    still.addEventListener("change", () => this.board.set_reduced_motion(still.matches));
     this.applyPrefs();
     this.resize();
     this.updateInsets(true);
@@ -649,6 +653,12 @@ export class Controller {
     const c = color();
     if (dark && c === 0x1c2024ff) { setColor(0xffffffff); this.board.set_color(0xffffffff); }
     if (!dark && c === 0xffffffff) { setColor(0x1c2024ff); this.board.set_color(0x1c2024ff); }
+  }
+
+  /** Zoom chip percentage: relative to fit, so 100 % is the fitted slide. */
+  zoomPct(z: number): number {
+    const fit = this.board?.fit_zoom() ?? 0;
+    return Math.round((fit > 0 ? z / fit : z) * 100);
   }
 
   zoomBy(f: number) {

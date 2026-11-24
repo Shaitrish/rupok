@@ -334,6 +334,16 @@ mod web {
             self.engine.fit_page();
         }
 
+        /// The fit zoom: 100 % on the zoom chip. A slide zooms from fit to 5 × fit.
+        pub fn fit_zoom(&self) -> f32 {
+            self.engine.fit_zoom()
+        }
+
+        /// A pinch released below fit springs back instantly instead of animating.
+        pub fn set_reduced_motion(&mut self, on: bool) {
+            self.engine.set_reduced_motion(on);
+        }
+
         /// Fit the page leaving `margin` (fraction of its size) around it.
         pub fn fit_page_margin(&mut self, margin: f32) {
             self.engine.fit_page_margin(margin);

@@ -296,7 +296,7 @@ export function StatusChips() {
       <Show when={c().zoom}>
       <div class="zoom surface">
         <button class="btn icon" onClick={() => controller.zoomBy(0.8)} title="Zoom out  ·  −" aria-label="Zoom out"><Icon name="zoomOut" size={20} /></button>
-        <button class="btn pct" onClick={() => controller.board.fit_page()} title="Fit page  ·  0">{Math.round(camera()[2] * 100)}%</button>
+        <button class="btn pct" onClick={() => controller.board.fit_page()} title="Fit page  ·  0">{controller.zoomPct(camera()[2])}%</button>
         <button class="btn icon" onClick={() => controller.zoomBy(1.25)} title="Zoom in  ·  +" aria-label="Zoom in"><Icon name="zoomIn" size={20} /></button>
       </div>
       </Show>
