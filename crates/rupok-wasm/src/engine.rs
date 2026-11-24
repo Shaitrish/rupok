@@ -8,8 +8,9 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use rupok_core::{
-    BoxGeom, Branding, Frame, ImageData, Item, ItemData, ItemId, Lesson, MediaData, NewItem, ObjectData,
-    PageBackground, PageId, PageSpec, PageStyle, Pattern, Scene, ShapeGeom, StrokeData, TextData,
+    BoxGeom, Branding, Frame, ImageData, Item, ItemData, ItemId, Lesson, MediaData, NewItem,
+    ObjectData, PageBackground, PageId, PageSpec, PageStyle, Pattern, Scene, ShapeGeom, StrokeData,
+    TextData,
 };
 use rupok_format::package::OUTLINE_MAX_AGE_MS;
 use rupok_format::{ObjectBundle, ObjectManifest, Package};
