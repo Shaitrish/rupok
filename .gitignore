@@ -9,3 +9,5 @@ apps/board/src/wasm/
 *.log
 .gstack/
 apps/board/public/rupoklib/
+__pycache__/
+*.pyc
