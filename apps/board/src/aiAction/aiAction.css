@@ -1,0 +1,136 @@
+/* "AI in action" (AiActionLayer.tsx): flat FigJam-style cards with the mint
+ * accent, a soft dashed outline that drifts while the AI works, big and
+ * readable in Teach. Tokens only, light and dark. No gradients or glow. */
+
+.aia-layer { position: absolute; inset: 0; pointer-events: none; z-index: 8; overflow: hidden; }
+.aia-float { position: absolute; left: 50%; bottom: calc(var(--inset) + 72px); transform: translateX(-50%); z-index: 14;
+  display: flex; flex-direction: column; align-items: center; gap: var(--s2); pointer-events: none; }
+.aia-float > * { pointer-events: auto; }
+
+/* ------------------------------------------------------------ the card */
+.aia-card {
+  position: absolute; pointer-events: auto; border-radius: 20px; color: var(--text);
+  background: color-mix(in srgb, var(--accent-3) 72%, transparent);
+  transition: left 600ms var(--ease), top 600ms var(--ease), width 600ms var(--ease), height 600ms var(--ease), opacity 400ms;
+  animation: aia-in 260ms var(--ease) both; font-family: var(--font);
+}
+@keyframes aia-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.aia-outline { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.aia-outline rect { width: calc(100% - 3px); height: calc(100% - 3px); fill: none; stroke: var(--accent-9); stroke-width: 3;
+  stroke-dasharray: 14 10; animation: aia-march 1.1s linear infinite; }
+@keyframes aia-march { to { stroke-dashoffset: -24; } }
+.aia-card.landing { background: transparent; opacity: 0; transition-delay: 0ms, 0ms, 0ms, 0ms, 450ms; }
+.aia-card.landing .aia-outline rect { stroke-dasharray: none; animation: none; }
+.aia-card.landing .aia-body { opacity: 0; transition: opacity 200ms; }
+.aia-card.done { opacity: 0; transition: opacity 900ms 400ms; }
+.aia-card.failed { background: color-mix(in srgb, var(--surface-solid) 92%, transparent); }
+.aia-card.failed .aia-outline rect { stroke: var(--gray-9, #8b8d98); animation: none; }
+
+.aia-body { position: absolute; left: 14px; top: 12px; right: 14px; display: flex; flex-direction: column; gap: 8px; max-height: calc(100% - 24px); overflow: hidden; }
+.aia-card.big .aia-body {
+  left: 50%; top: 50%; right: auto; transform: translate(-50%, -50%); width: min(560px, calc(100% - 48px));
+  padding: 18px 20px; border-radius: 16px; background: var(--surface-solid); box-shadow: var(--shadow-1);
+}
+.aia-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.aia-agent { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 14px; flex: none;
+  background: var(--text); color: var(--surface-solid); font: 650 13px/1 var(--font); }
+.aia-title { font: 600 14px/18px var(--font); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.aia-x { margin-left: auto; flex: none; width: 30px; height: 30px; border-radius: 15px; border: 0; background: transparent; color: var(--text-2);
+  display: grid; place-items: center; cursor: pointer; }
+.aia-x:hover { background: var(--gray-a3); color: var(--text); }
+.aia-step { display: flex; align-items: center; gap: 10px; font: 700 20px/26px var(--font); }
+.aia-dots { display: inline-flex; gap: 4px; flex: none; }
+.aia-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-9); animation: aia-dot 1s infinite ease-in-out; }
+.aia-dots i:nth-child(2) { animation-delay: 0.15s; }
+.aia-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes aia-dot { 0%, 80%, 100% { transform: translateY(0); opacity: 0.5; } 40% { transform: translateY(-4px); opacity: 1; } }
+.aia-note, .aia-error { margin: 0; font: 500 14px/19px var(--font); color: var(--text-2); }
+.aia-error { color: var(--text); }
+.aia-plan { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font: 500 15px/20px var(--font); color: var(--text-2); }
+.aia-plan li { display: flex; align-items: center; gap: 10px; }
+.aia-plan li.now { color: var(--text); font-weight: 650; }
+.aia-plan li.done { color: var(--text-2); }
+.aia-tick { width: 18px; height: 18px; border-radius: 6px; flex: none; box-shadow: inset 0 0 0 2px var(--gray-a6, rgba(0,0,0,.2)); }
+.aia-plan li.now .aia-tick { box-shadow: inset 0 0 0 2px var(--accent-9); }
+.aia-plan li.done .aia-tick { background: var(--accent-9); box-shadow: none;
+  -webkit-mask: none; position: relative; }
+.aia-plan li.done .aia-tick::after { content: ""; position: absolute; left: 6px; top: 2px; width: 5px; height: 10px;
+  border: solid var(--accent-contrast); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.aia-bar { height: 6px; border-radius: 3px; background: var(--gray-a3); overflow: hidden; }
+.aia-bar span { display: block; height: 100%; background: var(--accent-9); border-radius: 3px; transition: width 400ms var(--ease); }
+.aia-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aia-btn { height: 36px; padding: 0 16px; border-radius: 18px; border: 0; cursor: pointer; font: 650 14px/1 var(--font);
+  background: var(--gray-a3); color: var(--text); }
+.aia-btn.solid { background: var(--text); color: var(--surface-solid); }
+.aia-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* Live preview of a partial Smart Object. */
+.aia-preview { position: relative; height: 150px; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px var(--hairline); background: var(--surface-solid); }
+.aia-preview iframe { position: absolute; left: 0; top: 0; width: 400%; height: 400%; border: 0; transform: scale(0.25); transform-origin: 0 0; pointer-events: none; }
+.aia-preview-tag { position: absolute; left: 8px; bottom: 8px; height: 22px; padding: 0 8px; border-radius: 11px; display: inline-flex; align-items: center;
+  background: var(--text); color: var(--surface-solid); font: 650 11px/1 var(--font); }
+
+/* Teach: readable from the back of the room. */
+.aia-layer.teach .aia-step { font-size: 30px; line-height: 38px; }
+.aia-layer.teach .aia-agent { height: 36px; font-size: 17px; padding: 0 16px; border-radius: 18px; }
+.aia-layer.teach .aia-title { font-size: 18px; line-height: 24px; }
+.aia-layer.teach .aia-plan { font-size: 20px; line-height: 26px; gap: 8px; }
+.aia-layer.teach .aia-card.big .aia-body { width: min(720px, calc(100% - 48px)); padding: 24px 28px; }
+.aia-layer.teach .aia-dots i { width: 10px; height: 10px; }
+
+/* A placed result animates in (progress.ts animateItem). */
+.item.ai-land { animation: aia-land 620ms cubic-bezier(.2, .8, .2, 1.05) both; transform-origin: 50% 50%; }
+@keyframes aia-land { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: none; } }
+
+/* The landing sparkle: a mint ring and eight small stars. */
+.aia-sparkle { position: absolute; width: 0; height: 0; pointer-events: none; }
+.aia-sparkle .ring { position: absolute; left: -40px; top: -40px; width: 80px; height: 80px; border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--accent-9); animation: aia-ring 900ms var(--ease) both; }
+@keyframes aia-ring { from { transform: scale(0.3); opacity: 1; } to { transform: scale(2.2); opacity: 0; } }
+.aia-sparkle .star { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; background: var(--accent-9);
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  animation: aia-star 900ms var(--ease) both; }
+.aia-sparkle .star:nth-child(odd) { background: #f5b301; }
+@keyframes aia-star { from { transform: rotate(var(--a)) translateX(10px) scale(0.4); opacity: 1; } to { transform: rotate(var(--a)) translateX(110px) scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .aia-outline rect, .aia-dots i, .aia-sparkle .star, .item.ai-land { animation: none; }
+  .aia-sparkle .ring { animation-duration: 1ms; }
+}
+
+/* ------------------------------------------------- toast, chips, confirm */
+.aia-toast { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 8px 8px 18px; border-radius: 26px;
+  background: var(--text); color: var(--surface-solid); font: 550 15px/20px var(--font); box-shadow: var(--shadow-2); animation: pop 180ms var(--ease); }
+.aia-toast .aia-btn.solid { background: var(--accent-9); color: var(--accent-contrast); }
+.aia-toast .aia-x { color: inherit; }
+.aia-toast-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent-9); flex: none; }
+.aia-float.teach .aia-toast { font-size: 20px; line-height: 26px; min-height: 64px; padding-left: 24px; border-radius: 32px; }
+.aia-float.teach .aia-toast .aia-btn { height: 46px; font-size: 18px; padding: 0 22px; border-radius: 23px; }
+.aia-elsewhere { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px; border-radius: 22px; border: 0; cursor: pointer;
+  background: var(--surface-solid); color: var(--text); box-shadow: var(--shadow-1); font: 550 14px/1 var(--font); }
+.aia-elsewhere b { color: var(--accent-11); }
+
+.aia-confirm { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); z-index: 70; width: min(460px, calc(100vw - 32px));
+  padding: 20px 22px; border-radius: 20px; background: var(--surface-solid); box-shadow: var(--shadow-2); animation: pop 180ms var(--ease); }
+.aia-confirm-q { margin: 0 0 6px; font: 600 18px/24px var(--font); }
+.aia-confirm-d { margin: 0 0 12px; color: var(--text-2); font: 500 14px/20px var(--font); }
+:root[data-mode="teach"] .aia-confirm-q { font-size: 24px; line-height: 32px; }
+
+/* ------------------------------------------------------- students ask AI */
+.aia-ask { position: absolute; left: var(--inset); bottom: var(--inset); z-index: 14; }
+.aia-ask-chip { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 8px 0 16px; border-radius: 24px; border: 0;
+  cursor: pointer; color: var(--text); background: var(--surface-solid); box-shadow: var(--shadow-1); font: 650 15px/1 var(--font); }
+.aia-ask-left { height: 26px; padding: 0 10px; border-radius: 13px; display: inline-flex; align-items: center; background: var(--accent-3);
+  color: var(--accent-11); font: 650 13px/1 var(--font); font-variant-numeric: tabular-nums; }
+.aia-ask-box { width: min(420px, calc(100vw - 32px)); padding: 16px; border-radius: 20px; background: var(--surface-solid); box-shadow: var(--shadow-2);
+  display: flex; flex-direction: column; gap: 10px; }
+.aia-ask-head { display: flex; align-items: center; font: 650 16px/22px var(--font); }
+.aia-ask-input { height: 46px; border-radius: 12px; border: 0; padding: 0 14px; font: 500 16px/1 var(--font); color: var(--text);
+  background: var(--gray-a3); outline: none; }
+.aia-ask-input:focus { box-shadow: 0 0 0 2px var(--accent-9); }
+.aia-ask-help { margin: 0; color: var(--text-2); font: 500 14px/20px var(--font); }
+.aia-mine { position: absolute; pointer-events: auto; border-radius: 16px; overflow: hidden; background: var(--surface-solid);
+  box-shadow: 0 0 0 3px var(--accent-9), var(--shadow-2); animation: aia-land 620ms cubic-bezier(.2, .8, .2, 1.05) both; }
+.aia-mine iframe { width: 100%; height: 100%; border: 0; display: block; }
+.aia-mine-tag { position: absolute; right: 10px; top: 10px; z-index: 1; height: 26px; padding: 0 10px; border-radius: 13px; display: inline-flex; align-items: center;
+  background: var(--accent-9); color: var(--accent-contrast); font: 650 12px/1 var(--font); }
+.aia-mine-text { padding: 28px 32px; font: 500 32px/1.35 var(--font); overflow: auto; height: 100%; box-sizing: border-box; }

@@ -80,7 +80,7 @@ async function shareLessonFile() {
 
 /** Collapse thresholds: at this level or above the element moves into ⋯.
  * Level 1 only hides labels. */
-const AT = { replay: 2, viewOpen: 2, insert: 3, viewDownload: 3, history: 4, theme: 4, settings: 5, ai: 6, switcher: 7, pagesToggle: 8 } as const;
+const AT = { replay: 2, viewOpen: 2, insert: 3, viewDownload: 3, history: 4, theme: 4, settings: 5, switcher: 6, pagesToggle: 7, ai: 8 } as const;
 const MAX_LEVEL = 8;
 
 export function Header(props: { onObject: () => void; onSettings: () => void }) {
@@ -395,10 +395,10 @@ export function Header(props: { onObject: () => void; onSettings: () => void }) 
 
 /** Teach has no top bar: while an AI is connected (or pairing), its status
  * floats top right so the teacher still sees it and can open the panel. */
-export function FloatingAiStatus() {
+export function FloatingAiStatus(props: { label?: boolean }) {
   return (
     <div class="ai-float surface">
-      <AiStatus />
+      <AiStatus label={props.label} />
     </div>
   );
 }

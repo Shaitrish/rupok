@@ -8,7 +8,8 @@
 // share it.
 
 import { Show, createEffect, createSignal, on, onCleanup } from "solid-js";
-import { chatOpen, closeAiPanel, openAiPanel } from "../chat";
+import { chatOpen, chatTucked, closeAiPanel, openAiPanel, setChatTucked } from "../chat";
+import { isView, mode, showToast } from "../state";
 import { allowEdit, live, liveHasChat, liveAgent, liveEditing, liveLastEdit, livePhase, liveWaiting } from "../live";
 import { Icon } from "./Icon";
 import "./Header.css";
@@ -18,9 +19,15 @@ export const [aiPanelOpen, setAiPanelOpen] = createSignal(false);
 /** What the header button (or the ⋯ item) does: close the open panel, else
  * open it, starting the Connect flow when no AI is connected. */
 export function toggleAi() {
+  // Student view has no chat: say so instead of doing nothing.
+  if (isView()) return showToast("The AI chat is off in Student view. Switch to Prepare or Teach to use your assistant.", 4200);
   // The in-app chat (ChatPanel.tsx) takes the button when a relay offers it,
-  // and always in the desktop app (which starts its own relay).
-  if (chatOpen()) return closeAiPanel();
+  // and always in the desktop app (which starts its own relay). In Teach a
+  // tucked-away panel comes back first (the click used to close it unseen).
+  if (chatOpen()) {
+    if (mode() === "teach" && chatTucked()) return setChatTucked(false);
+    return closeAiPanel();
+  }
   if (liveHasChat() || (window as any).__TAURI_INTERNALS__) {
     setAiPanelOpen(false);
     return openAiPanel();
@@ -51,7 +58,7 @@ export function aiStatusText(): string {
 }
 export const aiConnected = () => livePhase() === "connected";
 
-export function AiStatus() {
+export function AiStatus(props: { label?: boolean }) {
   const [recent, setRecent] = createSignal(false);
   let timer: number | undefined;
   createEffect(on(liveLastEdit, (e) => {
@@ -77,7 +84,8 @@ export function AiStatus() {
         </button>
       </Show>
       <button
-        class="btn icon ai-status-btn"
+        class="btn ai-status-btn"
+        classList={{ icon: !props.label }}
         data-ai-toggle
         onClick={toggleAi}
         title={aiStatusText()}
@@ -86,6 +94,7 @@ export function AiStatus() {
         aria-haspopup="dialog"
       >
         <Icon name="smartink" active={aiConnected()} />
+        <Show when={props.label}><span class="label ai-status-label">{chatOpen() && !chatTucked() ? "Hide AI" : "Ask AI"}</span></Show>
         <Show when={phase() !== "idle" && phase() !== "unreachable"}>
           <span class="ai-status-dot" classList={{ live: aiConnected(), wait: waiting(), pulse: busy(), off: aiConnected() && !allowEdit() }} aria-hidden="true" />
         </Show>

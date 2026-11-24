@@ -13,7 +13,7 @@ import {
   chatBusy, chatHistory, chatOpen, chatPrefs, chatStatus, chatUsage, chatWidth, closeAiPanel, composerDraft, setComposerDraft, currentMode,
   currentModel, denyAllAndStop, editMessage, editsAutoApproved, forgetChat, formatUsage, goToPage, initChat,
   listAgentSessions, modeAutoApproves, models, modes, newChat, pendingPermissions, pickAgent, recallSent, refreshAgents,
-  replaying, resumeAgentSession, resumeChat, retryAgent, retryLast, sendPrompt, setAttachPage, setAutoApprove,
+  replaying, resumeAgentSession, resumeChat, retryAgent, retryLast, sendPrompt, setAttachPage, setAutoApprove, chatTucked, setChatTucked,
   setChatOpen, setChatWidth, setMode, setModel, startRelay, stopChat, unqueue, type ChatItem,
 } from "../chat";
 import {
@@ -712,7 +712,8 @@ function Conversation() {
 }
 
 export default function ChatPanel() {
-  const [hidden, setHidden] = createSignal(false); // Teach: tucked away while drawing
+  // Teach: tucked away while drawing (chat.ts, so the AI button can bring it back).
+  const hidden = chatTucked, setHidden = setChatTucked;
   onMount(() => initChat(controller));
   const teach = () => mode() === "teach";
   const docked = () => chatOpen() && !teach() && !isView();
@@ -733,7 +734,7 @@ export default function ChatPanel() {
     const down = (e: PointerEvent) => {
       if (!teach() || !chatOpen()) return;
       const t = e.target as Element;
-      if (t.closest?.(".chat-panel, .chat-peek, [data-ai-toggle], .topbar, .dock")) return;
+      if (t.closest?.(".chat-panel, .chat-peek, [data-ai-toggle], .topbar, .dock, .ai-float, .aia-card, .aia-toast, .aia-confirm, .solve-peek-row")) return;
       setHidden(true);
     };
     const key = (e: KeyboardEvent) => {

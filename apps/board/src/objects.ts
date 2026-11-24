@@ -106,7 +106,14 @@ export class ObjectHost {
   srcdoc(bundle: string): string {
     const cached = this.srcCache.get(bundle);
     if (cached) return cached;
-    const html = this.c.board.object_html(bundle) ?? "<p>Missing object</p>";
+    const doc = this.wrap(this.c.board.object_html(bundle) ?? "<p>Missing object</p>");
+    this.srcCache.set(bundle, doc);
+    return doc;
+  }
+
+  /** The iframe document for raw object HTML (an agent's live preview, a
+   * student's own layer): the same CSP and SDK as a placed object. */
+  wrap(html: string): string {
     const lib = `${location.origin}/rupoklib/`;
     const body = html.replaceAll("rupoklib://", lib);
     const csp = [
@@ -133,7 +140,6 @@ export class ObjectHost {
       : /<html[^>]*>/i.test(body)
         ? body.replace(/<html[^>]*>/i, (m) => `${m}<head>${head}</head>`)
         : `<!doctype html><html><head>${head}</head><body>${body}</body></html>`;
-    this.srcCache.set(bundle, doc);
     return doc;
   }
 

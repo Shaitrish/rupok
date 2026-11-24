@@ -35,6 +35,9 @@ export type LivePhase = "idle" | "searching" | "pairing" | "connected" | "reconn
 export interface Waiting { port: number; agent: string; code: string; expiresAt: number; pair: "agent" | "board"; chat: boolean }
 /** An agent op the board ran successfully (for the chat's tool cards). */
 export interface OpDone { agent: string; op: any; result: any; page: number }
+/** An agent op the board refused or that failed (e.g. a Smart Object that
+ * did not pass validation: `data.diagnostics`). */
+export interface OpFailed { agent: string; op: any; error: string; data?: any }
 export interface Activity { id: number; agent: string; label: string; at: number; ok: boolean; error?: string }
 export interface LivePointer { x: number; y: number; w?: number; h?: number; label?: string; until: number; page: number }
 /** Chrome's Local Network Access permission for this site, if the browser has one. */
@@ -86,7 +89,7 @@ function same(a: Uint8Array | null, b: Uint8Array): boolean {
 function access(op: any): "read" | "control" | "write" {
   switch (op?.op) {
     case "get_page": case "get_outline": case "get_selection": case "snapshot": return "read";
-    case "go_to_page": case "point_at": return "control";
+    case "go_to_page": case "point_at": case "show_progress": return "control";
     case "set_board_theme": return op.page_color || op.pattern ? "write" : "control";
     default: return "write";
   }
@@ -101,6 +104,7 @@ const LABELS: Record<string, string> = {
   set_page_design: "changed the page design", set_branding: "changed the branding",
   replace_items_with_text: "turned ink into text", step_object: "stepped a Smart Object",
   write_handwriting: "is writing on the board", add_media: "added media", add_model: "added a 3D model",
+  add_shape: "drew a shape", add_table: "drew a table", show_progress: "is working on something",
 };
 export const opLabel = (op: any) => LABELS[op?.op] ?? "is working";
 
@@ -131,6 +135,15 @@ class LiveClient {
   /** Receives `chat` frames from the paired server (chat.ts). */
   chatHandler: ((f: any) => void) | null = null;
   private opListeners = new Set<(e: OpDone) => void>();
+  private failListeners = new Set<(e: OpFailed) => void>();
+  /** Ops run by the web app itself (`show_progress`: aiAction/progress.ts). */
+  readonly handlers = new Map<string, (op: any, agent: string) => any>();
+  /** Asked before a write runs; throws (with the reason) to refuse it. Class
+   * mode uses it to confirm destructive ops with the teacher (aiAction/classMode.ts). */
+  gate: ((op: any, agent: string) => Promise<void>) | null = null;
+  /** Student view: a student's own AI request lands on their own layer, not
+   * the lesson. Returns the agent's result, or undefined to refuse as usual. */
+  studentRoute: ((op: any, agent: string) => any | undefined) | null = null;
 
   init(c: Controller) {
     this.c = c;
@@ -178,6 +191,11 @@ class LiveClient {
   onOpDone(fn: (e: OpDone) => void): () => void {
     this.opListeners.add(fn);
     return () => this.opListeners.delete(fn);
+  }
+
+  onOpFailed(fn: (e: OpFailed) => void): () => void {
+    this.failListeners.add(fn);
+    return () => this.failListeners.delete(fn);
   }
 
   // -------------------------------------------------------- connecting
@@ -466,11 +484,17 @@ class LiveClient {
       if (kind !== "read" && !allowEdit()) {
         throw new OpError("The teacher has turned off \"Allow AI to edit live\" on the board. You can still read the board; ask the teacher if you may edit.");
       }
-      if (kind === "write" && isView()) {
+      // Student view: only a student's own request may add (to their layer).
+      const routed = kind === "write" && isView() ? this.studentRoute?.(op, agent) : undefined;
+      if (kind === "write" && isView() && routed === undefined) {
         throw new OpError("The board is in Student view (read-only); ask the teacher to switch to Prepare or Teach.");
       }
+      if (kind === "write" && routed === undefined && this.gate) await this.gate(op, agent);
       let result: any;
-      if (op.op === "snapshot") result = await renderSnapshot(this.c, op, agent);
+      const own = this.handlers.get(op.op);
+      if (routed !== undefined) result = routed;
+      else if (own) result = await own(op, agent);
+      else if (op.op === "snapshot") result = await renderSnapshot(this.c, op, agent);
       else if (op.op === "point_at") result = this.pointAt(op);
       else if (op.op === "write_handwriting") result = (await import("./solve")).onWriteOp(op, agent); // preview or write (solve/)
       else {
@@ -484,7 +508,7 @@ class LiveClient {
         if (op.op === "set_board_theme") this.applyTheme(op);
       }
       this.c.sync(true);
-      if (kind === "write") {
+      if (kind === "write" && routed === undefined) {
         this.pushUpdates(); // before the result, so the agent's mirror is current
         this.editVV = this.c.board.live_version();
         setLiveLastEdit({ agent, label: opLabel(op), at: Date.now() });
@@ -498,7 +522,11 @@ class LiveClient {
       this.send({ ch: "tools", t: "result", id, ok: true, result });
     } catch (e: any) {
       const msg = e instanceof OpError ? e.message : String(e?.message ?? e);
-      if (kind !== "read") this.log(agent, opLabel(op), false, msg);
+      if (kind !== "read") {
+        this.log(agent, opLabel(op), false, msg);
+        const data = e instanceof OpError ? e.data : undefined;
+        for (const fn of this.failListeners) { try { fn({ agent, op, error: msg, data }); } catch { /* a listener failed */ } }
+      }
       this.send({ ch: "tools", t: "result", id, ok: false, error: msg, data: e instanceof OpError ? e.data : undefined });
     }
   }

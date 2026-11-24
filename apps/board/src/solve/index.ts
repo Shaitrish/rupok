@@ -20,7 +20,10 @@ import { render } from "solid-js/web";
 import { controller } from "../controller";
 import { MathInk } from "../wasm/rupok.js";
 import { live, liveHasChat } from "../live";
-import { chatBusy, chatOpen, openAiPanel, setChat } from "../chat";
+import { chatBusy, chatOpen, notePrompt, openAiPanel, setChat } from "../chat";
+import { aiPrefs, classModeOn } from "../aiAction/state";
+import { startCard } from "../aiAction/progress";
+import { STREAM_INSTRUCTIONS, startStream } from "../aiAction/solveStream";
 import { renderSnapshot } from "../snapshot";
 import { isView, mode, selectionIds, showToast } from "../state";
 import {
@@ -79,7 +82,7 @@ export function readSelection(): { latex: string; confidence: number }[] {
 // ---------------------------------------------------------------- prompt
 
 /** The prompt sent with a Solve this request. */
-export function solvePrompt(o: { ids: string[]; page: number; readings: { latex: string; confidence: number }[]; preview: boolean; extra?: string }): string {
+export function solvePrompt(o: { ids: string[]; page: number; readings: { latex: string; confidence: number }[]; preview: boolean; extra?: string; stream?: boolean }): string {
   const read = o.readings.length
     ? o.readings.map((r, i) => `${i + 1}. $${r.latex}$ (confidence ${r.confidence.toFixed(2)})`).join("\n")
     : "(the recogniser could not read it: use the picture)";
@@ -91,12 +94,16 @@ export function solvePrompt(o: { ids: string[]; page: number; readings: { latex:
     read,
     "",
     "Please:",
-    "1. Work out the solution, then check every step and all the arithmetic before writing anything.",
-    `2. Call write_handwriting once, with anchor {"item_ids": [the ids above]} so it goes right below the problem. One short step per line (under about 30 characters), maths in $…$ (e.g. "$2x = 4$", "$x = \\frac{4}{2}$"). Don't copy the problem out again; finish with the answer on its own line.`,
+    o.stream
+      ? "1. Work it out step by step, checking every step and all the arithmetic as you go."
+      : "1. Work out the solution, then check every step and all the arithmetic before writing anything.",
+    o.stream ? STREAM_INSTRUCTIONS : `2. Call write_handwriting once, with anchor {"item_ids": [the ids above]} so it goes right below the problem. One short step per line (under about 30 characters), maths in $…$ (e.g. "$2x = 4$", "$x = \\frac{4}{2}$"). Don't copy the problem out again; finish with the answer on its own line.`,
     "3. Keep to the level of the problem: the method a school student would use, no shortcuts they haven't met.",
     "4. While you explain, you may use point_at to circle the part of the board you are talking about.",
     "5. Then explain the steps in this chat in 2 to 4 short sentences.",
-    o.preview
+    o.stream
+      ? "The class watches each line appear as you write it."
+      : o.preview
       ? "The teacher checks the solution before the class sees it: when write_handwriting answers status \"preview\", it is waiting for their approval. Do not call it again, and never write the solution any other way."
       : "It is written on the board straight away, so be sure it is right first.",
   ].join("\n");
@@ -136,13 +143,18 @@ export async function solve(opts: { prompt?: string; source?: string } = {}): Pr
   try {
     const page = c.board.page_index() + 1;
     const readings = readSelection();
-    const preview = solvePrefs.read().preview || isView();
-    const text = solvePrompt({ ids, page, readings, preview, extra: opts.prompt });
+    // Class mode (or no teacher check): stream the solution line by line.
+    const preview = isView() || (solvePrefs.read().preview && !classModeOn());
+    const stream = !preview && aiPrefs.read().streamSolve;
+    const text = solvePrompt({ ids, page, readings, preview, extra: opts.prompt, stream });
     // Context: the selection as JSON, and a picture of it.
     const ctx: any[] = [];
+    let below: { x: number; y: number; w: number; h: number } | undefined;
     try {
       const sel = c.board.live_apply(JSON.stringify({ op: "get_selection" }), "Teacher");
       ctx.push({ kind: "selection", uri: `rupok://board/page/${page}/selection`, text: sel });
+      const b = JSON.parse(sel).bounds;
+      if (b) below = { x: b.x, y: b.y + b.h + 24, w: Math.max(420, b.w), h: Math.max(120, b.h * 1.4) };
     } catch { /* read failed */ }
     try {
       const snap = await renderSnapshot(c, { page, item_ids: ids, width: 1024 }, "Teacher");
@@ -160,6 +172,10 @@ export async function solve(opts: { prompt?: string; source?: string } = {}): Pr
     const label = readings[0] ? `Solve this: ${readings[0].latex}` : "Solve this";
     setChat("items", (l) => [...l, { kind: "user", id: `solve${++nextId}`, text: label, context: [`Selection (${ids.length})`] } as any]);
     live.sendChat({ t: "prompt", text, context: ctx });
+    notePrompt(text, "solve");
+    // The class sees the AI thinking right where the solution will appear.
+    const card = startCard({ source: "solve", kind: "handwriting", title: label, step: "Thinking…", rect: below, page });
+    if (stream) startStream(ids, card);
     lastProblem = ids.slice();
     return true;
   } finally {
@@ -188,7 +204,8 @@ export function onWriteOp(op: any, agent: string): any {
   const full = withDefaults(op);
   const lines: string[] = Array.isArray(op.lines) ? op.lines.map(String) : [];
   if (!lines.some((l) => l.trim())) throw new Error("lines must contain at least one line to write");
-  if (solvePrefs.read().preview) {
+  // Class mode writes straight away (the teacher can Undo); else the check.
+  if (solvePrefs.read().preview && !classModeOn()) {
     const item: PendingSolution = { id: ++nextId, agent, op: full, lines, at: Date.now() };
     setPending((l) => [...l, item]);
     return {
