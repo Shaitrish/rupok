@@ -1,4 +1,4 @@
-use super::layout::{Layout, Variation};
+use super::layout::{Layout, Pause, Variation};
 use super::parse::parse_line;
 use super::*;
 use crate::math::geom::BBox;
@@ -49,9 +49,11 @@ fn layout_boxes_follow_maths_structure() {
         var: Variation {
             jitter: 0.0,
             prefer_user: false,
+            connect: false,
         },
         rng: crate::math::synth::Rng::new(1),
         missing: Vec::new(),
+        drift: 0.0,
     };
     // Fraction: numerator ink above the bar, denominator below.
     let row = lay.row(&parse_line("$\\frac{12}{3}$"), 1.0);
@@ -264,6 +266,7 @@ fn hostile_options_are_clamped() {
             max_width: Some(-1.0),
             line_pitch: f32::NAN,
             prefer_user: true,
+            connect: true,
         },
     );
     assert!(!w.strokes.is_empty());
@@ -271,4 +274,168 @@ fn hostile_options_are_clamped() {
     assert!(write(&many, &g, &opts()).lines.len() <= MAX_LINES);
     let empty: [&str; 0] = [];
     assert!(write(&empty, &g, &opts()).strokes.is_empty());
+}
+
+// ------------------------------------------------- handwriting quality
+
+#[test]
+fn letters_advance_left_to_right_with_even_gaps() {
+    let g = GlyphSet::new();
+    for word in ["minimum", "Subtract", "quick", "x+y=12", "hello world"] {
+        let w = write(&[word], &g, &opts());
+        // Left edges of successive strokes' glyphs never jump backwards by
+        // more than a letter: the writing moves left to right.
+        let mut starts: Vec<f32> = Vec::new();
+        for s in &w.strokes {
+            let x0 = s.points.iter().map(|p| p.x).fold(f32::INFINITY, f32::min);
+            starts.push(x0);
+        }
+        let xh = opts().x_height;
+        let mut max_so_far = f32::NEG_INFINITY;
+        for x in &starts {
+            assert!(
+                *x >= max_so_far - xh * 1.2,
+                "{word}: a stroke starts {x} far left of {max_so_far}"
+            );
+            max_so_far = max_so_far.max(*x);
+        }
+    }
+    // Letter gaps are even: ink-to-ink spacing within a word varies little.
+    let lay_word = |word: &str| {
+        let g = GlyphSet::new();
+        let mut lay = Layout {
+            glyphs: &g,
+            var: Variation {
+                jitter: 0.0,
+                prefer_user: false,
+                connect: false,
+            },
+            rng: crate::math::synth::Rng::new(1),
+            missing: Vec::new(),
+            drift: 0.0,
+        };
+        let nodes = parse_line(word);
+        let mut gaps = Vec::new();
+        let mut prev: Option<BBox> = None;
+        let full = lay.row(&nodes, 1.0);
+        let mut boxes: Vec<BBox> = Vec::new();
+        for s in &full.strokes {
+            let b = BBox::of(&s.pts);
+            match boxes.last_mut() {
+                Some(last) if s.pause == Pause::Stroke => *last = last.union(b),
+                _ => boxes.push(b),
+            }
+        }
+        for b in &boxes {
+            if let Some(p) = prev {
+                gaps.push(b.x0 - p.x1);
+            }
+            prev = Some(*b);
+        }
+        gaps
+    };
+    let gaps = lay_word("minimum");
+    assert!(!gaps.is_empty());
+    for g in &gaps {
+        assert!(*g > 1.0 && *g < 7.0, "letter gap {g} in {gaps:?}");
+    }
+}
+
+#[test]
+fn writing_stays_inside_its_block_and_width() {
+    let g = GlyphSet::new();
+    for connect in [false, true] {
+        let lines = [
+            "Subtract 3 from both sides of the equation, then divide by two",
+            "$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$",
+            "Check: $2(2) + 3 = 7$",
+        ];
+        let o = WriteOptions {
+            max_width: Some(420.0),
+            connect,
+            ..opts()
+        };
+        let w = write(&lines, &g, &o);
+        let b = bbox_of(&w.strokes);
+        assert!(b.x0 >= -0.01 && b.y0 >= -0.01, "{b:?}");
+        assert!(b.x1 <= w.width + 0.5, "ink {} past width {}", b.x1, w.width);
+        assert!(
+            b.y1 <= w.height + 0.5,
+            "ink {} past height {}",
+            b.y1,
+            w.height
+        );
+        // Wrapping keeps lines near the asked width (one long word may exceed).
+        assert!(w.width < 420.0 + 60.0, "{}", w.width);
+        for s in &w.strokes {
+            for p in &s.points {
+                assert!(p.x.is_finite() && p.y.is_finite());
+                assert!((0.0..=1.0).contains(&p.p));
+            }
+        }
+    }
+}
+
+#[test]
+fn pen_lifts_like_a_hand() {
+    let g = GlyphSet::new();
+    // `v` and `w` are one movement each; `n` and `a` retrace their stem.
+    for c in ['v', 'w', 'n', 'a', 'd', 'm', 'u'] {
+        let gl = g.builtin(c).unwrap();
+        assert_eq!(gl.strokes.len(), 1, "{c}: {} strokes", gl.strokes.len());
+    }
+    // The dot of an i comes after its stem.
+    let i = g.builtin('i').unwrap();
+    assert_eq!(i.strokes.len(), 2);
+    assert!(BBox::of(&i.strokes[1]).size() < 2.5, "dot last");
+    // The joined style lifts the pen less often than neat print.
+    let neat = write(&["minimum quantum"], &g, &opts());
+    let joined = write(
+        &["minimum quantum"],
+        &g,
+        &WriteOptions {
+            connect: true,
+            ..opts()
+        },
+    );
+    assert!(
+        joined.strokes.len() < neat.strokes.len(),
+        "joined {} vs neat {}",
+        joined.strokes.len(),
+        neat.strokes.len()
+    );
+    // Same input, same ink, in both styles.
+    assert_eq!(
+        joined,
+        write(
+            &["minimum quantum"],
+            &g,
+            &WriteOptions {
+                connect: true,
+                ..opts()
+            }
+        )
+    );
+}
+
+#[test]
+fn neighbouring_letters_share_a_baseline() {
+    // The baseline wanders slowly: neighbours differ far less than the
+    // whole line's spread would allow with independent jitter.
+    let g = GlyphSet::new();
+    let w = write(&["nnnnnnnnnnnnnnnnnnnn"], &g, &opts());
+    let bottoms: Vec<f32> = w
+        .strokes
+        .iter()
+        .map(|s| {
+            s.points
+                .iter()
+                .map(|p| p.y)
+                .fold(f32::NEG_INFINITY, f32::max)
+        })
+        .collect();
+    let xh = opts().x_height;
+    for pair in bottoms.windows(2) {
+        assert!((pair[1] - pair[0]).abs() < xh * 0.2, "{pair:?}");
+    }
 }

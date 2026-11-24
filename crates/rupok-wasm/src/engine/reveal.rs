@@ -9,6 +9,12 @@
 //!
 //! In step mode (Teach, "one line per click") the writing pauses before each
 //! line until the teacher presses Next ([`Engine::reveal_next`]).
+//!
+//! Writing that arrives while a reveal is running (a solution streamed line by
+//! line) is queued after it instead of cutting it short. Agent shapes and
+//! tables are "drawn on" the same way ([`Engine::reveal_draw_on`]): their
+//! strokes have no pen timing, so each is drawn along its points over a
+//! moment set by its length.
 
 use rupok_core::{ItemData, ItemId};
 
@@ -21,6 +27,8 @@ struct RevealItem {
     start: f64,
     dur: f64,
     line: usize,
+    /// No pen timing (a shape): drawn by the share of its points.
+    synthetic: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -77,7 +85,6 @@ impl<S: InkSink> Engine<S> {
     /// `lines[i]` is stroke i's line; with `step`, only the first line is
     /// written until [`Self::reveal_next`]. Strokes not on this page are skipped.
     pub fn reveal_start(&mut self, ids: &[ItemId], lines: &[usize], step: bool, now_ms: f64) {
-        self.reveal_finish();
         let mut items: Vec<RevealItem> = Vec::with_capacity(ids.len());
         for (k, id) in ids.iter().enumerate() {
             let Some(it) = self.scene.get(id) else {
@@ -91,8 +98,45 @@ impl<S: InkSink> Engine<S> {
                 start: it.created,
                 dur: f64::from(s.points.last().map_or(0, |p| p.dt)),
                 line: lines.get(k).copied().unwrap_or(0),
+                synthetic: false,
             });
         }
+        self.push_reveal(items, step, now_ms);
+    }
+
+    /// Draw agent shapes on stroke by stroke: each stroke grows along its
+    /// points over 150–700 ms (by its length), one after another.
+    pub fn reveal_draw_on(&mut self, ids: &[ItemId], now_ms: f64) {
+        let mut items = Vec::with_capacity(ids.len());
+        let mut t = 0.0;
+        for id in ids {
+            let Some(it) = self.scene.get(id) else {
+                continue;
+            };
+            let ItemData::Stroke(s) = &it.data else {
+                continue;
+            };
+            let len: f64 = s
+                .points
+                .windows(2)
+                .map(|w| f64::from((w[1].x - w[0].x).hypot(w[1].y - w[0].y)))
+                .sum();
+            let dur = (len / 2.2).clamp(150.0, 700.0);
+            items.push(RevealItem {
+                id: id.clone(),
+                start: t,
+                dur,
+                line: 0,
+                synthetic: true,
+            });
+            t += dur + 60.0;
+        }
+        self.push_reveal(items, false, now_ms);
+    }
+
+    /// Start revealing `items` (start times in any origin), or queue them
+    /// after a reveal already running (not in step mode).
+    fn push_reveal(&mut self, mut items: Vec<RevealItem>, step: bool, now_ms: f64) {
         if items.is_empty() || self.replay.is_some() {
             return;
         }
@@ -100,9 +144,30 @@ impl<S: InkSink> Engine<S> {
         let t0 = items[0].start;
         for i in &mut items {
             i.start -= t0;
-            self.sink.remove_stroke(&i.id);
         }
         let n_lines = items.iter().map(|i| i.line + 1).max().unwrap_or(1);
+        if !step
+            && let Some(r) = &mut self.reveal
+            && !r.step
+        {
+            // Queue after what is being written, with a short breath.
+            let end = r.items.last().map_or(r.t, |i| i.start + i.dur).max(r.t);
+            let base = end + 150.0;
+            for i in &mut items {
+                i.start += base;
+                i.line += r.lines;
+                self.sink.remove_stroke(&i.id);
+            }
+            r.lines += n_lines;
+            r.gate = r.lines;
+            r.items.extend(items);
+            self.dirty = true;
+            return;
+        }
+        self.reveal_finish();
+        for i in &items {
+            self.sink.remove_stroke(&i.id);
+        }
         self.reveal = Some(Reveal {
             items,
             t: 0.0,
@@ -164,10 +229,19 @@ impl<S: InkSink> Engine<S> {
             return None;
         };
         let local = r.t - i.start;
+        let take = if i.synthetic {
+            let n = s.points.len();
+            ((local / i.dur.max(1.0)).clamp(0.0, 1.0) * n as f64).ceil() as usize
+        } else {
+            s.points
+                .iter()
+                .take_while(|p| f64::from(p.dt) <= local)
+                .count()
+        };
         let pts: Vec<_> = s
             .points
             .iter()
-            .take_while(|p| f64::from(p.dt) <= local)
+            .take(take.max(1))
             .map(|p| rupok_ink::StrokePoint {
                 x: p.x + s.offset[0],
                 y: p.y + s.offset[1],

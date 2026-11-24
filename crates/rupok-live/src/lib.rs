@@ -29,8 +29,10 @@
 pub mod apply;
 pub mod attribution;
 pub mod design;
+pub mod fit;
 pub mod handwriting;
 pub mod op;
+pub mod progress;
 pub mod protocol;
 
 pub use apply::{BoardCtx, LiveError, Outcome, apply, apply_with, doc_key};

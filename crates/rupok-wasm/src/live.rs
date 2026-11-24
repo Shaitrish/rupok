@@ -115,7 +115,20 @@ pub fn apply<S: InkSink>(
         serde_json::from_str(op_json).map_err(|err| error_json(format!("bad op: {err}")))?;
     // Shapes and tables: geometry lives in the engine (`engine/insert.rs`).
     if matches!(op, Op::AddShape { .. } | Op::AddTable { .. }) {
-        return e.ai_insert(&op, agent, now_ms);
+        let out = e.ai_insert(&op, agent, now_ms)?;
+        // Draw the shape on in front of the class, stroke by stroke.
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&out) {
+            let ids: Vec<String> = v["item_ids"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default();
+            e.reveal_draw_on(&ids, now_ms);
+        }
+        return Ok(out);
     }
     let page = e.page_id().to_string();
     let selection = e.selection().to_vec();
@@ -315,6 +328,71 @@ mod tests {
         assert!(e.undo());
         assert_eq!(e.stroke_count(), 0);
         assert!(e.sink.strokes.is_empty());
+    }
+
+    #[test]
+    fn streamed_lines_queue_behind_the_writing() {
+        // A solution streamed line by line: the second write must not cut
+        // the first one short; both are written in order.
+        let mut e = engine();
+        let r = apply(
+            &mut e,
+            r#"{"op":"write_handwriting","lines":["$2x = 4$"],"anchor":{"x":100,"y":100}}"#,
+            "Claude",
+            1_000.0,
+        )
+        .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&r).unwrap();
+        let n1 = v["strokes"].as_u64().unwrap() as usize;
+        let group = v["group"].as_str().unwrap().to_string();
+        e.tick(1_050.0);
+        let r2 = apply(
+            &mut e,
+            &format!(
+                r#"{{"op":"write_handwriting","lines":["$x = 2$"],"anchor":{{"group":"{group}"}}}}"#
+            ),
+            "Claude",
+            1_100.0,
+        )
+        .unwrap();
+        let v2: serde_json::Value = serde_json::from_str(&r2).unwrap();
+        let n2 = v2["strokes"].as_u64().unwrap() as usize;
+        assert!(
+            e.sink.strokes.len() < n1,
+            "the first line is still being written, not finished at once"
+        );
+        let st = e.reveal_state().unwrap();
+        assert_eq!(st.total, n1 + n2, "queued");
+        let mut t = 1_100.0;
+        while e.reveal_state().is_some() && t < 60_000.0 {
+            t += 50.0;
+            e.tick(t);
+        }
+        assert_eq!(e.sink.strokes.len(), n1 + n2);
+    }
+
+    #[test]
+    fn agent_shapes_are_drawn_on() {
+        let mut e = engine();
+        let r = apply(
+            &mut e,
+            r##"{"op":"add_shape","shape":"rect","x":100,"y":100,"w":400,"h":200}"##,
+            "Claude",
+            1_000.0,
+        )
+        .unwrap();
+        assert!(r.contains("item_ids"));
+        assert!(e.reveal_state().is_some(), "drawing on");
+        assert_eq!(e.sink.strokes.len(), 0);
+        let mut t = 1_000.0;
+        let mut partial = false;
+        while e.reveal_state().is_some() && t < 10_000.0 {
+            t += 40.0;
+            e.tick(t);
+            partial |= e.has_animation();
+        }
+        assert!(partial, "the outline grows");
+        assert!(!e.sink.strokes.is_empty(), "then it is on the board");
     }
 
     #[test]
