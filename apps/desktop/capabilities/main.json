@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "The board window: open and save lessons, the lesson library (Documents/Rupok), export PDFs, open the overlay, receive overlay snapshots.",
+  "description": "The board window: open and save lessons, the lesson library (Documents/Rupok), export PDFs, open the overlay, receive overlay snapshots, open the donate page in the browser.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -36,6 +36,7 @@
     "allow-voice-model-download",
     "allow-voice-model-cancel",
     "allow-voice-model-remove",
-    "allow-voice-transcribe"
+    "allow-voice-transcribe",
+    "allow-open-donate-page"
   ]
 }

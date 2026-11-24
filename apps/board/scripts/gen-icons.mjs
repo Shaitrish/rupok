@@ -80,6 +80,7 @@ const MAP = {
   openLink: ["square-arrow-right-up"],
   replace: ["gallery-edit", "refresh"],
   camera3d: ["camera-rotate"],
+  heart: ["heart"],
 };
 
 function body(name) {

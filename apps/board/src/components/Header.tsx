@@ -25,6 +25,7 @@ import { openExport } from "./ExportDialog";
 import { FILE_EXT, WORDMARK } from "../brand";
 import { LibraryTopButton } from "./LibraryButton";
 import { openSettings } from "../settings/open";
+import { openDonatePage } from "../donate";
 import { current, flush } from "../library/session";
 import { openShareDialog } from "./ShareDialog";
 import { MenuButton, type MenuEntry } from "./HeaderMenu";
@@ -240,6 +241,7 @@ export function Header(props: { onObject: () => void; onSettings: () => void }) 
       if (!k.settings) out.push({ id: "settings", label: "Settings", icon: "settings", run: props.onSettings });
       out.push({ id: "shortcuts", label: "Keyboard shortcuts", icon: "keyboard", run: () => openSettings("keyboard") });
       out.push({ id: "about", label: "Help & about", icon: "info", run: () => openSettings("about") });
+      out.push({ id: "donate", label: "Support Rupok", icon: "heart", run: () => void openDonatePage() });
     }
     while (out.length && out[out.length - 1].kind === "sep") out.pop();
     return out;

@@ -1,0 +1,31 @@
+/* "Support Rupok" card (DonateCard.tsx): bottom right, above the status chips
+ * and clear of the dock; above the Library home, below menus and dialogs. */
+.donate-card {
+  position: fixed; right: var(--inset); bottom: calc(var(--inset) + 56px); z-index: 35;
+  width: min(320px, calc(100vw - 2 * var(--inset)));
+  padding: var(--s4) var(--s4) var(--s3);
+  border-radius: 18px; background: var(--surface-solid); box-shadow: var(--shadow-2);
+  display: flex; flex-direction: column; gap: var(--s2);
+  user-select: text; -webkit-user-select: text;
+  animation: donate-in 220ms var(--ease) both;
+}
+@keyframes donate-in { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) { .donate-card { animation: none; } }
+.donate-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-3); color: var(--accent-11); }
+.donate-title { margin: 0; padding-right: 32px; font: 650 15px/21px var(--font); color: var(--text); }
+.donate-sub { margin: 0; font-size: 13px; line-height: 18px; color: var(--text-2); }
+.donate-acts { display: flex; gap: var(--s2); margin-top: var(--s1); }
+.donate-acts button, .donate-x, .donate-never { border: 0; cursor: pointer; font: inherit; }
+.donate-go, .donate-later { flex: 1; height: 40px; border-radius: var(--r-ctl); font-weight: 650; }
+.donate-go { background: var(--accent-9); color: var(--accent-contrast); }
+.donate-go:hover { background: var(--accent-10); }
+.donate-later { background: var(--gray-a3); color: var(--text); }
+.donate-later:hover { background: var(--gray-a4); }
+.donate-never { align-self: center; min-height: 32px; padding: 0 var(--s2); border-radius: 8px; background: transparent; color: var(--text-3); font-size: 13px; }
+.donate-never:hover { color: var(--text); background: var(--hover); }
+.donate-x { position: absolute; top: var(--s2); right: var(--s2); width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: transparent; color: var(--text-3); }
+.donate-x:hover { background: var(--hover); color: var(--text); }
+/* Phones: under the top bar, so the bottom dock stays free. */
+@media (max-width: 600px) {
+  .donate-card { bottom: auto; top: calc(var(--inset) + var(--bar) + var(--s2)); }
+}

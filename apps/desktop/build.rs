@@ -39,6 +39,7 @@ fn main() {
             "voice_model_cancel",
             "voice_model_remove",
             "voice_transcribe",
+            "open_donate_page",
         ]),
     ))
     .expect("tauri-build failed");

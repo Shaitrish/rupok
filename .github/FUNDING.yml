@@ -1,6 +1,4 @@
-# Funding links for rupok. Placeholder: uncomment and fill in when the
-# project has a sponsorship account.
-#
-# github: [shaitrish]
-# open_collective: rupok
-# custom: ["https://shaitrish.com/rupok/sponsor"]
+# The "Sponsor" button on GitHub. Donation methods (bKash, US bank transfer)
+# are listed on rupok.app/donate/, built from apps/board/site/pages/donate.mjs.
+# Add `github: [<account>]` here once a GitHub Sponsors listing exists.
+custom: ["https://rupok.app/donate/"]

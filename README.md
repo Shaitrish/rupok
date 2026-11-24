@@ -97,6 +97,15 @@ rupok validate examples/objects/binary-counter.html --steps 10
 
 ---
 
+## Support Rupok
+
+Rupok is free and open source, with no ads or tracking, and it stays free
+whether or not you donate. Donations pay for signing certificates (so Windows
+and macOS stop warning on install), servers, test devices and development
+time. **[Donate at rupok.app/donate](https://rupok.app/donate/)** by bKash or
+US bank transfer. Starring the repo, sharing Rupok with a teacher, reporting
+bugs and translating help just as much.
+
 ## For contributors
 
 Rupok is a Rust core compiled natively and to WebAssembly, a SolidJS UI, and
