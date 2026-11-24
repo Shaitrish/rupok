@@ -22,6 +22,8 @@ import { LibraryRoot } from "./components/Library";
 import { startLibrary } from "./library/session";
 import { isPhone, pagesShown } from "./viewport";
 import { drawCursor } from "./wetInk";
+import DonateCard from "./components/DonateCard";
+import { startDonateCard } from "./donate";
 
 const OverlayApp = lazy(() => import("./overlay/OverlayApp"));
 
@@ -93,6 +95,7 @@ export default function App() {
       attachDesktopBridge(controller); // desktop: files opened by the OS, overlay snapshots
       onLaunchFiles((files) => void controller.importFiles(files)); // installed PWA: "Open with Rupok"
       void takePendingLesson().then((f) => f && controller.importFiles([f])); // a file picked on /open/
+      startDonateCard(); // desktop: "Support Rupok" on first launch, once more ~2 weeks later (donate.ts)
     } catch (e: any) {
       console.error(e);
       setError(String(e?.message ?? e));
@@ -143,6 +146,7 @@ export default function App() {
         <ChatPanel />
         <VoiceLayer />
         <LibraryRoot />
+        <DonateCard />
       </Show>
       <Show when={objectDialog()}>
         <ObjectDialog onClose={() => setObjectDialog(false)} />

@@ -1,6 +1,7 @@
 // Key board flows in WebKit (Safari, WKWebView on macOS, WebKitGTK on Linux):
 // load, draw with pointer events, undo with ⌘Z/Ctrl+Z, insert a Smart Object
-// preset, Teach mode, save and reopen a lesson, and the website pages.
+// preset, Teach mode, save and reopen a lesson, the support card, and the
+// website pages.
 // Shortcuts use ControlOrMeta, so on macOS they are the ⌘ shortcuts.
 
 import { expect, test, type Page } from "@playwright/test";
@@ -210,8 +211,56 @@ test.describe("board in WebKit", () => {
   });
 });
 
+// The desktop app's "Support Rupok" card (donate.ts); `?donate-card` turns
+// it on in a browser, as if this were the desktop app.
+test.describe("support card", () => {
+  const card = (page: Page) => page.getByTestId("donate-card");
+  const openWithCard = async (page: Page) => {
+    await page.goto("/board/?donate-card");
+    await expect(page.locator(".loading")).toHaveCount(0, { timeout: 30_000 });
+  };
+
+  test("shows on first launch, Not now hides it, and it doesn't come back at once", async ({ page }) => {
+    const errors = trackErrors(page);
+    await openWithCard(page);
+    await expect(card(page)).toBeVisible();
+    await expect(card(page)).toContainText("Rupok is free and open source");
+    await card(page).getByRole("button", { name: "Not now" }).last().click();
+    await expect(card(page)).toHaveCount(0);
+    await openWithCard(page);
+    await page.waitForTimeout(2500);
+    await expect(card(page)).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test("Don't show again is remembered", async ({ page }) => {
+    await openWithCard(page);
+    await card(page).getByRole("button", { name: "Don't show again" }).click();
+    await expect(card(page)).toHaveCount(0);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("rupok.donate") ?? "null"));
+    expect(saved?.never).toBe(true);
+  });
+
+  test("never appears in Teach", async ({ page }) => {
+    await openWithCard(page);
+    await page.keyboard.press("F5");
+    await expect(page.locator("html")).toHaveAttribute("data-mode", "teach");
+    await page.waitForTimeout(2500);
+    await expect(card(page)).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("html")).toHaveAttribute("data-mode", "prepare");
+    await expect(card(page)).toBeVisible();
+  });
+
+  test("is off in the browser without the flag", async ({ page }) => {
+    await openBoard(page);
+    await page.waitForTimeout(2500);
+    await expect(card(page)).toHaveCount(0);
+  });
+});
+
 test.describe("website in WebKit (Safari)", () => {
-  for (const path of ["/", "/open/", "/bn/", "/compare/"]) {
+  for (const path of ["/", "/open/", "/bn/", "/compare/", "/donate/", "/bn/donate/"]) {
     test(`${path} loads without errors`, async ({ page }) => {
       const errors = trackErrors(page);
       const res = await page.goto(path);

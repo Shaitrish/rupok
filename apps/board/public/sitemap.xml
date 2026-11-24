@@ -28,6 +28,13 @@
     <lastmod>2026-11-23</lastmod>
   </url>
   <url>
+    <loc>https://rupok.app/donate/</loc>
+    <lastmod>2026-11-23</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/donate/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://rupok.app/bn/donate/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/donate/"/>
+  </url>
+  <url>
     <loc>https://rupok.app/download/</loc>
     <lastmod>2026-11-23</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/download/"/>
@@ -67,6 +74,13 @@
   <url>
     <loc>https://rupok.app/terms/</loc>
     <lastmod>2026-11-23</lastmod>
+  </url>
+  <url>
+    <loc>https://rupok.app/bn/donate/</loc>
+    <lastmod>2026-11-23</lastmod>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://rupok.app/bn/donate/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/donate/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/donate/"/>
   </url>
   <url>
     <loc>https://rupok.app/bn/download/</loc>

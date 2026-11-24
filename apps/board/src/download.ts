@@ -141,6 +141,21 @@ function render(rel: Release | null) {
   document.querySelectorAll<HTMLElement>("[data-os-card]").forEach((c) => c.classList.toggle("you", c.dataset.osCard === os));
 }
 
+// /download/: once a download starts, thank the teacher and point to /donate/.
+// The panel ([data-dl-thanks], from site/pages/download.mjs) never blocks the
+// page and closes with × or Esc.
+const thanks = document.querySelector<HTMLElement>("[data-dl-thanks]");
+if (thanks) {
+  const hide = () => (thanks.hidden = true);
+  document.addEventListener("click", (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest("[data-dl-thanks-close]")) return hide();
+    const a = t.closest<HTMLAnchorElement>("a[data-asset], [data-download]:not([data-download=foot]) a.dl-main, [data-download] a.dl-link[download]");
+    if (a) thanks.hidden = false;
+  });
+  document.addEventListener("keydown", (e) => e.key === "Escape" && hide());
+}
+
 if (document.querySelector("[data-download], [data-asset], [data-os-card]")) {
   render(null);
   void latestRelease().then((rel) => rel && render(rel));

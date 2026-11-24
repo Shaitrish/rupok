@@ -68,6 +68,7 @@ const MAP = {
   grow: ["maximize-square-minimalistic", "maximize-square"],
   shrink: ["minimize-square-minimalistic", "minimize-square"],
   broom: ["broom"],
+  heart: ["heart"],
 };
 
 function body(name) {

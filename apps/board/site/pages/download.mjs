@@ -21,6 +21,14 @@ function grid(t) {
       </div>`;
 }
 
+/** Shown by src/download.ts once a download button is clicked. */
+const thanks = (t) => `<div class="dl-thanks" role="status" data-dl-thanks hidden>
+          <button type="button" class="dl-thanks-x" data-dl-thanks-close aria-label="${t.close}">×</button>
+          <b>${t.title}</b>
+          <p>${t.p}</p>
+          <div class="dl-thanks-acts"><a class="pill mint" href="${t.href}">${t.donate}</a><a class="dl-link" href="#unsigned">${t.help}</a></div>
+        </div>`;
+
 const ld = (lang, path) => [
   {
     "@type": "SoftwareApplication",
@@ -62,7 +70,9 @@ const en = {
   crumbs: [["Download"]],
   h1: "Download Rupok",
   lede: "The free whiteboard for teachers, as a desktop app for Windows, Mac and Linux. Or open it in Chrome, Edge or Safari on any device: same board, no install.",
-  aside: `<div class="dl dl-hero" data-download="page"><a class="pill mint lg" href="${RELEASES_URL}">Download the latest release</a></div>`,
+  aside: `<div class="dl dl-hero" data-download="page"><a class="pill mint lg" href="${RELEASES_URL}">Download the latest release</a></div>
+        ${thanks({ title: "Thanks for downloading Rupok!", p: "Rupok is free. If it helps your class, consider supporting it.", donate: "Support Rupok ❤️", href: "/donate/", help: "Install help", close: "Close" })}`,
+  fine: "Rupok is free. If it helps your class, consider [supporting it](/donate/).",
   ld: ld("en", "/download/"),
   sections: [
     { id: "all", h2: "Every platform", blocks: [{ html: grid(tEn) }, { html: `<p class="fine"><a data-notes href="${RELEASES_URL}" rel="noopener">Release notes and every file</a> on GitHub.</p>` }] },
@@ -124,7 +134,9 @@ const bn = {
   crumbs: [["ডাউনলোড"]],
   h1: "Rupok ডাউনলোড করুন",
   lede: "শিক্ষকদের ফ্রি হোয়াইটবোর্ড, Windows, Mac ও Linux-এর ডেস্কটপ অ্যাপ হিসেবে। অথবা যেকোনো ডিভাইসে Chrome, Edge বা Safari-তে খুলুন: একই বোর্ড, ইনস্টল ছাড়াই।",
-  aside: `<div class="dl dl-hero" data-download="page"><a class="pill mint lg" href="${RELEASES_URL}">সর্বশেষ রিলিজ ডাউনলোড করুন</a></div>`,
+  aside: `<div class="dl dl-hero" data-download="page"><a class="pill mint lg" href="${RELEASES_URL}">সর্বশেষ রিলিজ ডাউনলোড করুন</a></div>
+        ${thanks({ title: "Rupok ডাউনলোড করার জন্য ধন্যবাদ!", p: "Rupok ফ্রি। আপনার ক্লাসে কাজে লাগলে Rupok-এর পাশে থাকার কথা ভাবুন।", donate: "Rupok-কে সহায়তা করুন ❤️", href: "/bn/donate/", help: "ইনস্টলে সাহায্য", close: "বন্ধ করুন" })}`,
+  fine: "Rupok ফ্রি। আপনার ক্লাসে কাজে লাগলে [Rupok-এর পাশে থাকুন](/bn/donate/)।",
   ld: ld("bn", "/bn/download/"),
   sections: [
     { id: "all", h2: "সব প্ল্যাটফর্ম", blocks: [{ html: grid(tBn) }, { html: `<p class="fine">GitHub-এ <a data-notes href="${RELEASES_URL}" rel="noopener">রিলিজ নোট ও সব ফাইল</a>।</p>` }] },

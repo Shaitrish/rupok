@@ -19,6 +19,18 @@ pub const MAIN: &str = "main";
 /// not lost: the board also drains the queue once at start-up.
 const OPEN_FILES_EVENT: &str = "rupok://open-files";
 
+/// Rupok's donate page. Fixed here, so web content can't make the app open
+/// any other address.
+const DONATE_URL: &str = "https://rupok.app/donate/";
+
+/// Open the donate page in the system browser ("Support Rupok" in Settings,
+/// the ⋯ menu and the first-launch card).
+#[tauri::command]
+fn open_donate_page() -> Result<(), String> {
+    crate::cloud_auth::open_in_browser(DONATE_URL)
+        .map_err(|e| format!("could not open the browser: {e}"))
+}
+
 /// Files the OS asked us to open (argv, file association, second launch),
 /// until the board takes them.
 #[derive(Default)]
@@ -96,6 +108,7 @@ pub fn run() {
             voice_cmd::voice_model_cancel,
             voice_cmd::voice_model_remove,
             voice_cmd::voice_transcribe,
+            open_donate_page,
         ])
         .setup(|app| {
             let args: Vec<String> = std::env::args().skip(1).collect();

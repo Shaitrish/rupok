@@ -1,9 +1,10 @@
-// Settings → About: version and licences, then troubleshooting switches.
+// Settings → About: version and licences, Support Rupok, then troubleshooting switches.
 
 import { setPrefs, prefs } from "../../state";
 import { AboutSection, GraphicsInfo } from "../../components/settings/About";
 import { pref } from "../bind";
 import { registerSettings } from "../registry";
+import { openDonatePage } from "../../donate";
 
 registerSettings([
   {
@@ -11,6 +12,13 @@ registerSettings([
     description: "Version, licences and links.",
     keywords: ["version", "licence", "license", "AGPL", "open source", "credits", "fonts", "github"],
     component: AboutSection,
+  },
+  {
+    id: "about.support", category: "about", order: 20, type: "action", label: "Support Rupok",
+    description: "Rupok is free and open source. A donation pays for signing certificates, test devices and development time.",
+    keywords: ["donate", "donation", "sponsor", "support", "bkash", "contribute", "অনুদান", "সহায়তা", "ডোনেট"],
+    button: "Donate", icon: "heart",
+    run: () => openDonatePage(),
   },
   {
     id: "about.renderer", category: "about", group: "Troubleshooting", order: 100, type: "segmented", label: "Renderer",
