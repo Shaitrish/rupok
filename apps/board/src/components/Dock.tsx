@@ -35,7 +35,7 @@ import { ShapeGlyph } from "./ShapeGlyph";
 import { clearShapesRequest, currentShape, openShapesPicker, shapeLabel, shapesRequest } from "../shapes";
 import { MarkerOpacity, SizeControl, StylePicker } from "./InkOptions";
 import { StampIcon, StampsPanel } from "./Stamps";
-import { brushOf } from "../brushes";
+import { brushInfo, brushOf } from "../brushes";
 import { celebrate, currentStamp } from "../stamps";
 
 const META = new Map(TOOLBAR_ITEMS.map((t) => [t.id, t]));
@@ -254,6 +254,8 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   };
   const bucket = () => screenBucket(viewport().w, viewport().h);
   const [dragPlace, setDragPlace] = createSignal<DockPlace | null>(null);
+  /** The Shapes popover's line styles are unfolded. */
+  const [lineStyles, setLineStyles] = createSignal(false);
   const place = () => dragPlace() ?? dockPlace(mode(), cfg(), bucket());
   const vertical = () => isVertical(place(), cfg().dock.orientation);
   const minimized = () => dockMinimized(mode(), cfg());
@@ -1123,10 +1125,20 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
             </Show>
             <Show when={p().kind === "shapes"}>
               <ShapesPicker onDone={() => setPop(null)} focus={p().focus} />
-              <div class="dock-hr" />
-              <div class="ink-label">Line style</div>
-              <StylePicker kind="shape" color={color()} size={sizes().pen ?? width()} />
-              <MarkerOpacity />
+              {/* Folded, so the picker still fits above the dock in Teach. */}
+              <button
+                class="dock-row"
+                aria-expanded={lineStyles()}
+                onClick={() => setLineStyles(!lineStyles())}
+              >
+                <Icon name="line" size={20} />
+                <span class="grow">Line style · {brushInfo(brushOf("shape")).label}</span>
+                <Icon name={lineStyles() ? "up" : "down"} size={16} />
+              </button>
+              <Show when={lineStyles()}>
+                <StylePicker kind="shape" color={color()} size={sizes().pen ?? width()} />
+                <MarkerOpacity />
+              </Show>
               <Show when={cfg().tools.includes("smartink")}>
                 <SmartInkToggle row />
               </Show>
