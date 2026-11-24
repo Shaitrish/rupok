@@ -116,11 +116,11 @@ Got an [.rpk file (Rich Presentation Kit)](https://rupok.app/rpk/) from your tea
 
 ## Pricing: the app is free, forever
 
-Rupok is open source. Rupok Cloud adds sync, sharing and live classes, starting with a free plan for every teacher.
+Rupok is open source. Rupok Cloud adds storage, student links, history and hosted AI, starting with a free plan for every teacher. See [all plans and prices](https://rupok.app/pricing/).
 
-- **Free (৳0):** the full app and every feature. Coming soon: 500 MB cloud sync, a Claude connector, student share links.
-- **Pro (coming soon):** large cloud storage, live class for students, Rupok AI credits, quiz and attendance insights.
-- **School (coming soon):** admin for all teachers, classes and student lists, a shared course library.
+- **Free (৳0):** the full app and every feature, and your own AI. Coming soon: 500 MB cloud, 10 student links, 30 days of history.
+- **Pro (coming soon, ৳299 or $7 a month):** 20 GB, unlimited student links, full history, 150 Rupok AI credits a month, priority support.
+- **Coaching centre and School (coming soon):** Pro for 5 teachers from ৳1,199 a month; per-teacher school plans with invoices and classroom board licences.
 
 ## More
 
@@ -134,7 +134,7 @@ Rupok is open source. Rupok Cloud adds sync, sharing and live classes, starting 
 
 ### Is Rupok really free?
 
-Yes. The whole app is free and open source, with every feature, on every device. Rupok Cloud, a hosted add-on for sync, sharing and live classes, is coming with a free plan for every teacher.
+Yes. The whole app is free and open source, with every feature, on every device. Rupok Cloud, a hosted add-on for sync, sharing and live classes, is coming with a free plan for every teacher. See [pricing](https://rupok.app/pricing/).
 
 ### Does it work with my smartboard or interactive panel?
 
@@ -239,17 +239,17 @@ Zoom, Google Meet বা Teams-এ Rupok-এর উইন্ডো শেয়�
 
 ## অ্যাপটি ফ্রি। চিরকাল।
 
-Rupok ওপেন সোর্স (AGPL-3.0), তাই কেউ ফ্রি সংস্করণ বন্ধ করে দিতে পারবে না। শীঘ্রই আসছে Rupok Cloud: সিঙ্ক, শেয়ার লিংক আর লাইভ ক্লাস, প্রত্যেক শিক্ষকের জন্য ফ্রি প্ল্যানসহ।
+Rupok ওপেন সোর্স (AGPL-3.0), তাই কেউ ফ্রি সংস্করণ বন্ধ করে দিতে পারবে না। Rupok Cloud যোগ করে স্টোরেজ, শিক্ষার্থী-লিংক, হিস্ট্রি আর AI, প্রত্যেক শিক্ষকের জন্য ফ্রি প্ল্যানসহ। [সব প্ল্যান আর দাম দেখুন](https://rupok.app/bn/pricing/)।
 
-- **ফ্রি (৳০):** পুরো অ্যাপ, সব ফিচার; ৫০০ MB ক্লাউড সিঙ্ক (শীঘ্রই); Claude কানেক্টর (শীঘ্রই); শিক্ষার্থীদের শেয়ার লিংক (শীঘ্রই)
-- **Pro (ব্যস্ত শিক্ষকদের জন্য):** ফ্রি প্ল্যানের সবকিছু; বড় ক্লাউড স্টোরেজ; শিক্ষার্থীদের জন্য লাইভ ক্লাস; Rupok AI ক্রেডিট; কুইজ ও উপস্থিতির হিসাব
-- **School (পুরো স্কুলের জন্য):** Pro-র সবকিছু; সব শিক্ষকের জন্য অ্যাডমিন; ক্লাস আর শিক্ষার্থীর তালিকা; স্কুলের নিজস্ব কোর্স লাইব্রেরি
+- **ফ্রি (৳০):** পুরো অ্যাপ, সব ফিচার; নিজের AI, যত খুশি; ৫০০ MB ক্লাউড (শীঘ্রই); ১০টি শিক্ষার্থী-লিংক (শীঘ্রই)
+- **Pro (মাসে ৳২৯৯):** ফ্রি প্ল্যানের সবকিছু; ২০ GB ক্লাউড স্টোরেজ (শীঘ্রই); যত খুশি শিক্ষার্থী-লিংক (শীঘ্রই); মাসে ১৫০ Rupok AI ক্রেডিট (শীঘ্রই); লাইভ ক্লাস (শীঘ্রই)
+- **কোচিং ও স্কুল (মাসে ৳১,১৯৯ থেকে):** প্রত্যেক শিক্ষকের জন্য Pro; অ্যাডমিন আর শেয়ার্ড লাইব্রেরি (শীঘ্রই); ইনভয়েস আর ব্যাংক ট্রান্সফার; ক্লাসরুম বোর্ড লাইসেন্স
 
 ## শিক্ষকরা যা জানতে চান
 
 ### Rupok কি সত্যিই ফ্রি?
 
-হ্যাঁ। পুরো অ্যাপটি ফ্রি আর ওপেন সোর্স (AGPL-3.0); সফটওয়্যারের কোনো পেইড সংস্করণ নেই। শীঘ্রই আসছে Rupok Cloud (সিঙ্ক, শেয়ার লিংক, লাইভ ক্লাস), সেখানেও প্রত্যেক শিক্ষকের জন্য ৫০০ MB-এর ফ্রি প্ল্যান থাকবে।
+হ্যাঁ। পুরো অ্যাপটি ফ্রি আর ওপেন সোর্স (AGPL-3.0); সফটওয়্যারের কোনো পেইড সংস্করণ নেই। শীঘ্রই আসছে Rupok Cloud (সিঙ্ক, শেয়ার লিংক, লাইভ ক্লাস), সেখানেও প্রত্যেক শিক্ষকের জন্য ৫০০ MB-এর ফ্রি প্ল্যান থাকবে। [দাম দেখুন](https://rupok.app/bn/pricing/)।
 
 ### কোন স্মার্টবোর্ডে Rupok চলে?
 
@@ -886,6 +886,208 @@ Safari-তে [rupok.app/board](https://rupok.app/board/) খুলুন, **Sha
 - **ব্রাউজার**: সাম্প্রতিক Chrome, Edge বা Safari (যেকোনো OS), WebGL2 বা WebGPU সহ
 - **হার্ডওয়্যার**: যেকোনো স্মার্ট বোর্ড, ইন্টারঅ্যাক্টিভ প্যানেল, ল্যাপটপ বা ট্যাবলেট; পেন ঐচ্ছিক
 - **অ্যাকাউন্ট**: লাগবে না
+
+---
+
+# The app is free. The classroom cloud is cheap.
+
+> Rupok's whiteboard app is free and open source, forever. Rupok Cloud adds storage, student links, history and AI credits: free 500 MB plan, Pro from ৳299 or $7 a month, coaching centres and schools.
+
+Canonical: https://rupok.app/pricing/ · Language: en · Updated: 2026-11-24
+
+Every board feature is free and open source, forever: ink, PDF, replay, Smart Objects, desktop apps and your own AI. Rupok Cloud adds storage, student links, history and hosted AI. Pay in taka with bKash or Nagad, or in dollars by card.
+
+## Plans
+
+**Free (৳0 / $0):** the whole app and your own AI, now; when Rupok Cloud opens, 500 MB cloud, 10 active student links, 30 days of version history.
+
+**Pro:** ৳299/month, ৳1,599/6 months or ৳2,999/year in Bangladesh (bKash, Nagad, cards; VAT included); $7/month or $60/year elsewhere. 20 GB, unlimited links, full history, 150 AI credits a month (soon).
+
+**Coaching centre (5 teachers, Bangladesh):** ৳1,199/month or ৳11,999/year.
+
+**School:** ৳1,999 per teacher per year (10 or more, invoice) or $36 (5 or more). Classroom board licence ৳2,500 / $29 per board per year.
+
+**AI credit top-ups:** 250 for ৳599 / $5, 1,000 for ৳2,199 / $18. They never expire.
+
+*Paid plans open soon; the free plan is available now.*
+
+## Compare plans
+
+Rupok Cloud opens soon. Items marked “soon” are being built; nothing on this page can be bought yet.
+
+*What each plan includes*
+
+|  | Free | Pro | Coaching centre | School |
+|---|---|---|---|---|
+| The whole app: board, ink, PDF, Teach mode, replay, Smart Objects, desktop apps | ✓  | ✓  | ✓  | ✓  |
+| Your own AI (Claude Code, Codex, OpenCode) | ✓ unlimited | ✓ unlimited | ✓ unlimited | ✓ unlimited |
+| Cloud storage | ◷ 500 MB | ◷ 20 GB | ◷ 30 GB per teacher | ◷ 50 GB per teacher |
+| Student links (no student account needed) | ◷ 10 active | ◷ unlimited | ◷ unlimited | ◷ unlimited |
+| Make a copy, share with colleagues, sync devices | ◷  | ◷  | ◷  | ◷  |
+| Version history | ◷ 30 days | ◷ full | ◷ full | ◷ full |
+| Rupok AI credits (no AI subscription needed) | ◷ 25 to try | ◷ 150 a month | ◷ 150 per teacher a month | ◷ 150 per teacher a month |
+| Live classes | ◷ 300 min a month, 30 students | ◷ 3,000 min a month, 100 students | ◷ 6,000 min, 300 students | ◷ 6,000 min, 300 students |
+| Student view analytics, branding templates | ✗  | ◷  | ◷  | ◷  |
+| Admin, shared library, attendance, quizzes | ✗  | ✗  | ◷  | ◷  |
+| Invoices and bank transfer | ✗  | ✗  | ✗  | ✓  |
+| Priority support | ✗  | ✓  | ✓  | ✓  |
+
+## Ways to pay
+
+### In Bangladesh, in taka
+
+- **bKash, Nagad, Rocket**, Visa, Mastercard, AMEX and internet banking, through SSLCommerz.
+- Prepaid for 1, 6 or 12 months. Nothing renews by itself; we remind you a week before.
+- Prices include VAT. You get a receipt for every payment.
+
+### Everywhere else, in US dollars
+
+- **Cards, PayPal, Apple Pay and Google Pay**, through Paddle, our reseller and merchant of record.
+- Monthly or yearly. Change plan, card or cancel any time from Settings.
+- Paddle adds sales tax or VAT where it applies and sends the invoice.
+
+*You can switch between taka and dollars on this page and in the app. Taka prices are for teachers in Bangladesh.*
+
+## Questions people ask
+
+### Is Rupok really free?
+
+Yes. The app is open source (AGPL-3.0) and every board feature is free forever, on every device. You only pay for Rupok Cloud extras: more storage, unlimited student links, full history, hosted AI and, soon, live classes.
+
+### What stays free forever?
+
+The whole app, offline, with plain `.rpk` files; every board feature, including future ones; using your own Claude, Codex or OpenCode; the 500 MB cloud plan; student links students open with no account; exporting and deleting your data.
+
+### What happens if I stop paying?
+
+Nothing is deleted. You keep every lesson, can open, download and share them, and can delete things to get back under the free limits. Only new uploads stop while you're over 500 MB.
+
+### How do I pay from Bangladesh?
+
+In taka, with bKash, Nagad, Rocket, a card or internet banking, through SSLCommerz. Buy 1, 6 or 12 months at a time; nothing renews automatically, and the app reminds you before your time runs out.
+
+### How do I pay from other countries?
+
+In US dollars by card, PayPal, Apple Pay or Google Pay, through Paddle. Paddle is our reseller: it handles tax and invoices. Change plan, update your card or cancel any time from Settings → Account → Manage subscription.
+
+### What are Rupok AI credits?
+
+Credits run Rupok's hosted AI (Solve this, Design with AI, the chat) for teachers who don't have their own AI subscription. A chat reply or a quick solution uses about 1 credit, a full step-by-step solution about 4, and designing a Smart Object about 10. Using your own Claude Code, Codex or OpenCode is always free.
+
+### Do you offer refunds?
+
+We plan a 14-day, no-questions refund on your first purchase. The exact policy will be in our terms before payments open.
+
+### Can my school pay by invoice?
+
+Yes. School plans and classroom board licences are invoiced once a year and paid by bank transfer, with a VAT receipt in Bangladesh. [Talk to us](https://shaitrish.com) for a quote or a free pilot.
+
+### Do students pay?
+
+Never. Students open lessons from a link with no account, and a student account is free.
+
+### Is there a free trial?
+
+Yes: 14 days of Pro, no card needed, once per account, when paid plans open.
+
+---
+
+# অ্যাপটি ফ্রি। ক্লাসরুমের ক্লাউড সস্তা।
+
+> Rupok হোয়াইটবোর্ড অ্যাপ চিরকাল ফ্রি আর ওপেন সোর্স। Rupok Cloud-এ স্টোরেজ, শিক্ষার্থী-লিংক, হিস্ট্রি আর AI ক্রেডিট: ৫০০ MB ফ্রি, Pro মাসে ৳২৯৯ থেকে, বিকাশ বা নগদে। কোচিং সেন্টার আর স্কুলের প্ল্যানও আছে।
+
+Canonical: https://rupok.app/bn/pricing/ · Language: bn · Updated: 2026-11-24
+
+বোর্ডের সব ফিচার ফ্রি আর ওপেন সোর্স, চিরকাল: কালি, PDF, রিপ্লে, স্মার্ট অবজেক্ট, ডেস্কটপ অ্যাপ আর নিজের AI। Rupok Cloud যোগ করে স্টোরেজ, শিক্ষার্থী-লিংক, হিস্ট্রি আর AI। টাকায় দিন বিকাশ বা নগদে, অথবা ডলারে কার্ডে।
+
+## প্ল্যান
+
+**ফ্রি (৳০):** পুরো অ্যাপ আর নিজের AI, এখনই; Rupok Cloud চালু হলে ৫০০ MB ক্লাউড, ১০টি সক্রিয় শিক্ষার্থী-লিংক, ৩০ দিনের ভার্সন হিস্ট্রি।
+
+**Pro:** ৳২৯৯/মাস, ৳১,৫৯৯/৬ মাস, ৳২,৯৯৯/বছর (বিকাশ, নগদ, কার্ড; ভ্যাটসহ)। অন্য দেশে $৭/মাস বা $৬০/বছর। ২০ GB, যত খুশি লিংক, পুরো হিস্ট্রি, মাসে ১৫০ AI ক্রেডিট (শীঘ্রই)।
+
+**কোচিং সেন্টার (৫ জন শিক্ষক):** ৳১,১৯৯/মাস বা ৳১১,৯৯৯/বছর।
+
+**স্কুল:** প্রতি শিক্ষক বছরে ৳১,৯৯৯ (অন্তত ১০ জন, ইনভয়েস), বা $৩৬ (অন্তত ৫ জন)। ক্লাসরুম বোর্ড লাইসেন্স প্রতি বোর্ড বছরে ৳২,৫০০ / $২৯।
+
+**AI ক্রেডিট:** ২৫০টি ৳৫৯৯ / $৫, ১,০০০টি ৳২,১৯৯ / $১৮।
+
+*পেইড প্ল্যানগুলো শীঘ্রই চালু হবে; এখন ফ্রি প্ল্যান চালু আছে।*
+
+## প্ল্যানগুলো মিলিয়ে দেখুন
+
+Rupok Cloud শীঘ্রই চালু হবে। “শীঘ্রই” লেখা জিনিসগুলো তৈরি হচ্ছে; এই পাতার কিছুই এখনো কেনা যায় না।
+
+*কোন প্ল্যানে কী আছে*
+
+|  | ফ্রি | Pro | কোচিং সেন্টার | স্কুল |
+|---|---|---|---|---|
+| পুরো অ্যাপ: বোর্ড, কালি, PDF, টিচ মোড, রিপ্লে, স্মার্ট অবজেক্ট, ডেস্কটপ অ্যাপ | ✓  | ✓  | ✓  | ✓  |
+| নিজের AI (Claude Code, Codex, OpenCode) | ✓ যত খুশি | ✓ যত খুশি | ✓ যত খুশি | ✓ যত খুশি |
+| ক্লাউড স্টোরেজ | ◷ ৫০০ MB | ◷ ২০ GB | ◷ প্রতি শিক্ষক ৩০ GB | ◷ প্রতি শিক্ষক ৫০ GB |
+| শিক্ষার্থী-লিংক (শিক্ষার্থীর অ্যাকাউন্ট লাগে না) | ◷ ১০টি সক্রিয় | ◷ যত খুশি | ◷ যত খুশি | ◷ যত খুশি |
+| কপি করা, সহকর্মীর সাথে শেয়ার, সব ডিভাইসে সিঙ্ক | ◷  | ◷  | ◷  | ◷  |
+| ভার্সন হিস্ট্রি | ◷ ৩০ দিন | ◷ পুরোটা | ◷ পুরোটা | ◷ পুরোটা |
+| Rupok AI ক্রেডিট (AI সাবস্ক্রিপশন লাগে না) | ◷ একবার ২৫ | ◷ মাসে ১৫০ | ◷ প্রতি শিক্ষক মাসে ১৫০ | ◷ প্রতি শিক্ষক মাসে ১৫০ |
+| লাইভ ক্লাস | ◷ মাসে ৩০০ মিনিট, ৩০ জন | ◷ মাসে ৩,০০০ মিনিট, ১০০ জন | ◷ মাসে ৬,০০০ মিনিট, ৩০০ জন | ◷ মাসে ৬,০০০ মিনিট, ৩০০ জন |
+| শিক্ষার্থীদের দেখার হিসাব, ব্র্যান্ডিং টেমপ্লেট | ✗  | ◷  | ◷  | ◷  |
+| অ্যাডমিন, শেয়ার্ড লাইব্রেরি, উপস্থিতি, কুইজ | ✗  | ✗  | ◷  | ◷  |
+| ইনভয়েস আর ব্যাংক ট্রান্সফার | ✗  | ✗  | ✗  | ✓  |
+| আগে সাপোর্ট | ✗  | ✓  | ✓  | ✓  |
+
+## কীভাবে টাকা দেবেন
+
+### বাংলাদেশ থেকে, টাকায়
+
+- SSLCommerz-এর মাধ্যমে **বিকাশ, নগদ, রকেট**, ভিসা, মাস্টারকার্ড, অ্যামেক্স আর ইন্টারনেট ব্যাংকিং।
+- ১, ৬ বা ১২ মাসের জন্য আগে টাকা দিন। নিজে থেকে কিছু কাটবে না; মেয়াদ শেষের এক সপ্তাহ আগে আমরা মনে করিয়ে দেব।
+- দামে ভ্যাট ধরা আছে। প্রতিটি পেমেন্টের রসিদ পাবেন।
+
+### অন্য দেশ থেকে, ডলারে
+
+- আমাদের রিসেলার Paddle-এর মাধ্যমে **কার্ড, PayPal, Apple Pay আর Google Pay**।
+- মাসিক বা বাৎসরিক। সেটিংস থেকে যখন খুশি প্ল্যান বা কার্ড বদলান, বা বাতিল করুন।
+- প্রযোজ্য হলে Paddle কর যোগ করে ইনভয়েস পাঠায়।
+
+*এই পাতায় আর অ্যাপে টাকা আর ডলারের মধ্যে বদলানো যায়। টাকার দাম বাংলাদেশের শিক্ষকদের জন্য।*
+
+## দাম নিয়ে যা জানতে চান
+
+### Rupok কি সত্যিই ফ্রি?
+
+হ্যাঁ। অ্যাপটি ওপেন সোর্স (AGPL-3.0), আর বোর্ডের সব ফিচার সব ডিভাইসে চিরকাল ফ্রি। টাকা লাগে শুধু Rupok Cloud-এর বাড়তি সুবিধার জন্য: বেশি স্টোরেজ, যত খুশি শিক্ষার্থী-লিংক, পুরো হিস্ট্রি, AI আর শীঘ্রই লাইভ ক্লাস।
+
+### কোনগুলো চিরকাল ফ্রি থাকবে?
+
+পুরো অ্যাপ, ইন্টারনেট ছাড়াও, সাধারণ `.rpk` ফাইলসহ; বোর্ডের সব ফিচার, ভবিষ্যতেরগুলোও; নিজের Claude, Codex বা OpenCode ব্যবহার; ৫০০ MB-এর ক্লাউড প্ল্যান; শিক্ষার্থীরা অ্যাকাউন্ট ছাড়াই যে লিংক খোলে; নিজের ডেটা এক্সপোর্ট আর মুছে ফেলা।
+
+### টাকা দেওয়া বন্ধ করলে কী হবে?
+
+কিছুই মুছে যাবে না। সব লেসন থাকবে; খুলতে, ডাউনলোড আর শেয়ার করতে পারবেন, আর কিছু মুছে ফ্রি সীমার মধ্যে ফিরতে পারবেন। ৫০০ MB-এর বেশি থাকলে শুধু নতুন আপলোড বন্ধ থাকবে।
+
+### বাংলাদেশ থেকে কীভাবে টাকা দেব?
+
+টাকায়, SSLCommerz-এর মাধ্যমে বিকাশ, নগদ, রকেট, কার্ড বা ইন্টারনেট ব্যাংকিংয়ে। একবারে ১, ৬ বা ১২ মাস কিনুন; নিজে থেকে নবায়ন হয় না, মেয়াদ শেষের আগে অ্যাপ মনে করিয়ে দেবে।
+
+### Rupok AI ক্রেডিট কী?
+
+যাদের নিজের AI সাবস্ক্রিপশন নেই, ক্রেডিট দিয়ে তারা Rupok-এর AI (Solve this, Design with AI, চ্যাট) চালান। একটি চ্যাট উত্তর বা ছোট সমাধানে প্রায় ১ ক্রেডিট, ধাপে ধাপে পুরো সমাধানে প্রায় ৪, আর একটি স্মার্ট অবজেক্ট বানাতে প্রায় ১০। নিজের Claude Code, Codex বা OpenCode সবসময় ফ্রি।
+
+### টাকা ফেরত পাওয়া যায়?
+
+প্রথম কেনাকাটায় ১৪ দিনের মধ্যে কোনো প্রশ্ন ছাড়াই পুরো টাকা ফেরতের পরিকল্পনা আছে। পেমেন্ট চালুর আগে পুরো নীতিমালা আমাদের শর্তাবলিতে থাকবে।
+
+### স্কুল কি ইনভয়েসে টাকা দিতে পারবে?
+
+হ্যাঁ। স্কুল প্ল্যান আর ক্লাসরুম বোর্ড লাইসেন্সের ইনভয়েস বছরে একবার হয়, টাকা দেওয়া যায় ব্যাংক ট্রান্সফারে, ভ্যাট রসিদসহ। কোটেশন বা ফ্রি পাইলটের জন্য [যোগাযোগ করুন](https://shaitrish.com)।
+
+### শিক্ষার্থীদের কি টাকা দিতে হয়?
+
+কখনোই না। শিক্ষার্থীরা অ্যাকাউন্ট ছাড়াই লিংক থেকে লেসন খোলে, আর শিক্ষার্থীর অ্যাকাউন্টও ফ্রি।
+
+### ফ্রি ট্রায়াল আছে?
+
+হ্যাঁ: ১৪ দিনের Pro, কার্ড লাগবে না, প্রতি অ্যাকাউন্টে একবার, পেইড প্ল্যান চালু হলে।
 
 ---
 

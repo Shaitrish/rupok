@@ -10,7 +10,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SITE, UPDATED, faqHtml, footer, jsonLd, mdPath, pageHtml, pageMd } from "./lib.mjs";
+import { SITE, UPDATED, faqHtml, footer, jsonLd, mdPath, pageHtml, pageMd, plansHtml } from "./lib.mjs";
+import { homePlans } from "./pages/pricing.mjs";
 import { HOME, PAGES } from "./pages/index.mjs";
 import { FACTS } from "./pages/facts.mjs";
 
@@ -48,6 +49,7 @@ write("site/inputs.json", JSON.stringify(inputs, null, 2) + "\n");
       jsonLd(HOME, { home: true }),
     ].join("\n    "),
     faq: faqHtml(HOME),
+    plans: plansHtml(homePlans("en")),
     footer: footer(HOME),
   };
   for (const [name, body] of Object.entries(regions)) {

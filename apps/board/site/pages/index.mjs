@@ -6,6 +6,7 @@ import { OPEN } from "./open.mjs";
 import { RPK } from "./rpk.mjs";
 import { DOWNLOAD } from "./download.mjs";
 import { LEGAL } from "./legal.mjs";
+import { PRICING } from "./pricing.mjs";
 
 /** The home page. Its HTML is hand-written in index.html; the builder only
  * injects the FAQ and JSON-LD below (between <!-- site:… --> markers) and
@@ -40,11 +41,11 @@ export const HOME = {
     {
       h2: "Pricing: the app is free, forever",
       blocks: [
-        "Rupok is open source. Rupok Cloud adds sync, sharing and live classes, starting with a free plan for every teacher.",
+        "Rupok is open source. Rupok Cloud adds storage, student links, history and hosted AI, starting with a free plan for every teacher. See [all plans and prices](/pricing/).",
         { ul: [
-          "**Free (৳0):** the full app and every feature. Coming soon: 500 MB cloud sync, a Claude connector, student share links.",
-          "**Pro (coming soon):** large cloud storage, live class for students, Rupok AI credits, quiz and attendance insights.",
-          "**School (coming soon):** admin for all teachers, classes and student lists, a shared course library.",
+          "**Free (৳0):** the full app and every feature, and your own AI. Coming soon: 500 MB cloud, 10 student links, 30 days of history.",
+          "**Pro (coming soon, ৳299 or $7 a month):** 20 GB, unlimited student links, full history, 150 Rupok AI credits a month, priority support.",
+          "**Coaching centre and School (coming soon):** Pro for 5 teachers from ৳1,199 a month; per-teacher school plans with invoices and classroom board licences.",
         ] },
       ],
     },
@@ -61,7 +62,7 @@ export const HOME = {
   ],
   faqTitle: "Questions teachers ask",
   faq: [
-    { q: "Is Rupok really free?", a: "Yes. The whole app is free and open source, with every feature, on every device. Rupok Cloud, a hosted add-on for sync, sharing and live classes, is coming with a free plan for every teacher." },
+    { q: "Is Rupok really free?", a: "Yes. The whole app is free and open source, with every feature, on every device. Rupok Cloud, a hosted add-on for sync, sharing and live classes, is coming with a free plan for every teacher. See [pricing](/pricing/)." },
     { q: "Does it work with my smartboard or interactive panel?", a: "Yes, with any brand: SMART, Promethean, BenQ, ViewSonic, Prestigio and others. Rupok runs in Chrome, Edge or Safari on the computer connected to the board, and uses its touch and pen like any browser app." },
     { q: "Do I need to install anything?", a: "No. Open [rupok.app/board](/board/) in Chrome, Edge or Safari. You can install it from the browser menu so it opens in its own window. There is also a desktop app for Windows, Mac and Linux: see [Download](/download/)." },
     { q: "How does the AI part work?", a: "Ask the AI you already use for a simulation, 3D model or quiz as a single HTML file, and paste it onto the board. Or chat with your own Claude, Codex or OpenCode inside Rupok: it can build whole lessons, edit the open board live, and write step-by-step solutions in handwriting that you check first. [More about the AI whiteboard](/ai-whiteboard/)." },
@@ -81,6 +82,7 @@ export const PAGES = [
   ...OPEN.map(tag("open.mjs")),
   ...RPK.map(tag("rpk.mjs")),
   ...DOWNLOAD.map(tag("download.mjs")),
+  ...PRICING.map(tag("pricing.mjs")),
   ...FEATURES.map(tag("features.mjs")),
   ...COMPARE.map(tag("compare.mjs")),
   ...LEGAL.map(tag("legal.mjs")),

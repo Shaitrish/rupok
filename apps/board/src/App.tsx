@@ -7,7 +7,7 @@ import { PagesPanel, StatusChips, TopBar } from "./components/Chrome";
 import { ObjectDialog } from "./components/Dialogs";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
 import { closeSettings, openSettings, settingsRequest } from "./settings/open";
-import { prefs, sizes, toast, tool } from "./state";
+import { prefs, showToast, sizes, toast, tool } from "./state";
 import { Icon, Mark } from "./components/Icon";
 import { APP_NAME, FILE_EXT, TAGLINE, WORDMARK } from "./brand";
 import { Suspense, lazy } from "solid-js";
@@ -19,6 +19,9 @@ import LivePanel from "./components/LivePanel";
 import ChatPanel from "./components/ChatPanel";
 import VoiceLayer from "./voice/VoiceLayer";
 import { LibraryRoot } from "./components/Library";
+import { UpgradeHost } from "./components/Billing";
+import { openUpgrade, refreshBilling, takeBillingParams } from "./cloud/billing";
+import { initCloud } from "./cloud/account";
 import { startLibrary } from "./library/session";
 import { isPhone, pagesShown } from "./viewport";
 import { drawCursor } from "./wetInk";
@@ -90,6 +93,16 @@ export default function App() {
       setReady(true);
       void import("./solve").then((m) => m.initSolve()); // Solve this: AI handwriting, preview, reveal
       startLibrary(controller); // the Library home and saving lessons to their files (before files below arrive)
+      // Back from a payment page (?billing=…) or sent by the pricing page (?upgrade=pro).
+      const billingParams = takeBillingParams();
+      if (billingParams.message || billingParams.upgrade)
+        void initCloud().then(async () => {
+          if (billingParams.message) {
+            await refreshBilling();
+            showToast(billingParams.message, 6000);
+          }
+          if (billingParams.upgrade) openUpgrade(billingParams.upgrade);
+        });
       attachDesktopBridge(controller); // desktop: files opened by the OS, overlay snapshots
       onLaunchFiles((files) => void controller.importFiles(files)); // installed PWA: "Open with Rupok"
       void takePendingLesson().then((f) => f && controller.importFiles([f])); // a file picked on /open/
@@ -150,6 +163,7 @@ export default function App() {
       <Show when={settingsRequest()}>
         {(r) => <SettingsDialog request={r()} onClose={closeSettings} />}
       </Show>
+      <UpgradeHost />
       <Show when={toast()}>
         <div class="toast surface" role="status"><Icon name="info" size={18} />{toast()}</div>
       </Show>

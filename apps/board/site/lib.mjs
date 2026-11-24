@@ -200,8 +200,8 @@ export function footer(page) {
   const bn = page.lang === "bn";
   const a = (href, label, extra = "") => `<a href="${href}"${extra}>${label}</a>`;
   const product = bn
-    ? [a("/board/", "বোর্ড খুলুন"), a("/bn/download/", "ডাউনলোড"), a("/bn/", "স্মার্ট বোর্ড সফটওয়্যার"), a("/bn/open/", ".rpk ফাইল খুলুন"), a("/bn/rpk/", "আরপিকে ফাইল ফরম্যাট"), a("/bn/compare/note3/", "Note3 বনাম Rupok"), a("/#plans", "মূল্য", ' hreflang="en"')]
-    : [a("/board/", "Open the board"), a("/download/", "Download"), a("/smartboard-software/", "Smartboard software"), a("/ai-whiteboard/", "AI whiteboard"), a("/online-class-whiteboard/", "Online class whiteboard"), a("/for-teachers/", "For teachers"), a("/open/", "Open a .rpk file"), a("/rpk/", "RPK file format"), a("/#plans", "Pricing")];
+    ? [a("/board/", "বোর্ড খুলুন"), a("/bn/download/", "ডাউনলোড"), a("/bn/", "স্মার্ট বোর্ড সফটওয়্যার"), a("/bn/open/", ".rpk ফাইল খুলুন"), a("/bn/rpk/", "আরপিকে ফাইল ফরম্যাট"), a("/bn/compare/note3/", "Note3 বনাম Rupok"), a("/bn/pricing/", "দাম")]
+    : [a("/board/", "Open the board"), a("/download/", "Download"), a("/smartboard-software/", "Smartboard software"), a("/ai-whiteboard/", "AI whiteboard"), a("/online-class-whiteboard/", "Online class whiteboard"), a("/for-teachers/", "For teachers"), a("/open/", "Open a .rpk file"), a("/rpk/", "RPK file format"), a("/pricing/", "Pricing")];
   const compare = [a("/compare/", bn ? "সব তুলনা" : "All comparisons", bn ? ' hreflang="en"' : ""), ...COMPARE_LINKS.map(([h, l]) => a(h, l, bn ? ' hreflang="en"' : ""))];
   const oss = [a(GITHUB, "GitHub", ' rel="noopener"'), a(`${GITHUB}/blob/main/ROADMAP.md`, bn ? "রোডম্যাপ" : "Roadmap", ' rel="noopener"'), a(`${GITHUB}/blob/main/CONTRIBUTING.md`, bn ? "অবদান রাখুন" : "Contribute", ' rel="noopener"'), a("/llms.txt", "llms.txt"), `<span class="lic">AGPL-3.0</span>`];
   const lang = bn
@@ -614,6 +614,9 @@ const PARTS = {
         </div>
       </section>`,
 };
+
+/** The home page's plan cards (index.html region "plans"; /bn/ uses the same part). */
+export const plansHtml = (p) => PARTS.plans(p);
 
 export function homeMain(page) {
   return [homeHero(page), ...page.parts.map((p) => (PARTS[p.kind] ?? sectionHtml)(p))].join("\n    ");

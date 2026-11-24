@@ -50,6 +50,13 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/open/"/>
   </url>
   <url>
+    <loc>https://rupok.app/pricing/</loc>
+    <lastmod>2026-11-24</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/pricing/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://rupok.app/bn/pricing/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/pricing/"/>
+  </url>
+  <url>
     <loc>https://rupok.app/privacy/</loc>
     <lastmod>2026-11-23</lastmod>
   </url>
@@ -81,6 +88,13 @@
     <xhtml:link rel="alternate" hreflang="bn" href="https://rupok.app/bn/open/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/open/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/open/"/>
+  </url>
+  <url>
+    <loc>https://rupok.app/bn/pricing/</loc>
+    <lastmod>2026-11-24</lastmod>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://rupok.app/bn/pricing/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/pricing/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/pricing/"/>
   </url>
   <url>
     <loc>https://rupok.app/bn/rpk/</loc>

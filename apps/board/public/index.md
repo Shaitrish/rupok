@@ -24,11 +24,11 @@ Got an [.rpk file (Rich Presentation Kit)](https://rupok.app/rpk/) from your tea
 
 ## Pricing: the app is free, forever
 
-Rupok is open source. Rupok Cloud adds sync, sharing and live classes, starting with a free plan for every teacher.
+Rupok is open source. Rupok Cloud adds storage, student links, history and hosted AI, starting with a free plan for every teacher. See [all plans and prices](https://rupok.app/pricing/).
 
-- **Free (৳0):** the full app and every feature. Coming soon: 500 MB cloud sync, a Claude connector, student share links.
-- **Pro (coming soon):** large cloud storage, live class for students, Rupok AI credits, quiz and attendance insights.
-- **School (coming soon):** admin for all teachers, classes and student lists, a shared course library.
+- **Free (৳0):** the full app and every feature, and your own AI. Coming soon: 500 MB cloud, 10 student links, 30 days of history.
+- **Pro (coming soon, ৳299 or $7 a month):** 20 GB, unlimited student links, full history, 150 Rupok AI credits a month, priority support.
+- **Coaching centre and School (coming soon):** Pro for 5 teachers from ৳1,199 a month; per-teacher school plans with invoices and classroom board licences.
 
 ## More
 
@@ -42,7 +42,7 @@ Rupok is open source. Rupok Cloud adds sync, sharing and live classes, starting 
 
 ### Is Rupok really free?
 
-Yes. The whole app is free and open source, with every feature, on every device. Rupok Cloud, a hosted add-on for sync, sharing and live classes, is coming with a free plan for every teacher.
+Yes. The whole app is free and open source, with every feature, on every device. Rupok Cloud, a hosted add-on for sync, sharing and live classes, is coming with a free plan for every teacher. See [pricing](https://rupok.app/pricing/).
 
 ### Does it work with my smartboard or interactive panel?
 

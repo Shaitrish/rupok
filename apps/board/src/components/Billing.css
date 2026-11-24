@@ -1,0 +1,72 @@
+/* Rupok Cloud plans in the app (Billing.tsx): the plan panel in Settings,
+ * receipts, and the Upgrade dialog. FigJam-flat: hairlines, one accent
+ * (mint by default), hard offset shadow on the featured card. App tokens
+ * only, so light, dark and every accent work. */
+
+.bl-panel, .bl-up { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; }
+:is(.bl-panel, .bl-up, .bl-receipts) .btn { border-radius: 999px; padding: 0 var(--s4); font: 600 14px/20px var(--font); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--hairline); }
+:is(.bl-panel, .bl-up, .bl-receipts) .btn:hover { background: var(--hover); }
+:is(.bl-panel, .bl-up, .bl-receipts, .bl-notice) .btn.solid { width: auto; padding: 0 var(--s4); color: var(--accent-contrast); background: var(--accent-9); box-shadow: none; }
+:is(.bl-panel, .bl-up, .bl-notice) .btn.solid:hover { background: var(--accent-10); }
+:is(.bl-panel, .bl-up) .btn:disabled { opacity: .5; cursor: default; }
+.bl-up .btn.ghost { box-shadow: none; color: var(--accent-11); }
+.bl-muted { margin: 0; font: 500 13px/19px var(--font); color: var(--text-3); }
+.bl-muted b { color: var(--text-2); }
+
+.bl-plan { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px var(--s2); }
+.bl-plan-name { font: 800 20px/26px var(--font); letter-spacing: -0.02em; color: var(--text); }
+.bl-plan-sub { font: 500 13px/18px var(--font); color: var(--text-3); }
+.bl-meters { display: grid; gap: var(--s3); }
+.bl-meter { display: grid; gap: 6px; }
+.bl-meter-head { display: flex; justify-content: space-between; gap: var(--s2); font: 500 13px/18px var(--font); color: var(--text-2); }
+.bl-meter-head b { font-weight: 600; color: var(--text); text-align: right; }
+.bl-meter.warn .lib-meter > i { background: var(--danger); }
+.bl-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.bl-notice { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2) var(--s3); padding: var(--s3) var(--s4); border-radius: 14px; background: var(--accent-3); color: var(--text); font: 500 13px/19px var(--font); }
+.bl-notice.warn { background: var(--danger-soft); }
+.bl-notice .btn { margin-left: auto; }
+
+.bl-receipts { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.bl-receipts li { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) 0; border-bottom: 1px solid var(--hairline); min-width: 0; }
+.bl-r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bl-r-main b { font: 600 14px/20px var(--font); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bl-r-main span { font: 500 12px/17px var(--font); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bl-r-amt { font: 700 14px/20px var(--font); color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* Upgrade dialog */
+.bl-signin { display: grid; gap: var(--s2); padding: var(--s3) var(--s4); border-radius: 14px; background: var(--gray-a3); }
+.bl-signin p { margin: 0; font: 600 14px/20px var(--font); }
+.bl-controls { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s3); }
+.bl-seg { display: inline-flex; gap: 3px; padding: 3px; border-radius: 999px; box-shadow: inset 0 0 0 1.5px var(--text); }
+.bl-seg button { height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--text); font: 600 13px/1 var(--font); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.bl-seg button small { font: 500 11px/1 var(--font); color: var(--text-3); }
+.bl-seg button[aria-checked="true"] { background: var(--text); color: var(--surface-solid); }
+.bl-seg button[aria-checked="true"] small { color: color-mix(in srgb, var(--surface-solid) 70%, transparent); }
+.bl-seg button:focus-visible { outline: 2px solid var(--accent-9); outline-offset: 2px; }
+.bl-save { font: 700 10px/1 var(--font); padding: 3px 6px; border-radius: 999px; background: var(--accent-9); color: var(--accent-contrast); }
+.bl-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s4); }
+.bl-card { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s5); border-radius: 20px; box-shadow: 0 0 0 1.5px var(--hairline); background: var(--surface-solid); min-width: 0; }
+.bl-card.feat { box-shadow: 0 0 0 1.5px var(--text), 6px 6px 0 var(--accent-9); }
+.bl-card h3 { margin: 0; font: 800 18px/24px var(--font); letter-spacing: -0.02em; }
+.bl-amt { margin: 0; font: 800 30px/1 var(--font); letter-spacing: -0.03em; color: var(--text); }
+.bl-amt small { font: 600 13px/1 var(--font); letter-spacing: 0; color: var(--text-3); }
+.bl-per { margin: 0; min-height: 18px; font: 600 13px/18px var(--font); color: var(--accent-11); }
+.bl-card ul { list-style: none; margin: var(--s1) 0 var(--s2); padding: var(--s3) 0 0; display: grid; gap: 6px; flex: 1; align-content: start; border-top: 1px solid var(--hairline); font: 500 13px/19px var(--font); color: var(--text-2); }
+.bl-card li { position: relative; padding-left: 20px; }
+.bl-card li::before { content: "✓"; position: absolute; left: 0; font-weight: 800; color: var(--accent-11); }
+.bl-card .btn { display: inline-flex; align-items: center; justify-content: center; white-space: normal; height: auto; min-height: var(--ctl); text-decoration: none; }
+.bl-phone { display: grid; gap: 6px; max-width: 420px; font: 600 13px/18px var(--font); color: var(--text-2); }
+.bl-phone small { font: 500 12px/17px var(--font); color: var(--text-3); }
+.bl-topups { display: grid; gap: var(--s3); }
+.bl-topup-row { display: flex; flex-wrap: wrap; gap: var(--s3); }
+.bl-topup { display: grid; gap: 4px; min-width: 160px; padding: var(--s4) var(--s5); border: 0; border-radius: 18px; text-align: left; cursor: pointer; background: var(--surface-solid); color: var(--text); box-shadow: 0 0 0 1.5px var(--text), 5px 5px 0 var(--accent-9); }
+.bl-topup b { font: 800 17px/22px var(--font); }
+.bl-topup span { font: 600 14px/20px var(--font); color: var(--text-2); }
+.bl-topup:disabled { opacity: .5; cursor: default; box-shadow: 0 0 0 1.5px var(--hairline); }
+.bl-cloud-hint { font: 500 12px/17px var(--font); color: var(--text-3); }
+.bl-cloud-hint button { padding: 0; border: 0; background: none; color: var(--accent-11); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 560px) {
+  .bl-seg { display: flex; width: 100%; }
+  .bl-seg button { flex: 1; justify-content: center; padding: 0 8px; }
+  .bl-seg button small { display: none; }
+}

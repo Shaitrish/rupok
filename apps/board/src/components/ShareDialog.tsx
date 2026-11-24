@@ -10,6 +10,7 @@ import { LibDialog } from "./LibraryDialogs";
 import { showToast } from "../state";
 import { cloud, cloudLibrary, cloudOffline, cloudUser, refreshUsage } from "../cloud/account";
 import { type Share, type ShareRole, explain } from "../cloud/api";
+import { softGate } from "../cloud/billing";
 import type { CloudLibrary } from "../cloud/library";
 import { qrSvg } from "../cloud/qr";
 import { adoptBoard, controllerRef, current, flush } from "../library/session";
@@ -59,7 +60,10 @@ function ShareDialog(props: { t: Target; onClose: () => void }) {
   const [fresh, setFresh] = createSignal<Share | null>(null);
   const [links, { refetch }] = createResource(nodeId, async (id) => (await cloud.shares(id)).filter((s) => s.type === "link" && s.active));
 
-  const fail = (e: unknown) => showToast(explain(e), 6000);
+  // A plan limit (10 active links on Free) opens the friendly Upgrade dialog instead of a dead end.
+  const fail = (e: unknown) => {
+    if (!softGate(e)) showToast(explain(e), 6000);
+  };
 
   /** A local lesson goes to Rupok Cloud first (same folders), and is edited there from now on. */
   const upload = async () => {
