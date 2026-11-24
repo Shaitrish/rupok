@@ -181,30 +181,37 @@ fn fs_main(i: VOut) -> @location(0) vec4<f32> {
     var cov = 0.0;
 
     {
-        // The nearest of the three capsules: its distance, the radius and
-        // the distance along the stroke at the nearest point.
-        let arc_a = i.info.z;
-        let arc_b = arc_a + distance(i.a.xy, i.b.xy);
+        // The nearest of the three capsules (0 = a→b, 1 = prev→a, 2 = b→next).
         var c = capsule(p, i.a, i.b);
-        var r = mix(i.a.z, i.b.z, c.y);
-        var s = mix(arc_a, arc_b, c.y);
+        var seg = 0u;
         if (i.prev.z >= 0.0) {
             let q = capsule(p, i.prev, i.a);
-            if (q.x < c.x) {
-                c = q;
-                r = mix(i.prev.z, i.a.z, q.y);
-                s = mix(arc_a - distance(i.prev.xy, i.a.xy), arc_a, q.y);
-            }
+            if (q.x < c.x) { c = q; seg = 1u; }
         }
         if (i.next.z >= 0.0) {
             let q = capsule(p, i.b, i.next);
-            if (q.x < c.x) {
-                c = q;
-                r = mix(i.b.z, i.next.z, q.y);
-                s = mix(arc_b, arc_b + distance(i.b.xy, i.next.xy), q.y);
-            }
+            if (q.x < c.x) { c = q; seg = 2u; }
         }
         var d = c.x;
+        // The plain pen, ballpoint, fountain and marker need nothing more (the
+        // common case stays as cheap as before brushes). The others read the
+        // radius and, for dashes, dots and the rainbow, the distance along
+        // the stroke at the nearest point.
+        var r = 0.0;
+        var s = 0.0;
+        if (k >= PENCIL) {
+            let e0 = select(select(i.a, i.prev, seg == 1u), i.b, seg == 2u);
+            let e1 = select(select(i.b, i.a, seg == 1u), i.next, seg == 2u);
+            r = mix(e0.z, e1.z, c.y);
+            if (k == DASHED || k == DOTTED || k == RAINBOW) {
+                // arc at the segment's start: a's arc, minus or plus a segment.
+                let arc_a = i.info.z;
+                var s0 = arc_a;
+                if (seg == 1u) { s0 = arc_a - distance(i.prev.xy, i.a.xy); }
+                if (seg == 2u) { s0 = arc_a + distance(i.a.xy, i.b.xy); }
+                s = s0 + c.y * distance(e0.xy, e1.xy);
+            }
+        }
 
         if (k == DASHED || k == DOTTED) {
             // Round-capped dashes (or dots) centred along the path.
