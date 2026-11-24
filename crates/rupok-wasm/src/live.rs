@@ -113,6 +113,10 @@ pub fn apply<S: InkSink>(
 ) -> Result<String, String> {
     let op: Op =
         serde_json::from_str(op_json).map_err(|err| error_json(format!("bad op: {err}")))?;
+    // Shapes and tables: geometry lives in the engine (`engine/insert.rs`).
+    if matches!(op, Op::AddShape { .. } | Op::AddTable { .. }) {
+        return e.ai_insert(&op, agent, now_ms);
+    }
     let page = e.page_id().to_string();
     let selection = e.selection().to_vec();
     let read_only = e.read_only();

@@ -21,10 +21,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::b64;
 use crate::replay::Replay;
-use crate::shapes::{ShapeKind, shape_points};
+use crate::shapes::ShapeKind;
 
 mod clip;
 mod duster;
+pub mod insert;
 mod restyle;
 mod reveal;
 mod smart;
@@ -66,12 +67,51 @@ pub struct WetStroke {
     pub opacity: f32,
 }
 
+/// Renderer id of the `k`-th dash of a dashed shape stroke.
+fn dash_id(id: &str, k: usize) -> String {
+    format!("{id}\u{1}{k}")
+}
+
+/// Remove the dashes a dashed stroke `id` was drawn as.
+fn remove_dashes(r: &mut rupok_render::InkRenderer, id: &str) {
+    let mut k = 0;
+    while r.remove_stroke(&dash_id(id, k)) {
+        k += 1;
+    }
+}
+
 impl InkSink for rupok_render::InkRenderer {
     fn add_stroke(&mut self, id: &str, s: &StrokeData) {
+        // A dashed shape is drawn as its dashes, each a stroke of its own
+        // (`catalog::dash_pieces`); ink never takes this branch.
+        if s.geom.as_ref().is_some_and(|g| g.dash) {
+            rupok_render::InkRenderer::remove_stroke(self, id);
+            remove_dashes(self, id);
+            for (k, points) in crate::catalog::dash_pieces(&s.points, s.width)
+                .into_iter()
+                .enumerate()
+            {
+                let piece = StrokeData {
+                    points,
+                    geom: None,
+                    shape: None,
+                    tool: s.tool.clone(),
+                    ..*s
+                };
+                rupok_render::InkRenderer::add_stroke(self, &dash_id(id, k), &piece);
+            }
+            return;
+        }
+        if s.shape.is_some() {
+            // It may have been dashed before.
+            remove_dashes(self, id);
+        }
         rupok_render::InkRenderer::add_stroke(self, id, s);
     }
     fn remove_stroke(&mut self, id: &str) {
-        rupok_render::InkRenderer::remove_stroke(self, id);
+        if !rupok_render::InkRenderer::remove_stroke(self, id) {
+            remove_dashes(self, id);
+        }
     }
     fn clear(&mut self) {
         rupok_render::InkRenderer::clear(self);
@@ -116,6 +156,9 @@ impl ToolKind {
             "ellipse" => ToolKind::Shape(ShapeKind::Ellipse),
             "line" => ToolKind::Shape(ShapeKind::Line),
             "arrow" => ToolKind::Shape(ShapeKind::Arrow),
+            s if s.starts_with("shape:") => {
+                ToolKind::Shape(ShapeKind::Preset(crate::catalog::Preset::parse(&s[6..])?))
+            }
             _ => return None,
         })
     }
@@ -200,7 +243,7 @@ struct Pinch {
 
 #[derive(Serialize)]
 pub struct DomItem<'a> {
-    pub id: &'a str,
+    pub id: std::borrow::Cow<'a, str>,
     pub kind: &'static str,
     pub x: f64,
     pub y: f64,
@@ -229,6 +272,10 @@ pub struct DomItem<'a> {
     /// A text item whose text is LaTeX maths.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latex: Option<bool>,
+    /// A shape's fill (`kind: "fill"`, id `<stroke id>#fill`): SVG path data
+    /// relative to the box, drawn under the ink.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
     pub selected: bool,
 }
 
@@ -248,6 +295,8 @@ pub struct Engine<S: InkSink> {
     pen: StrokeStyle,
     highlighter: StrokeStyle,
     shape_style: StrokeStyle,
+    /// Shapes picker state (`insert.rs`).
+    shape_opts: insert::ShapeOpts,
     eraser_radius: f32,
     /// Partial (rub out what the eraser covers) or whole strokes.
     eraser_mode: EraserMode,
@@ -332,6 +381,11 @@ enum PreviewItem<'a> {
         opacity: f32,
         /// Flat `[x0, y0, x1, y1, …]`.
         pts: Vec<f64>,
+        /// A closed shape's fill (`#rrggbbaa`), painted inside `pts`.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        fill: Option<String>,
+        #[serde(skip_serializing_if = "std::ops::Not::not")]
+        dash: bool,
     },
     Text {
         rect: [f64; 4],
@@ -603,6 +657,7 @@ impl<S: InkSink> Engine<S> {
                 width: 3.0,
                 opacity: 1.0,
             },
+            shape_opts: insert::ShapeOpts::default(),
             eraser_radius: 32.0,
             eraser_mode: EraserMode::Partial,
             cut: None,
@@ -1132,7 +1187,17 @@ impl<S: InkSink> Engine<S> {
     /// object). Those would swallow every lasso drawn over them, so a drag
     /// there lassos and a plain click still selects them.
     fn press_target(&self, w: [f32; 2], tol: f32) -> Option<ItemId> {
-        let it = self.scene.hit_test(w[0], w[1], tol / self.camera.zoom)?;
+        let hit = self.scene.hit_test(w[0], w[1], tol / self.camera.zoom);
+        // Inside a filled shape (above any box item there) grabs the shape.
+        if let Some(f) = self.filled_hit(w)
+            && hit.is_none_or(|it| {
+                !matches!(it.data, ItemData::Stroke(_))
+                    && self.scene.get(&f).is_some_and(|fi| fi.z > it.z)
+            })
+        {
+            return Some(f);
+        }
+        let it = hit?;
         if !matches!(it.data, ItemData::Stroke(_))
             && let Some(f) = self.lesson.page(&self.page).ok().and_then(|p| p.frame)
         {
@@ -1386,25 +1451,7 @@ impl<S: InkSink> Engine<S> {
                 start,
                 end,
                 started,
-            } => {
-                let d = ((end[0] - start[0]).powi(2) + (end[1] - start[1]).powi(2)).sqrt();
-                if d * self.camera.zoom > 3.0 {
-                    let st = self.shape_style;
-                    self.commit_stroke(
-                        StrokeData {
-                            tool: "pen".into(),
-                            color: st.color,
-                            width: st.width,
-                            opacity: st.opacity,
-                            points: shape_points(kind, start, end, st.width),
-                            offset: [0.0, 0.0],
-                            shape: Some(kind.as_str().into()),
-                            geom: Some(crate::shapes::shape_geom(kind, start, end)),
-                        },
-                        started,
-                    );
-                }
-            }
+            } => self.place_shape(kind, start, end, started),
             Gesture::Pan { .. } => {}
             Gesture::Laser { points } => self.lasers.push(LaserTrail { points }),
         }
@@ -1709,6 +1756,8 @@ impl<S: InkSink> Engine<S> {
             // Shared colour (#rrggbbaa) and stroke width, when uniform, and
             // whether all the ink is highlighter (`restyle.rs`).
             "style": self.selection_style(),
+            // Fill, dash and table size of the selected shapes (`insert.rs`).
+            "shapeStyle": self.shape_style_meta(),
         })
         .to_string()
     }
@@ -2265,9 +2314,12 @@ impl<S: InkSink> Engine<S> {
             .scene
             .ordered()
             .into_iter()
-            .filter(|it| !matches!(it.data, ItemData::Stroke(_)))
+            .filter(|it| match &it.data {
+                ItemData::Stroke(s) => s.geom.as_ref().is_some_and(|g| g.fill.is_some()),
+                _ => true,
+            })
             .filter(|it| visible.as_ref().is_none_or(|v| v.contains(it.id.as_str())))
-            .map(|it| {
+            .filter_map(|it| {
                 let selected = sel.contains(it.id.as_str());
                 let off = if selected {
                     self.drag_offset
@@ -2275,7 +2327,7 @@ impl<S: InkSink> Engine<S> {
                     [0.0, 0.0]
                 };
                 let base = |g: &BoxGeom, kind| DomItem {
-                    id: &it.id,
+                    id: it.id.as_str().into(),
                     kind,
                     x: g.x + f64::from(off[0]),
                     y: g.y + f64::from(off[1]),
@@ -2293,9 +2345,10 @@ impl<S: InkSink> Engine<S> {
                     color: None,
                     asset: None,
                     latex: None,
+                    path: None,
                     selected,
                 };
-                match &it.data {
+                Some(match &it.data {
                     ItemData::Object(o) => DomItem {
                         title: Some(&o.title),
                         bundle: Some(&o.bundle),
@@ -2315,8 +2368,27 @@ impl<S: InkSink> Engine<S> {
                         asset: Some(&i.asset),
                         ..base(&i.geom, "image")
                     },
-                    ItemData::Stroke(_) => unreachable!(),
-                }
+                    ItemData::Stroke(s) => {
+                        let g = s.geom.as_ref()?;
+                        let poly = crate::catalog::fill_outline(g, &s.points, s.offset)?;
+                        let (path, b) = crate::catalog::svg_path(&poly);
+                        DomItem {
+                            id: format!("{}#fill", it.id).into(),
+                            path: Some(path),
+                            color: g.fill.map(css_color),
+                            ..base(
+                                &BoxGeom {
+                                    x: b[0],
+                                    y: b[1],
+                                    w: b[2],
+                                    h: b[3],
+                                    rot: 0.0,
+                                },
+                                "fill",
+                            )
+                        }
+                    }
+                })
             })
             .collect();
         serde_json::to_string(&items).unwrap_or_else(|_| "[]".into())
@@ -2368,11 +2440,17 @@ impl<S: InkSink> Engine<S> {
                     if n > 1 && (n - 1) % step != 0 {
                         push(&s.points[n - 1]);
                     }
+                    let g = s.geom.as_ref();
                     PreviewItem::Stroke {
                         color: css_color(s.color),
                         width: s.width,
                         opacity: s.opacity,
                         pts,
+                        fill: g
+                            .filter(|g| crate::catalog::fillable(&g.kind))
+                            .and_then(|g| g.fill)
+                            .map(css_color),
+                        dash: g.is_some_and(|g| g.dash),
                     }
                 }
                 ItemData::Text(t) => PreviewItem::Text {
@@ -2483,15 +2561,7 @@ impl<S: InkSink> Engine<S> {
                 }
                 Gesture::Shape {
                     kind, start, end, ..
-                } => {
-                    let st = self.shape_style;
-                    wet.push(WetStroke {
-                        points: shape_points(*kind, *start, *end, st.width),
-                        width: st.width,
-                        color: st.color,
-                        opacity: st.opacity,
-                    });
-                }
+                } => wet.extend(self.shape_wet(*kind, *start, *end)),
                 Gesture::Laser { points } => wet.push(laser_wet(points, now_ms, zoom)),
                 _ => {}
             }

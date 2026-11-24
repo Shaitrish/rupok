@@ -306,6 +306,8 @@ called with **`path: "live"`**; with a real `.rpk` path they still edit files.
 | `add_page_after_current(title?, pattern?, color?, show?)` | A new page after the current one, same look. |
 | `step_object(item_id?, step?, delta?)` | A Smart Object's Next/Back. |
 | `replace_items_with_text(item_ids, text, …)` | Ink to text as one undo step. |
+| `add_shape(shape, x, y, w, h, color?, fill?, width?, dashed?, text?, page?)` | A clean shape from the Shapes picker (rect, circle, star, arrows, Venn, flowchart, number line, axes, speech bubble, braces…) with optional fill, dashes and centred text; one undo step. Run by the board's engine, which owns shape geometry. |
+| `add_table(x, y, rows, cols, w?, h?, cells?, color?, header_fill?, text_size?, page?)` | A table (1–10 × 1–10) with cell text and an optional filled header row, grouped; one undo step. |
 | `point_at(x, y, w?, h?, label?, seconds?)` | A temporary laser ring or highlight box (not saved). |
 | `write_handwriting(lines, anchor?, style?, speed?, color?, size?, step_mode?)` | Write lines (text with inline LaTeX) in handwriting, animated stroke by stroke, below the anchor; one undo step. See [Solve this](#solve-this). |
 | `set_board_theme(page_color?, pattern?, ui?)` | Page colour (white, paper, chalkboard, blackboard, #hex) and pattern; app light/dark. |
@@ -488,7 +490,9 @@ An operation is `{"op": "<name>", …fields}`; the names and fields are the
 `get_selection`, `snapshot`, `go_to_page`, `point_at`, `set_board_theme`,
 `add_page`, `add_page_after_current`, `add_text`, `add_smart_object`,
 `update_smart_object`, `delete_item`, `set_page_background`,
-`replace_items_with_text`, `step_object`, `write_handwriting`). Pages are 1-based and `page`
+`replace_items_with_text`, `step_object`, `write_handwriting`, `add_shape`,
+`add_table`; the last two run in the board's engine, `crates/rupok-wasm`
+`engine/insert.rs`). Pages are 1-based and `page`
 omitted means the page on screen; coordinates are slide pixels in the
 1920 × 1080 frame.
 

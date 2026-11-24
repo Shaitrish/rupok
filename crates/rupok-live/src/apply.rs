@@ -201,6 +201,9 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
         Op::Snapshot { .. } => Err(LiveError::Unsupported("snapshot")),
         Op::WriteHandwriting { .. } => crate::handwriting::run(ctx, op, msg, now, None),
         Op::PointAt { .. } => Err(LiveError::Unsupported("point_at")),
+        // Shape geometry lives in the board engine (rupok-wasm `live.rs`).
+        Op::AddShape { .. } => Err(LiveError::Unsupported("add_shape")),
+        Op::AddTable { .. } => Err(LiveError::Unsupported("add_table")),
 
         Op::GoToPage { page } => {
             let (idx, info) = page_ref(ctx.lesson, ctx.page_id, Some(*page))?;
@@ -667,11 +670,7 @@ pub fn page_index(lesson: &Lesson, page_id: &str) -> Option<usize> {
 }
 
 /// Resolve a 1-based page number (default: the current page).
-pub(crate) fn page_ref(
-    lesson: &Lesson,
-    current: &str,
-    page: Option<u32>,
-) -> Result<(usize, PageInfo)> {
+pub fn page_ref(lesson: &Lesson, current: &str, page: Option<u32>) -> Result<(usize, PageInfo)> {
     let pages = lesson.pages();
     let idx = match page {
         None => pages.iter().position(|p| p.id == current).unwrap_or(0),
@@ -1045,7 +1044,7 @@ fn scheme(rgba: u32) -> &'static str {
 
 /// Default text colour on a page: near-black on light pages, near-white on
 /// chalkboard and blackboard.
-pub(crate) fn default_ink(bg: u32) -> u32 {
+pub fn default_ink(bg: u32) -> u32 {
     if is_dark(bg) { 0xf1f3f5ff } else { 0x1c2024ff }
 }
 

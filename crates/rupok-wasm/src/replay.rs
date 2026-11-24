@@ -115,12 +115,16 @@ impl Replay {
         })
     }
 
-    /// DOM items (objects, text, images) that have appeared by now.
+    /// DOM items (objects, text, images, shape fills) that have appeared by now.
     pub fn visible_dom_ids(&self) -> HashSet<&str> {
         self.events
             .iter()
             .take_while(|e| e.start <= self.t)
-            .filter(|e| !matches!(e.item.data, ItemData::Stroke(_)))
+            // Filled shapes too: their fill is a DOM item.
+            .filter(|e| match &e.item.data {
+                ItemData::Stroke(s) => s.geom.as_ref().is_some_and(|g| g.fill.is_some()),
+                _ => true,
+            })
             .map(|e| e.item.id.as_str())
             .collect()
     }

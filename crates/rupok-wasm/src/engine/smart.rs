@@ -764,9 +764,16 @@ impl<S: InkSink> Engine<S> {
     /// Snap a fresh line or arrow's ends to the shapes they touch and link
     /// them (Flowchart family).
     fn connect(&self, g: ShapeGeom, self_id: &str) -> ShapeGeom {
-        if !matches!(g.kind.as_str(), "line" | "arrow")
-            || self.smart.families & family::FLOWCHART == 0
-        {
+        if self.smart.families & family::FLOWCHART == 0 {
+            return g;
+        }
+        self.connect_any(g, self_id)
+    }
+
+    /// [`Self::connect`] whatever the Smart Ink families (the picker's
+    /// connector tool).
+    pub(super) fn connect_any(&self, g: ShapeGeom, self_id: &str) -> ShapeGeom {
+        if !matches!(g.kind.as_str(), "line" | "arrow") {
             return g;
         }
         let (a, b) = ([g.x, g.y], [g.x + g.w, g.y + g.h]);
