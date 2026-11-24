@@ -101,8 +101,18 @@ const LABELS: Record<string, string> = {
   set_page_design: "changed the page design", set_branding: "changed the branding",
   replace_items_with_text: "turned ink into text", step_object: "stepped a Smart Object",
   write_handwriting: "is writing on the board", add_media: "added media", add_model: "added a 3D model",
+  start_voice_text: "turned on voice text", stop_voice_text: "finished voice text",
 };
 export const opLabel = (op: any) => LABELS[op?.op] ?? "is working";
+
+/** Break an agent's `add_text` lines at its box width `w`, as the board will
+ * show them (text items keep explicit line breaks; see voice/wrap.ts). */
+async function wrapForBoard(op: any): Promise<any> {
+  const { boardMeasure, loadBoardFont, wrapText, WRAP_SLACK } = await import("./voice/wrap");
+  const size = typeof op.size === "number" && op.size > 0 ? op.size : 32;
+  await loadBoardFont(size, op.text);
+  return { ...op, text: wrapText(op.text, op.w - WRAP_SLACK, boardMeasure(size)) };
+}
 
 class OpError extends Error {
   constructor(message: string, public data?: any) { super(message); }
@@ -473,7 +483,10 @@ class LiveClient {
       if (op.op === "snapshot") result = await renderSnapshot(this.c, op, agent);
       else if (op.op === "point_at") result = this.pointAt(op);
       else if (op.op === "write_handwriting") result = (await import("./solve")).onWriteOp(op, agent); // preview or write (solve/)
+      else if (op.op === "start_voice_text" || op.op === "stop_voice_text") result = await (await import("./voice/board")).onVoiceOp(op); // the board's microphone
       else {
+        // `add_text` with a width: break the lines to fit it, measured with the board's font (voice/wrap.ts).
+        if (op.op === "add_text" && typeof op.w === "number" && op.w > 0 && typeof op.text === "string") op = await wrapForBoard(op);
         try {
           result = JSON.parse(this.c.board.live_apply(JSON.stringify(op), agent));
         } catch (e) {

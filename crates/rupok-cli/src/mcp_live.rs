@@ -469,6 +469,42 @@ pub struct AddTableParams {
     pub page: Option<u32>,
 }
 
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StartVoiceTextParams {
+    /// Left edge of the voice box in slide pixels. Default: below the last
+    /// voice text, else the middle of the visible page.
+    #[serde(default)]
+    pub x: Option<f64>,
+    /// Top edge of the voice box in slide pixels.
+    #[serde(default)]
+    pub y: Option<f64>,
+    /// Box width in slide pixels; the words wrap inside it and inside the page.
+    /// Default 900.
+    #[serde(default)]
+    pub w: Option<f64>,
+    /// Spoken language: `en-US` (English) or `bn-BD` (Bangla). Default: the
+    /// teacher's voice setting.
+    #[serde(default)]
+    pub lang: Option<String>,
+    /// `text` (default): the words go on the board. `ask`: the words become a
+    /// prompt to the AI chat, with the page attached.
+    #[serde(default)]
+    pub mode: Option<String>,
+    /// `typed` (default) or `handwriting` (written in the handwriting
+    /// synthesiser; English only).
+    #[serde(default)]
+    pub style: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StopVoiceTextParams {
+    /// Throw the words away instead of putting them on the board.
+    #[serde(default)]
+    pub cancel: Option<bool>,
+}
+
 // ------------------------------------------------------------------- tools
 
 fn wrap(v: Value) -> Value {
@@ -842,6 +878,51 @@ page colour automatically; new text you add picks a readable colour for it. Use 
         })
         .await
     }
+
+    #[tool(
+        description = "Turn on \"Voice text\" on the board: the teacher talks and their words appear as text \
+in a box on the current page while they speak, wrapped inside the box and the page. Use it when the teacher asks \
+you to \"take dictation\" or \"let me speak the notes\". It switches on the teacher's microphone on the board, \
+with the board's privacy indicator; it is refused when the board has no speech recognition or voice input is \
+off. With `mode: \"ask\"` the words become a prompt to the AI chat instead. Call stop_voice_text to finish; \
+the teacher can also tap the box or press Esc.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn start_voice_text(
+        &self,
+        Parameters(p): Parameters<StartVoiceTextParams>,
+    ) -> CallToolResult {
+        self.live_call(Op::StartVoiceText {
+            x: p.x,
+            y: p.y,
+            w: p.w,
+            lang: p.lang,
+            mode: p.mode,
+            style: p.style,
+        })
+        .await
+    }
+
+    #[tool(
+        description = "Finish \"Voice text\" on the board: the words heard so far become one normal text item \
+(one undo step; the teacher can edit, move and recolour it), or are thrown away with `cancel: true`. Returns the \
+text and the new item id (or, in `ask` mode, the prompt sent to the chat).",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn stop_voice_text(
+        &self,
+        Parameters(p): Parameters<StopVoiceTextParams>,
+    ) -> CallToolResult {
+        self.live_call(Op::StopVoiceText { cancel: p.cancel }).await
+    }
 }
 
 #[cfg(test)]
@@ -888,5 +969,7 @@ mod tests {
         );
         let t = serde_json::to_value(schemars::schema_for!(AddTableParams)).unwrap();
         assert_eq!(t["properties"]["rows"]["maximum"], 10);
+        let v = serde_json::to_value(schemars::schema_for!(StartVoiceTextParams)).unwrap();
+        assert!(v["properties"]["lang"]["description"].is_string());
     }
 }

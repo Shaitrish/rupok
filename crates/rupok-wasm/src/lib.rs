@@ -835,6 +835,22 @@ mod web {
             self.engine.add_text(x, y, text, size, now())
         }
 
+        /// Voice text: a text box at world (`x`, `y`), `w` wide, its lines
+        /// already broken to fit, in 0xRRGGBBAA; kept on the page. One undo
+        /// step. Returns its id.
+        #[allow(clippy::too_many_arguments)]
+        pub fn add_text_box(
+            &mut self,
+            x: f64,
+            y: f64,
+            w: f64,
+            text: &str,
+            size: f64,
+            rgba: u32,
+        ) -> Option<String> {
+            self.engine.add_text_box(x, y, w, text, size, rgba, now())
+        }
+
         /// Place a classroom stamp (`star`, `tick`, `badge`, `emoji`, …)
         /// centred on the screen point, `w` × `h` world units; `text` is
         /// the emoji or label a reader without stamps shows. Returns its id.

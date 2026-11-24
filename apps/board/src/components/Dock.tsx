@@ -37,6 +37,7 @@ import { MarkerOpacity, SizeControl, StylePicker } from "./InkOptions";
 import { StampIcon, StampsPanel } from "./Stamps";
 import { brushInfo, brushOf } from "../brushes";
 import { celebrate, currentStamp } from "../stamps";
+import { dockClickConsumed, dockPress, dockRelease, pickVoiceTool, voiceListening } from "../voice/board";
 
 const META = new Map(TOOLBAR_ITEMS.map((t) => [t.id, t]));
 const INK_TOOLS: Tool[] = ["pen", "highlighter", "rect", "ellipse", "line", "arrow", "shape"];
@@ -62,14 +63,14 @@ type Group = "ink" | "colors" | "create" | "point" | "context" | "history" | "na
 type Kind = "tool" | "colors" | "shapes" | "smartink" | "undo" | "redo" | "pager" | "replay" | "exit" | "context" | "more";
 interface Entry { key: string; kind: Kind; group: Group; id?: ToolbarItem }
 const GROUP: Partial<Record<ToolbarItem, Group>> = {
-  pen: "ink", highlighter: "ink", eraser: "ink", smartink: "create", text: "create", stamp: "create",
+  pen: "ink", highlighter: "ink", eraser: "ink", smartink: "create", text: "create", voice: "create", stamp: "create",
   lasso: "point", laser: "point", hand: "point", interact: "point", undo: "history", redo: "history", pager: "nav", replay: "nav", exit: "exit",
 };
 
 /** On a phone, what moves into ⋯ first when the dock is too long for the
  * screen ("colors:N" keeps N recent colours). Pen, eraser, the pager and ⋯
  * always stay; exit and undo go last (on the narrowest phones in Teach). */
-const PHONE_DROP = ["redo", "hand", "laser", "stamp", "colors:2", "lasso", "colors:1", "smartink", "interact", "replay", "text", "shapes", "highlighter", "colors:0", "exit", "undo"];
+const PHONE_DROP = ["redo", "hand", "laser", "voice", "stamp", "colors:2", "lasso", "colors:1", "smartink", "interact", "replay", "text", "shapes", "highlighter", "colors:0", "exit", "undo"];
 /** Phone dock metrics (Dock.css): 44px cells with no gap; a 1px separator with 1.5px margins. */
 const PHONE_CELL = 44, PHONE_SEP = 4;
 
@@ -527,14 +528,18 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
         ref={btn}
         class="tool"
         data-tour={p.id === "pen" ? "pen" : undefined}
-        classList={{ on: on(), "has-options": options }}
-        title={tipOf(p.id, p.id === "stamp" ? "  ·  tap again for all stamps" : options ? "  ·  tap again for styles, colours and sizes" : "")}
+        classList={{ on: on(), "has-options": options, listening: p.id === "voice" && voiceListening() }}
+        title={tipOf(p.id, p.id === "stamp" ? "  ·  tap again for all stamps" : p.id === "voice" ? "  ·  tap the page and speak; hold to talk" : options ? "  ·  tap again for styles, colours and sizes" : "")}
         aria-label={labelOf(p.id)}
         aria-pressed={on()}
         aria-haspopup={options ? "dialog" : undefined}
-        onPointerDown={options ? lp.onPointerDown : undefined}
+        onPointerDown={options ? lp.onPointerDown : p.id === "voice" ? dockPress : undefined}
+        onPointerUp={p.id === "voice" ? dockRelease : undefined}
+        onPointerCancel={p.id === "voice" ? dockRelease : undefined}
         onClick={() => {
           if (lp.consumed()) return;
+          // Voice text (voice/board.ts): a hold was push-to-talk, a tap picks the tool.
+          if (p.id === "voice") { if (!dockClickConsumed()) { setPop(null); pickVoiceTool(); } return; }
           if (options && on()) toggle(p.id as Pop["kind"], btn);
           else {
             setPop(null);

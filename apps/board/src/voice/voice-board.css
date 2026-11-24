@@ -1,0 +1,126 @@
+/* Voice on the board (VoiceBoard.tsx): the place layer, the voice box on the
+ * page and its bar. FigJam-flat, mint accent, light and dark via tokens. */
+
+.vb-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.vb-place { position: absolute; inset: 0; pointer-events: auto; cursor: cell; touch-action: none; }
+.vb-drag {
+  position: absolute; height: 0; margin-top: -2px; border-top: 4px dashed var(--accent-9); border-radius: 2px; pointer-events: none;
+}
+
+/* ------------------------------------------------------------- the box */
+.vb-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+.vb-box {
+  position: absolute; box-sizing: border-box; pointer-events: auto; cursor: grab; touch-action: none;
+  font-family: var(--font); font-weight: 500; line-height: 1.25; white-space: pre; color: var(--vb-ink);
+  border-radius: calc(10px / var(--vbz, 1));
+  outline: calc(2px / var(--vbz, 1)) dashed var(--accent-9); outline-offset: calc(2px / var(--vbz, 1));
+  /* Opaque in the page colour with a mint tint, so the words read over ink. */
+  background: color-mix(in srgb, var(--accent-9) 8%, var(--vb-page, #fff));
+  box-shadow: 0 6px 18px -10px rgba(0, 0, 40, 0.3);
+  -webkit-user-select: none; user-select: none;
+}
+.vb-box:active { cursor: grabbing; }
+.vb-box.listening { outline-style: solid; }
+/* Ask AI: a question bubble, mint text on light (on the page's own colours). */
+.vb-box.ask {
+  background: #e6fcf5; color: #087f5b; outline-style: solid;
+  border-radius: calc(18px / var(--vbz, 1)) calc(18px / var(--vbz, 1)) calc(18px / var(--vbz, 1)) calc(4px / var(--vbz, 1));
+}
+.vb-box.ask.on-dark { background: #0b2b23; color: #63e6be; }
+.vb-box.ask .vb-done, .vb-box.ask .vb-live, .vb-box.ask .vb-placeholder { color: inherit; }
+.vb-line { min-height: 1.25em; }
+.vb-done { color: var(--vb-ink); }
+.vb-live { color: var(--vb-ink); opacity: 0.45; }
+.vb-placeholder { opacity: 0.45; font-weight: 450; }
+
+/* The pulsing mint mic at the box's corner: the same size at any zoom. */
+.vb-badge {
+  position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--accent-9); color: var(--accent-contrast);
+  transform-origin: 0 0; transform: scale(calc(1 / var(--vbz, 1))) translate(-14px, -14px);
+  box-shadow: 0 0 0 2px #fff;
+}
+.vb-box.on-dark .vb-badge { box-shadow: 0 0 0 2px #17191c; }
+.vb-box:not(.listening) .vb-badge { background: var(--gray-9); color: #fff; }
+.vb-box.listening .vb-badge::after {
+  content: ""; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--accent-9);
+  animation: vb-pulse 1.4s var(--ease) infinite;
+}
+@keyframes vb-pulse { 0% { opacity: 0.9; inset: -2px; } 80% { opacity: 0; inset: -12px; } 100% { opacity: 0; } }
+
+/* Right edge: drag to set the wrap width. */
+.vb-resize {
+  position: absolute; top: 0; bottom: 0; right: calc(-22px / var(--vbz, 1)); width: calc(44px / var(--vbz, 1));
+  cursor: ew-resize; touch-action: none;
+}
+.vb-resize::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: calc(6px / var(--vbz, 1)); height: calc(28px / var(--vbz, 1));
+  transform: translate(-50%, -50%); border-radius: 99px; background: var(--accent-9);
+  box-shadow: 0 0 0 calc(2px / var(--vbz, 1)) var(--surface-solid);
+}
+
+/* -------------------------------------------------------------- the bar */
+.vb-bar {
+  position: absolute; pointer-events: auto; display: flex; align-items: center; gap: 4px; padding: 4px;
+  height: 52px; box-sizing: border-box; border-radius: 16px; background: var(--surface-solid); color: var(--text);
+  box-shadow: 0 0 0 1px var(--hairline), 0 6px 20px -8px rgba(0, 0, 40, 0.22);
+  font: 550 13px/16px var(--font); white-space: nowrap; animation: pop 160ms var(--ease);
+}
+.vb-btn {
+  flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; padding: 0; border-radius: 12px;
+  background: transparent; color: var(--text-2); cursor: pointer; transition: background 120ms var(--ease), color 120ms var(--ease);
+  touch-action: none;
+}
+.vb-btn:hover { background: var(--hover); color: var(--text); }
+.vb-btn:active { background: var(--pressed); }
+.vb-btn.on { background: var(--accent-3); color: var(--accent-11); }
+.vb-grip { width: 28px; cursor: grab; color: var(--text-3); }
+.vb-mic { position: relative; border-radius: 999px; }
+.vb-mic.on { background: var(--accent-9); color: var(--accent-contrast); }
+.vb-mic.on:hover { background: var(--accent-10); }
+.vb-mic.on::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; border: 2px solid var(--accent-9); pointer-events: none;
+  animation: vb-pulse 1.4s var(--ease) infinite;
+}
+.vb-mic.finishing::after { animation: none; opacity: 0.4; }
+.vb-btn.vb-finish { background: var(--accent-9); color: var(--accent-contrast); }
+.vb-btn.vb-finish:hover { background: var(--accent-10); }
+.vb-seg { flex: none; display: inline-flex; height: 44px; box-sizing: border-box; padding: 4px; gap: 2px; border-radius: 12px; background: var(--gray-a3); }
+.vb-seg button {
+  min-width: 44px; height: 36px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; color: var(--text-2);
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; font: 600 13px/1 var(--font); cursor: pointer;
+}
+.vb-seg button:hover:not(.on):not(:disabled) { color: var(--text); }
+.vb-seg button.on { background: var(--surface-solid); color: var(--accent-11); box-shadow: 0 0 0 1px var(--hairline), 0 1px 2px rgba(0, 0, 40, 0.08); }
+.vb-seg button:disabled { opacity: 0.4; cursor: default; }
+.vb-privacy { flex: none; padding: 0 6px; font: 550 11px/12px var(--font); color: var(--text-3); max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ------------------------------------------------- "Sent to the AI" pill */
+.vb-sent {
+  position: absolute; left: 50%; top: 72px; transform: translateX(-50%); pointer-events: auto;
+  display: flex; align-items: center; gap: 10px; max-width: min(560px, calc(100% - 32px)); box-sizing: border-box;
+  padding: 8px 14px 8px 8px; border-radius: 16px; background: var(--surface-solid); color: var(--text);
+  box-shadow: 0 0 0 1px var(--hairline), 0 8px 24px -8px rgba(0, 0, 40, 0.25); animation: pop 160ms var(--ease);
+}
+.vb-sent-icon { flex: none; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-9); color: var(--accent-contrast); }
+.vb-sent-text { display: grid; min-width: 0; font: 450 13px/18px var(--font); }
+.vb-sent-text b { font-weight: 650; color: var(--accent-11); }
+.vb-sent-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 520px) {
+  .vb-privacy { display: none; }
+  .vb-bar { gap: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vb-box.listening .vb-badge::after, .vb-mic.on::after { animation: none; }
+  .vb-bar, .vb-sent { animation: none; }
+}
+
+/* The dock's Voice text button while it listens (push-to-talk). */
+.dock-shell .tool.listening { --dock-cell: var(--accent-9); background: var(--accent-9); color: var(--accent-contrast); position: relative; }
+.dock-shell .tool.listening:hover { --dock-cell: var(--accent-10); background: var(--accent-10); }
+.dock-shell .tool.listening::after {
+  content: ""; position: absolute; inset: 2px; border-radius: inherit; border: 2px solid var(--accent-9); pointer-events: none;
+  animation: vb-pulse 1.4s var(--ease) infinite;
+}
+@media (prefers-reduced-motion: reduce) { .dock-shell .tool.listening::after { animation: none; } }

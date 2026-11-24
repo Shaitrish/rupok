@@ -93,6 +93,23 @@ function body(name) {
   return null;
 }
 
+// Composed icons: a Solar icon made smaller in the top-left corner, with a
+// mark drawn in the free bottom-right corner (same stroke as the variant).
+// voiceText: the Voice text tool (src/voice/board.ts), a mic with a T.
+const COMPOSE = {
+  voiceText: { base: "microphone", mark: "M14.5 15H21.5M18 15V21.5" },
+};
+const STROKED = new Set(["linear", "line-duotone", "broken"]);
+
+function compose({ base, mark }, v) {
+  const k = 0.74;
+  let b = body(`${base}-${v}`);
+  // Keep the stroke width the eye expects after scaling down.
+  if (STROKED.has(v)) b = b.replace(/stroke-width="1\.5"/g, `stroke-width="${(1.5 / k).toFixed(2)}"`);
+  const w = STROKED.has(v) ? 1.5 : 2;
+  return `<g transform="translate(0.4 0.2) scale(${k})">${b}</g><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="${w}" d="${mark}"/>`;
+}
+
 const out = {};
 const missing = [];
 for (const [logical, candidates] of Object.entries(MAP)) {
@@ -102,6 +119,13 @@ for (const [logical, candidates] of Object.entries(MAP)) {
     continue;
   }
   out[logical] = Object.fromEntries(VARIANTS.map((v) => [v, body(`${base}-${v}`)]));
+}
+for (const [logical, spec] of Object.entries(COMPOSE)) {
+  if (!VARIANTS.every((v) => body(`${spec.base}-${v}`))) {
+    missing.push(logical);
+    continue;
+  }
+  out[logical] = Object.fromEntries(VARIANTS.map((v) => [v, compose(spec, v)]));
 }
 if (missing.length) {
   console.error("missing icons:", missing.join(", "));

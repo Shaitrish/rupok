@@ -321,8 +321,15 @@ tools (`get_lesson_outline`, `add_page`, `add_text`, `add_smart_object`,
 | `point_at(x, y, w?, h?, label?, seconds?)` | A temporary laser ring or highlight box (not saved). |
 | `write_handwriting(lines, anchor?, style?, speed?, color?, size?, step_mode?)` | Write lines (text with inline LaTeX) in handwriting, animated stroke by stroke, below the anchor; one undo step. See [Solve this](#solve-this). |
 | `set_board_theme(page_color?, pattern?, ui?)` | Page colour (white, paper, chalkboard, blackboard, #hex) and pattern; app light/dark. |
+| `start_voice_text(x?, y?, w?, lang?, mode?, style?)` | Live only. Turn on [Voice on the board](#voice-on-the-board): the teacher speaks and the words appear in a box at `x, y`, `w` wide (default: under the last voice text, else mid-page), wrapped inside the page. `lang` `en-US` or `bn-BD`; `mode` `text` (default) or `ask` (the words become a chat prompt); `style` `typed` (default) or `handwriting`. Refused when the board has no speech recognition or voice input is off. |
+| `stop_voice_text(cancel?)` | Live only. Finish: the words become one text item (one undo step) and the result has `text` and `item_id`; `cancel: true` throws them away. |
 | `set_page_design(path, page?, all_pages?, color?, pattern?, background_svg?, background_image?, background_fit?, background_opacity?, background_dim?, remove_background?)` | Page design: colour, pattern and a background image (SVG, or base64 PNG/JPEG), for a page or every page. Only `path`: read the design. Live or on a file. |
 | `set_branding(path, scope?, page?, logo_svg?, logo_image?, logo_corner?, logo_x?, logo_y?, logo_width?, logo_opacity?, remove_logo?, school?, teacher?, class?, date?, text_position?, text_align?, hidden?, remove?)` | Logo and header/footer line on every page (`scope: "lesson"`) or one page; text placeholders `{lesson}`, `{page}`, `{pages}`, `{date}`, `{teacher}`, `{school}`, `{subject}`, `{course}`, `{chapter}`. Only `path`: read it. |
+
+`add_text` with a `w` wraps on the board: the board breaks the lines to fit
+`w`, measured with its own font, and stores them as `\n` (text items never
+reflow by themselves, so every reader shows the same lines). On a lesson file
+the text is stored as given.
 
 Every change is one undo step on the board, tagged with the agent's name in
 the lesson history (the Loro commit message
@@ -428,6 +435,50 @@ students use Solve this, and **Teach Rupok my handwriting**: a calibration
 screen where the teacher writes digits, letters and maths symbols once; the
 samples (writing units, per device, `rupok.handwriting.v1`) drive both the
 writer and the recogniser's user templates.
+
+## Voice on the board
+
+Teachers talk during class and don't want to write whole sentences. The
+dock's **Voice text** tool (a mic with a T, in Prepare and Teach) puts what
+they say on the board while they say it:
+
+- **Place:** pick the tool, then tap the page (or drag across it to set the
+  width). A voice box opens there with a pulsing mint mic and starts
+  listening. Drag the box to move it, drag its right edge to change the
+  width.
+- **Live words:** words still being recognised show lighter; final words
+  turn into the ink colour. Text wraps inside the box, and the box stays on
+  the page (it moves up, then shrinks its text, rather than run off the
+  slide).
+- **Punctuation and lines:** spoken punctuation works as in every field
+  ("comma", "full stop", "question mark", "new line"; কমা, দাঁড়ি,
+  প্রশ্নবোধক চিহ্ন, নতুন লাইন). A pause of about 2 s starts a new line.
+- **Finish:** tap the box, press Esc or ✓. The words become a normal text
+  item (editable, resizable, recolourable), with the line breaks the teacher
+  saw. **One undo step per box**: the box is not in the lesson until it is
+  finished, so Ctrl+Z after finishing removes the whole voice text. ✕
+  discards it.
+- **Teach:** hold the dock button to talk (push-to-talk): the box opens under
+  the last voice text and its words go on the board on release, the pen stays
+  the tool, one undo step per hold. With the tool on, Space or a clicker's
+  "blank" key (B or .) toggles listening.
+- **On the box:** EN / বাং; **Text ↔ Ask AI**; typed ↔ **hand-written**
+  (the Solve this synthesiser, English; Bangla stays typed); where the audio
+  goes (offline Whisper on this computer, or the browser's cloud service).
+- **Ask AI:** the words become a prompt to the in-app chat with the page (or
+  the selection) attached. A small bubble confirms it; in Teach the chat
+  stays closed. Not connected yet: the chat opens with the words in its box.
+
+Settings → General → Voice on the board: what a new box does (text or Ask
+AI), tap or hold to talk, hand-written by default, the pause before a new
+line (0 turns it off), and whether students may ask the AI by voice in
+Student view (the tool can then be added to Student view in Teaching modes;
+students never write on the board).
+
+Agents use `start_voice_text` / `stop_voice_text` (live only) when the teacher
+asks ("take my dictation", "let me speak the notes"). The microphone is the
+teacher's: the board shows it is listening, and the ops need *Allow AI to
+edit live*.
 
 ## Pairing and security
 
@@ -542,8 +593,10 @@ An operation is `{"op": "<name>", …fields}`; the names and fields are the
 `update_smart_object`, `add_media`, `add_model`, `delete_item`,
 `set_page_background`, `set_page_design`, `set_branding`,
 `replace_items_with_text`, `step_object`, `write_handwriting`, `add_shape`,
-`add_table`; the last two run in the board's engine, `crates/rupok-wasm`
-`engine/insert.rs`). `add_media`
+`add_table`, `start_voice_text`, `stop_voice_text`; `add_shape` and
+`add_table` run in the board's engine, `crates/rupok-wasm`
+`engine/insert.rs`, the voice ops in the board app, which owns the
+microphone, `apps/board/src/voice/board.ts`). `add_media`
 carries a `url` (YouTube or a trusted embed) or a base64 `file_base64` (video
 or audio); `add_model` a base64 `.glb` as `file_base64`. The MCP tools
 `add_youtube`, `add_media` and `add_3d_model` read files from the workspace and

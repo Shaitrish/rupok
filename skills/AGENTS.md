@@ -74,6 +74,8 @@ they have open: they click **Connect AI** and give you a 6-digit code; call
   `get_selection` show you the board;
 - `add_page_after_current`, `go_to_page`, `step_object`, `point_at`,
   `replace_items_with_text` (ink to text) and `set_board_theme` help you teach;
+- `start_voice_text` / `stop_voice_text` let the teacher dictate onto the
+  board (only when they ask);
 - `add_shape` (rect, circle, arrow, star, Venn, flowchart, number line,
   axes, speech bubble, …) and `add_table` (rows × cols with cell text) draw
   clean shapes the teacher can resize, fill and edit.

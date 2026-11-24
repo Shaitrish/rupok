@@ -311,16 +311,16 @@ export class Controller {
 
   setTool(t: Tool) {
     // Student view: only panning and using Smart Objects.
-    if (isView() && t !== "interact") t = "hand";
+    if (isView() && t !== "interact" && t !== "voice") t = "hand";
     // Leaving "use objects": take keyboard focus back from any object iframe so
     // shortcuts and the clicker reach the board again.
     if (t !== "interact" && document.activeElement instanceof HTMLIFrameElement) document.activeElement.blur();
     setTool(t);
-    if (t === "interact" || t === "text" || t === "stamp") {
+    if (t === "interact" || t === "text" || t === "stamp" || t === "voice") {
       // A just-placed object stays selected in "use objects" so it can be
       // resized right away; the text tool starts fresh.
       this.board.set_tool("lasso");
-      if (t === "text" || t === "stamp") this.board.select_json("[]");
+      if (t === "text" || t === "stamp" || t === "voice") this.board.select_json("[]");
     } else {
       this.board.set_tool(t === "shape" ? shapeToolName() : t);
     }

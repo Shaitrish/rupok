@@ -6,6 +6,8 @@ import { type Mode, type ModeConfig, type ModesConfig, resolveMode, sanitizeMode
 export type Tool =
   | "pen" | "highlighter" | "eraser" | "lasso" | "hand" | "laser" | "interact" | "text"
   | "rect" | "ellipse" | "line" | "arrow" | "stamp"
+  /** Voice text: speak and the words go on the board (voice/board.ts). */
+  | "voice"
   /** The Shapes picker's tool; which shape is shapes.ts `currentShape()`. */
   | "shape";
 
