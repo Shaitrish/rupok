@@ -9,6 +9,7 @@
 
 import { createSignal } from "solid-js";
 import { type DomItem, items, prefs, setPrefs } from "./state";
+import { customSize, resolveStamp, svgDataUrl } from "./stampLib";
 
 export type StampRender = "star" | "tick" | "cross" | "heart" | "circle" | "label" | "emoji" | "arrow";
 
@@ -98,7 +99,13 @@ function starPath(cx: number, cy: number, R: number, r: number): string {
  */
 export function stampSvg(kind: string, text: string, color: number, w: number, h: number): string {
   const def = stampDef(kind);
-  const render: StampRender = def?.render ?? "emoji";
+  const custom = def ? undefined : resolveStamp(kind);
+  if (custom?.art === "svg" && custom.svg) {
+    // An agent's (or the teacher's) SVG, already sanitised in Rust, drawn
+    // as an image so it can never run code in the page.
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${esc(svgDataUrl(custom.svg, css(color)))}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/></svg>`;
+  }
+  const render: StampRender = def?.render ?? (custom?.art === "text" ? "label" : "emoji");
   const c = css(color);
   const s = Math.min(w, h);
   const cx = w / 2, cy = h / 2;
@@ -164,7 +171,21 @@ export async function stampCanvas(kind: string, text: string, color: number, w: 
   const g = canvas.getContext("2d");
   if (!g) return null;
   const def = stampDef(kind);
-  if (!def || def.render === "emoji") {
+  const custom = def ? undefined : resolveStamp(kind);
+  if (custom?.art === "svg" && custom.svg) {
+    const img = new Image();
+    img.src = svgDataUrl(custom.svg, css(color));
+    try {
+      await img.decode();
+    } catch {
+      return null;
+    }
+    const k = Math.min(canvas.width / (img.naturalWidth || 1), canvas.height / (img.naturalHeight || 1));
+    const dw = (img.naturalWidth || canvas.width) * k, dh = (img.naturalHeight || canvas.height) * k;
+    g.drawImage(img, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
+    return canvas;
+  }
+  if ((!def && custom?.art !== "text") || def?.render === "emoji") {
     // Emoji straight from the system font (an SVG image may not reach it).
     const size = Math.min(w, h) * 0.82 * s;
     g.font = `${size}px ${EMOJI_FONT}`;
@@ -200,6 +221,12 @@ export function nextBadge(list: readonly DomItem[] = items): number {
 /** What placing `id` stores: kind, fallback text, size and colour. */
 export function stampToPlace(id: string, emoji?: string): { kind: string; text: string; w: number; h: number; color: number } {
   const def = stampDef(id);
+  const custom = def ? undefined : resolveStamp(id);
+  if (custom) {
+    const { w, h } = customSize(custom);
+    const c = custom.color ? (parseInt(custom.color.slice(1, 7), 16) * 256 + 255) >>> 0 : 0x1c2024ff;
+    return { kind: id, text: custom.art === "emoji" ? custom.emoji ?? custom.name : custom.art === "text" ? custom.text ?? custom.name : custom.name, w, h, color: c };
+  }
   if (!def) {
     const text = emoji || id;
     return { kind: "emoji", text, w: 96, h: 96, color: 0x1c2024ff };
@@ -224,7 +251,11 @@ export const [quickMenu, setQuickMenu] = createSignal<{ x: number; y: number } |
 // ------------------------------------------------------------ celebration
 
 /** A short burst of stars and confetti across the board (Celebrate.tsx). */
+export type CelebrateKind = "stars" | "confetti" | "hearts";
 export const [celebration, setCelebration] = createSignal(0);
-export function celebrate() {
+/** What the next burst throws (Celebrate.tsx reads it). */
+export let celebrateKind: CelebrateKind = "stars";
+export function celebrate(kind: CelebrateKind = "stars") {
+  celebrateKind = kind;
   setCelebration((n) => n + 1);
 }

@@ -231,6 +231,150 @@ fn mcp_server_over_stdio() {
         "{m}"
     );
 
+    // ------------------------------------------------ agent control on a file
+    for expected in [
+        "list_pages",
+        "move_pages",
+        "delete_pages",
+        "duplicate_pages",
+        "select_items",
+        "move_items",
+        "align_items",
+        "restyle_items",
+        "scale_items",
+        "group_items",
+        "bring_to_front",
+        "send_to_back",
+        "delete_items",
+        "draw_stroke",
+        "update_text",
+        "list_stamps",
+        "create_stamp",
+        "update_stamp",
+        "delete_stamp",
+        "add_stamp",
+        "set_mode",
+        "zoom_to",
+        "fit_page",
+        "start_replay",
+        "celebrate",
+        "export_pdf",
+        "library_list",
+        "library_open",
+        "get_settings",
+        "set_setting",
+        "get_dock_layout",
+        "set_dock_layout",
+        "list_dock_items",
+        "apply_dock_preset",
+    ] {
+        assert!(names.contains(&expected), "missing tool {expected}");
+    }
+    let f = "units/plants.rpk";
+    let r = structured(&c.call(
+        "draw_stroke",
+        json!({ "path": f, "page": 2, "points": [[100, 100], [400, 300]], "brush": "chalk" }),
+    ));
+    let stroke = r["item_ids"][0].as_str().unwrap().to_string();
+    let t = structured(&c.call(
+        "add_text",
+        json!({ "path": f, "page": 2, "text": "Leaf", "x": 600, "y": 100, "size": 48 }),
+    ));
+    let text = t["item_id"].as_str().unwrap().to_string();
+    let r = c.call(
+        "restyle_items",
+        json!({ "path": f, "page": 2, "item_ids": [stroke, text], "color": "#30a46c" }),
+    );
+    assert_ne!(r["isError"], true, "{r}");
+    assert_eq!(structured(&r)["restyled"], 2);
+    let r = c.call(
+        "align_items",
+        json!({ "path": f, "page": 2, "item_ids": [stroke, text], "align": "top" }),
+    );
+    assert_ne!(r["isError"], true, "{r}");
+    let r = c.call(
+        "update_text",
+        json!({ "path": f, "page": 2, "item_id": text, "text": "Leaf cell" }),
+    );
+    assert_ne!(r["isError"], true, "{r}");
+    // a custom SVG stamp with behaviour, and a Smart stamp, placed in the file
+    let svg =
+        r#"<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="currentColor"/></svg>"#;
+    let st = structured(&c.call(
+        "create_stamp",
+        json!({ "path": f, "name": "Sun", "art": "svg", "svg": svg,
+        "color": "#f5b301", "behavior": { "animation": "sparkle", "counter": true } }),
+    ));
+    let sid = st["id"].as_str().unwrap().to_string();
+    let r = c.call(
+        "add_stamp",
+        json!({ "path": f, "page": 2, "stamp": sid, "x": 800, "y": 400 }),
+    );
+    assert_ne!(r["isError"], true, "{r}");
+    let dice = r#"<!doctype html><title>Dice</title><body style="font:80px system-ui"><b id=d>1</b>
+<script>document.body.onclick=()=>{d.textContent=1+Math.floor(Math.random()*6)}</script>"#;
+    let r = c.call(
+        "create_stamp",
+        json!({ "path": f, "id": "dice", "name": "Dice", "art": "smart", "html": dice }),
+    );
+    assert_ne!(r["isError"], true, "{r}");
+    let r = c.call(
+        "add_stamp",
+        json!({ "path": f, "page": 2, "stamp": "dice" }),
+    );
+    assert_ne!(r["isError"], true, "{r}");
+    let stamps = structured(&c.call("list_stamps", json!({ "path": f })));
+    assert_eq!(stamps["custom"].as_array().unwrap().len(), 2);
+    // unsafe SVG is refused and nothing is saved
+    let before = std::fs::read(dir.path().join(f)).unwrap();
+    let r = c.call(
+        "create_stamp",
+        json!({ "path": f, "name": "Bad", "art": "svg", "svg": "<svg onload=\"x()\"/>" }),
+    );
+    assert_eq!(r["isError"], true);
+    assert!(
+        structured(&r)["error"]
+            .as_str()
+            .unwrap()
+            .contains("svg refused")
+    );
+    assert_eq!(std::fs::read(dir.path().join(f)).unwrap(), before);
+    // pages
+    let r = structured(&c.call("duplicate_pages", json!({ "path": f, "pages": [2] })));
+    assert_eq!(r["copies"], json!([3]));
+    let r = c.call("move_pages", json!({ "path": f, "pages": [3], "to": 1 }));
+    assert_ne!(r["isError"], true, "{r}");
+    let pages = structured(&c.call("list_pages", json!({ "path": f })));
+    assert_eq!(pages["page_count"], 3);
+    assert_eq!(
+        pages["pages"][0]["objects"], 1,
+        "the copy (with the Smart stamp) is first: {pages}"
+    );
+    // board-only tools need the live board
+    let r = c.call("set_mode", json!({ "mode": "teach" }));
+    assert_eq!(r["isError"], true);
+    assert!(
+        structured(&r)["error"]
+            .as_str()
+            .unwrap()
+            .contains("no board is paired")
+    );
+    // settings that are the teacher's alone never reach the board
+    let r = c.call(
+        "set_setting",
+        json!({ "key": "claudeKey", "value": "sk-x" }),
+    );
+    assert_eq!(r["isError"], true);
+    assert!(
+        structured(&r)["error"]
+            .as_str()
+            .unwrap()
+            .contains("teacher's alone")
+    );
+    // the PDF goes in the workspace only
+    let r = c.call("export_pdf", json!({ "save_as": "../out.pdf" }));
+    assert_eq!(r["isError"], true);
+
     // list + spec
     let lessons = structured(&c.call("list_lessons", json!({})));
     assert_eq!(lessons["lessons"][0]["title"], "How plants grow");

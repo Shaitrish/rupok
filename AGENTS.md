@@ -16,12 +16,12 @@ a Tauri 2 shell (planned). Status: Phase 0, pre-alpha. See
 | `crates/rupok-ink` | Pen input pipeline, wasm-safe | `StrokeBuilder` (wet ink), `filter::OneEuro2`, `pressure::PressureCurve`, `simplify`, `codec::{encode_points, decode_points}` (point codec v1), `MIN_WIDTH_RATIO`, `point_radius`, `math` (handwritten maths → LaTeX), `write` (text + LaTeX → timed handwriting strokes) |
 | `crates/rupok-core` | Lesson document on Loro | `Lesson` (`doc.rs`: all mutations), model types (`model.rs`: `ItemData`, `StrokeData`, `ObjectData`, `PageSpec`…), `Scene` (`scene.rs`: R*-tree hit-test, eraser, lasso), `DOC_FORMAT` |
 | `crates/rupok-format` | `.rpk` package and Smart Object bundles (Apache-2.0) | `Package::{read, write, from_lesson, add_asset, content_markdown}`, `readable` (derived `README.md`/`content.md`/`content.json`), `ObjectBundle::{from_single_html, from_files, from_dir, validate}`, `LIBS`, `safe_path`, `FORMAT_VERSION`, `MIMETYPE`, `media` (embed allowlist, `parse_link`, `embed_url`, `prepare`), `model3d` (3D viewer object) |
-| `crates/rupok-live` | Live agent bridge shared by the board and `rupok mcp --live` | `protocol.rs` (WebSocket protocol v1: channels, ports, origin/host checks), `op.rs` (`Op`), `apply.rs` (`apply`: one attributed commit per agent op), `attribution.rs`, `sync` |
+| `crates/rupok-live` | Live agent bridge shared by the board and `rupok mcp --live` | `protocol.rs` (WebSocket protocol v1: channels, ports, origin/host checks), `op.rs` (`Op`), `apply.rs` (`apply`: one attributed commit per agent op), `items.rs` (pages and items: move, align, restyle, scale, draw…), `stamps.rs` (built-in and custom stamps, Smart stamps), `attribution.rs`, `sync` |
 | `crates/rupok-render` | wgpu ink renderer | `InkRenderer` (SDF capsules, chunk culling, cached dry layer, wet layer), `Camera`, `Gpu::headless`, `ink.wgsl` |
 | `crates/rupok-wasm` | Board engine and wasm-bindgen API | `engine.rs` (`Engine`: tools, gestures, selection), `lib.rs` (`Board` JS API), `replay.rs`, `shapes.rs` |
-| `crates/rupok-cli` | `rupok` binary: CLI and MCP server | `cli.rs` (clap), `ops.rs` (shared operations), `mcp.rs` + `tools.rs` (15 MCP tools), `workspace.rs` (path sandbox), `spec.rs`, `live/` (`LiveHub`: loopback WebSocket, pairing, Loro mirror) + `mcp_live.rs` (live tools; docs/ai-agents.md), `chat/` (`rupok agent`: ACP client relaying the in-app chat) + `mcp_http.rs` (MCP over loopback HTTP for it) |
+| `crates/rupok-cli` | `rupok` binary: CLI and MCP server | `cli.rs` (clap), `ops.rs` (shared operations), `mcp.rs` + `tools.rs` (lesson tools), `mcp_agent.rs` (agent control: pages, items, stamps, modes, export, library, settings, dock; docs/agent-capabilities.md), `workspace.rs` (path sandbox), `spec.rs`, `live/` (`LiveHub`: loopback WebSocket, pairing, Loro mirror) + `mcp_live.rs` (live tools; docs/ai-agents.md), `chat/` (`rupok agent`: ACP client relaying the in-app chat) + `mcp_http.rs` (MCP over loopback HTTP for it) |
 | `bench/` | Performance harness and budgets | `cargo run -p rupok-bench --release [-- --check]` |
-| `apps/board` | SolidJS board UI (Vite) | `controller.ts`, `objects.ts` (Smart Object host), `media/` + `components/Media*.tsx` (YouTube, video, audio, web embeds), `pdf.ts`, `storage.ts`, `live.ts` + `snapshot.ts` + `components/LivePanel.tsx` (Connect AI), `chat.ts` + `components/ChatPanel.tsx` + `markdown.ts` (AI chat), `voice/` (dictation; `board.ts` + `VoiceBoard.tsx`: Voice on the board), `components/` |
+| `apps/board` | SolidJS board UI (Vite) | `controller.ts`, `objects.ts` (Smart Object host), `media/` + `components/Media*.tsx` (YouTube, video, audio, web embeds), `pdf.ts`, `storage.ts`, `live.ts` + `agentControl.ts` + `snapshot.ts` + `components/LivePanel.tsx` (Connect AI; board-side agent ops), `customStamps.ts` + `stampLib.ts` + `components/StampEditor.tsx` (My stamps), `components/DockEditor.tsx` (Customize dock), `agentSettings.ts` (settings an agent may change), `chat.ts` + `components/ChatPanel.tsx` + `markdown.ts` (AI chat), `voice/` (dictation; `board.ts` + `VoiceBoard.tsx`: Voice on the board), `components/` |
 | `packages/object-sdk` | In-object SDK, `window.rupok` (Apache-2.0) | `sdk.js` (ES2019 IIFE), `index.d.ts`, `test/` |
 | `spec/` | Normative specs (Apache-2.0) | `rupok-format.md`, `smart-object.md` |
 | `examples/objects/` | Validated example Smart Objects | checked by `crates/rupok-format/tests/examples.rs` |
@@ -103,3 +103,22 @@ The toolchain (1.100, edition 2024) is pinned in `rust-toolchain.toml`.
    asks.
 7. **Stay in scope.** Other contributors (human or agent) may be editing
    other parts of the tree; change only what your task needs.
+8. **Agent-first: every feature is agent-controllable.** Anything a teacher
+   can do, their AI agent must be able to do on their behalf. A new
+   user-facing feature ships, in the same pull request, with matching live
+   op(s) in `crates/rupok-live` (`op.rs`, run in `apply`/`items.rs`/… or
+   the board's `agentControl.ts`), MCP tool(s) (`crates/rupok-cli/src/
+   mcp*.rs`, working on a file and with `path: "live"` where that makes
+   sense), docs in `docs/ai-agents.md` and `skills/rupok-live-board/
+   SKILL.md`, tests, and a row in `docs/agent-capabilities.md`
+   (`tests/agent_capabilities.rs` fails CI for a setting, dock button or op
+   without one). Guardrails, always:
+   - one attributed undo step per agent action (one Loro commit tagged
+     with `rupok_live::commit_message`);
+   - respect **Allow AI to edit live** and Student view (the op's `Access`);
+   - settings and mode changes ask the teacher's permission in the chat like
+     edits, and can be undone from the AI chip;
+   - agent-written code runs only in the Smart Object sandbox;
+   - AI keys, accounts, payments, storage locations and permissions stay
+     teacher only. When an agent must not do something, mark it *teacher
+     only* in the matrix with the reason.

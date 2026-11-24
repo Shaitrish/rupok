@@ -726,6 +726,20 @@ impl Tools {
     /// Run a page design op (`set_page_design`, `set_branding`) on a lesson
     /// file: the same code the live board runs, saved when it changed.
     pub fn design_op(&self, path: &str, op: rupok_live::Op) -> Result<serde_json::Value> {
+        self.doc_op(path, op)
+    }
+
+    /// Run a live operation (pages, items, stamps, page design…) on a lesson
+    /// file with exactly the code the board runs, and save the file when it
+    /// changed. "The current page" is page 1. Board-app operations (modes,
+    /// the view, the library, settings) are refused with a clear error.
+    pub fn doc_op(&self, path: &str, op: rupok_live::Op) -> Result<serde_json::Value> {
+        if op.board_only() {
+            return Err(ops::OpError::Invalid(format!(
+                "`{}` works only on the live board: pass path \"live\" (a board must be paired)",
+                op.name()
+            )));
+        }
         let _g = self.guard();
         let abs = self.lesson(path)?;
         let (mut pkg, mut lesson) = ops::load(&abs)?;
@@ -742,6 +756,10 @@ impl Tools {
         };
         let out = rupok_live::apply(ctx, &op, "agent", now).map_err(|e| match e {
             rupok_live::LiveError::NotFound(m) => ops::OpError::NotFound(m),
+            rupok_live::LiveError::Diagnostics(d) => ops::OpError::Diagnostics(d),
+            rupok_live::LiveError::Unsupported(name) => ops::OpError::Invalid(format!(
+                "`{name}` works only on the live board: pass path \"live\" (a board must be paired)"
+            )),
             e => ops::OpError::Invalid(e.to_string()),
         })?;
         if out.changed {

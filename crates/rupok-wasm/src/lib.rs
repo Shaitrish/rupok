@@ -1015,6 +1015,16 @@ mod web {
                 .map_err(|e| JsValue::from_str(&e))
         }
 
+        /// Custom stamps stored in the lesson: `{id: definition}`.
+        pub fn stamp_defs_json(&self) -> String {
+            crate::live::stamp_defs_json(&self.engine)
+        }
+
+        /// Check a custom stamp definition (the stamp editor, stamp packs).
+        pub fn check_stamp_json(def_json: &str) -> Result<String, JsValue> {
+            crate::live::check_stamp_json(def_json).map_err(|e| JsValue::from_str(&e))
+        }
+
         // ------------------------------------------- AI handwriting (solve)
         // `write_handwriting` writes through `live_apply`; these set the
         // teacher's glyphs, preview without writing, and drive the reveal.

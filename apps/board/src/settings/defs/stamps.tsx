@@ -3,6 +3,7 @@
 import { For } from "solid-js";
 import { BRUSHES, TOOL_BRUSHES } from "../../brushes";
 import { STAMPS } from "../../stamps";
+import { myStamps } from "../../stampLib";
 import { PREF_DEFAULTS, prefs, setPrefs } from "../../state";
 import { StampIcon } from "../../components/Stamps";
 import { pref } from "../bind";
@@ -13,13 +14,13 @@ function Favorites(p: SettingProps) {
   const favs = () => prefs().stampFavorites;
   return (
     <div class="stamp-grid settings-stamps" role="group" aria-labelledby={p.labelId} aria-describedby={p.descId}>
-      <For each={STAMPS}>
+      <For each={[...STAMPS.map((s) => ({ id: s.id, label: s.label, wide: s.render === "label" })), ...myStamps().map((s) => ({ id: s.id, label: s.name, wide: s.art === "text" }))]}>
         {(s) => {
           const on = () => favs().includes(s.id);
           return (
             <button
               class="tool stamp-cell"
-              classList={{ on: on(), wide: s.render === "label" }}
+              classList={{ on: on(), wide: s.wide }}
               aria-pressed={on()}
               aria-label={s.label}
               title={s.label}
@@ -54,6 +55,12 @@ registerSettings([
     description: "Hold the pen still on the board for half a second: your favourite stamps appear around it, with Celebrate in the middle.",
     keywords: ["stamp", "sticker", "star", "tick", "radial", "long press", "quick menu", "স্ট্যাম্প", "তারা"],
     ...pref("stampQuickMenu"),
+  },
+  {
+    id: "pen.stampSounds", category: "pen", group: "Stamps", order: 305, type: "toggle", label: "Stamp sounds",
+    description: "Custom stamps may play their short sound (a chime, a clap…) when placed. Off: silent.",
+    keywords: ["mute", "sound", "audio", "chime", "শব্দ"],
+    ...pref("stampSounds"),
   },
   {
     id: "pen.stampFavorites", category: "pen", group: "Stamps", order: 310, type: "custom", layout: "block",

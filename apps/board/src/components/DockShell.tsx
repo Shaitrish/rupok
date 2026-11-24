@@ -42,8 +42,14 @@ export interface DockShellProps {
   /** The dock element, or the bubble while minimised. */
   ref?: (el: HTMLElement) => void;
   gripClass?: string;
+  /** Holding the grip still (opens the "Customize dock" editor). */
+  onGripHold?: () => void;
+  /** No minimise chevron (the split dock). */
+  noMinimize?: boolean;
   children: JSX.Element;
 }
+
+const HOLD_MS = 650;
 
 /** Six dots: a handle, not an icon, so it is drawn here. */
 function GripDots(props: { size: number; vertical: boolean }) {
@@ -120,6 +126,23 @@ export function DockShell(props: DockShellProps) {
     props.onActivity?.();
     if (props.windowed) return; // data-tauri-drag-region: the OS moves the window
     const g = e.currentTarget as HTMLElement;
+    if (props.onGripHold && e.button === 0) {
+      const [x0, y0] = [e.clientX, e.clientY];
+      const timer = window.setTimeout(() => {
+        cleanup();
+        props.onGripHold?.();
+      }, HOLD_MS);
+      const move = (ev: PointerEvent) => Math.hypot(ev.clientX - x0, ev.clientY - y0) >= TAP_MOVE && cleanup();
+      const cleanup = () => {
+        clearTimeout(timer);
+        g.removeEventListener("pointermove", move);
+        g.removeEventListener("pointerup", cleanup);
+        g.removeEventListener("pointercancel", cleanup);
+      };
+      g.addEventListener("pointermove", move);
+      g.addEventListener("pointerup", cleanup);
+      g.addEventListener("pointercancel", cleanup);
+    }
     track(e, g, () => ({ x: g.offsetLeft + g.offsetWidth / 2, y: g.offsetTop + g.offsetHeight / 2 }), () => {
       const now = performance.now();
       if (now - lastTap < DOUBLE_TAP_MS) {
@@ -196,21 +219,23 @@ export function DockShell(props: DockShellProps) {
         <div
           class={`tool dock-grip ${props.gripClass ?? ""}`}
           data-tauri-drag-region={props.windowed ? "" : undefined}
-          title="Drag to move  ·  double-tap to minimise"
+          title={props.onGripHold ? "Drag to move  ·  double-tap to minimise  ·  hold to customise" : "Drag to move  ·  double-tap to minimise"}
           aria-hidden="true"
           onPointerDown={onGripDown}
         >
           <GripDots size={props.iconSize} vertical={props.vertical} />
         </div>
         {props.children}
-        <button
-          class="tool dock-min"
-          title="Minimise the dock  ·  or double-tap the grip"
-          aria-label="Minimise the dock"
-          onClick={() => props.onMinimized(true)}
-        >
-          <Icon name={chevronFor(props.windowed ? "bottom" : props.place.edge)} size={props.iconSize} />
-        </button>
+        <Show when={!props.noMinimize}>
+          <button
+            class="tool dock-min"
+            title="Minimise the dock  ·  or double-tap the grip"
+            aria-label="Minimise the dock"
+            onClick={() => props.onMinimized(true)}
+          >
+            <Icon name={chevronFor(props.windowed ? "bottom" : props.place.edge)} size={props.iconSize} />
+          </button>
+        </Show>
       </div>
     </Show>
   );

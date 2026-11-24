@@ -28,6 +28,7 @@ only when, they appear in all capitals.
 - [Stroke width and rendering](#stroke-width-and-rendering)
 - [Brushes](#brushes)
 - [Stamps](#stamps)
+- [Custom stamps](#custom-stamps)
 - [Assets](#assets)
 - [Smart Object bundles](#smart-object-bundles)
 - [Thumbnails and layers](#thumbnails-and-layers)
@@ -154,6 +155,7 @@ the full operation history. It MUST NOT be empty.
 ```text
 meta   : Map          { format, title, created }
 pages  : MovableList  [ Map page, ... ]      presentation order
+stamps : Map          { <stamp id>: String JSON, ... }   custom stamps (proposed; see Custom stamps)
 ```
 
 Other root containers are reserved. Readers MUST ignore unknown root
@@ -725,6 +727,46 @@ reader without stamps should show instead (`⭐`, `✅`, `Excellent!`, the
 number or the emoji), and `size` about `0.7 h`. Readers that do not know a
 stamp value draw `text`. Replay shows a stamp at its `created` time, like
 any item.
+
+## Custom stamps
+
+> **Status: proposed, pending RFC.** The root `stamps` map is additive and
+> optional; the reference writer emits it today. A reader that ignores it
+> draws a custom stamp's `text` (its emoji, label or name), which is always
+> readable.
+
+A teacher (or their AI agent) can define stamps of their own. A lesson
+stores the definitions its stamps use in the root container `stamps`, a
+`Map` from stamp id to the definition as a JSON `String` (at most 256 KiB).
+Ids follow the `brush` naming rules (`a-z`, `0-9`, `-`, at most 32 bytes)
+and MUST NOT be a built-in stamp name. Readers MUST skip entries that are not
+strings, have a bad id, are too large or do not parse.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `name` | string, 1–40 chars | Shown in palettes. |
+| `keywords` | string[] (≤ 12, each ≤ 24 chars) | Search words. |
+| `art` | `svg`, `emoji`, `text` or `smart` | What the stamp shows. |
+| `svg` | string (≤ 64 KiB) | `art: svg`: SVG markup, sanitised as for page design (no scripts, event handlers, external references, animation or `foreignObject`). `currentColor` takes the placement's `color`. Readers MUST draw it as an image (never inline in a document that can run script). |
+| `emoji` | string | `art: emoji`. |
+| `text` | string, 1–24 chars | `art: text`: a pill with this label, in `color`. |
+| `color` | `#rrggbb` | Default colour. |
+| `size` | number, 24–600 | Default height in world units. |
+| `behavior` | map | Optional, all keys optional: `animation` (`none`, `pop`, `sparkle`, `bounce`, `spin`, `fade-in`), `burst` (`none`, `stars`, `confetti`, `hearts`, `sparkles`), `burst_colors` (≤ 6 `#rrggbb`), `counter` (bool: draw the placement's number among this stamp's placements on the page, in stacking order), `sound` (`none`, `chime`, `pop`, `ding`, `tada`, `clap`, `whoosh`), `fade_after` (1–600 s: an interactive reader removes a stamp placed in that session after this long). Readers MAY ignore behaviour. |
+| `bundle` | string | `art: smart`: the Smart Object bundle (`objects/<bundle>/`) that is the stamp. |
+| `width`, `height` | number, 40–800 | `art: smart`: the placement's size. |
+
+Placements:
+
+- `svg`, `emoji` and `text` stamps are text items whose `stamp` key is the
+  definition's id ([Stamps](#stamps)); `text` is the emoji, the label or the
+  name, and `size` about `0.7 h`.
+- A `smart` stamp is an object item placing its `bundle` (see Smart stamps
+  in smart-object.md). Bundles are shared by every placement and
+  deduplicated by content.
+
+Writers SHOULD store only definitions the lesson uses; a stamp and its new
+definition are written in one change.
 
 ## Assets
 

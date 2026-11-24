@@ -427,6 +427,11 @@ impl LiveHub {
 
     /// Run an agent op on the paired board and wait for its result.
     pub async fn call(&self, op: Op) -> Result<Value, CallError> {
+        // Making a PDF of a long lesson takes the board a while.
+        let timeout = match &op {
+            Op::ExportPdf { .. } => self.cfg.op_timeout.max(Duration::from_secs(180)),
+            _ => self.cfg.op_timeout,
+        };
         let (id, rx, track) = {
             let mut s = self.lock();
             let Some(board) = s.board.as_ref() else {
@@ -471,14 +476,14 @@ impl LiveHub {
             }
             (id, orx, track)
         };
-        let res = match tokio::time::timeout(self.cfg.op_timeout, rx).await {
+        let res = match tokio::time::timeout(timeout, rx).await {
             Ok(Ok(r)) => r,
             Ok(Err(_)) => Err(CallError::new("the board disconnected before answering")),
             Err(_) => {
                 self.lock().waiting.remove(&id);
                 Err(CallError::new(format!(
                     "the board did not answer within {} s; it may be busy or the tab may be in the background",
-                    self.cfg.op_timeout.as_secs()
+                    timeout.as_secs()
                 )))
             }
         };

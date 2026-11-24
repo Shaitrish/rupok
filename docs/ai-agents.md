@@ -28,7 +28,8 @@ the board and the agent.
 - [Setup](#setup): install `rupok`, add it to your agent.
 - [In class](#in-class): connect the board, then ask.
 - [Prompt library](#prompt-library) for science, maths and ICT teachers.
-- [Tools](#tools) the agent gets.
+- [Tools](#tools) the agent gets; [everything an agent can do](agent-capabilities.md).
+- [Custom stamps](#custom-stamps) and [the Smart Dock](#the-smart-dock).
 - [Pairing and security](#pairing-and-security).
 - [Live protocol v1](#live-protocol-v1): the WebSocket protocol, for developers.
 
@@ -103,7 +104,7 @@ In the panel:
   **Attach page** (on by default) sends the page you are on, or your lasso
   selection, when you mention nothing on the board.
 - **/commands**: the assistant's own (Claude Code's `/review`, `/compact`…)
-  and Rupok's: `/solve` (Solve this), `/quiz 5`, `/explain`, `/translate bn`, `/design` (page design),
+  and Rupok's: `/solve` (Solve this), `/quiz 5`, `/explain`, `/translate bn`, `/design` (page design), `/stamp` (a custom stamp), `/dock` (arrange the dock),
   `/clear` (clears the view) and `/new`.
 - **History**: the clock button lists the chats on this lesson (kept in this
   browser) and the assistant's own saved chats. Reopening one resumes it when
@@ -336,6 +337,123 @@ the lesson history (the Loro commit message
 `rupok-agent/1 {"agent":"Claude Code","op":"add_text"}`).
 `update_smart_object` stores the new HTML as a new bundle and re-points the
 placement, so it can be undone too.
+
+
+### Everything else on the board
+
+Rupok is agent-first: anything the teacher can do, the agent can do for
+them ([agent-capabilities.md](agent-capabilities.md) is the full list, with
+what stays the teacher's alone and why). Document tools take an optional
+`path`: omit it (or pass `"live"`) for the board, or give a `.rpk` path to
+edit a lesson file with the same code. Board tools need a paired board.
+
+| Area | Tools | File | Live |
+|---|---|---|---|
+| Pages | `list_pages`, `move_pages(pages, to)`, `delete_pages(pages)`, `duplicate_pages(pages)`, `set_page_title(page?, title)` | ✅ | ✅ |
+| Select and arrange | `select_items(item_ids)` (live), `move_items(item_ids, dx/dy or x/y)`, `align_items(item_ids, align?, distribute?, relative_to?)`, `group_items`, `ungroup_items`, `bring_to_front`, `send_to_back`, `delete_items` | ✅ | ✅ |
+| Ink and style | `draw_stroke(points or strokes, color?, width?, brush?, opacity?, tool?)`, `restyle_items(item_ids, color?, width?, brush?, fill?, opacity?, dashed?, text_size?)`, `scale_items(item_ids, factor)`, `update_text(item_id, text?, size?, color?, x?, y?, w?)` | ✅ | ✅ |
+| Stamps | `list_stamps`, `add_stamp(stamp, x?, y?, size?, color?, text?)`, `create_stamp`, `update_stamp`, `delete_stamp` (see [Custom stamps](#custom-stamps)) | ✅ | ✅ |
+| Modes and view | `set_mode(prepare \| teach \| student)`, `zoom_to(zoom?, x?, y?)`, `fit_page`, `start_replay(page?, speed?)`, `stop_replay`, `celebrate(kind?)`, `set_tool(tool, color?, width?, brush?)`, `undo_last_change` | – | ✅ |
+| Export | `export_pdf(pages?, layout?, ink?, print_friendly?, save_as?, download?)`: the board makes the PDF, the server saves it in the workspace | – | ✅ |
+| Library | `library_list(folder?, query?)`, `library_open(id)`, `library_create_lesson(title, folder?, template?, open?)`, `library_move(id, folder?)`, `library_rename(id, name)`, `library_trash(id)` | – | ✅ |
+| Settings | `get_settings`, `set_setting(key, value)`: an allowlist (theme, accent, density, pen style and defaults, gestures, PDF defaults, voice language…). Never AI keys, the cloud account, payments, storage or permissions. | – | ✅ |
+| Smart Dock | `list_dock_items`, `get_dock_layout(mode?)`, `set_dock_layout(mode?, layout)`, `save_dock_preset(name, modes?)`, `apply_dock_preset(name)` (see [The Smart Dock](#the-smart-dock)) | – | ✅ |
+
+Examples, one per area:
+
+```text
+move_pages(pages: [5], to: 1)                                  # page 5 to the front
+align_items(item_ids: ["a", "b", "c"], align: "top", distribute: "horizontal")
+restyle_items(item_ids: ["s1", "s2"], color: "#e5484d", brush: "chalk", width: 6)
+draw_stroke(points: [[400, 620], [900, 640]], color: "#e5484d", width: 8)   # underline
+add_stamp(stamp: "excellent", x: 1500, y: 80)
+set_mode(mode: "teach") · zoom_to(zoom: 2, x: 600, y: 400) · fit_page()
+export_pdf(pages: "2-5", layout: "handout-2", save_as: "handouts/forces.pdf")
+library_create_lesson(title: "Week 3: Forces", template: "slides", open: true)
+set_setting(key: "appearance.theme", value: "dark")
+set_dock_layout(mode: "teach", layout: {groups: [{items: ["pen", "highlighter", "eraser"]}], split: {position: "right", groups: [{items: ["undo"]}, {items: ["pager"]}]}, size: "l"})
+```
+
+Board-tool writes are refused in Student view and when *Allow AI to edit
+live* is off, like edits. In Rupok's chat the agent asks permission for
+settings, dock and mode changes exactly as for edits. A settings or dock
+change is undone from the AI chip's **Undo**, not Ctrl+Z (it is not part of
+the lesson). `undo_last_change` undoes only the agent's own newest change
+on the board; the teacher's history is never touched.
+
+## Custom stamps
+
+Teachers ask: "make me a stamp for a great experiment" or "a dice my class
+can roll". `create_stamp` makes it; it joins the teacher's **My stamps**
+(kept on their device) and the lesson (so a shared lesson shows it), and
+`add_stamp` places it. In Rupok's chat, **/stamp** or the palette's **Make a
+stamp with AI…** button starts this.
+
+- **Artwork**: `svg` (sanitised exactly like page design SVG: no scripts,
+  event handlers, external references or SMIL; drawn only as an image),
+  `emoji`, or `text` (a short pill label).
+- **Behaviour, no code**: `animation` (`pop`, `sparkle`, `bounce`, `spin`,
+  `fade-in`), `burst` (`stars`, `confetti`, `hearts`, `sparkles`) with
+  `burst_colors`, `counter` (a 1, 2, 3… badge per placement on the page),
+  `sound` (`chime`, `pop`, `ding`, `tada`, `clap`, `whoosh`; the teacher's
+  *Stamp sounds* switch wins), `fade_after` seconds (the stamp is removed,
+  as its own undo step).
+- **Smart stamps, with your own logic**: `art: "smart"` and `html`: a tiny
+  Smart Object, placed and sized like a stamp. It runs in the Smart Object
+  sandbox (opaque origin, no network, the `window.rupok` SDK), never
+  anywhere else. Good ones: a dice that rolls on tap, a 1-minute timer, a
+  "correct answer" stamp that plays a little animation and counts taps
+  (`rupok.state` keeps the count).
+
+```text
+create_stamp(name: "Super star", art: "svg", color: "#f5b301",
+  svg: '<svg viewBox="0 0 100 100"><path d="M50 6 61 38 95 38 67 58 78 92 50 72 22 92 33 58 5 38 39 38Z" fill="currentColor"/></svg>',
+  behavior: {animation: "sparkle", burst: "stars", counter: true, sound: "chime"})
+create_stamp(id: "dice", name: "Dice", art: "smart", width: 160, height: 160,
+  html: "<!doctype html><title>Dice</title><body style='margin:0;display:grid;place-items:center;height:100vh;font:120px system-ui'><b id=d>⚀</b><script>document.body.onclick=()=>{d.textContent='⚀⚁⚂⚃⚄⚅'[Math.floor(Math.random()*6)]}</script>")
+add_stamp(stamp: "dice", x: 1600, y: 80)
+```
+
+**Designing a stamp** (projector rules):
+
+- Bold and simple: one shape, a thick outline or solid fill, no fine
+  detail or text inside the drawing. It must read at 96 px from the back
+  row. Use `fill="currentColor"` so the teacher can recolour it.
+- Celebratory but brief: one animation, at most one burst and one short
+  sound. `fade_after` suits reactions ("Shh!", "Thinking…"), not rewards.
+- Labels: 1–3 words, under 24 characters ("Well done!", "Try again").
+- Smart stamps: the whole body is the button, 44 px targets or bigger,
+  large type, works offline, respects the theme (`--rupok-color-*`).
+
+`update_stamp(id, …)` changes only the fields given (placed stamps follow).
+`delete_stamp(id)` removes it from My stamps; a lesson that still shows the
+stamp keeps its definition unless `remove_placements: true`.
+
+## The Smart Dock
+
+Teachers say "put pen, highlighter and eraser on the left, undo and next
+page on the right, bigger buttons". The dock is customisable per mode
+(Prepare, Teach): its position, ordered **groups** of buttons (separated on
+the dock), an optional **split** second dock on another edge, a button
+`size` (`s`, `m`, `l`), per-button `sizes`, and `large` icons for low
+vision. Named layouts: *Left-handed*, *Minimal teaching*, *Maths class*,
+*Default*, and the teacher's own (`save_dock_preset`).
+
+```text
+list_dock_items()                          # ids: pen, highlighter, eraser, lasso, laser, text, shapes, stamp,
+                                           # undo, redo, pager, exit, celebrate, pages, solve, settings…
+set_dock_layout(mode: "teach", layout: {
+  position: "left", size: "l",
+  groups: [{label: "Ink", items: ["pen", "highlighter", "eraser"]}, {items: ["laser", "lasso"]}],
+  split: {position: "right", groups: [{items: ["undo"]}, {items: ["pager", "exit"]}]}})
+save_dock_preset(name: "Big board")
+```
+
+Pen, highlighter, eraser, laser and undo always stay on a dock (a layout
+that leaves one out gets it back in its first group). The result lists
+`warnings`, e.g. when no button leads back to Settings. In Rupok's chat,
+**/dock** and the dock's ⋯ → **Customize dock with AI…** start this; the
+teacher's own editor is ⋯ → **Customize dock…** (or hold the dock's grip).
 
 ## Designing pages
 
@@ -593,10 +711,24 @@ An operation is `{"op": "<name>", …fields}`; the names and fields are the
 `update_smart_object`, `add_media`, `add_model`, `delete_item`,
 `set_page_background`, `set_page_design`, `set_branding`,
 `replace_items_with_text`, `step_object`, `write_handwriting`, `add_shape`,
-`add_table`, `start_voice_text`, `stop_voice_text`; `add_shape` and
-`add_table` run in the board's engine, `crates/rupok-wasm`
-`engine/insert.rs`, the voice ops in the board app, which owns the
-microphone, `apps/board/src/voice/board.ts`). `add_media`
+`add_table`, `list_pages`, `move_pages`, `delete_pages`, `duplicate_pages`,
+`set_page_title`, `select_items`, `move_items`, `align_items`,
+`restyle_items`, `scale_items`, `group_items`, `ungroup_items`,
+`reorder_items`, `delete_items`, `draw_stroke`, `update_text`, `list_stamps`,
+`create_stamp`, `update_stamp`, `delete_stamp`, `add_stamp`, and the board
+ops `set_mode`, `zoom_to`, `fit_page`, `start_replay`, `stop_replay`,
+`celebrate`, `set_tool`, `undo`, `export_pdf`, `library_list`,
+`library_open`, `library_create_lesson`, `library_move`, `library_rename`,
+`library_trash`, `get_settings`, `set_setting`, `get_dock_layout`,
+`set_dock_layout`, `list_dock_items`, `save_dock_preset`,
+`apply_dock_preset`, `start_voice_text`, `stop_voice_text`). `add_shape` and
+`add_table` run in the board's engine (`crates/rupok-wasm`
+`engine/insert.rs`); the board ops run in `apps/board/src/agentControl.ts`;
+the voice ops in the board app, which owns the microphone
+(`apps/board/src/voice/board.ts`); the rest in `rupok_live::apply` (also on
+lesson files). The board adds `def` (`add_stamp`), `base` (`update_stamp`)
+and `in_library` (`delete_stamp`) from the teacher's device library before
+running the stamp ops. `export_pdf` answers `pdf_base64`. `add_media`
 carries a `url` (YouTube or a trusted embed) or a base64 `file_base64` (video
 or audio); `add_model` a base64 `.glb` as `file_base64`. The MCP tools
 `add_youtube`, `add_media` and `add_3d_model` read files from the workspace and
@@ -604,13 +736,16 @@ send these ops when called with `path: "live"`. Pages are 1-based and `page`
 omitted means the page on screen; coordinates are slide pixels in the
 1920 × 1080 frame.
 
-Each op has an access level: **read** (`get_*`, `snapshot`), **control**
-(`go_to_page`, `point_at`, `set_board_theme` with only `ui`) or **write**
-(everything else). With *Allow AI to edit live* off the board refuses control
+Each op has an access level: **read** (`get_*`, `snapshot`, `list_*`,
+`library_list`), **control** (`go_to_page`, `point_at`, `set_board_theme`
+with only `ui`, `select_items`, `set_mode`, `zoom_to`, `fit_page`,
+`start_replay`, `stop_replay`, `celebrate`, `set_tool`, `export_pdf`,
+`library_open`; leaving Student view with `set_mode` is refused) or
+**write** (everything else, including settings and dock changes). With *Allow AI to edit live* off the board refuses control
 and write ops; in Student view it refuses write ops. A write runs as **one**
 Loro commit with the message `rupok-agent/1 {"agent": …, "op": …}` and the
 board sends its `doc/update` *before* the `result`, so the server's mirror is
-current when the agent gets the answer. The server waits 30 s for a result.
+current when the agent gets the answer. The server waits 30 s for a result (180 s for `export_pdf`).
 
 `snapshot` answers `{png, width, height, page, region, note}`; `png` is a
 base64 PNG drawn by the board (Smart Objects as labelled cards).

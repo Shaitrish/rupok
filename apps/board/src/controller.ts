@@ -27,6 +27,8 @@ import { onPresentFullscreenLost, presentFullscreen, toggleFullscreen } from "./
 import { openShapesPicker, shapeToolName } from "./shapes";
 import { brushOf, opacityOf } from "./brushes";
 import { currentStamp, freshStamps, setQuickMenu, stampToPlace } from "./stamps";
+import { resolveStamp, syncLessonStamps } from "./stampLib";
+import { loadMyStamps, placeCustom } from "./customStamps";
 
 /** Long-press with the pen (held still this long) opens the stamps menu. */
 const QUICK_MENU_MS = 650;
@@ -83,6 +85,7 @@ export class Controller {
     this.world = world;
     await init({ module_or_path: wasmUrl });
     this.board = await Board.create(canvas, prefs().forceWebgl);
+    void loadMyStamps();
     // A pinch released below fit springs back; instantly with reduced motion.
     const still = matchMedia("(prefers-reduced-motion: reduce)");
     this.board.set_reduced_motion(still.matches);
@@ -147,6 +150,15 @@ export class Controller {
    * board): the Stamps tool's current stamp unless one is given. */
   placeStamp(x: number, y: number, id = currentStamp().id, emoji = currentStamp().emoji): string | undefined {
     if (isView()) return undefined;
+    if (resolveStamp(id)) {
+      // A custom stamp: placed with its definition (one undo step).
+      const placed = placeCustom(this, id, x, y);
+      if (placed) {
+        freshStamps.add(placed);
+        this.sync(true);
+      }
+      return placed;
+    }
     const s = stampToPlace(id, emoji);
     const placed = this.board.add_stamp(s.kind, s.text, x, y, s.w, s.h, s.color);
     if (placed) {
@@ -292,6 +304,7 @@ export class Controller {
       const pageList = JSON.parse(this.board.pages_json()) as PageInfo[];
       setPages(pageList);
       setLessonBranding(JSON.parse(this.board.branding_json()));
+      syncLessonStamps(this.board.stamp_defs_json());
       setPageIndex(this.board.page_index());
       // Teach paints the letterbox around the slide in the page colour.
       const bg = pageList[this.board.page_index()]?.bg_color ?? 0xffffffff;

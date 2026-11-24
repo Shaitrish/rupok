@@ -6,7 +6,8 @@
 //! - `..` components are rejected outright (even when they would stay inside);
 //! - absolute paths are accepted only when they point inside the workspace;
 //! - symlinks are resolved and the *target* must be inside the workspace;
-//! - only `.rpk` files may be written.
+//! - only `.rpk` files may be written, plus the `.pdf` an agent exports
+//!   from the live board (`export_pdf`).
 
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
@@ -23,6 +24,8 @@ pub enum PathError {
     SymlinkEscape(String),
     #[error("only .rpk lesson files may be written, got `{0}`")]
     NotLesson(String),
+    #[error("an exported PDF must be saved as a .pdf file, got `{0}`")]
+    NotPdf(String),
     #[error("`{0}` does not exist")]
     NotFound(String),
     #[error("`{0}` is not a regular file")]
@@ -144,9 +147,24 @@ impl Workspace {
     /// are allowed (they must themselves end up inside the workspace); the
     /// caller creates them.
     pub fn resolve_new_lesson(&self, user: &str) -> Result<PathBuf, PathError> {
+        self.resolve_new(user, is_lesson_path, PathError::NotLesson)
+    }
+
+    /// Resolve a `.pdf` path to write (an exported lesson), like
+    /// [`Workspace::resolve_new_lesson`].
+    pub fn resolve_new_pdf(&self, user: &str) -> Result<PathBuf, PathError> {
+        self.resolve_new(user, is_pdf_path, PathError::NotPdf)
+    }
+
+    fn resolve_new(
+        &self,
+        user: &str,
+        is_lesson_path: fn(&Path) -> bool,
+        bad: fn(String) -> PathError,
+    ) -> Result<PathBuf, PathError> {
         let joined = self.lexical(user)?;
         if !is_lesson_path(&joined) {
-            return Err(PathError::NotLesson(user.to_string()));
+            return Err(bad(user.to_string()));
         }
         // If something already exists at the path (file or dangling link),
         // resolve it fully so a symlink cannot redirect the write.
@@ -158,7 +176,7 @@ impl Workspace {
                 return Err(self.escape_error(user, &joined));
             }
             if !is_lesson_path(&canonical) {
-                return Err(PathError::NotLesson(user.to_string()));
+                return Err(bad(user.to_string()));
             }
             return Ok(canonical);
         }
@@ -166,7 +184,7 @@ impl Workspace {
         // components are plain names (no `..`, checked above).
         let file_name = joined
             .file_name()
-            .ok_or_else(|| PathError::NotLesson(user.to_string()))?
+            .ok_or_else(|| bad(user.to_string()))?
             .to_owned();
         let mut existing = joined
             .parent()
@@ -224,6 +242,12 @@ impl Workspace {
         }
         PathError::Outside(user.to_string())
     }
+}
+
+pub fn is_pdf_path(p: &Path) -> bool {
+    p.extension()
+        .and_then(OsStr::to_str)
+        .is_some_and(|e| e.eq_ignore_ascii_case("pdf"))
 }
 
 pub fn is_lesson_path(p: &Path) -> bool {

@@ -85,8 +85,12 @@ function same(a: Uint8Array | null, b: Uint8Array): boolean {
 /** How an op touches the board (mirrors `rupok_live::op::Access`). */
 function access(op: any): "read" | "control" | "write" {
   switch (op?.op) {
-    case "get_page": case "get_outline": case "get_selection": case "snapshot": return "read";
-    case "go_to_page": case "point_at": return "control";
+    case "get_page": case "get_outline": case "get_selection": case "snapshot":
+    case "list_pages": case "list_stamps": case "library_list": case "get_settings": case "get_dock_layout": case "list_dock_items":
+      return "read";
+    case "go_to_page": case "point_at": case "select_items": case "set_mode": case "zoom_to": case "fit_page":
+    case "start_replay": case "stop_replay": case "celebrate": case "set_tool": case "export_pdf": case "library_open":
+      return "control";
     case "set_board_theme": return op.page_color || op.pattern ? "write" : "control";
     default: return "write";
   }
@@ -102,6 +106,19 @@ const LABELS: Record<string, string> = {
   replace_items_with_text: "turned ink into text", step_object: "stepped a Smart Object",
   write_handwriting: "is writing on the board", add_media: "added media", add_model: "added a 3D model",
   start_voice_text: "turned on voice text", stop_voice_text: "finished voice text",
+  add_shape: "drew a shape", add_table: "drew a table",
+  list_pages: "is reading the pages", move_pages: "moved pages", delete_pages: "deleted pages", duplicate_pages: "duplicated pages",
+  set_page_title: "renamed a page", select_items: "selected items", move_items: "moved items", align_items: "aligned items",
+  restyle_items: "restyled items", scale_items: "resized items", group_items: "grouped items", ungroup_items: "ungrouped items",
+  reorder_items: "reordered items", delete_items: "deleted items", draw_stroke: "drew on the board", update_text: "edited text",
+  list_stamps: "is reading the stamps", create_stamp: "made a stamp", update_stamp: "changed a stamp", delete_stamp: "deleted a stamp",
+  add_stamp: "placed a stamp", set_mode: "changed the mode", zoom_to: "zoomed", fit_page: "fitted the page",
+  start_replay: "started a replay", stop_replay: "stopped the replay", celebrate: "celebrated", set_tool: "changed the tool",
+  undo: "undid its change", export_pdf: "exported a PDF", library_list: "is reading the Library", library_open: "opened a lesson",
+  library_create_lesson: "created a lesson", library_move: "moved a lesson", library_rename: "renamed a lesson",
+  library_trash: "moved a lesson to the trash", get_settings: "is reading the settings", set_setting: "changed a setting",
+  get_dock_layout: "is reading the dock", set_dock_layout: "changed the dock", list_dock_items: "is reading the dock",
+  save_dock_preset: "saved a dock layout", apply_dock_preset: "changed the dock",
 };
 export const opLabel = (op: any) => LABELS[op?.op] ?? "is working";
 
@@ -134,6 +151,8 @@ class LiveClient {
   private retry = 0;
   private wanted = false; // the teacher asked to be connected
   private editVV: Uint8Array | null = null;
+  /** Puts the agent's last settings or dock change back (AI chip Undo). */
+  private undoSettings: (() => void) | null = null;
   private activityId = 0;
   private probeByPort = new Map<number, WebSocket>();
   /** Codes to send as soon as that port's server welcomes us (`#rupok-agent=`, desktop). */
@@ -479,27 +498,48 @@ class LiveClient {
       if (kind === "write" && isView()) {
         throw new OpError("The board is in Student view (read-only); ask the teacher to switch to Prepare or Teach.");
       }
+      if (op.op === "set_mode" && isView()) {
+        throw new OpError("The board is in Student view; only the teacher can leave it.");
+      }
       let result: any;
+      let undoSettings: (() => void) | undefined;
+      // Loaded on the first agent op: the board app's half of the agent tools.
+      const { AgentOpError, BOARD_OPS, finishStampOp, isStampOp, prepareStampOp, runBoardOp } = await import("./agentControl");
       if (op.op === "snapshot") result = await renderSnapshot(this.c, op, agent);
       else if (op.op === "point_at") result = this.pointAt(op);
       else if (op.op === "write_handwriting") result = (await import("./solve")).onWriteOp(op, agent); // preview or write (solve/)
       else if (op.op === "start_voice_text" || op.op === "stop_voice_text") result = await (await import("./voice/board")).onVoiceOp(op); // the board's microphone
-      else {
+      else if (BOARD_OPS.has(op.op)) {
+        // Modes, view, export, Library, settings, dock (agentControl.ts).
+        try {
+          // Optional fields the server leaves out arrive as null.
+          const clean = Object.fromEntries(Object.entries(op).filter(([, v]) => v !== null));
+          const r = await runBoardOp(this.c, clean, agent, () => !!liveLastEdit() && same(this.editVV, this.c.board.live_version()));
+          result = r.result;
+          undoSettings = r.undo;
+        } catch (e: any) {
+          throw new OpError(e instanceof AgentOpError || e instanceof Error ? e.message : String(e));
+        }
+      } else {
         // `add_text` with a width: break the lines to fit it, measured with the board's font (voice/wrap.ts).
         if (op.op === "add_text" && typeof op.w === "number" && op.w > 0 && typeof op.text === "string") op = await wrapForBoard(op);
+        const stamp = isStampOp(op.op);
+        const sent = stamp ? await prepareStampOp(op) : op;
         try {
-          result = JSON.parse(this.c.board.live_apply(JSON.stringify(op), agent));
+          result = JSON.parse(this.c.board.live_apply(JSON.stringify(sent), agent));
         } catch (e) {
           let body: any;
           try { body = JSON.parse(String(e)); } catch { body = { error: String((e as any)?.message ?? e) }; }
           throw new OpError(body.error ?? "the board refused the operation", body);
         }
+        if (stamp) result = await finishStampOp(op, result);
         if (op.op === "set_board_theme") this.applyTheme(op);
       }
       this.c.sync(true);
       if (kind === "write") {
         this.pushUpdates(); // before the result, so the agent's mirror is current
         this.editVV = this.c.board.live_version();
+        this.undoSettings = undoSettings ?? null;
         setLiveLastEdit({ agent, label: opLabel(op), at: Date.now() });
       }
       if (kind !== "read") {
@@ -549,9 +589,13 @@ class LiveClient {
   undoLast() {
     if (!liveLastEdit() || !same(this.editVV, this.c.board.live_version())) {
       setLiveLastEdit(null);
+      this.undoSettings = null;
       return;
     }
-    this.c.board.undo();
+    // A settings or dock change is not in the lesson: put the prefs back.
+    if (this.undoSettings) this.undoSettings();
+    else this.c.board.undo();
+    this.undoSettings = null;
     setLiveLastEdit(null);
   }
 

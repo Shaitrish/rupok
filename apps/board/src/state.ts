@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { APP_SLUG } from "./brand";
-import { type Mode, type ModeConfig, type ModesConfig, resolveMode, sanitizeModes } from "./modes";
+import { type Mode, type ModeConfig, type ModesConfig, resolveMode, sanitizeDockPresets, sanitizeModes } from "./modes";
 
 export type Tool =
   | "pen" | "highlighter" | "eraser" | "lasso" | "hand" | "laser" | "interact" | "text"
@@ -163,6 +163,10 @@ export interface Prefs {
   stampFavorites: string[];
   /** Long-press with the pen opens the stamps quick menu. */
   stampQuickMenu: boolean;
+  /** Custom stamps may play their short sound (Settings → Pen & ink → Stamps). */
+  stampSounds: boolean;
+  /** The teacher's saved dock layouts (Customize dock → Save layout). */
+  dockPresets?: import("./modes").DockPreset[];
 }
 // WebGL2 is the default until WebGPU presentation is verified on real boards (see ROADMAP).
 const defaults: Prefs = {
@@ -172,7 +176,7 @@ const defaults: Prefs = {
   smartGraphs: true, smartFlowchart: true, smartGates: true, smartNumberLine: true,
   smartGeometry: true, smartTables: true, smartScience: false, smartMath: true,
   penBrush: "pen", hlBrush: "pen", shapeBrush: "pen", markerOpacity: 0.8,
-  stampFavorites: ["star", "tick", "cross", "thumbs-up", "hundred", "excellent"], stampQuickMenu: true,
+  stampFavorites: ["star", "tick", "cross", "thumbs-up", "hundred", "excellent"], stampQuickMenu: true, stampSounds: true,
 };
 
 /** Smart ink families that are on, as the engine's comma-separated list. */
@@ -203,6 +207,8 @@ function loadPrefs(): Prefs {
     if (!Array.isArray(saved.stampFavorites)) saved.stampFavorites = [...defaults.stampFavorites];
     saved.stampFavorites = saved.stampFavorites.filter((v: unknown) => typeof v === "string").slice(0, 8);
     saved.stampQuickMenu = saved.stampQuickMenu !== false;
+    saved.stampSounds = saved.stampSounds !== false;
+    saved.dockPresets = sanitizeDockPresets(saved.dockPresets);
     saved.modes = sanitizeModes(saved.modes);
     return saved;
   } catch {

@@ -14,7 +14,7 @@ pub mod doc;
 pub mod model;
 pub mod scene;
 
-pub use doc::{CoreError, Lesson, media_from_value};
+pub use doc::{CoreError, Lesson, MAX_STAMP_DEF_BYTES, media_from_value};
 pub use model::*;
 pub use scene::Scene;
 

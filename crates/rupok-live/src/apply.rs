@@ -53,6 +53,8 @@ pub struct Outcome {
     pub changed: bool,
     /// Show this page (0-based) afterwards.
     pub show_page: Option<usize>,
+    /// Select these items on the board afterwards (on the shown page).
+    pub select: Option<Vec<String>>,
 }
 
 impl Outcome {
@@ -61,6 +63,7 @@ impl Outcome {
             result,
             changed: false,
             show_page: None,
+            select: None,
         }
     }
     pub(crate) fn changed(result: Value) -> Self {
@@ -68,6 +71,7 @@ impl Outcome {
             result,
             changed: true,
             show_page: None,
+            select: None,
         }
     }
 }
@@ -124,7 +128,13 @@ pub fn apply_with(
     if ctx.read_only && op.access() == Access::Write {
         return Err(LiveError::ReadOnly);
     }
-    let msg = crate::commit_message(agent, op.name());
+    // An empty agent is the teacher using the same code path (e.g. placing
+    // a custom stamp from the board's palette): the change is not tagged.
+    let msg = if agent.is_empty() {
+        String::new()
+    } else {
+        crate::commit_message(agent, op.name())
+    };
     let out = if let Op::WriteHandwriting { .. } = op {
         crate::handwriting::run(&mut ctx, op, &msg, now_ms, glyphs)
     } else {
@@ -140,6 +150,9 @@ pub fn apply_with(
 /// Tag the next commit with the agent's message. Call right before the one
 /// mutation that commits.
 pub(crate) fn tag(lesson: &Lesson, msg: &str) {
+    if msg.is_empty() {
+        return;
+    }
     lesson.loro().set_next_commit_message(msg);
 }
 
@@ -207,6 +220,27 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
         // Voice text needs the board's microphone (apps/board/src/voice/board.ts).
         Op::StartVoiceText { .. } => Err(LiveError::Unsupported("start_voice_text")),
         Op::StopVoiceText { .. } => Err(LiveError::Unsupported("stop_voice_text")),
+        Op::ListPages
+        | Op::MovePages { .. }
+        | Op::DeletePages { .. }
+        | Op::DuplicatePages { .. }
+        | Op::SetPageTitle { .. }
+        | Op::SelectItems { .. }
+        | Op::MoveItems { .. }
+        | Op::AlignItems { .. }
+        | Op::RestyleItems { .. }
+        | Op::ScaleItems { .. }
+        | Op::GroupItems { .. }
+        | Op::UngroupItems { .. }
+        | Op::ReorderItems { .. }
+        | Op::DeleteItems { .. }
+        | Op::DrawStroke { .. }
+        | Op::UpdateText { .. } => crate::items::run(ctx, op, msg, now),
+        Op::ListStamps
+        | Op::CreateStamp(_)
+        | Op::UpdateStamp { .. }
+        | Op::DeleteStamp { .. }
+        | Op::AddStamp { .. } => crate::stamps::run(ctx, op, msg, now),
 
         Op::GoToPage { page } => {
             let (idx, info) = page_ref(ctx.lesson, ctx.page_id, Some(*page))?;
@@ -218,6 +252,7 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
                 }),
                 changed: false,
                 show_page: Some(idx),
+                select: None,
             })
         }
         Op::SetBoardTheme {
@@ -293,6 +328,7 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
                 }),
                 changed: true,
                 show_page: show.then_some(idx0),
+                select: None,
             })
         }
         Op::AddText {
@@ -801,6 +837,8 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
             ctx.lesson.set_object_step(&info.id, &item.id, target)?;
             Ok(Outcome::changed(out))
         }
+        // Board-app ops (UI state, library, settings): not on the document.
+        op => Err(LiveError::Unsupported(op.name())),
     }
 }
 
@@ -913,7 +951,7 @@ fn r1(v: f64) -> f64 {
     (v * 10.0).round() / 10.0
 }
 
-fn geometry_of(g: &BoxGeom) -> Geometry {
+pub(crate) fn geometry_of(g: &BoxGeom) -> Geometry {
     Geometry {
         x: r1(g.x),
         y: r1(g.y),
@@ -1101,7 +1139,7 @@ pub(crate) fn union_bounds<'a>(items: impl Iterator<Item = &'a Item>) -> Option<
 
 // ---------------------------------------------------------------- helpers
 
-fn warning(code: &'static str, message: String) -> Diagnostic {
+pub(crate) fn warning(code: &'static str, message: String) -> Diagnostic {
     Diagnostic {
         severity: Severity::Warning,
         code,
@@ -1109,11 +1147,11 @@ fn warning(code: &'static str, message: String) -> Diagnostic {
     }
 }
 
-fn has_errors(d: &[Diagnostic]) -> bool {
+pub(crate) fn has_errors(d: &[Diagnostic]) -> bool {
     d.iter().any(|d| d.severity == Severity::Error)
 }
 
-fn check_text(text: &str) -> Result<()> {
+pub(crate) fn check_text(text: &str) -> Result<()> {
     if text.trim().is_empty() {
         return Err(LiveError::Invalid("text must not be empty".into()));
     }
@@ -1197,7 +1235,7 @@ pub fn is_dark(rgba: u32) -> bool {
     0.2126 * ch(24) + 0.7152 * ch(16) + 0.0722 * ch(8) < 0.25
 }
 
-fn scheme(rgba: u32) -> &'static str {
+pub(crate) fn scheme(rgba: u32) -> &'static str {
     if is_dark(rgba) { "dark" } else { "light" }
 }
 
@@ -1230,7 +1268,7 @@ fn text_box(text: &str, size: f64, w: Option<f64>, x: f64, frame: Frame) -> (f64
     (w, rows * size * 1.3)
 }
 
-fn placement_warning(g: &BoxGeom, frame: Option<Frame>) -> Option<Diagnostic> {
+pub(crate) fn placement_warning(g: &BoxGeom, frame: Option<Frame>) -> Option<Diagnostic> {
     let f = frame?;
     let tol = 0.5;
     let outside = g.x < -tol || g.y < -tol || g.x + g.w > f.w + tol || g.y + g.h > f.h + tol;
@@ -1297,7 +1335,7 @@ fn updated_bundle(
     b
 }
 
-fn slug(title: &str) -> String {
+pub(crate) fn slug(title: &str) -> String {
     let mut s = String::new();
     for c in title.chars() {
         if s.len() >= 32 {
@@ -1317,7 +1355,7 @@ fn slug(title: &str) -> String {
     }
 }
 
-fn fnv1a(bytes: &[u8], seed: u64) -> u64 {
+pub(crate) fn fnv1a(bytes: &[u8], seed: u64) -> u64 {
     let mut h = 0xcbf2_9ce4_8422_2325u64 ^ seed;
     for b in bytes {
         h ^= u64::from(*b);

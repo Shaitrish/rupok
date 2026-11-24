@@ -30,12 +30,20 @@ pub mod apply;
 pub mod attribution;
 pub mod design;
 pub mod handwriting;
+pub mod items;
 pub mod op;
 pub mod protocol;
+pub mod stamps;
+
+#[cfg(test)]
+mod agent_ops_tests;
 
 pub use apply::{BoardCtx, LiveError, Outcome, apply, apply_with, doc_key};
 pub use attribution::{agent_items, parse_commit_message};
-pub use op::{Anchor, BrandingArgs, Op, PageDesignArgs, PatternName, Rect};
+pub use op::{
+    Access, Anchor, BrandingArgs, Op, PageDesignArgs, PatternName, Rect, StampBehavior, StampDef,
+    StrokeArg,
+};
 
 /// Prefix of the Loro commit message of every change an agent makes:
 /// `rupok-agent/1 {"agent":"Claude Code","op":"add_text"}`.

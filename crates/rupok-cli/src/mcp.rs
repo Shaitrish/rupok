@@ -55,6 +55,13 @@ you teach on the board.\n\
 - Page design (`set_page_design`, `set_branding`): when asked for a background, a theme or a school logo. \
 Draw it as SVG; keep the content area calm, ink readable (light ink on dark pages) and the logo small in a \
 corner; read the current design first by calling the tool with only `path`.\n\
+- Agent-first: you can do anything the teacher can. Pages (`list_pages`, `move_pages`, `duplicate_pages`, \
+`delete_pages`), items (`select_items`, `move_items`, `align_items`, `restyle_items`, `scale_items`, `group_items`, \
+`delete_items`, `draw_stroke`, `update_text`), stamps (`add_stamp`, `create_stamp` incl. Smart stamps with sandboxed \
+logic), modes and view (`set_mode`, `zoom_to`, `start_replay`, `celebrate`), `export_pdf`, the Library \
+(`library_*`), settings (`get_settings`/`set_setting`, an allowlist) and the Smart Dock (`set_dock_layout`). \
+Document tools take an optional `path` (omit for the board). Settings and mode changes ask the teacher's permission \
+like edits; AI keys, accounts, payments and permissions are never yours to change.\n\
 - To solve a problem written on the board, read it (`get_page_snapshot` with its item_ids), check every \
 step, then `write_handwriting` the solution as short lines; the board writes it in handwriting next to \
 the problem. If the result says `preview`, the teacher is checking it first: do not write it again.",
@@ -64,7 +71,7 @@ the problem. If the result says `preview`, the teacher is checking it first: do 
 
 #[derive(Clone)]
 pub struct McpServer {
-    tools: Arc<Tools>,
+    pub(crate) tools: Arc<Tools>,
     /// The live board channel (see `crate::mcp_live`); disabled without `--live`.
     pub(crate) live: Arc<LiveHub>,
     tool_router: ToolRouter<Self>,
@@ -83,12 +90,12 @@ impl McpServer {
         Self {
             tools: Arc::new(tools),
             live,
-            tool_router: Self::tool_router() + Self::live_tool_router(),
+            tool_router: Self::tool_router() + Self::live_tool_router() + Self::agent_tool_router(),
         }
     }
 
     /// Run a tool body on the blocking pool (it does file IO) and map the result.
-    async fn run<T, F>(&self, f: F) -> CallToolResult
+    pub(crate) async fn run<T, F>(&self, f: F) -> CallToolResult
     where
         T: Serialize + Send + 'static,
         F: FnOnce(&Tools) -> Result<T, OpError> + Send + 'static,

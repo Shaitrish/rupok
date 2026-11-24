@@ -207,6 +207,8 @@ export const RUPOK_COMMANDS: SlashCommand[] = [
   { name: "explain", description: "Explain this page simply, for the class", hint: "optional: for which class", source: "rupok" },
   { name: "translate", description: "Translate this page onto a new page", hint: "language, e.g. bn", source: "rupok" },
   { name: "design", description: "Design the page background, theme and branding", hint: "what you want, e.g. chalkboard, physics, our logo", source: "rupok" },
+  { name: "stamp", description: "Make a custom stamp, with its look and behaviour (or logic)", hint: "what it should look like and do", source: "rupok" },
+  { name: "dock", description: "Arrange the Smart Dock for you", hint: "e.g. pen and eraser on the left, undo on the right, bigger", source: "rupok" },
   { name: "clear", description: "Clear the chat view (the agent keeps its memory)", source: "rupok" },
   { name: "new", description: "Start a new chat", source: "rupok" },
 ];
@@ -225,6 +227,8 @@ export function runRupokCommand(name: string, args: string): CommandAction {
       return { prompt: `Translate this page into ${lang} on a new page right after it, keeping the same layout (same positions and sizes). Keep numbers and formulas as they are.`, attachPage: true };
     }
     case "design": return { prompt: designPrompt(a), attachPage: true };
+    case "stamp": return { prompt: stampPrompt(a), attachPage: false };
+    case "dock": return { prompt: dockPrompt(a), attachPage: false };
     case "clear": return { local: "clear" };
     case "new": return { local: "new" };
     default: return { error: `Unknown command /${name}` };
@@ -246,6 +250,26 @@ export function designPrompt(wish: string): string {
     "Use the set_page_design tool (colour, pattern, a background drawn as SVG for the 1920×1080 page) and set_branding (a small logo in a corner, a header or footer line). Ask before changing every page if I did not say so.",
     "Rules: keep the middle of the page calm and low-contrast so handwriting stays readable; on a dark page the ink is light, on a light page dark; decoration goes to the edges; no text in the background image; keep any logo small (logo_width about 0.1) in a corner. Header and footer text may use {lesson}, {page}, {pages}, {date}, {teacher}, {school}, {subject}, {course} and {chapter}.",
     `The current design: ${JSON.stringify(current)}.`,
+  ].join("\n");
+}
+
+/** `/stamp`: a custom stamp for the teacher's "My stamps", with the house rules. */
+export function stampPrompt(wish: string): string {
+  return [
+    `Make me a custom classroom stamp: ${wish || "a cheerful one for a great answer"}.`,
+    "Use create_stamp (call list_stamps first to see what exists). Artwork: simple, bold SVG (viewBox about 100×100, fill=\"currentColor\" for the main colour, no text in it), or an emoji, or a short label (text art).",
+    "Behaviour without code: animation (pop, sparkle, bounce, spin, fade-in), a burst (stars, confetti, hearts, sparkles), counter, sound (chime, pop, ding, tada, clap, whoosh), fade_after seconds. Keep it celebratory but brief: one animation, at most one burst and one short sound.",
+    "If it needs logic (a dice that rolls on tap, a timer, a tap counter), use art \"smart\" with html: a tiny Smart Object (read_object_spec), the whole body tappable, large and readable on a projector, offline, no network.",
+    "Then place one with add_stamp on the current page so I can see it, and tell me its name in one line.",
+  ].join("\n");
+}
+
+/** `/dock`: arrange the Smart Dock as the teacher asks. */
+export function dockPrompt(wish: string): string {
+  return [
+    `Arrange my Smart Dock: ${wish || "make it comfortable for teaching on a big board"}.`,
+    "Call list_dock_items and get_dock_layout first, then set_dock_layout (groups of button ids in order, position left/right/top/bottom, an optional split second dock, size s/m/l, large icons) for the mode I mean (teach or prepare; both if I did not say).",
+    "Pen, highlighter, eraser, laser and undo always stay on a dock. Mention any warnings it returns. Offer to save it with save_dock_preset if I like it. Reply in one or two lines.",
   ].join("\n");
 }
 

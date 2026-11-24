@@ -142,6 +142,92 @@ pub struct BrandingArgs {
     pub remove: bool,
 }
 
+/// One stroke for [`Op::DrawStroke`]: points in slide pixels, each
+/// `[x, y]` or `[x, y, pressure]` (pressure 0..1, default 0.5).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct StrokeArg {
+    pub points: Vec<Vec<f64>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brush: Option<String>,
+}
+
+/// Declarative behaviour of a custom stamp (no code): what happens when it
+/// is placed. Unknown values are refused with a clear error.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct StampBehavior {
+    /// `none`, `pop` (default), `sparkle`, `bounce`, `spin` or `fade-in`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub animation: Option<String>,
+    /// A short burst around the stamp: `none`, `stars`, `confetti`,
+    /// `hearts` or `sparkles`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub burst: Option<String>,
+    /// Burst colours `#rrggbb` (at most 6). Default: the stamp's colour.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub burst_colors: Vec<String>,
+    /// Show a number badge counting this stamp's placements on the page.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub counter: bool,
+    /// A short built-in sound (respects the board's mute): `none`, `chime`,
+    /// `pop`, `ding`, `tada`, `clap` or `whoosh`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sound: Option<String>,
+    /// Fade the stamp away this many seconds after it is placed (1–600).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fade_after: Option<f64>,
+}
+
+/// A custom stamp definition, as given to `create_stamp` / `update_stamp`
+/// (every field optional for an update) and as stored (spec: Custom
+/// stamps). See [`crate::stamps`].
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct StampDef {
+    /// `a-z`, `0-9`, `-`, at most 32 bytes; generated from the name when
+    /// omitted. Built-in stamp ids are reserved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keywords: Vec<String>,
+    /// `svg`, `emoji`, `text` or `smart` (a tiny Smart Object).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub art: Option<String>,
+    /// SVG markup (sanitised: no scripts, handlers, external references or
+    /// animation). `currentColor` takes the stamp's colour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub svg: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub emoji: Option<String>,
+    /// A short label drawn as a pill (`text` art).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    /// `#rrggbb`: the pill colour, or the tint of `currentColor` in SVG.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// Default height in slide pixels (24–600).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<f64>,
+    #[serde(default, alias = "behaviour", skip_serializing_if = "Option::is_none")]
+    pub behavior: Option<StampBehavior>,
+    /// `smart` art: the Smart Object HTML (sandboxed, offline, no network).
+    /// Not stored in the definition: it becomes a bundle in the lesson.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub html: Option<String>,
+    /// `smart` art: the bundle in the lesson (set by Rupok).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle: Option<String>,
+    /// `smart` art: width and height of a placement (40–800, default 200).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<f64>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Op {
@@ -440,6 +526,316 @@ pub enum Op {
         #[serde(default)]
         delta: Option<i32>,
     },
+
+    // ------------------------------------------------------------ pages
+    /// Every page: number, id, title, look and item count (lighter than
+    /// `get_outline`).
+    ListPages,
+    /// Move pages (1-based) together so the first ends at position `to`
+    /// (1-based, in the order after the move), keeping their order.
+    MovePages {
+        pages: Vec<u32>,
+        to: u32,
+    },
+    /// Delete pages; a lesson keeps at least one page.
+    DeletePages {
+        pages: Vec<u32>,
+    },
+    /// Copy pages, each right after its original.
+    DuplicatePages {
+        pages: Vec<u32>,
+    },
+    SetPageTitle {
+        #[serde(default)]
+        page: Option<u32>,
+        title: String,
+    },
+
+    // ------------------------------------------------------------ items
+    /// Select items on the board (board only; the teacher sees the handles).
+    SelectItems {
+        #[serde(default)]
+        page: Option<u32>,
+        item_ids: Vec<String>,
+    },
+    /// Move items by (`dx`, `dy`), or so their bounds' top-left lands at
+    /// (`x`, `y`).
+    MoveItems {
+        #[serde(default)]
+        page: Option<u32>,
+        item_ids: Vec<String>,
+        #[serde(default)]
+        dx: Option<f64>,
+        #[serde(default)]
+        dy: Option<f64>,
+        #[serde(default)]
+        x: Option<f64>,
+        #[serde(default)]
+        y: Option<f64>,
+    },
+    /// Align (`left`, `center`, `right`, `top`, `middle`, `bottom`) and/or
+    /// distribute (`horizontal`, `vertical`) items; groups move as one.
+    AlignItems {
+        #[serde(default)]
+        page: Option<u32>,
+        item_ids: Vec<String>,
+        #[serde(default)]
+        align: Option<String>,
+        #[serde(default)]
+        distribute: Option<String>,
+        /// `items` (default: their common bounds) or `page` (the slide frame).
+        #[serde(default)]
+        relative_to: Option<String>,
+    },
+    /// Restyle ink, shapes, text and stamps.
+    RestyleItems {
+        #[serde(default)]
+        page: Option<u32>,
+        item_ids: Vec<String>,
+        #[serde(default)]
+        color: Option<String>,
+        #[serde(default)]
+        width: Option<f64>,
+        #[serde(default)]
+        brush: Option<String>,
+        /// Shape fill `#rrggbb[aa]`, or `none` to remove it.
+        #[serde(default)]
+        fill: Option<String>,
+        #[serde(default)]
+        opacity: Option<f64>,
+        #[serde(default)]
+        dashed: Option<bool>,
+        /// Font size of text items.
+        #[serde(default)]
+        text_size: Option<f64>,
+    },
+    /// Scale items by `factor` about the centre of their bounds.
+    ScaleItems {
+        #[serde(default)]
+        page: Option<u32>,
+        item_ids: Vec<String>,
+        factor: f64,
+    },
+    GroupItems {
+        #[serde(default)]
+        page: Option<u32>,
+        item_ids: Vec<String>,
+    },
+    UngroupItems {
+        #[serde(default)]
+        page: Option<u32>,
+        item_ids: Vec<String>,
+    },
+    /// Bring items to the `front` (default) or send them to the `back`.
+    ReorderItems {
+        #[serde(default)]
+        page: Option<u32>,
+        item_ids: Vec<String>,
+        #[serde(default)]
+        to: Option<String>,
+    },
+    DeleteItems {
+        #[serde(default)]
+        page: Option<u32>,
+        item_ids: Vec<String>,
+    },
+    /// Draw ink strokes from points (one stroke via `points`, or several
+    /// via `strokes`), as one undo step.
+    DrawStroke {
+        #[serde(default)]
+        page: Option<u32>,
+        #[serde(default)]
+        points: Option<Vec<Vec<f64>>>,
+        #[serde(default)]
+        strokes: Option<Vec<StrokeArg>>,
+        #[serde(default)]
+        color: Option<String>,
+        #[serde(default)]
+        width: Option<f64>,
+        #[serde(default)]
+        brush: Option<String>,
+        #[serde(default)]
+        opacity: Option<f64>,
+        /// `pen` (default) or `highlighter`.
+        #[serde(default)]
+        tool: Option<String>,
+    },
+    /// Change a text box: its text, size, colour or position.
+    UpdateText {
+        #[serde(default)]
+        page: Option<u32>,
+        item_id: String,
+        #[serde(default)]
+        text: Option<String>,
+        #[serde(default)]
+        size: Option<f64>,
+        #[serde(default)]
+        color: Option<String>,
+        #[serde(default)]
+        x: Option<f64>,
+        #[serde(default)]
+        y: Option<f64>,
+        #[serde(default)]
+        w: Option<f64>,
+    },
+
+    // ----------------------------------------------------------- stamps
+    /// Built-in stamps and the lesson's custom stamps (the board adds the
+    /// teacher's device library).
+    ListStamps,
+    CreateStamp(Box<StampDef>),
+    /// Change a custom stamp; only the given fields change. `base` is the
+    /// definition from the board's device library when the lesson does not
+    /// have it yet (set by the board, not by agents).
+    UpdateStamp {
+        #[serde(flatten)]
+        def: Box<StampDef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        base: Option<Box<StampDef>>,
+    },
+    /// Delete a custom stamp. Placements keep it in the lesson unless
+    /// `remove_placements`. `in_library` is set by the board.
+    DeleteStamp {
+        id: String,
+        #[serde(default)]
+        remove_placements: bool,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        in_library: bool,
+    },
+    /// Place a stamp (built-in or custom) at (`x`, `y`), `size` high.
+    /// `def` is a custom stamp from the board's device library (set by the
+    /// board, not by agents).
+    AddStamp {
+        #[serde(default)]
+        page: Option<u32>,
+        stamp: String,
+        #[serde(default)]
+        x: Option<f64>,
+        #[serde(default)]
+        y: Option<f64>,
+        #[serde(default)]
+        size: Option<f64>,
+        #[serde(default)]
+        color: Option<String>,
+        /// The emoji of the `emoji` stamp, a badge number, a label's words.
+        #[serde(default)]
+        text: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        def: Option<Box<StampDef>>,
+    },
+
+    // ------------------------------------------- board app (live only)
+    /// Switch mode: `prepare`, `teach` or `student`.
+    SetMode {
+        mode: String,
+    },
+    /// Zoom the view (`zoom`: 1 = 100 %) around (`x`, `y`) in slide pixels.
+    ZoomTo {
+        #[serde(default)]
+        zoom: Option<f64>,
+        #[serde(default)]
+        x: Option<f64>,
+        #[serde(default)]
+        y: Option<f64>,
+    },
+    /// Fit the page to the screen.
+    FitPage,
+    StartReplay {
+        #[serde(default)]
+        page: Option<u32>,
+        /// 0.5–8, default 2.
+        #[serde(default)]
+        speed: Option<f64>,
+    },
+    StopReplay,
+    /// A short burst of stars and confetti across the board (not saved).
+    Celebrate {
+        #[serde(default)]
+        kind: Option<String>,
+    },
+    /// The teacher's current tool and its colour, width and pen style.
+    SetTool {
+        tool: String,
+        #[serde(default)]
+        color: Option<String>,
+        #[serde(default)]
+        width: Option<f64>,
+        #[serde(default)]
+        brush: Option<String>,
+    },
+    /// Undo the agent's own last change, if it is still the newest.
+    Undo,
+    /// Make a PDF of the lesson on the board; it answers the bytes
+    /// (`pdf_base64`) and, with `download`, also saves it on the board.
+    ExportPdf {
+        /// `all` (default), `current`, or a range like `2-5`.
+        #[serde(default)]
+        pages: Option<String>,
+        /// `slides` (default), `handout-2` or `handout-3`.
+        #[serde(default)]
+        layout: Option<String>,
+        #[serde(default)]
+        ink: Option<bool>,
+        #[serde(default)]
+        print_friendly: Option<bool>,
+        #[serde(default)]
+        download: bool,
+    },
+    LibraryList {
+        #[serde(default)]
+        folder: Option<String>,
+        #[serde(default)]
+        query: Option<String>,
+    },
+    LibraryOpen {
+        id: String,
+    },
+    LibraryCreateLesson {
+        title: String,
+        #[serde(default)]
+        folder: Option<String>,
+        /// `blank`, `slides`, `lined` or `grid`.
+        #[serde(default)]
+        template: Option<String>,
+        #[serde(default)]
+        open: bool,
+    },
+    LibraryMove {
+        id: String,
+        folder: Option<String>,
+    },
+    LibraryRename {
+        id: String,
+        name: String,
+    },
+    LibraryTrash {
+        id: String,
+    },
+    GetSettings,
+    SetSetting {
+        key: String,
+        value: serde_json::Value,
+    },
+    GetDockLayout {
+        #[serde(default)]
+        mode: Option<String>,
+    },
+    SetDockLayout {
+        #[serde(default)]
+        mode: Option<String>,
+        layout: serde_json::Value,
+    },
+    ListDockItems,
+    SaveDockPreset {
+        name: String,
+        #[serde(default)]
+        modes: Option<Vec<String>>,
+    },
+    ApplyDockPreset {
+        name: String,
+    },
+
+    // ------------------------------------------------- voice (live only)
     /// Start "Voice text" on the board: the teacher's speech appears as text
     /// in a box at `x, y` (slide pixels; default the last place or the middle
     /// of the page), `w` wide, wrapped inside the page. `mode` is `text`
@@ -509,15 +905,76 @@ impl Op {
             Op::AddTable { .. } => "add_table",
             Op::StartVoiceText { .. } => "start_voice_text",
             Op::StopVoiceText { .. } => "stop_voice_text",
+            Op::ListPages => "list_pages",
+            Op::MovePages { .. } => "move_pages",
+            Op::DeletePages { .. } => "delete_pages",
+            Op::DuplicatePages { .. } => "duplicate_pages",
+            Op::SetPageTitle { .. } => "set_page_title",
+            Op::SelectItems { .. } => "select_items",
+            Op::MoveItems { .. } => "move_items",
+            Op::AlignItems { .. } => "align_items",
+            Op::RestyleItems { .. } => "restyle_items",
+            Op::ScaleItems { .. } => "scale_items",
+            Op::GroupItems { .. } => "group_items",
+            Op::UngroupItems { .. } => "ungroup_items",
+            Op::ReorderItems { .. } => "reorder_items",
+            Op::DeleteItems { .. } => "delete_items",
+            Op::DrawStroke { .. } => "draw_stroke",
+            Op::UpdateText { .. } => "update_text",
+            Op::ListStamps => "list_stamps",
+            Op::CreateStamp(_) => "create_stamp",
+            Op::UpdateStamp { .. } => "update_stamp",
+            Op::DeleteStamp { .. } => "delete_stamp",
+            Op::AddStamp { .. } => "add_stamp",
+            Op::SetMode { .. } => "set_mode",
+            Op::ZoomTo { .. } => "zoom_to",
+            Op::FitPage => "fit_page",
+            Op::StartReplay { .. } => "start_replay",
+            Op::StopReplay => "stop_replay",
+            Op::Celebrate { .. } => "celebrate",
+            Op::SetTool { .. } => "set_tool",
+            Op::Undo => "undo",
+            Op::ExportPdf { .. } => "export_pdf",
+            Op::LibraryList { .. } => "library_list",
+            Op::LibraryOpen { .. } => "library_open",
+            Op::LibraryCreateLesson { .. } => "library_create_lesson",
+            Op::LibraryMove { .. } => "library_move",
+            Op::LibraryRename { .. } => "library_rename",
+            Op::LibraryTrash { .. } => "library_trash",
+            Op::GetSettings => "get_settings",
+            Op::SetSetting { .. } => "set_setting",
+            Op::GetDockLayout { .. } => "get_dock_layout",
+            Op::SetDockLayout { .. } => "set_dock_layout",
+            Op::ListDockItems => "list_dock_items",
+            Op::SaveDockPreset { .. } => "save_dock_preset",
+            Op::ApplyDockPreset { .. } => "apply_dock_preset",
         }
     }
 
     pub fn access(&self) -> Access {
         match self {
-            Op::GetPage { .. } | Op::GetOutline | Op::GetSelection | Op::Snapshot { .. } => {
-                Access::Read
-            }
-            Op::GoToPage { .. } | Op::PointAt { .. } => Access::Control,
+            Op::GetPage { .. }
+            | Op::GetOutline
+            | Op::GetSelection
+            | Op::Snapshot { .. }
+            | Op::ListPages
+            | Op::ListStamps
+            | Op::LibraryList { .. }
+            | Op::GetSettings
+            | Op::GetDockLayout { .. }
+            | Op::ListDockItems => Access::Read,
+            Op::GoToPage { .. }
+            | Op::PointAt { .. }
+            | Op::SelectItems { .. }
+            | Op::SetMode { .. }
+            | Op::ZoomTo { .. }
+            | Op::FitPage
+            | Op::StartReplay { .. }
+            | Op::StopReplay
+            | Op::Celebrate { .. }
+            | Op::SetTool { .. }
+            | Op::ExportPdf { .. }
+            | Op::LibraryOpen { .. } => Access::Control,
             Op::SetBoardTheme {
                 page_color,
                 pattern,
@@ -531,6 +988,40 @@ impl Op {
             }
             _ => Access::Write,
         }
+    }
+
+    /// Ops the board app runs itself (UI state, the library, settings):
+    /// [`crate::apply`] refuses them and lesson files cannot run them.
+    pub fn board_only(&self) -> bool {
+        matches!(
+            self,
+            Op::Snapshot { .. }
+                | Op::PointAt { .. }
+                | Op::SetMode { .. }
+                | Op::ZoomTo { .. }
+                | Op::FitPage
+                | Op::StartReplay { .. }
+                | Op::StopReplay
+                | Op::Celebrate { .. }
+                | Op::SetTool { .. }
+                | Op::Undo
+                | Op::ExportPdf { .. }
+                | Op::LibraryList { .. }
+                | Op::LibraryOpen { .. }
+                | Op::LibraryCreateLesson { .. }
+                | Op::LibraryMove { .. }
+                | Op::LibraryRename { .. }
+                | Op::LibraryTrash { .. }
+                | Op::GetSettings
+                | Op::SetSetting { .. }
+                | Op::GetDockLayout { .. }
+                | Op::SetDockLayout { .. }
+                | Op::ListDockItems
+                | Op::SaveDockPreset { .. }
+                | Op::ApplyDockPreset { .. }
+                | Op::StartVoiceText { .. }
+                | Op::StopVoiceText { .. }
+        )
     }
 
     /// A short label for the board's activity feed, e.g. `added text`.
@@ -558,6 +1049,49 @@ impl Op {
             Op::AddTable { .. } => "drew a table",
             Op::StartVoiceText { .. } => "started voice text",
             Op::StopVoiceText { .. } => "stopped voice text",
+            Op::ListPages => "read the lesson",
+            Op::MovePages { .. } => "moved pages",
+            Op::DeletePages { .. } => "deleted pages",
+            Op::DuplicatePages { .. } => "duplicated pages",
+            Op::SetPageTitle { .. } => "renamed a page",
+            Op::SelectItems { .. } => "selected items",
+            Op::MoveItems { .. } => "moved items",
+            Op::AlignItems { .. } => "aligned items",
+            Op::RestyleItems { .. } => "restyled items",
+            Op::ScaleItems { .. } => "resized items",
+            Op::GroupItems { .. } => "grouped items",
+            Op::UngroupItems { .. } => "ungrouped items",
+            Op::ReorderItems { .. } => "reordered items",
+            Op::DeleteItems { .. } => "deleted items",
+            Op::DrawStroke { .. } => "drew on the board",
+            Op::UpdateText { .. } => "edited text",
+            Op::ListStamps => "read the stamps",
+            Op::CreateStamp(_) => "made a stamp",
+            Op::UpdateStamp { .. } => "changed a stamp",
+            Op::DeleteStamp { .. } => "deleted a stamp",
+            Op::AddStamp { .. } => "placed a stamp",
+            Op::SetMode { .. } => "changed the mode",
+            Op::ZoomTo { .. } => "zoomed",
+            Op::FitPage => "fitted the page",
+            Op::StartReplay { .. } => "started a replay",
+            Op::StopReplay => "stopped the replay",
+            Op::Celebrate { .. } => "celebrated",
+            Op::SetTool { .. } => "changed the tool",
+            Op::Undo => "undid its change",
+            Op::ExportPdf { .. } => "exported a PDF",
+            Op::LibraryList { .. } => "read the library",
+            Op::LibraryOpen { .. } => "opened a lesson",
+            Op::LibraryCreateLesson { .. } => "created a lesson",
+            Op::LibraryMove { .. } => "moved a lesson",
+            Op::LibraryRename { .. } => "renamed a lesson",
+            Op::LibraryTrash { .. } => "moved a lesson to the trash",
+            Op::GetSettings => "read the settings",
+            Op::SetSetting { .. } => "changed a setting",
+            Op::GetDockLayout { .. } => "read the dock",
+            Op::SetDockLayout { .. } => "changed the dock",
+            Op::ListDockItems => "read the dock",
+            Op::SaveDockPreset { .. } => "saved a dock layout",
+            Op::ApplyDockPreset { .. } => "changed the dock",
         }
     }
 }

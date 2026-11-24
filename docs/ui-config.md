@@ -86,6 +86,23 @@ text size while editing text. Everything else in `tools` waits in the ⋯ menu.
 - `orientation`: `"auto"` (vertical on the left and right edges), or
   `"horizontal"` / `"vertical"` to force one.
 - `minimized`: start as the small round bubble (tap it to open the dock).
+- `groups` (optional): the teacher's own order and grouping of the dock's
+  buttons, `[{ "id": "ink", "label": "Ink", "items": ["pen", "highlighter",
+  "eraser"] }, …]`. Groups are separated on the dock. Items are tool ids
+  (below), `"shapes"` (the Shapes button), and the action buttons
+  `"celebrate"`, `"pages"`, `"solve"` and `"settings"`; an item also joins
+  `tools`. With `groups`, `pinned` is ignored on import (and written as the
+  flat list). Core tools left out go back into the first group.
+- `split` (optional): a second dock, `{ "position": "right", "orientation":
+  "auto", "groups": [ … ] }`, e.g. undo and the pager on the other edge of a
+  big board. A button sits on one dock only.
+- `size` (`"s"`, `"m"`, `"l"`), `sizes` (per button, `{ "pen": "l" }`) and
+  `large` (large icons, for low vision) (all optional).
+
+The editor for all of this is **Customize dock** (the dock's ⋯ menu, a long
+press on its grip, or Settings → Teaching modes). Named layouts the teacher
+saves there go in the file's top-level `dockPresets`:
+`[{ "name": "Big board", "modes": { "teach": { …dock… } }, "hand": "left" }]`.
 
 Teachers drag the dock by its grip; it snaps to the edges and corners and
 remembers where it was left per mode and per screen size (in the browser,

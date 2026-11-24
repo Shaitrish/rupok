@@ -324,6 +324,36 @@ async fn chat_builds_a_class_on_the_board() {
             .any(|f| f["update"]["sessionUpdate"] == "plan")
     );
 
+    // /stamp: custom stamps (SVG with behaviour, a Smart dice), placed, ink
+    // drawn and restyled, pages copied and reordered, all through MCP.
+    b.chat.clear();
+    b.ops.clear();
+    send(
+        &mut b.ws,
+        json!({"ch": "chat", "t": "prompt", "text": "/stamp a gold star that sparkles and a dice"}),
+    )
+    .await;
+    let done = b.until_chat(|f| f["t"] == "done").await;
+    assert_eq!(done["stop_reason"], "end_turn", "{done} {}", b.text());
+    assert_eq!(
+        b.ops,
+        [
+            "create_stamp",
+            "create_stamp",
+            "add_stamp",
+            "add_stamp",
+            "draw_stroke",
+            "restyle_items",
+            "list_stamps",
+            "duplicate_pages",
+            "move_pages"
+        ]
+    );
+    assert_eq!(b.lesson.stamp_defs().len(), 2);
+    assert!(b.lesson.stamp_def("dice").is_some());
+    assert_eq!(b.lesson.page_count(), 3);
+    assert!(b.text().contains("Dice"), "{}", b.text());
+
     // Board context reaches the agent as a resource block.
     b.chat.clear();
     send(&mut b.ws, json!({"ch": "chat", "t": "prompt", "text": "What context did you get?",

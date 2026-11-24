@@ -11,7 +11,10 @@ import type { Tool } from "./state";
 export type Mode = "prepare" | "teach" | "view";
 
 /** Toolbar entries: drawing tools plus a few actions. */
-export type ToolbarItem = Tool | "smartink" | "undo" | "redo" | "pager" | "replay" | "exit";
+export type ToolbarItem =
+  | Tool | "smartink" | "undo" | "redo" | "pager" | "replay" | "exit"
+  /** Action buttons a teacher (or their AI) may put on the dock. */
+  | "celebrate" | "pages" | "solve" | "settings";
 
 /** Chrome elements a mode can show or hide. */
 export type ChromeKey =
@@ -39,13 +42,39 @@ export type DockOrientation = "auto" | "horizontal" | "vertical";
 /** A dock pin: a toolbar entry, or "shapes" for the one Shapes button
  * (the Shapes picker, components/ShapesPicker.tsx, and the Smart shapes toggle). */
 export type DockPin = ToolbarItem | "shapes";
+/** Button size: small, medium (default), large. */
+export type DockSize = "s" | "m" | "l";
+export const DOCK_SIZES: DockSize[] = ["s", "m", "l"];
+/** A group of dock buttons, in order; groups are separated on the dock. */
+export interface DockGroup {
+  id: string;
+  label?: string;
+  items: DockPin[];
+}
+/** A second dock, e.g. the pager and undo on the other edge of a big board. */
+export interface DockSplit {
+  position: DockPosition;
+  orientation: DockOrientation;
+  groups: DockGroup[];
+}
 export interface DockConfig {
   position: DockPosition;
   orientation: DockOrientation;
   /** Start as the small round bubble. */
   minimized: boolean;
-  /** Tools on the dock besides the core ones; the mode's other tools go in ⋯. */
+  /** Tools on the dock besides the core ones; the mode's other tools go in ⋯.
+   * With `groups`, it is kept as the flat list of what the groups hold. */
   pinned: DockPin[];
+  /** The teacher's own grouping and order of the dock's buttons (else the
+   * dock groups them itself: ink, create, point, history…). */
+  groups?: DockGroup[];
+  /** A second dock on another edge, with its own groups. */
+  split?: DockSplit | null;
+  /** Size of every button, and per-button sizes. */
+  size?: DockSize;
+  sizes?: Partial<Record<DockPin, DockSize>>;
+  /** Large icons, for low vision. */
+  large?: boolean;
 }
 /** Always on the dock in Prepare and Teach; a config cannot remove them. */
 export const CORE_TOOLS: ToolbarItem[] = ["pen", "highlighter", "eraser", "laser", "undo"];
@@ -81,7 +110,13 @@ export const TOOLBAR_ITEMS: { id: ToolbarItem; icon: IconName; label: string; ke
   { id: "replay", icon: "replay", label: "Replay", kind: "action" },
   { id: "pager", icon: "next", label: "Page back / next", key: "← →", kind: "nav" },
   { id: "exit", icon: "exit", label: "Exit mode", key: "Esc", kind: "exit" },
+  { id: "celebrate", icon: "celebrate", label: "Celebrate", kind: "action" },
+  { id: "pages", icon: "pages", label: "Pages", key: "G", kind: "action" },
+  { id: "solve", icon: "totext", label: "Solve this", kind: "action" },
+  { id: "settings", icon: "settings", label: "Settings", kind: "action" },
 ];
+/** "shapes" is a dock pin, not a toolbar entry: the Shapes button. */
+export const SHAPES_PIN = { id: "shapes" as const, icon: "rect" as IconName, label: "Shapes and tables" };
 
 export const CHROME_ITEMS: { id: ChromeKey; label: string }[] = [
   { id: "switcher", label: "Mode switcher" },
@@ -163,8 +198,196 @@ export function sanitizeMode(m: Mode, raw: unknown): ModeConfig {
   // A config written before the dock (tools, no dock.pinned) meant "these
   // tools on the toolbar": keep showing them all on the dock.
   const d = (r.dock && typeof r.dock === "object" ? r.dock : {}) as Record<string, unknown>;
+  // A custom layout's buttons are the mode's tools too (Shapes brings the shape tool).
+  for (const pin of [...(Array.isArray(d.groups) ? d.groups : []), ...(Array.isArray((d.split as any)?.groups) ? (d.split as any).groups : [])]
+    .flatMap((g: any) => (Array.isArray(g) ? g : Array.isArray(g?.items) ? g.items : []))) {
+    const p = pinOf(m, pin);
+    const t: ToolbarItem | null = p === "shapes" ? "shape" : p;
+    if (t && !out.tools.includes(t)) out.tools.push(t);
+  }
   out.dock = sanitizeDock(m, d, customTools && !Array.isArray(d.pinned) ? out.tools : null, out.tools, def.dock);
   return out;
+}
+
+/** Things a teacher should know about a dock layout before keeping it. */
+export function dockWarnings(m: Mode, c: ModeConfig): string[] {
+  const w: string[] = [];
+  const has = (t: ToolbarItem) => c.tools.includes(t);
+  if (m === "teach" && !has("exit") && !has("settings") && !c.chrome.settings) {
+    w.push("There is no button back to Prepare or Settings in Teach (Esc still leaves Teach).");
+  }
+  if (m === "prepare" && !c.chrome.settings && !has("settings")) {
+    w.push("There is no Settings button: add Settings to the dock or show it in the top bar.");
+  }
+  return w;
+}
+
+// ---------------------------------------------------------- dock presets
+
+export interface DockPreset {
+  name: string;
+  hint: string;
+  /** Dock layouts per mode (validated like any config). */
+  modes: Partial<Record<Exclude<Mode, "view">, Partial<DockConfig>>>;
+  /** Also switch the writing hand. */
+  hand?: "left" | "right";
+}
+
+/** Named layouts. "Default" resets both modes' docks. */
+export const DOCK_PRESETS: DockPreset[] = [
+  { name: "Default", hint: "The dock as Rupok ships it", modes: {} },
+  {
+    name: "Left-handed", hint: "Tools on the left edge, popovers open to the right", hand: "left",
+    modes: {
+      prepare: { position: "left", orientation: "vertical" },
+      teach: { position: "left", orientation: "vertical" },
+    },
+  },
+  {
+    name: "Minimal teaching", hint: "Teach with pen, eraser, undo and the pager, big buttons",
+    modes: {
+      teach: {
+        size: "l",
+        groups: [
+          { id: "ink", items: ["pen", "highlighter", "eraser", "laser"] },
+          { id: "history", items: ["undo"] },
+          { id: "nav", items: ["pager", "exit"] },
+        ],
+      },
+    },
+  },
+  {
+    name: "Maths class", hint: "Shapes, smart ink and text up front; undo and the pager on the right",
+    modes: {
+      prepare: {
+        groups: [
+          { id: "ink", label: "Ink", items: ["pen", "highlighter", "eraser"] },
+          { id: "maths", label: "Maths", items: ["shapes", "smartink", "text", "solve"] },
+          { id: "point", items: ["lasso", "laser"] },
+        ],
+        split: { position: "right", orientation: "vertical", groups: [{ id: "history", items: ["undo", "redo"] }, { id: "nav", items: ["pages"] }] },
+      },
+      teach: {
+        groups: [
+          { id: "ink", items: ["pen", "highlighter", "eraser"] },
+          { id: "maths", items: ["shapes", "smartink", "solve"] },
+          { id: "point", items: ["laser", "lasso"] },
+        ],
+        split: { position: "right", orientation: "vertical", groups: [{ id: "history", items: ["undo"] }, { id: "nav", items: ["pager", "exit"] }] },
+      },
+    },
+  },
+];
+
+/** The teacher's saved layouts from untrusted storage or a UI config file. */
+export function sanitizeDockPresets(raw: unknown): DockPreset[] {
+  if (!Array.isArray(raw)) return [];
+  const out: DockPreset[] = [];
+  for (const r of raw.slice(0, 12)) {
+    if (!r || typeof r !== "object" || typeof (r as any).name !== "string" || !(r as any).name.trim()) continue;
+    const name = (r as any).name.trim().slice(0, 32);
+    if (DOCK_PRESETS.some((p) => p.name.toLowerCase() === name.toLowerCase())) continue;
+    const modes: DockPreset["modes"] = {};
+    for (const m of ["prepare", "teach"] as const) {
+      const d = (r as any).modes?.[m];
+      if (d && typeof d === "object") modes[m] = sanitizeMode(m, { dock: d }).dock;
+    }
+    const hand = (r as any).hand === "left" || (r as any).hand === "right" ? (r as any).hand : undefined;
+    out.push({ name, hint: "Saved by you", modes, ...(hand ? { hand } : {}) });
+  }
+  return out;
+}
+
+/** A preset (built-in or saved) applied to the stored modes: each mode's dock
+ * is replaced (validated), other keys kept. */
+export function applyDockPreset(stored: Partial<ModesConfig> | undefined, p: DockPreset): Partial<ModesConfig> {
+  const next: Partial<ModesConfig> = { ...(stored ?? {}) };
+  for (const m of ["prepare", "teach"] as const) {
+    const cur = resolveMode(stored, m);
+    const dock = p.modes[m];
+    if (p.name === "Default") next[m] = sanitizeMode(m, { chrome: cur.chrome, tools: cur.tools, dock: DEFAULT_MODES[m].dock });
+    else if (dock) next[m] = sanitizeMode(m, { chrome: cur.chrome, tools: cur.tools, dock: { ...DEFAULT_MODES[m].dock, ...dock } });
+  }
+  return next;
+}
+
+/** A dock pin from untrusted input, or null (shape tools fold into "shapes"). */
+function pinOf(m: Mode, t: unknown): DockPin | null {
+  if (t === "shapes" || SHAPE_TOOLS.includes(t as ToolbarItem)) return ALLOWED_TOOLS[m].some((x) => SHAPE_TOOLS.includes(x)) ? "shapes" : null;
+  return ALLOWED_TOOLS[m].includes(t as ToolbarItem) ? (t as ToolbarItem) : null;
+}
+
+function cleanGroups(m: Mode, raw: unknown, seen: Set<DockPin>): DockGroup[] {
+  if (!Array.isArray(raw)) return [];
+  const out: DockGroup[] = [];
+  for (const [i, g] of raw.slice(0, 12).entries()) {
+    const r = (Array.isArray(g) ? { items: g } : g && typeof g === "object" ? g : null) as Record<string, unknown> | null;
+    if (!r || !Array.isArray(r.items)) continue;
+    const items: DockPin[] = [];
+    for (const t of r.items.slice(0, 32)) {
+      const pin = pinOf(m, t);
+      if (pin && !seen.has(pin)) {
+        seen.add(pin);
+        items.push(pin);
+      }
+    }
+    if (!items.length) continue;
+    const id = typeof r.id === "string" && /^[a-z0-9-]{1,24}$/.test(r.id) && !out.some((x) => x.id === r.id) ? r.id : `g${i + 1}`;
+    const label = typeof r.label === "string" && r.label.trim() ? r.label.trim().slice(0, 24) : undefined;
+    out.push(label ? { id, label, items } : { id, items });
+  }
+  return out;
+}
+
+function cleanPosition(p: unknown): DockPosition | null {
+  if (typeof p === "string" && (DOCK_POSITIONS as readonly string[]).includes(p)) return p as DockPosition;
+  if (p && typeof p === "object") {
+    const { x, y } = p as { x?: unknown; y?: unknown };
+    if (typeof x === "number" && typeof y === "number" && Number.isFinite(x) && Number.isFinite(y)) {
+      return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
+    }
+  }
+  return null;
+}
+
+const cleanOrientation = (o: unknown): DockOrientation | null => (o === "auto" || o === "horizontal" || o === "vertical" ? o : null);
+
+/** The custom layout keys of a dock (groups, split, sizes) from untrusted
+ * JSON; core tools that were left out go back into the first group. */
+function sanitizeLayout(m: Mode, d: Record<string, unknown>, out: DockConfig) {
+  if (typeof d.size === "string" && (DOCK_SIZES as string[]).includes(d.size)) out.size = d.size as DockSize;
+  if (typeof d.large === "boolean") out.large = d.large;
+  if (d.sizes && typeof d.sizes === "object") {
+    const sizes: Partial<Record<DockPin, DockSize>> = {};
+    for (const [k, v] of Object.entries(d.sizes as Record<string, unknown>)) {
+      const pin = pinOf(m, k);
+      if (pin && typeof v === "string" && (DOCK_SIZES as string[]).includes(v)) sizes[pin] = v as DockSize;
+    }
+    if (Object.keys(sizes).length) out.sizes = sizes;
+  }
+  if (!Array.isArray(d.groups) && !(d.split && typeof d.split === "object")) return;
+  const seen = new Set<DockPin>();
+  const groups = cleanGroups(m, d.groups, seen);
+  let split: DockSplit | null = null;
+  if (d.split && typeof d.split === "object") {
+    const s = d.split as Record<string, unknown>;
+    const sg = cleanGroups(m, s.groups, seen);
+    if (sg.length) split = { position: cleanPosition(s.position) ?? "right", orientation: cleanOrientation(s.orientation) ?? "auto", groups: sg };
+  }
+  if (hasCore(m)) {
+    const missing = CORE_TOOLS.filter((t) => !seen.has(t));
+    if (missing.length) {
+      if (groups.length) groups[0] = { ...groups[0], items: [...missing, ...groups[0].items] };
+      else groups.push({ id: "core", items: missing });
+    }
+  }
+  if (groups.length) out.groups = groups;
+  if (split) out.split = split;
+}
+
+/** Every pin a custom layout puts on the docks, main then split. */
+export function layoutPins(d: DockConfig): DockPin[] {
+  return [...(d.groups ?? []), ...(d.split?.groups ?? [])].flatMap((g) => g.items);
 }
 
 function sanitizeDock(m: Mode, d: Record<string, unknown>, legacy: ToolbarItem[] | null, tools: ToolbarItem[], def: DockConfig): DockConfig {
@@ -190,6 +413,11 @@ function sanitizeDock(m: Mode, d: Record<string, unknown>, legacy: ToolbarItem[]
     out.pinned = pins.filter((x) => x !== "shapes" || tools.some((t) => SHAPE_TOOLS.includes(t)));
   } else {
     out.pinned = out.pinned.filter((x) => (x === "shapes" ? tools.some((t) => SHAPE_TOOLS.includes(t)) : tools.includes(x)));
+  }
+  sanitizeLayout(m, d, out);
+  if (out.groups || out.split) {
+    // A custom layout says what is on the dock; `pinned` mirrors it.
+    out.pinned = layoutPins(out).filter((p) => !(hasCore(m) && CORE_TOOLS.includes(p as ToolbarItem)));
   }
   return out;
 }
@@ -225,4 +453,6 @@ export interface UiConfigFile {
   appearance?: { theme?: string; accent?: string; iconStyle?: string; toolbar?: string; density?: string; hand?: string };
   /** Classroom touch gestures (gestures.ts → GestureConfig). */
   gestures?: Record<string, unknown>;
+  /** The teacher's saved dock layouts ("My layouts"), by name. */
+  dockPresets?: DockPreset[];
 }
