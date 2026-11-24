@@ -9,6 +9,7 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+base64 = "0.23"
 rupok-core.workspace = true
 rupok-ink.workspace = true
 rupok-format.workspace = true

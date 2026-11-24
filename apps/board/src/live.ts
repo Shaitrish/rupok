@@ -98,6 +98,7 @@ const LABELS: Record<string, string> = {
   set_board_theme: "changed the board theme", add_page: "added a page", add_page_after_current: "added a page",
   add_text: "added text", add_smart_object: "added a Smart Object", update_smart_object: "updated a Smart Object",
   delete_item: "deleted an item", set_page_background: "changed the background",
+  set_page_design: "changed the page design", set_branding: "changed the branding",
   replace_items_with_text: "turned ink into text", step_object: "stepped a Smart Object",
   write_handwriting: "is writing on the board",
 };

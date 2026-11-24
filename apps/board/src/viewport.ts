@@ -72,10 +72,13 @@ if (typeof window !== "undefined") trackKeyboard();
 
 // --------------------------------------------------------- pages drawer
 
-/** Phones: the pages panel is a drawer over the board, closed by default
- * (the Prepare preference `showPages` is for larger screens). */
+/** The pages drawer: the pages panel as an overlay with large thumbnails,
+ * over the board without refitting it ("Show pages": the dock's ⋯ and page
+ * counter, the G key). On phones it is the only form of the panel (the
+ * Prepare preference `showPages` is for larger screens). */
 const [pagesDrawer, setPagesDrawer] = createSignal(false);
 export { pagesDrawer, setPagesDrawer };
+export const togglePagesDrawer = () => setPagesDrawer(!pagesDrawer());
 /** Is the pages panel showing: the drawer on a phone, the preference elsewhere. */
 export const pagesShown = () => (phone() ? pagesDrawer() : prefs().showPages);
 export function togglePages() {

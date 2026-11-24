@@ -429,6 +429,8 @@ export function describeChange(e: OpDone): BoardChange {
     case "replace_items_with_text": return { label: `Turned ink into text${on}`, page, itemId: r.item_id };
     case "set_page_background": return { label: `Changed the background${on}`, page };
     case "set_board_theme": return { label: "Changed the board theme", page };
+    case "set_page_design": return { label: r.pages_changed > 1 ? `Changed the design of ${r.pages_changed} pages` : `Changed the page design${on}`, page };
+    case "set_branding": return { label: "Changed the branding", page };
     case "step_object": return { label: `Stepped a Smart Object to step ${r.step ?? ""}`.trim(), page };
     case "write_handwriting": return r.status === "preview"
       ? { label: `Solution ready to check (${r.lines ?? ""} lines)`, page }

@@ -127,9 +127,17 @@ svg.icon { display: block; flex: none; }
 .board { position: absolute; inset: 0; overflow: hidden; background: var(--canvas); touch-action: none; }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .page-frame { position: absolute; left: 0; top: 0; box-shadow: var(--page-shadow); border-radius: 2px; }
-.page-frame.grid { background-image: linear-gradient(var(--pat) 1.5px, transparent 1.5px), linear-gradient(90deg, var(--pat) 1.5px, transparent 1.5px); background-size: 48px 48px; }
-.page-frame.dots { background-image: radial-gradient(var(--pat) 2px, transparent 2.4px); background-size: 40px 40px; background-position: 20px 20px; }
-.page-frame.lines { background-image: linear-gradient(transparent 46px, var(--pat) 46px, var(--pat) 48px); background-size: 100% 48px; }
+.page-frame.grid, .pd-pattern.grid, .ds-page.grid { background-image: linear-gradient(var(--pat) 1.5px, transparent 1.5px), linear-gradient(90deg, var(--pat) 1.5px, transparent 1.5px); background-size: 48px 48px; }
+.page-frame.dots, .pd-pattern.dots, .ds-page.dots { background-image: radial-gradient(var(--pat) 2px, transparent 2.4px); background-size: 40px 40px; background-position: 20px 20px; }
+.page-frame.lines, .pd-pattern.lines, .ds-page.lines { background-image: linear-gradient(transparent 46px, var(--pat) 46px, var(--pat) 48px); background-size: 100% 48px; }
+/* Page design layers (PageBackdrop.tsx): under the items and the ink, never hit-tested. */
+.page-design { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.page-brand { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; }
+.page-design > * { position: absolute; }
+.pd-bg, .pd-dim, .pd-pattern { inset: 0; }
+.pd-logo { display: block; height: auto; max-width: none; user-select: none; -webkit-user-select: none; }
+.pd-logo.editable { pointer-events: auto; cursor: grab; touch-action: none; }
+.pd-text { font-family: var(--font); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.01em; }
 .ink { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .input-layer { position: absolute; inset: 0; touch-action: none; }
 .input-layer.interact { pointer-events: none; }

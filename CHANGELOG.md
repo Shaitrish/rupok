@@ -9,6 +9,25 @@ notes come after each list. Downloads are on
 
 ### For teachers
 
+- **Show pages anywhere:** press G, tap the page counter on the dock, or
+  use ⋯ → Show pages, in Teach, Prepare and Student view. Big thumbnails
+  slide in over the slide without moving it; tap one to jump (pin it to
+  keep it open).
+- **New pages look like the last one:** + adds a page right after the one
+  you are on, with the same colour, pattern, background and branding. Insert
+  before or after, a + between thumbnails, and a page menu (right-click or
+  press and hold) to duplicate, move or delete. Mark several pages at once
+  to delete, copy or move them together.
+- **Page design:** looks such as chalkboard, lined notebook, graph paper and
+  exam paper; your own background image (fit, fill, stretch, tile, centre,
+  dimmed for readable ink); and your school's logo with the school, teacher,
+  class and date on every page (or one). The text can fill itself in with
+  the lesson title, page number and more. Save it as your default and every
+  new lesson starts with it. Shown in Teach, Student view, replay,
+  thumbnails and the PDF.
+- **Design with AI:** ask your AI (or type /design in the chat) for a
+  background or theme; it can set colours, draw a background and place your
+  logo, and each change is one undo step.
 - **Teach is truly full screen:** F5 or the mode switcher fills the whole
   screen, with no title bar in the desktop app. Esc or the exit button on
   the dock leaves Teach and full screen together.
@@ -39,6 +58,17 @@ notes come after each list. Downloads are on
   and `Edits` has `text_colors`. The file format does not change.
 - The desktop main window may set full screen
   (`core:window:allow-set-fullscreen`).
+- Page design in the format (proposed, pending RFC; spec "Page design"):
+  page keys `background` and `branding`, and `meta.branding`, additive plain
+  map values that older readers ignore. `rupok_core`: `PageStyle`,
+  `PageBackground`, `Branding`, `Lesson::{set_page_style, set_branding,
+  set_page_branding, branding_for, add_page_like, duplicate_pages,
+  remove_pages, move_pages, forget_history}`.
+- New live ops and MCP tools `set_page_design` and `set_branding` (live or
+  on a file); agent SVG is checked (no scripts, external references or
+  animation).
+- `bench/latency/pen-latency.mjs --lesson FILE.rpk` writes over a given
+  lesson's first page.
 
 ## v0.2.1 (23 November 2026)
 

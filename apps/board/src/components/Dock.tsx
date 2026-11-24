@@ -25,7 +25,8 @@ import {
   hlOpacity, setHlOpacityStored,
 } from "../dock";
 import { DockPopover, DockShell, longPress } from "./DockShell";
-import { isPhone, keyboard } from "../viewport";
+import { isPhone, keyboard, pagesDrawer, setPagesDrawer, togglePagesDrawer } from "../viewport";
+import { addPageLike } from "./Chrome";
 import { Icon } from "./Icon";
 import type { IconName } from "../icons.generated";
 import { APP_SLUG, FILE_EXT } from "../brand";
@@ -253,7 +254,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   const frame = (edge: DockEdge, v: boolean, x?: number) => dockFrame(cfg(), edge, v, viewport().w, viewport().h, pagesOn(), x);
   // Compared by value: a stored mode config is re-parsed on every prefs
   // change, and the buttons must not be re-created (popovers anchor to them).
-  const layout = createMemo(() => dockLayout(cfg(), core(), mode() === "prepare", fitSpec().room, fitSpec().cell, fitSpec().sep), undefined, {
+  const layout = createMemo(() => dockLayout(cfg(), core(), true, fitSpec().room, fitSpec().cell, fitSpec().sep), undefined, {
     equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
   const setMin = (m: boolean) => {
@@ -631,7 +632,17 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
       >
         <Icon name="prev" size={iconSize()} />
       </button>
-      <span class="viewer-count" aria-live="polite">{pageIndex() + 1} / {pages().length}</span>
+      <button
+        class="viewer-count"
+        classList={{ on: pagesDrawer() }}
+        aria-live="polite"
+        title="Show all pages  ·  G"
+        aria-label={`Page ${pageIndex() + 1} of ${pages().length}. Show all pages`}
+        aria-expanded={pagesDrawer()}
+        onClick={togglePagesDrawer}
+      >
+        {pageIndex() + 1} / {pages().length}
+      </button>
       <button
         class="tool"
         disabled={pageIndex() >= pages().length - 1 && (mode() !== "teach" || pagerSteps())}
@@ -641,6 +652,12 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
       >
         <Icon name="next" size={iconSize()} />
       </button>
+      {/* Teach: a new page (same look) without leaving the slide. */}
+      <Show when={mode() === "teach" && !isPhone()}>
+        <button class="tool" title="New page after this one (same look)" aria-label="New page" onClick={() => addPageLike(false)}>
+          <Icon name="plus" size={iconSize()} />
+        </button>
+      </Show>
     </>
   );
 
@@ -1096,6 +1113,31 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
             </Show>
             <Show when={p().kind === "more"}>
               <div class="dock-menu" role="menu">
+                <button
+                  class="dock-row"
+                  role="menuitemcheckbox"
+                  aria-checked={pagesDrawer()}
+                  onClick={() => {
+                    setPop(null);
+                    setPagesDrawer(!pagesDrawer());
+                  }}
+                >
+                  <Icon name="pages" size={20} active={pagesDrawer()} /><span class="grow">Show pages</span>
+                  <kbd>G</kbd>
+                </button>
+                <Show when={!isView()}>
+                  <button
+                    class="dock-row"
+                    role="menuitem"
+                    onClick={() => {
+                      setPop(null);
+                      addPageLike(false);
+                    }}
+                  >
+                    <Icon name="plus" size={20} /><span class="grow">New page</span>
+                  </button>
+                </Show>
+                <div class="dock-hr" />
                 <For each={layout().overflow.filter((t) => t !== "pager")}>
                   {(t) => (
                     <button

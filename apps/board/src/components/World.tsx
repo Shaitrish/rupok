@@ -7,6 +7,8 @@ import { For, Match, Show, Switch, createEffect, onCleanup, onMount } from "soli
 import { controller } from "../controller";
 import { renderTex } from "../katex";
 import { BOARD_COLORS, type DomItem, editingText, items, pageIndex, pages, setEditingText, tool } from "../state";
+import { brandingFor, designPreview, lessonBranding } from "../design";
+import { PageBackdrop } from "./PageBackdrop";
 
 function ObjectItem(props: { item: DomItem }) {
   let iframe!: HTMLIFrameElement;
@@ -129,17 +131,33 @@ export default function World(props: { ref: (el: HTMLDivElement) => void }) {
   return (
     <div class="world" ref={props.ref}>
       <Show when={page()}>
-        {(p) => (
-          <div
-            class={`page-frame ${p().pattern}`}
-            style={{
-              width: `${p().frame?.w ?? 1920}px`,
-              height: `${p().frame?.h ?? 1080}px`,
-              "background-color": "#" + (p().bg_color >>> 8).toString(16).padStart(6, "0"),
-              "--pat": BOARD_COLORS.find((b) => b.rgba === p().bg_color)?.pattern ?? "rgba(30, 60, 120, 0.10)",
-            }}
-          />
-        )}
+        {(p) => {
+          // A drag in Page design previews here before it is committed.
+          const background = () => { const o = designPreview(); return o && "background" in o ? o.background : p().background; };
+          return (
+            <div
+              class={`page-frame ${background() ? "" : p().pattern}`}
+              style={{
+                width: `${p().frame?.w ?? 1920}px`,
+                height: `${p().frame?.h ?? 1080}px`,
+                "background-color": "#" + (p().bg_color >>> 8).toString(16).padStart(6, "0"),
+                "--pat": BOARD_COLORS.find((b) => b.rgba === p().bg_color)?.pattern ?? "rgba(30, 60, 120, 0.10)",
+              }}
+            >
+              <PageBackdrop
+                layer="background"
+                w={p().frame?.w ?? 1920}
+                h={p().frame?.h ?? 1080}
+                bg={p().bg_color}
+                pattern={p().pattern}
+                background={background()}
+                branding={null}
+                place={{ page: pageIndex() + 1, pages: pages().length }}
+                assetUrl={(n) => controller.assetUrl(n)}
+              />
+            </div>
+          );
+        }}
       </Show>
       <For each={items}>
         {(item) => (
@@ -178,6 +196,29 @@ export default function World(props: { ref: (el: HTMLDivElement) => void }) {
           </Switch>
         )}
       </For>
+      {/* Branding: above the items (a logo shows on imported slides), under the ink. */}
+      <Show when={page()}>
+        {(p) => {
+          const branding = () => { const o = designPreview(); return o && "branding" in o ? o.branding : brandingFor(p(), lessonBranding()); };
+          return (
+            <Show when={branding()}>
+              <div class="page-brand" style={{ width: `${p().frame?.w ?? 1920}px`, height: `${p().frame?.h ?? 1080}px` }}>
+                <PageBackdrop
+                  layer="branding"
+                  w={p().frame?.w ?? 1920}
+                  h={p().frame?.h ?? 1080}
+                  bg={p().bg_color}
+                  pattern={p().pattern}
+                  background={null}
+                  branding={branding()}
+                  place={{ page: pageIndex() + 1, pages: pages().length }}
+                  assetUrl={(n) => controller.assetUrl(n)}
+                />
+              </div>
+            </Show>
+          );
+        }}
+      </Show>
     </div>
   );
 }

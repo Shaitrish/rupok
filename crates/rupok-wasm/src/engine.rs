@@ -8,8 +8,8 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use rupok_core::{
-    BoxGeom, Frame, ImageData, Item, ItemData, ItemId, Lesson, NewItem, ObjectData, PageId,
-    PageSpec, Pattern, Scene, ShapeGeom, StrokeData, TextData,
+    BoxGeom, Branding, Frame, ImageData, Item, ItemData, ItemId, Lesson, NewItem, ObjectData,
+    PageBackground, PageId, PageSpec, PageStyle, Pattern, Scene, ShapeGeom, StrokeData, TextData,
 };
 use rupok_format::package::OUTLINE_MAX_AGE_MS;
 use rupok_format::{ObjectBundle, ObjectManifest, Package};
@@ -329,6 +329,12 @@ struct Preview<'a> {
     frame: Option<Frame>,
     bg: u32,
     pattern: &'static str,
+    /// The page's background image.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    background: Option<PageBackground>,
+    /// The branding the page shows (its own, else the lesson's).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    branding: Option<Branding>,
     /// Union bounds of all items (for infinite boards), world units.
     bounds: Option<[f32; 4]>,
     items: Vec<PreviewItem<'a>>,
@@ -903,6 +909,165 @@ impl<S: InkSink> Engine<S> {
         let _ = self
             .lesson
             .set_page_background(&self.page.clone(), pattern, color);
+        self.bump();
+    }
+
+    /// Add a page that looks like the current one (colour, pattern,
+    /// background image, page branding): right after it, or at the end.
+    /// Shows the new page and returns its index.
+    pub fn add_page_like(&mut self, at_end: bool) -> usize {
+        if self.read_only {
+            return self.page_index();
+        }
+        let idx = (!at_end).then(|| self.page_index() + 1);
+        let Ok(id) = self.lesson.add_page_like(idx, &self.page.clone()) else {
+            return self.page_index();
+        };
+        let i = self
+            .lesson
+            .pages()
+            .iter()
+            .position(|p| p.id == id)
+            .unwrap_or(0);
+        self.goto_page(i);
+        i
+    }
+
+    /// Insert a page that looks like page `src` right before or after it,
+    /// and show it. Returns its index.
+    pub fn insert_page_like(&mut self, src: usize, before: bool) -> usize {
+        if self.read_only {
+            return self.page_index();
+        }
+        let Ok(src_id) = self.lesson.page_id_at(src) else {
+            return self.page_index();
+        };
+        let at = if before { src } else { src + 1 };
+        let Ok(id) = self.lesson.add_page_like(Some(at), &src_id) else {
+            return self.page_index();
+        };
+        let i = self
+            .lesson
+            .pages()
+            .iter()
+            .position(|p| p.id == id)
+            .unwrap_or(0);
+        self.goto_page(i);
+        i
+    }
+
+    fn page_ids_at(&self, indices: &[usize]) -> Vec<PageId> {
+        indices
+            .iter()
+            .filter_map(|&i| self.lesson.page_id_at(i).ok())
+            .collect()
+    }
+
+    /// Delete the pages at `indices` (one undo step); at least one page
+    /// stays. Shows the page after the first deleted one. Returns how many
+    /// were deleted.
+    pub fn delete_pages(&mut self, indices: &[usize]) -> usize {
+        if self.read_only {
+            return 0;
+        }
+        let ids = self.page_ids_at(indices);
+        let first = indices.iter().copied().min().unwrap_or(0);
+        let current = self.page.clone();
+        let Ok(n) = self.lesson.remove_pages(&ids) else {
+            return 0;
+        };
+        let at = if ids.contains(&current) {
+            first.min(self.lesson.page_count().saturating_sub(1))
+        } else {
+            self.lesson
+                .pages()
+                .iter()
+                .position(|p| p.id == current)
+                .unwrap_or(0)
+        };
+        self.goto_page(at);
+        n
+    }
+
+    /// Copy the pages at `indices`, each right after its original (one undo
+    /// step). Returns the copies' indexes.
+    pub fn duplicate_pages(&mut self, indices: &[usize]) -> Vec<usize> {
+        if self.read_only {
+            return Vec::new();
+        }
+        let ids = self.page_ids_at(indices);
+        let Ok(copies) = self.lesson.duplicate_pages(&ids) else {
+            return Vec::new();
+        };
+        let pages = self.lesson.pages();
+        let out: Vec<usize> = copies
+            .iter()
+            .filter_map(|c| pages.iter().position(|p| &p.id == c))
+            .collect();
+        self.bump();
+        out
+    }
+
+    /// Move the pages at `indices` together to the gap before page `gap`
+    /// (indexes before the move), in order, as one undo step.
+    pub fn move_pages(&mut self, indices: &[usize], gap: usize) {
+        if self.read_only {
+            return;
+        }
+        let ids = self.page_ids_at(indices);
+        if self.lesson.move_pages(&ids, gap).is_ok() {
+            self.bump();
+        }
+    }
+
+    /// Give the current page, or every page, the look `style` (one undo
+    /// step).
+    pub fn set_page_style(&mut self, style: &PageStyle, all: bool) -> Result<(), String> {
+        if self.read_only {
+            return Ok(());
+        }
+        let ids: Vec<PageId> = if all {
+            self.lesson.pages().into_iter().map(|p| p.id).collect()
+        } else {
+            vec![self.page.clone()]
+        };
+        self.lesson
+            .set_page_style(&ids, style)
+            .map_err(|e| e.to_string())?;
+        self.bump();
+        Ok(())
+    }
+
+    /// Set or remove (`None`) the lesson's branding, or, with `page_only`,
+    /// the current page's own branding (one undo step).
+    pub fn set_branding(&mut self, b: Option<&Branding>, page_only: bool) -> Result<(), String> {
+        if self.read_only {
+            return Ok(());
+        }
+        let r = if page_only {
+            self.lesson.set_page_branding(&self.page.clone(), b)
+        } else {
+            self.lesson.set_branding(b)
+        };
+        r.map_err(|e| e.to_string())?;
+        self.bump();
+        Ok(())
+    }
+
+    /// Store bytes as a package asset (deduplicated by BLAKE3) and return
+    /// its name, for a background image or a logo. Nothing references it
+    /// until the document does; unreferenced assets are not saved.
+    pub fn add_asset(&mut self, bytes: Vec<u8>, ext: &str) -> Option<String> {
+        if self.read_only {
+            return None;
+        }
+        Some(self.pkg.add_asset(bytes, ext))
+    }
+
+    /// Forget the undo stack (a new lesson's default design is not an
+    /// action to undo).
+    pub fn forget_history(&mut self) {
+        self.lesson.forget_history();
         self.bump();
     }
 
@@ -2329,9 +2494,19 @@ impl<S: InkSink> Engine<S> {
     }
 
     fn save_with(&mut self, now_ms: f64, outline_max_age_ms: f64) -> Result<Vec<u8>, String> {
-        // Drop bundles no longer referenced by any page.
+        // Leave out bundles and assets no page references (items, background
+        // images, branding logos).
         let mut used = HashSet::new();
+        if let Some(logo) = self.lesson.branding().and_then(|b| b.logo) {
+            used.insert(logo);
+        }
         for p in self.lesson.pages() {
+            if let Some(bg) = &p.background {
+                used.insert(bg.image.clone());
+            }
+            if let Some(logo) = p.branding.as_ref().and_then(|b| b.logo.clone()) {
+                used.insert(logo);
+            }
             for it in self.lesson.items(&p.id).unwrap_or_default() {
                 match it.data {
                     ItemData::Object(o) => {
@@ -2344,11 +2519,24 @@ impl<S: InkSink> Engine<S> {
                 }
             }
         }
-        self.pkg.objects.retain(|k, _| used.contains(k));
-        self.pkg.assets.retain(|k, _| used.contains(k));
+        // Kept in memory, not written: an undo can bring a reference back
+        // (a removed image, a replaced logo) after an autosave.
+        let (objects, unused_objects): (BTreeMap<_, _>, BTreeMap<_, _>) =
+            std::mem::take(&mut self.pkg.objects)
+                .into_iter()
+                .partition(|(k, _)| used.contains(k));
+        let (assets, unused_assets): (BTreeMap<_, _>, BTreeMap<_, _>) =
+            std::mem::take(&mut self.pkg.assets)
+                .into_iter()
+                .partition(|(k, _)| used.contains(k));
+        self.pkg.objects = objects;
+        self.pkg.assets = assets;
         self.pkg
             .update_lesson_throttled(&self.lesson, GENERATOR, now_ms, outline_max_age_ms);
-        self.pkg.write().map_err(|e| e.to_string())
+        let out = self.pkg.write().map_err(|e| e.to_string());
+        self.pkg.objects.extend(unused_objects);
+        self.pkg.assets.extend(unused_assets);
+        out
     }
 
     pub fn load(&mut self, bytes: &[u8]) -> Result<(), String> {
@@ -2509,10 +2697,13 @@ impl<S: InkSink> Engine<S> {
                 },
             });
         }
+        let branding = self.lesson.branding_for(&info);
         serde_json::to_string(&Preview {
             frame: info.frame,
             bg: info.bg_color,
             pattern: info.pattern.as_str(),
+            background: info.background.clone(),
+            branding,
             bounds,
             items: out,
         })

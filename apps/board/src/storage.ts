@@ -52,3 +52,38 @@ export async function autosaveClear(): Promise<void> {
     db.close();
   } catch { /* ignore */ }
 }
+
+// The teacher's default page design for new lessons (design.ts), per device.
+const DESIGN_KEY = "design-default";
+
+export async function designDefaultStore(value: unknown | null): Promise<boolean> {
+  try {
+    const db = await open();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      if (value === null) tx.objectStore(STORE).delete(DESIGN_KEY);
+      else tx.objectStore(STORE).put(value, DESIGN_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function designDefaultLoad(): Promise<unknown | null> {
+  try {
+    const db = await open();
+    const v = await new Promise<unknown>((resolve, reject) => {
+      const req = db.transaction(STORE, "readonly").objectStore(STORE).get(DESIGN_KEY);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+    return v ?? null;
+  } catch {
+    return null;
+  }
+}

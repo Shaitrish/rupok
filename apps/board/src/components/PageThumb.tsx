@@ -9,7 +9,10 @@
 
 import { createEffect, on, onCleanup, onMount } from "solid-js";
 import { controller } from "../controller";
-import { revision } from "../state";
+import { pages, revision } from "../state";
+import {
+  type Branding, type PageBackground, DIM_ALPHA, bgPlacements, brandInk, brandLine, brandTextBox, cssColor, frameOf, hasBranding, logoRect,
+} from "../design";
 
 const MAX_POINTS = 48;
 const CURRENT_DEBOUNCE_MS = 450;
@@ -24,6 +27,8 @@ interface Preview {
   frame: { w: number; h: number } | null;
   bg: number;
   pattern: string;
+  background?: PageBackground;
+  branding?: Branding;
   bounds: Rect | null;
   items: PreviewItem[];
 }
@@ -89,7 +94,7 @@ function imageFor(asset: string, onLoad: () => void): HTMLImageElement | null {
 
 // ---------------------------------------------------------------- drawing
 
-function draw(canvas: HTMLCanvasElement, p: Preview, redraw: () => void) {
+function draw(canvas: HTMLCanvasElement, p: Preview, redraw: () => void, index: number) {
   const cssW = canvas.clientWidth, cssH = canvas.clientHeight;
   if (!cssW || !cssH) return;
   const dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -121,6 +126,7 @@ function draw(canvas: HTMLCanvasElement, p: Preview, redraw: () => void) {
   const objectTint = css.color;
   const placeholder = css.outlineColor;
   const minLine = 1 / s; // one CSS pixel
+  drawBackground(ctx, p, redraw);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   for (const it of p.items) {
@@ -185,6 +191,58 @@ function draw(canvas: HTMLCanvasElement, p: Preview, redraw: () => void) {
       it.text.split("\n").forEach((line, i) => ctx.fillText(line, x, y + i * lh, Math.max(w, it.size)));
     }
   }
+  ctx.globalAlpha = 1;
+  drawBranding(ctx, p, redraw, css.fontFamily, index);
+}
+
+/** Under the items: the background image and the dim wash (design.ts). */
+function drawBackground(ctx: CanvasRenderingContext2D, p: Preview, redraw: () => void) {
+  const { w: fw, h: fh } = frameOf(p);
+  const bg = p.background;
+  if (bg) {
+    const img = imageFor(bg.image, redraw);
+    if (img) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, fw, fh);
+      ctx.clip();
+      ctx.globalAlpha = Math.max(0, Math.min(1, bg.opacity));
+      for (const [x, y, w, h] of bgPlacements(bg.fit, fw, fh, img.naturalWidth, img.naturalHeight)) ctx.drawImage(img, x, y, w, h);
+      ctx.restore();
+    }
+    if (bg.dim) {
+      ctx.globalAlpha = DIM_ALPHA;
+      ctx.fillStyle = cssColor(p.bg);
+      ctx.fillRect(0, 0, fw, fh);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+/** Above the items (as on the board): the branding logo and text line. */
+function drawBranding(ctx: CanvasRenderingContext2D, p: Preview, redraw: () => void, font: string, index: number) {
+  const { w: fw, h: fh } = frameOf(p);
+  const b = p.branding;
+  if (!hasBranding(b)) return;
+  if (b.logo) {
+    const img = imageFor(b.logo, redraw);
+    if (img) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, b.logo_opacity));
+      ctx.drawImage(img, ...logoRect(b, fw, fh, img.naturalWidth / img.naturalHeight));
+      ctx.globalAlpha = 1;
+    }
+  }
+  const line = brandLine(b, { page: index + 1, pages: pages().length });
+  if (line) {
+    const { rect, size } = brandTextBox(b, fw, fh);
+    ctx.font = `600 ${size}px ${font}`;
+    ctx.fillStyle = brandInk(p.bg);
+    ctx.textBaseline = "middle";
+    ctx.textAlign = b.text_align;
+    const x = b.text_align === "left" ? rect[0] : b.text_align === "right" ? rect[0] + rect[2] : rect[0] + rect[2] / 2;
+    ctx.fillText(line, x, rect[1] + rect[3] / 2, rect[2]);
+    ctx.textAlign = "left";
+  }
 }
 
 /** Draw page `index` into `canvas` now. */
@@ -193,11 +251,11 @@ function render(canvas: HTMLCanvasElement, index: number) {
   const json = controller.board.page_preview_json(index, MAX_POINTS);
   const p = JSON.parse(json) as Preview | null;
   if (!p) return;
-  draw(canvas, p, () => enqueue(canvas, () => render(canvas, index)));
+  draw(canvas, p, () => enqueue(canvas, () => render(canvas, index)), index);
 }
 
 /** A thumbnail canvas for one page. */
-export function ThumbCanvas(props: { index: number; current: boolean; itemCount: number }) {
+export function ThumbCanvas(props: { index: number; current: boolean; itemCount: number; design?: string }) {
   let canvas!: HTMLCanvasElement;
   let visible = false;
   let stale = true;
@@ -234,7 +292,7 @@ export function ThumbCanvas(props: { index: number; current: boolean; itemCount:
   // The current page follows every edit (debounced); other pages redraw when
   // their content changes size or they move to another index.
   createEffect(on(revision, () => props.current && request(CURRENT_DEBOUNCE_MS), { defer: true }));
-  createEffect(on(() => [props.itemCount, props.index] as const, () => request(), { defer: true }));
+  createEffect(on(() => [props.itemCount, props.index, props.design] as const, () => request(), { defer: true }));
   createEffect(on(() => props.current, (cur, was) => was && !cur && request(), { defer: true }));
 
   return <canvas class="thumb-canvas" ref={canvas} aria-hidden="true" />;

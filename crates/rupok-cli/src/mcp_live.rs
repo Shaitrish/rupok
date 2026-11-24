@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use crate::mcp::McpServer;
 use crate::tools::{
     AddPageParams, AddSmartObjectParams, AddTextParams, DeleteItemParams, PatternArg,
-    SetPageBackgroundParams, UpdateSmartObjectParams,
+    SetBrandingParams, SetPageBackgroundParams, SetPageDesignParams, UpdateSmartObjectParams,
 };
 
 /// The `path` value that sends a lesson tool to the paired board.
@@ -89,6 +89,44 @@ pub fn op_delete_item(p: &DeleteItemParams) -> Op {
         page: Some(p.page),
         item_id: p.item_id.clone(),
     }
+}
+
+pub fn op_set_page_design(p: &SetPageDesignParams) -> Op {
+    Op::SetPageDesign(Box::new(rupok_live::PageDesignArgs {
+        page: p.page,
+        all_pages: p.all_pages,
+        color: p.color.clone(),
+        pattern: p.pattern.map(pattern),
+        background_svg: p.background_svg.clone(),
+        background_image: p.background_image.clone(),
+        background_fit: p.background_fit.clone(),
+        background_opacity: p.background_opacity,
+        background_dim: p.background_dim,
+        remove_background: p.remove_background,
+    }))
+}
+
+pub fn op_set_branding(p: &SetBrandingParams) -> Op {
+    Op::SetBranding(Box::new(rupok_live::BrandingArgs {
+        page: p.page,
+        scope: p.scope.clone(),
+        logo_svg: p.logo_svg.clone(),
+        logo_image: p.logo_image.clone(),
+        logo_corner: p.logo_corner.clone(),
+        logo_x: p.logo_x,
+        logo_y: p.logo_y,
+        logo_width: p.logo_width,
+        logo_opacity: p.logo_opacity,
+        remove_logo: p.remove_logo,
+        school: p.school.clone(),
+        teacher: p.teacher.clone(),
+        class: p.class.clone(),
+        date: p.date,
+        text_position: p.text_position.clone(),
+        text_align: p.text_align.clone(),
+        hidden: p.hidden,
+        remove: p.remove,
+    }))
 }
 
 pub fn op_set_page_background(p: &SetPageBackgroundParams) -> Op {

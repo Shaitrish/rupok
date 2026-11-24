@@ -184,7 +184,9 @@ Attribution lives in `NOTICE` and in Settings → About.
 | **Input** | 40px, radius 10, gray-a3 fill. Focus switches to the solid surface with a 2px inset accent ring. There is no separate border. |
 | **Dialog** | Radius 20, padding 24, shadow 2. The header is a 40px soft-accent icon badge, then the title, the subtitle, and a close button. |
 | **Toast** | 40px pill under the top bar, with an info icon. It auto-dismisses after about 2.6s. |
-| **Page thumbnail** | 90px tall and tinted with the page's board colour. The page-number chip sits bottom-left. The current page gets a 2px accent ring. |
+| **Page thumbnail** | 90px tall and tinted with the page's board colour. The page-number chip sits bottom-left. The current page gets a 2px accent ring. Thumbnails show the page design. Long-press (touch), Ctrl/Shift-click (mouse) marks pages: a 24px check circle top-left, an accent ring and wash. A "+" between thumbnails on hover (on touch: beside the current page) inserts a page there. |
+| **Pages drawer** | The pages panel over the board, never refitting it ("Show pages": dock ⋯, the page counter, `G`): 472px wide, `--surface-solid`, radius 20, shadow 2, a grid of 16:9 thumbnails at least 176px wide, 44px controls. Closes after a jump unless pinned; a scrim only when not pinned. The only form of the panel on phones. |
+| **Page design sheet** | 400px side sheet (bottom sheet on phones) with a live preview (drag the logo), looks, background, branding and "Save as my default". The slide moves aside to stay in view in Prepare. Every change is one undo step; sliders and drags preview live and commit on release. |
 | **Step badge** | A 28px pill at the bottom-right of a Smart Object showing `step / steps`, in tabular numbers. |
 | **Smart Dock** | The drawing toolbar (`components/Dock.tsx`, shell in `DockShell.tsx`). Grip, core tools (pen, highlighter, eraser, laser, undo), three recent colours, pinned tools, ⋯, minimise chevron, all in `--tb` cells. Surface: `--surface-solid` at 94%, hairline ring, small shadow; a 12px backdrop blur only on hardware GPUs and never while ink is drawn next to it. The pen and highlighter carry a colour dot sized by width. Contextual sections open by animating their width. Minimised: a 48px round bubble (56 on Large board) with the current tool and colour. Popovers: radius 14, `--surface-solid`, on the side facing the screen centre, opening away from the writing hand. |
 
@@ -229,7 +231,8 @@ Attribution lives in `NOTICE` and in Settings → About.
 | Writing hand | Right · Left (dock popovers open away from it) |
 | Size | Compact · Comfortable · Large board |
 | Pen & touch | Finger mode (auto palm rejection / draw / pan & zoom), smoothing, pressure curve |
-| Board | Page pattern (plain, grid, dots, lines) and board colour, per page |
+| Board | Page pattern (plain, grid, dots, lines) and board colour, per page; new pages copy the current page's look |
+| Page design | Looks (whiteboard, chalkboard, dark board, lined notebook, graph paper, exam paper), background image (fit, fill, stretch, tile, centre; opacity; dim), branding (logo, school, teacher, class, date) on all pages or one; a per-device default for new lessons |
 
 Planned customisation (see the [roadmap](ROADMAP.md)) includes custom accent hex values, a high-contrast theme, and agent-driven theming through the MCP tool `set_ui_theme`.
 
