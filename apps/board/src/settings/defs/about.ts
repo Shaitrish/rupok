@@ -1,7 +1,12 @@
 // Settings → About: version and licences, then troubleshooting switches.
 
-import { setPrefs, prefs } from "../../state";
+import { setPrefs, prefs, mode } from "../../state";
 import { AboutSection, GraphicsInfo } from "../../components/settings/About";
+import { UpdateCheck } from "../../updates/UpdateCheck";
+import { startTour } from "../../tour/tour";
+import { controller } from "../../controller";
+import { closeSettings } from "../open";
+import { isDesktop } from "../../platform";
 import { pref } from "../bind";
 import { registerSettings } from "../registry";
 
@@ -11,6 +16,25 @@ registerSettings([
     description: "Version, licences and links.",
     keywords: ["version", "licence", "license", "AGPL", "open source", "credits", "fonts", "github"],
     component: AboutSection,
+  },
+  {
+    id: "about.updates", category: "about", order: 20, type: "custom", label: "Updates",
+    description: isDesktop
+      ? "Rupok looks for a new release once a day and offers the installer for this computer."
+      : "The web version updates itself, and works without internet after the first visit.",
+    keywords: ["update", "upgrade", "new version", "release", "download", "offline", "আপডেট", "নতুন সংস্করণ"],
+    component: UpdateCheck,
+  },
+  {
+    id: "about.tour", category: "about", order: 30, type: "action", label: "Quick tour",
+    description: "A short walk through the pen, pages, Insert, Teach mode and saving.",
+    keywords: ["tour", "help", "guide", "tutorial", "first run", "onboarding", "intro", "সাহায্য", "পরিচিতি"],
+    button: "Show the tour", icon: "play",
+    run: () => {
+      closeSettings();
+      if (mode() !== "prepare") controller.setMode("prepare");
+      startTour();
+    },
   },
   {
     id: "about.renderer", category: "about", group: "Troubleshooting", order: 100, type: "segmented", label: "Renderer",

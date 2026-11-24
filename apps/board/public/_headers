@@ -3,6 +3,15 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# The service worker and the build id must never be stale: open tabs and the
+# browser check them for a new build (pwa/plugin.ts, docs/offline.md).
+/sw.js
+  Cache-Control: no-cache
+  Service-Worker-Allowed: /
+
+/version.json
+  Cache-Control: no-store
+
 # Offline libraries for Smart Objects. Objects run in sandboxed (opaque-origin)
 # frames, so module scripts and fonts need CORS.
 /rupoklib/*

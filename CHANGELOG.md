@@ -5,6 +5,30 @@ notes come after each list. Downloads are on
 [rupok.app/download](https://rupok.app/download/) and on
 [GitHub Releases](https://github.com/Shaitrish/rupok/releases).
 
+## Unreleased
+
+### For teachers
+
+- **The web board works offline:** after the first visit, rupok.app/board
+  starts without internet, opens lessons and draws, and the student viewer
+  (`/open/`) works offline too. Install it as an app and every Smart Object
+  library is kept offline as well.
+- **Update notices:** the desktop app tells you when a new version is out,
+  with the right installer for your computer and the release notes (never
+  during Teach; "Skip this version" is remembered). An open web board offers
+  "Reload" when a new version is live. Settings → About → Check for updates.
+- **Quick tour:** a short, skippable tour the first time the board opens:
+  pen and colours, pages, Insert, Teach mode and saving. Restart it from ⋯ →
+  Quick tour or Settings → About.
+
+### For developers
+
+- Offline web app: a hand-written service worker (`apps/board/pwa/sw.js`)
+  generated per build by `pwa/plugin.ts`, which also writes `/version.json`
+  and `<meta name="rupok-build">`. Update notices in `src/updates/`, the
+  shared release lookup in `src/release.ts`, the tour in `src/tour/`. See
+  docs/offline.md. The desktop CSP allows `https://api.github.com`.
+
 ## v0.2.2 (24 November 2026)
 
 ### For teachers

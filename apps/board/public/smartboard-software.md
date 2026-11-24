@@ -90,7 +90,7 @@ Yes. Rupok runs on the computer connected to the board and uses its touch and pe
 
 ### Does Rupok work offline?
 
-Yes, with the [desktop app](https://rupok.app/download/) for Windows, Mac and Linux: drawing, slides, replay, PDF export and handwritten-maths recognition work without internet (the AI features need it). In the browser, the board runs on your device once it’s open.
+Yes, with the [desktop app](https://rupok.app/download/) for Windows, Mac and Linux: drawing, slides, replay, PDF export and handwritten-maths recognition work without internet (the AI features need it). The web version works offline too: after your first visit to [rupok.app/board](https://rupok.app/board/), the board starts without internet, and you can install it as an app.
 
 ### Can I use my PowerPoint slides?
 

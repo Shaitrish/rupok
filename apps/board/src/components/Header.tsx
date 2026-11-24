@@ -33,6 +33,7 @@ import { pagesShown, togglePages } from "../viewport";
 import "./Header.css";
 import { MicButton } from "./MicButton";
 import { insertVideo, insertWebEmbed, pickMedia, pickModel } from "./MediaDialog";
+import { startTour } from "../tour/tour";
 
 function pickFiles(accept: string, multiple = false): Promise<File[]> {
   return new Promise((resolve) => {
@@ -238,6 +239,7 @@ export function Header(props: { onObject: () => void; onSettings: () => void }) 
     if (!view()) {
       sep();
       if (!k.settings) out.push({ id: "settings", label: "Settings", icon: "settings", run: props.onSettings });
+      out.push({ id: "tour", label: "Quick tour", icon: "play", run: startTour });
       out.push({ id: "shortcuts", label: "Keyboard shortcuts", icon: "keyboard", run: () => openSettings("keyboard") });
       out.push({ id: "about", label: "Help & about", icon: "info", run: () => openSettings("about") });
     }

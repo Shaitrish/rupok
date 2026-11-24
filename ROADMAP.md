@@ -67,7 +67,7 @@ first (see [CONTRIBUTING.md](CONTRIBUTING.md#rfcs)).
 | ✅ | Live agent edits during class, merged into the open lesson (v0.2.0, `rupok mcp --live`, [docs/ai-agents.md](docs/ai-agents.md)) | [acp-agent-panel § Live edits](docs/roadmap/acp-agent-panel.md#live-edits) | advanced |
 | 📋 | Replay with audio | [replay-audio](docs/roadmap/replay-audio.md) | intermediate |
 | 📋 | LAN "send to board" from laptop or phone | [lan-send](docs/roadmap/lan-send.md) | intermediate |
-| 🚧 | Web viewer (PWA): open any `.rpk` in a browser, offline. Read-only student view at `/board/?view` done; the `/open/` page hands a picked file to it; installed-PWA "Open with" (`launchQueue`) done; offline install to do | [web-viewer](docs/roadmap/web-viewer.md) | intermediate |
+| 🚧 | Web viewer (PWA): open any `.rpk` in a browser, offline. Read-only student view at `/board/?view` done; the `/open/` page hands a picked file to it; installed-PWA "Open with" (`launchQueue`) done; offline service worker done ([offline.md](docs/offline.md)) | [web-viewer](docs/roadmap/web-viewer.md) | intermediate |
 | 📋 | Android share target: share a `.rpk` from WhatsApp straight into Rupok (Web Share Target + service worker) | [rupok-cloud § Android](docs/roadmap/rupok-cloud.md#android-web-share-target) | intermediate |
 | 📋 | Rupok Cloud: Google sign-in, 500 MB free per teacher, share links (`rupok.app/s/<id>`) students open with no account, Pro and School plans (Paddle, then bKash) | [rupok-cloud](docs/roadmap/rupok-cloud.md) | advanced |
 | 📋 | Claude connector: remote MCP server on Workers with OAuth, so teachers manage lessons from their own Claude | [rupok-cloud § Claude connector](docs/roadmap/rupok-cloud.md#claude-connector-remote-mcp) | advanced |

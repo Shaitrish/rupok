@@ -30,6 +30,9 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // The offline service worker (docs/offline.md) would serve the app from
+    // its cache between tests; these flows test the page itself.
+    serviceWorkers: "block",
   },
   projects: wanted.map((name) => ({ name, use: { ...BROWSERS[name], viewport: { width: 1280, height: 800 } } })),
   // The production build, as on rupok.app and in the desktop app.

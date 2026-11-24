@@ -32,7 +32,7 @@ export const RUPOK = {
   ink: "yes: Smart shapes, offline: hand-drawn shapes, graphs, flowcharts, logic gates, tables and Venn diagrams snap clean. Handwritten maths to LaTeX, offline. Other handwriting to text with your own Claude API key. Bangla handwriting: coming soon",
   pdf: "yes: Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes",
   bangla: "part: Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon",
-  offline: "yes: The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open",
+  offline: "yes: The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app)",
   board: "yes: Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari",
   collab: "soon: Live class and share links: coming soon with Rupok Cloud",
   format: "Open `.rpk` (a ZIP package with a published spec)",

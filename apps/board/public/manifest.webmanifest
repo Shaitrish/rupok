@@ -1,5 +1,5 @@
 {
-  "name": "Rupok — Mind Over Matter",
+  "name": "Rupok",
   "short_name": "Rupok",
   "description": "The open-source smart whiteboard for teachers: live AI content, pen on top, every class replayable.",
   "start_url": "/board/",
@@ -35,6 +35,15 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/hero.webp",
+      "sizes": "1920x1080",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "A lesson on the Rupok board"
     }
   ],
   "file_handlers": [

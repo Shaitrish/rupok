@@ -1,0 +1,45 @@
+/* First-run quick tour (Tour.tsx): an outline on the control and a callout
+ * beside it. No scrim: the board stays live. */
+.tour-ring {
+  position: fixed; z-index: 44; pointer-events: none; border-radius: 16px;
+  box-shadow: 0 0 0 2px var(--accent-9), 0 0 0 6px color-mix(in srgb, var(--accent-9) 22%, transparent);
+  transition: left 180ms var(--ease), top 180ms var(--ease), width 180ms var(--ease), height 180ms var(--ease);
+}
+.tour-card {
+  position: fixed; z-index: 45; width: min(320px, calc(100vw - 32px));
+  padding: var(--s4) var(--s4) var(--s3); border-radius: 18px;
+  background: var(--surface-solid); color: var(--text); box-shadow: var(--shadow-2);
+  animation: pop 180ms var(--ease);
+  transition: left 180ms var(--ease), top 180ms var(--ease);
+}
+.tour-arrow {
+  position: absolute; width: 14px; height: 14px; background: var(--surface-solid);
+  box-shadow: -1px -1px 0 0 var(--hairline); transform: rotate(45deg);
+}
+.tour-card.side-below .tour-arrow { top: -7px; left: calc(var(--arrow) - 7px); }
+.tour-card.side-above .tour-arrow { bottom: -7px; left: calc(var(--arrow) - 7px); transform: rotate(225deg); }
+.tour-card.side-right .tour-arrow { left: -7px; top: calc(var(--arrow) - 7px); transform: rotate(-45deg); }
+.tour-card.side-left .tour-arrow { right: -7px; top: calc(var(--arrow) - 7px); transform: rotate(135deg); }
+.tour-card.side-none .tour-arrow { display: none; }
+
+.tour-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+.tour-count { font: 650 12px/16px var(--font); letter-spacing: 0.02em; color: var(--accent-11); font-variant-numeric: tabular-nums; }
+.tour-dots { display: flex; gap: 6px; }
+.tour-dots span { width: 6px; height: 6px; border-radius: 3px; background: var(--gray-a6); transition: width 180ms var(--ease), background-color 180ms var(--ease); }
+.tour-dots span.on { width: 16px; background: var(--accent-9); }
+.tour-title { margin: var(--s2) 0 var(--s1); font: 700 16px/24px var(--font); }
+/* Tall line height: Bangla conjuncts and vowel signs need the room. */
+.tour-body { margin: 0; font: 450 14px/22px var(--font); color: var(--text-2); overflow-wrap: anywhere; }
+.tour-actions { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); flex-wrap: wrap; }
+.tour-grow { flex: 1; }
+.tour-btn {
+  min-height: 44px; min-width: 44px; padding: 0 var(--s4); border: 0; border-radius: 12px; cursor: pointer;
+  font: 600 14px/20px var(--font); background: var(--gray-a3); color: var(--text);
+  transition: background-color 120ms var(--ease);
+}
+.tour-btn:hover { background: var(--gray-a4); }
+.tour-btn.solid { background: var(--accent-9); color: var(--accent-contrast); }
+.tour-btn.solid:hover { background: var(--accent-10); }
+.tour-btn.ghost { background: transparent; color: var(--text-2); padding: 0 var(--s3); margin-left: calc(-1 * var(--s3)); }
+.tour-btn.ghost:hover { background: var(--hover); color: var(--text); }
+.tour-btn:focus-visible { outline: 2px solid var(--accent-9); outline-offset: 2px; }

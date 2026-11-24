@@ -21,7 +21,7 @@ OpenBoard is a mature, free desktop whiteboard maintained in Geneva. Rupok is a 
 | Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ✓ Web widgets and about 25 built-in activities (memory, word games)[^6] |
 | PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports and exports PDF[^5]; IWB (Common File Format) import and export[^3] |
 | Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ 35 interface languages, no Bangla translation[^3] |
-| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Installed desktop app[^1] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app) | ✓ Installed desktop app[^1] |
 | Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ✓ Any interactive whiteboard, graphics tablet or mouse[^1] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.ubz`[^5] |
 | Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Actively maintained: version 1.7.7 released 30 March 2026; 1.8 in development[^2] |

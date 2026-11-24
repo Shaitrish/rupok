@@ -21,7 +21,7 @@ SMART Notebook is the most established smartboard software, with a free basic ve
 | Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ✓ Game templates, assessments and SMART Blocks in Plus[^2]; Lumio games and widgets[^6] |
 | PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports PDF, and PowerPoint on Windows[^4] |
 | Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ 38 interface languages on Windows, no Bangla[^3] |
-| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Installed desktop app; some features need internet[^3] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app) | ✓ Installed desktop app; some features need internet[^3] |
 | Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ◐ Without Plus, touch on non-SMART displays is limited; Plus works with any brand[^2] |
 | Real-time collaboration | ◷ Live class and share links: coming soon with Rupok Cloud | ◐ Student-device activities through Lumio[^6] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.notebook`; imports ActivInspire `.flipchart` files[^4] |

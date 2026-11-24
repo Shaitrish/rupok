@@ -27,6 +27,9 @@ import { setBrandVars } from "./design";
 import { isPhone, pagesDrawer, pagesShown } from "./viewport";
 import { PageDesignHost } from "./components/PageDesign";
 import { drawCursor } from "./wetInk";
+import { UpdateNotice } from "./updates/UpdateNotice";
+import { startUpdateChecks } from "./updates/updates";
+import { Tour } from "./tour/Tour";
 
 const OverlayApp = lazy(() => import("./overlay/OverlayApp"));
 
@@ -98,6 +101,7 @@ export default function App() {
       input.addEventListener("pointerdown", eraserAt);
       for (const t of ["pointerup", "pointercancel", "pointerleave"]) input.addEventListener(t, eraserOff as EventListener);
       setReady(true);
+      startUpdateChecks(); // desktop: new release; web: offline service worker, new build
       void import("./solve").then((m) => m.initSolve()); // Solve this: AI handwriting, preview, reveal
       startLibrary(controller); // the Library home and saving lessons to their files (before files below arrive)
       attachDesktopBridge(controller); // desktop: files opened by the OS, overlay snapshots
@@ -156,6 +160,8 @@ export default function App() {
         <ChatPanel />
         <VoiceLayer />
         <LibraryRoot />
+        <UpdateNotice />
+        <Tour />
       </Show>
       <Show when={objectDialog()}>
         <ObjectDialog onClose={() => setObjectDialog(false)} />
