@@ -13,6 +13,10 @@
 //                       selection, points at it, writes a step-by-step
 //                       solution with write_handwriting, then explains.
 //   "/review ..."       one of its slash commands: answers "Reviewing: …".
+//   "/stamp ..."        makes two custom stamps (an SVG star with a sparkle
+//                       and a counter, a Smart dice that rolls on tap),
+//                       places them, draws and restyles ink, and reorders
+//                       pages, through the agent-control MCP tools.
 // It also offers Claude-style modes, a model picker (session config option
 // with category "model", mirrored in the unstable `models` field), slash
 // commands, usage updates, and session list/load (replaying the chat).
@@ -204,6 +208,30 @@ async function solveThis(sid, text) {
   return "end_turn";
 }
 
+const STAR_SVG = '<svg viewBox="0 0 100 100"><path d="M50 6 61 38 95 38 67 58 78 92 50 72 22 92 33 58 5 38 39 38Z" fill="currentColor"/></svg>';
+const DICE_HTML = `<!doctype html><html><head><title>Dice</title><style>html,body{margin:0;height:100%}
+body{display:grid;place-items:center;font:120px system-ui;cursor:pointer;user-select:none}</style></head>
+<body><div id="d">⚀</div><script>
+var faces=["⚀","⚁","⚂","⚃","⚄","⚅"];
+document.body.addEventListener("click",function(){document.getElementById("d").textContent=faces[Math.floor(Math.random()*6)];});
+</script></body></html>`;
+
+async function stamps(sid) {
+  await say(sid, "Making your stamps…\n\n");
+  const star = await tool("create_stamp", { name: "Super star", keywords: ["praise"], art: "svg", svg: STAR_SVG, color: "#f5b301",
+    behavior: { animation: "sparkle", burst: "stars", counter: true, sound: "chime" } });
+  const dice = await tool("create_stamp", { id: "dice", name: "Dice", art: "smart", html: DICE_HTML, width: 160, height: 160 });
+  const a = await tool("add_stamp", { stamp: star.id, x: 200, y: 200 });
+  await tool("add_stamp", { stamp: dice.id, x: 500, y: 200 });
+  const s = await tool("draw_stroke", { points: [[100, 600], [400, 650], [700, 600]], brush: "marker" });
+  await tool("restyle_items", { item_ids: [s.item_ids[0], a.item_id], color: "#e5484d" });
+  await tool("list_stamps", {});
+  await tool("duplicate_pages", { pages: [1] });
+  await tool("move_pages", { pages: [2], to: 1 });
+  await say(sid, `Done: **${star.stamp.name}** sparkles and counts, the **Dice** rolls when tapped. Both are in My stamps.`);
+  return "end_turn";
+}
+
 async function prompt(params) {
   const sid = params.sessionId;
   cancelled = false;
@@ -227,6 +255,7 @@ async function prompt(params) {
       if (all.length > 1 || imgs.length > 1) await say(sid, `\n\nAll context: ${all.join(", ")}; ${imgs.length} picture(s).`);
       return { stopReason: "end_turn" };
     }
+    if (/^\/stamp/i.test(text)) return { stopReason: await stamps(sid) };
     if (/ohm/i.test(text)) return { stopReason: await ohm(sid) };
     if (/^\/review\b/.test(text)) {
       await say(sid, `Reviewing: ${text.slice(7).trim() || "the board"} (model ${model}, mode ${mode}).`);
