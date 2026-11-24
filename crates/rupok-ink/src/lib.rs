@@ -7,6 +7,7 @@
 //! Everything here is allocation-light and `no_std`-friendly in spirit, so the
 //! same code runs in the webview (WASM) on the pen hot path and natively.
 
+pub mod brush;
 pub mod builder;
 pub mod codec;
 pub mod filter;
@@ -16,6 +17,7 @@ pub mod recognize;
 pub mod simplify;
 pub mod write;
 
+pub use brush::Brush;
 pub use builder::{BuilderConfig, StrokeBuilder, StrokeStyle, Tool};
 pub use codec::{CodecError, decode_points, encode_points};
 

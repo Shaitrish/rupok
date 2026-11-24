@@ -386,6 +386,10 @@ pub struct StrokeData {
     /// Editable geometry of a shape stroke (the optional `geom` key), so the
     /// shape can be resized by regenerating `points` at a constant width.
     pub geom: Option<ShapeGeom>,
+    /// Pen style (the optional `brush` key: `fountain`, `chalk`, `dashed`, …,
+    /// see [`rupok_ink::Brush`]). `None` is the plain pen; unknown names are
+    /// kept as they are and drawn as a plain pen.
+    pub brush: Option<String>,
 }
 
 /// Geometry of a shape stroke, in the same coordinate frame as its points
@@ -453,11 +457,18 @@ impl ShapeGeom {
 }
 
 impl StrokeData {
+    /// The stroke's pen style.
+    pub fn brush(&self) -> rupok_ink::Brush {
+        rupok_ink::Brush::of(self.brush.as_deref())
+    }
+    /// How far ink reaches from the points (the brush's width, nib and glow).
     pub fn max_radius(&self) -> f32 {
+        let b = self.brush();
         self.points
             .iter()
-            .map(|p| rupok_ink::point_radius(p.p, self.width))
+            .map(|p| b.radius(p.p, self.width))
             .fold(0.0, f32::max)
+            * b.reach()
     }
     pub fn aabb(&self) -> Aabb {
         let b = rupok_ink::bounds(&self.points, self.max_radius());
@@ -479,6 +490,11 @@ pub struct TextData {
     /// `text` is LaTeX maths, shown typeset (the optional `latex` key).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub latex: bool,
+    /// A classroom stamp (the optional `stamp` key: `star`, `tick`, `badge`,
+    /// …). `text` holds what a reader without stamps shows instead: the
+    /// emoji or the label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stamp: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

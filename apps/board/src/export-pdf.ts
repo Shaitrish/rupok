@@ -35,6 +35,7 @@ import { APP_NAME, FILE_EXT, SITE_URL } from "./brand";
 import {
   type Branding, type PageBackground, DIM_ALPHA, bgPlacements, brandInkRgba, brandLine, brandTextBox, frameOf, hasBranding, imageSize, logoRect,
 } from "./design";
+import { stampCanvas } from "./stamps";
 
 export type Layout = "slides" | "handout3" | "handout2";
 
@@ -64,8 +65,10 @@ export class ExportCancelled extends Error {
 // ------------------------------------------------------------------- data
 
 type Rect = [number, number, number, number];
-interface StrokeItem { kind: "stroke"; color: number; opacity: number; tool: string; shape: string | null; outline: number[][] }
-interface TextItem { kind: "text"; rect: Rect; text: string; size: number; color: number; latex?: boolean }
+/** A pen style's vector layers (`fills`, painted instead of `outline`). */
+interface Fill { outline: number[][]; color: number; opacity: number }
+interface StrokeItem { kind: "stroke"; color: number; opacity: number; tool: string; shape: string | null; outline: number[][]; brush?: string; fills?: Fill[] }
+interface TextItem { kind: "text"; rect: Rect; text: string; size: number; color: number; latex?: boolean; stamp?: string; rot?: number }
 interface ImageItem { kind: "image"; rect: Rect; asset: string; media?: ExportMedia }
 interface ObjectItem { kind: "object"; id: string; rect: Rect; title: string; bundle: string; step: number; steps: number; state: string | null }
 /** A shape's fill (export.rs `Fill`), drawn under the ink like on the board. */
@@ -397,6 +400,7 @@ class Exporter {
   // -------------------------------------------------------------- text
 
   private async drawText(ops: string[], res: Resources, t: TextItem, paper: boolean) {
+    if (t.stamp) return this.drawStamp(ops, res, t);
     const color = paper ? darkInk(t.color) : t.color;
     const r = t.latex ? await rasterLatex(t) : await rasterText(t);
     if (!r) return;
@@ -404,6 +408,23 @@ class Exporter {
     ops.push("q");
     if (alphaOf(color) < 0.995) ops.push(this.alpha(alphaOf(color), res));
     this.placeImage(ops, this.xobject(ref, res), ...r.rect);
+    ops.push("Q");
+  }
+
+  /** A classroom stamp (stamps.ts), rasterised in its own colours and
+   * turned about its centre. */
+  private async drawStamp(ops: string[], res: Resources, t: TextItem) {
+    const [x, y, w, h] = t.rect;
+    const canvas = await stampCanvas(t.stamp!, t.text, t.color, w, h, TEXT_SCALE);
+    if (!canvas) return;
+    const ref = await this.embedPixels(canvas, false);
+    ops.push("q");
+    if (t.rot) {
+      const [c, s] = [Math.cos(t.rot), Math.sin(t.rot)];
+      const [cx, cy] = [x + w / 2, y + h / 2];
+      ops.push(`${num(c)} ${num(s)} ${num(-s)} ${num(c)} ${num(cx - c * cx + s * cy)} ${num(cy - s * cx - c * cy)} cm`);
+    }
+    this.placeImage(ops, this.xobject(ref, res), x, y, w, h);
     ops.push("Q");
   }
 
@@ -492,29 +513,35 @@ class Exporter {
     for (const it of items) {
       if (it.kind !== "stroke" || !it.outline.length) continue;
       if (!this.o.includeInk && !it.shape) continue;
-      const translucent = it.opacity < 0.6 || it.tool === "highlighter";
-      const color = paper && !translucent ? darkInk(it.color) : it.color;
-      const a = Math.round(Math.max(0, Math.min(1, alphaOf(color) * it.opacity)) * 100) / 100;
-      if (a <= 0) continue;
-      if (a !== lastAlpha) {
-        ops.push(this.alpha(a, res));
-        lastAlpha = a;
+      // A pen style paints its own layers (glow, dashes, rainbow pieces); on
+      // paper a neon line loses its white core.
+      let layers: Fill[] = it.fills ?? [{ outline: it.outline, color: it.color, opacity: it.opacity }];
+      if (paper && it.brush === "neon") layers = layers.filter((f) => f.color !== 0xffffffff);
+      for (const f of layers) {
+        const translucent = f.opacity < 0.6 || it.tool === "highlighter";
+        const color = paper && !translucent ? darkInk(f.color) : f.color;
+        const a = Math.round(Math.max(0, Math.min(1, alphaOf(color) * f.opacity)) * 100) / 100;
+        if (a <= 0) continue;
+        if (a !== lastAlpha) {
+          ops.push(this.alpha(a, res));
+          lastAlpha = a;
+        }
+        if (color >>> 8 !== lastColor) {
+          ops.push(`${rgbOps(color)} rg`);
+          lastColor = color >>> 8;
+        }
+        // One fill per stroke: its polygons wind the same way, so the non-zero
+        // rule paints their union once (a highlighter is not darker where the
+        // stroke crosses itself, as on the board).
+        const parts: string[] = [];
+        for (const poly of f.outline) {
+          if (poly.length < 6) continue;
+          parts.push(`${poly[0]} ${poly[1]} m`);
+          for (let i = 2; i < poly.length; i += 2) parts.push(`${poly[i]} ${poly[i + 1]} l`);
+          parts.push("h");
+        }
+        if (parts.length) ops.push(parts.join("\n"), "f");
       }
-      if (color >>> 8 !== lastColor) {
-        ops.push(`${rgbOps(color)} rg`);
-        lastColor = color >>> 8;
-      }
-      // One fill per stroke: its polygons wind the same way, so the non-zero
-      // rule paints their union once (a highlighter is not darker where the
-      // stroke crosses itself, as on the board).
-      const parts: string[] = [];
-      for (const poly of it.outline) {
-        if (poly.length < 6) continue;
-        parts.push(`${poly[0]} ${poly[1]} m`);
-        for (let i = 2; i < poly.length; i += 2) parts.push(`${poly[i]} ${poly[i + 1]} l`);
-        parts.push("h");
-      }
-      if (parts.length) ops.push(parts.join("\n"), "f");
     }
   }
 

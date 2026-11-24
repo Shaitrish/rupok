@@ -1129,6 +1129,7 @@ rupok.steps.onChange(step => { document.getElementById("bars").textContent = "St
                 offset: [0.0, 0.0],
                 shape: None,
                 geom: None,
+                brush: None,
             })
         };
         let a = lesson.add_item(&page, &stroke(100.0), 1.0).unwrap();

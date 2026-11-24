@@ -27,7 +27,8 @@
 //
 // Options: --dist DIR, --chrome PATH, --swiftshader, --headed, --present,
 // --rate HZ (240), --speed PX_PER_S (400), --strokes N (12), --smoothing S,
-// --smart (Smart shapes "auto"), --json FILE, --check, --label TEXT,
+// --smart (Smart shapes "auto"), --brush NAME (pen style, e.g. fountain),
+// --json FILE, --check, --label TEXT,
 // --lesson FILE.rpk (write over its first page, e.g. one with a page design).
 
 import { chromium } from "playwright-core";
@@ -50,6 +51,7 @@ const SPEED = Number(opt("speed", 400));
 const STROKES = Number(opt("strokes", 12));
 const SMOOTHING = opt("smoothing", null);
 const LABEL = opt("label", "");
+const BRUSH = opt("brush", null);
 
 // Budgets for --check. They hold under SwiftShader on a CI runner, so they
 // test the pipeline (no smoothing lag at the tip, no pen-up jump, no dropped
@@ -226,6 +228,7 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 const prefs = { theme: "light", smartShapes: flag("smart") ? "auto" : "off", showPages: false };
 if (SMOOTHING !== null) prefs.smoothing = Number(SMOOTHING);
+if (BRUSH !== null) prefs.penBrush = BRUSH;
 await page.addInitScript((v) => { if (window === window.top) localStorage.setItem("rupok.prefs", v); }, JSON.stringify(prefs));
 await page.addInitScript(probe);
 await page.goto(`http://127.0.0.1:${port}/board/`, { waitUntil: "load" });
@@ -462,7 +465,7 @@ const ffd = L.firstFrameAfterDown;
 const firstFrame = stats(ffd);
 const result = {
   label: LABEL,
-  env: { ...env, rateHz: RATE, speedPxPerS: SPEED, strokes: STROKES, smoothing: SMOOTHING ?? "default", smart: flag("smart"), renderer: flag("swiftshader") ? "SwiftShader" : "GPU" },
+  env: { ...env, rateHz: RATE, speedPxPerS: SPEED, strokes: STROKES, smoothing: SMOOTHING ?? "default", brush: BRUSH ?? "pen", smart: flag("smart"), renderer: flag("swiftshader") ? "SwiftShader" : "GPU" },
   handlerMs: stats(L.samples.map((s) => s.handler)),
   processMs: stats(L.proc),
   frameMs: stats(L.samples.map((s) => s.frame)),
@@ -490,7 +493,7 @@ const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : "—");
 const row = (name, s, unit = "ms") => console.log(`${name.padEnd(42)} p50 ${f(s.p50).padStart(6)}  p95 ${f(s.p95).padStart(6)}  max ${f(s.max).padStart(6)} ${unit}  (n=${s.n})`);
 console.log(`\nRupok pen latency ${LABEL ? `— ${LABEL}` : ""}`);
 console.log(`GPU: ${env.gpu}\nBrowser: ${env.ua}, dpr ${env.dpr}, navigator.ink ${env.inkApi ? "yes" : "no"}`);
-console.log(`Input: pen ${RATE} Hz, ${SPEED} px/s, ${STROKES} strokes, smoothing ${SMOOTHING ?? "default"}, smart shapes ${flag("smart") ? "auto" : "off"}\n`);
+console.log(`Input: pen ${RATE} Hz, ${SPEED} px/s, ${STROKES} strokes, smoothing ${SMOOTHING ?? "default"}, brush ${BRUSH ?? "pen"}, smart shapes ${flag("smart") ? "auto" : "off"}\n`);
 row("event → board handler done", result.handlerMs);
 row("board pointermove handler (processing)", result.processMs);
 row("event → GPU frame submitted", result.frameMs);

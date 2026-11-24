@@ -1,5 +1,6 @@
 //! Editing a selection in place, from the floating selection toolbar:
-//! recolour, re-thicken and scale ink, shapes and text. Each change is one
+//! recolour, re-thicken, change the pen style (brush) of, and scale ink,
+//! shapes and text. Each change is one
 //! undo step (`Lesson::apply_edits`). Shapes keep their geometry: they are
 //! regenerated from it, so a scaled rectangle is still a rectangle.
 
@@ -25,12 +26,20 @@ impl<S: InkSink> Engine<S> {
         let mut mixed_width = false;
         let mut strokes = 0;
         let mut highlighter = 0;
+        let mut brush: Option<&str> = None;
+        let mut mixed_brush = false;
         for it in self.selection.iter().filter_map(|id| self.scene.get(id)) {
             let c = match &it.data {
                 ItemData::Stroke(s) => {
                     strokes += 1;
                     if s.tool == "highlighter" {
                         highlighter += 1;
+                    }
+                    let b = s.brush().as_str();
+                    match brush {
+                        None => brush = Some(b),
+                        Some(x) if x != b => mixed_brush = true,
+                        _ => {}
                     }
                     match width {
                         None => width = Some(s.width),
@@ -52,19 +61,24 @@ impl<S: InkSink> Engine<S> {
             "color": if mixed_color { None } else { color.map(css_color) },
             "width": if mixed_width { None } else { width },
             "highlighter": strokes > 0 && strokes == highlighter,
+            "brush": if mixed_brush { None } else { brush },
         })
     }
 
     /// Restyle the selection as one undo step: `color` (0xRRGGBBAA) for
     /// strokes and text, and a stroke width, either absolute (`width`) or a
-    /// factor of each stroke's own (`width_scale`). Highlighter strokes keep
-    /// their own opacity. Returns false when nothing changed.
+    /// factor of each stroke's own (`width_scale`), and a pen style
+    /// (`brush`; magic ink is not a stored style and is ignored).
+    /// Highlighter strokes keep their own opacity. Returns false when
+    /// nothing changed.
     pub fn restyle_selection(
         &mut self,
         color: Option<u32>,
         width: Option<f32>,
         width_scale: Option<f32>,
+        brush: Option<Brush>,
     ) -> bool {
+        let brush = brush.filter(|b| *b != Brush::Magic);
         if self.read_only || self.selection.is_empty() {
             return false;
         }
@@ -107,6 +121,9 @@ impl<S: InkSink> Engine<S> {
                                 n.geom = Some(g);
                             }
                         }
+                    }
+                    if let Some(b) = brush {
+                        n.brush = b.key().map(Into::into);
                     }
                     if n != *s {
                         e.strokes.push((id, n));

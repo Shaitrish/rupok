@@ -3,7 +3,7 @@
 use crate::filter::{OneEuro2, OneEuroParams};
 use crate::pressure::PressureCurve;
 use crate::simplify::simplify;
-use crate::{InputPoint, StrokePoint};
+use crate::{Brush, InputPoint, StrokePoint};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Tool {
@@ -35,6 +35,8 @@ pub struct StrokeStyle {
     /// Nominal full width in world units.
     pub width: f32,
     pub opacity: f32,
+    /// Pen style (`brush` key; [`Brush::Pen`] is not stored).
+    pub brush: Brush,
 }
 
 impl Default for StrokeStyle {
@@ -44,6 +46,7 @@ impl Default for StrokeStyle {
             color: 0x1d2433ff,
             width: 3.0,
             opacity: 1.0,
+            brush: Brush::Pen,
         }
     }
 }
@@ -164,12 +167,17 @@ impl StrokeBuilder {
 
     /// Finish the stroke: end it at the [tip] (the real pen-up position, which
     /// the last wet frame already showed) and simplify. Tolerances are ~0.2
-    /// screen px, below what the eye can tell from the wet stroke.
+    /// screen px, below what the eye can tell from the wet stroke. Brushes
+    /// patterned along the stroke (dashes, the rainbow) keep every point, so
+    /// the pattern does not shift at pen-up ([`Brush::keeps_every_point`]).
     ///
     /// [tip]: StrokeBuilder::tip
     pub fn finish(mut self) -> Vec<StrokePoint> {
         if let Some(t) = self.tip() {
             self.points.push(t);
+        }
+        if self.style.brush.keeps_every_point() {
+            return self.points;
         }
         let eps = 0.2 / self.cfg.zoom.max(1e-3);
         simplify(&self.points, eps, 0.06)
@@ -261,6 +269,38 @@ mod tests {
             assert_eq!((p.x, p.y), (s.x, s.y));
         }
         assert!(b.tip().is_none(), "raw points already reach the pen");
+    }
+
+    #[test]
+    fn patterned_brushes_keep_every_wet_point() {
+        let at = |i: i32| InputPoint {
+            x: i as f32,
+            y: 0.0,
+            pressure: 0.5,
+            t_ms: i as f64 * 4.0,
+        };
+        for (brush, simplified) in [
+            (Brush::Pen, true),
+            (Brush::Chalk, true),
+            (Brush::Dashed, false),
+            (Brush::Rainbow, false),
+        ] {
+            let style = StrokeStyle {
+                brush,
+                ..Default::default()
+            };
+            let mut b = StrokeBuilder::begin(style, BuilderConfig::default(), at(0), true);
+            for i in 1..=100 {
+                b.push(at(i));
+            }
+            let mut wet = b.points().to_vec();
+            wet.extend(b.tip());
+            let dry = b.finish();
+            assert_eq!(dry.len() < wet.len(), simplified, "{brush:?}");
+            if !simplified {
+                assert_eq!(dry, wet, "{brush:?}: dry is exactly the last wet frame");
+            }
+        }
     }
 
     #[test]

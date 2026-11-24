@@ -34,6 +34,7 @@ fn text(lesson: &mut Lesson, page: &str, y: f64, s: &str, latex: bool, t: f64) {
         size: 44.0,
         color: 0x1d2433ff,
         latex,
+        stamp: None,
     };
     lesson.add_item(page, &ItemData::Text(data), t).unwrap();
 }
@@ -55,6 +56,7 @@ fn stroke(points: Vec<StrokePoint>, shape: Option<&str>) -> ItemData {
             h: 300.0,
             ..Default::default()
         }),
+        brush: None,
     })
 }
 

@@ -14,8 +14,10 @@
 // engine, boxes here, and the release commits one undo step.
 //
 // The toolbar is built for a finger on a board (44px targets): recolour,
-// thinner / thicker ink, smaller / bigger, To text, duplicate, group and
-// delete. Each change is one undo step in the engine (`restyle.rs`).
+// change the pen style, thinner / thicker ink, smaller / bigger, To text,
+// duplicate, group and delete. Each change is one undo step in the engine
+// (`restyle.rs`). A single stamp scales from its corners about its centre
+// and turns with the round handle above it (`set_stamp_geom`).
 
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { controller } from "../controller";
@@ -27,6 +29,7 @@ import { ToTextButton } from "./ToText";
 import { makeItLive } from "./MakeItLive";
 import { SolveButton } from "../solve/SolveUI";
 import { FillRow, ShapeControls, TableCells, setTableCellMode } from "./ShapeControls";
+import { StyleRow } from "./InkOptions";
 
 /** Shapes that keep their proportions while resizing (Shift frees them). */
 const KEEP_ASPECT = [
@@ -132,11 +135,14 @@ export function SelectionOverlay() {
   const [fills, setFills] = createSignal(false);
   /** The table row (rows, columns, type in a cell) is open. */
   const [tableRow, setTableRow] = createSignal(false);
+  /** The pen-style row of the toolbar is open. */
+  const [styles, setStyles] = createSignal(false);
   createEffect(() => {
     selectionIds();
     setPalette(false);
     setFills(false);
     setTableRow(false);
+    setStyles(false);
     setTableCellMode(false);
   });
   /** Selected text items (they take a colour and scale their font). */
@@ -191,8 +197,11 @@ export function SelectionOverlay() {
     return { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) };
   });
 
+  /** A single stamp: corners scale it about its centre, the knob turns it. */
+  const stamp = () => (single()?.stamp ? single() : undefined);
   const handles = createMemo<Handle[]>(() => {
     const it = single();
+    if (it?.stamp) return SCALE_HANDLES;
     const sh = shapeSel();
     if (sh) {
       const [x0, y0, x1, y1] = sh.box;
@@ -330,7 +339,64 @@ export function SelectionOverlay() {
     el.addEventListener("pointercancel", cancel);
   };
 
+  /** Scale (`h` set) or turn (`h` null) a stamp about its centre. */
+  const startStamp = (h: Handle | null, e: PointerEvent) => {
+    const it = stamp();
+    if (!it || e.button > 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const id = it.id;
+    const start = { x: it.x, y: it.y, w: it.w, h: it.h, rot: it.rot || 0 };
+    const [cx0, cy0, z] = camera();
+    const c = [(start.x + start.w / 2 - cx0) * z, (start.y + start.h / 2 - cy0) * z];
+    const root = controller.root.getBoundingClientRect();
+    const at = (ev: PointerEvent) => [ev.clientX - root.left - c[0], ev.clientY - root.top - c[1]];
+    const p0 = at(e);
+    const d0 = Math.max(4, Math.hypot(p0[0], p0[1]));
+    const a0 = Math.atan2(p0[1], p0[0]);
+    let g = start;
+    let moved = false;
+    setResizing(true);
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      const p = at(ev);
+      if (!moved && Math.hypot(p[0] - p0[0], p[1] - p0[1]) < 2) return;
+      moved = true;
+      if (h) {
+        const k = Math.max(MIN_SIZE / Math.min(start.w, start.h), Math.hypot(p[0], p[1]) / d0);
+        const w = start.w * k, hh = start.h * k;
+        g = { ...start, x: start.x + (start.w - w) / 2, y: start.y + (start.h - hh) / 2, w, h: hh };
+      } else {
+        let rot = start.rot + Math.atan2(p[1], p[0]) - a0;
+        // Snap to 15° steps when close (Shift turns freely).
+        const step = Math.PI / 12;
+        const near = Math.round(rot / step) * step;
+        if (!ev.shiftKey && Math.abs(rot - near) < 0.07) rot = near;
+        g = { ...start, rot: Math.atan2(Math.sin(rot), Math.cos(rot)) };
+      }
+      setItems((i) => i.id === id, { x: r1(g.x), y: r1(g.y), w: r1(g.w), h: r1(g.h), rot: g.rot });
+    };
+    const finish = (commit: boolean) => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", cancel);
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      setResizing(false);
+      if (!moved) return;
+      if (commit) controller.board.set_stamp_geom(id, r1(g.x), r1(g.y), r1(g.w), r1(g.h), g.rot);
+      else controller.sync(true);
+    };
+    const up = (ev: PointerEvent) => ev.pointerId === e.pointerId && finish(true);
+    const cancel = (ev: PointerEvent) => ev.pointerId === e.pointerId && finish(false);
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", cancel);
+  };
+
   const startResize = (h: Handle, e: PointerEvent) => {
+    if (stamp()) return startStamp(h, e);
     if (shapeSel()) return startShapeResize(h, e);
     const it = single();
     if (!it) return startScale(h, e);
@@ -410,8 +476,12 @@ export function SelectionOverlay() {
           <>
             <div
               class="sel-frame"
-              classList={{ loose: !single(), resizing: resizing() }}
-              style={{ transform: `translate(${r().x}px, ${r().y}px)`, width: `${r().w}px`, height: `${r().h}px` }}
+              classList={{ loose: !single(), resizing: resizing(), stamped: !!stamp() }}
+              style={{
+                transform: `translate(${r().x}px, ${r().y}px)${stamp()?.rot ? ` rotate(${stamp()!.rot}rad)` : ""}`,
+                width: `${r().w}px`,
+                height: `${r().h}px`,
+              }}
             >
               <For each={handles()}>
                 {(h) => (
@@ -422,6 +492,9 @@ export function SelectionOverlay() {
                   />
                 )}
               </For>
+              <Show when={stamp()}>
+                <div class="sel-rotate" role="presentation" title="Turn  ·  Shift turns freely" onPointerDown={(e) => startStamp(null, e)} />
+              </Show>
             </div>
             <Show when={!resizing()}>
               <div
@@ -450,7 +523,7 @@ export function SelectionOverlay() {
                     title={selectionMeta().shapeStyle ? "Outline colour" : "Colour"}
                     aria-label="Colour"
                     aria-expanded={palette()}
-                    onClick={() => (setFills(false), setTableRow(false), setPalette(!palette()))}
+                    onClick={() => (setFills(false), setTableRow(false), setStyles(false), setPalette(!palette()))}
                   >
                     <span
                       class="swatch-dot"
@@ -460,6 +533,21 @@ export function SelectionOverlay() {
                   </button>
                 </Show>
                 <Show when={selectionMeta().strokes > 0}>
+                  <button
+                    class="btn icon sel-style"
+                    classList={{ on: styles() }}
+                    title="Pen style"
+                    aria-label="Pen style"
+                    aria-expanded={styles()}
+                    onClick={() => {
+                      setStyles(!styles());
+                      setPalette(false);
+                      setFills(false);
+                      setTableRow(false);
+                    }}
+                  >
+                    <Icon name="pen" />
+                  </button>
                   <button class="btn icon" title="Thinner" aria-label="Thinner" onClick={() => controller.board.restyle_selection(undefined, undefined, 1 / WIDTH_STEP)}>
                     <span class="sel-line thin" aria-hidden="true" />
                   </button>
@@ -469,9 +557,9 @@ export function SelectionOverlay() {
                 </Show>
                 <ShapeControls
                   fillsOpen={fills()}
-                  onFills={(o) => (setPalette(false), setTableRow(false), setFills(o))}
+                  onFills={(o) => (setPalette(false), setTableRow(false), setStyles(false), setFills(o))}
                   tableOpen={tableRow()}
-                  onTable={(o) => (setPalette(false), setFills(false), setTableRow(o))}
+                  onTable={(o) => (setPalette(false), setFills(false), setStyles(false), setTableRow(o))}
                   up={(barPos()?.top ?? 0) < (rect()?.y ?? 0)}
                 />
                 <button class="btn icon" title="Smaller" aria-label="Smaller" onClick={() => controller.board.scale_selection_by(1 / SIZE_STEP)}>
@@ -513,6 +601,15 @@ export function SelectionOverlay() {
                 </button>
                 <Show when={fills() && selectionMeta().shapeStyle?.fillable}>
                   <FillRow up={(barPos()?.top ?? 0) < (rect()?.y ?? 0)} />
+                </Show>
+                <Show when={styles() && selectionMeta().strokes > 0}>
+                  <div class="sel-palette sel-styles" classList={{ up: (barPos()?.top ?? 0) < (rect()?.y ?? 0) }}>
+                    <StyleRow
+                      current={selectionMeta().style?.brush ?? null}
+                      color={currentColor() ? parseInt(currentColor()!.slice(1, 9).padEnd(8, "f"), 16) >>> 0 : 0x1c2024ff}
+                      onPick={(b) => controller.board.restyle_selection(undefined, undefined, undefined, b)}
+                    />
+                  </div>
                 </Show>
                 <Show when={palette() && colorable()}>
                   <div class="sel-palette" classList={{ up: (barPos()?.top ?? 0) < (rect()?.y ?? 0) }} role="group" aria-label="Colours">

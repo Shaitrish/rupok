@@ -226,6 +226,7 @@ impl Board {
             offset: [0.0, 0.0],
             shape: None,
             geom: None,
+            brush: None,
         });
         self.lesson
             .add_item(&self.page.clone(), &data, 2_500.0)

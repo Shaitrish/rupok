@@ -100,6 +100,7 @@ Settings → Teaching modes) resets that memory, so the config takes effect.
 | `lasso` | Select & move | prepare, teach |
 | `laser` | Laser pointer | prepare, teach |
 | `text` | Text (key `T`) | prepare, teach |
+| `stamp` | Stamps (key `K`) | prepare, teach |
 | `shape` | The Shapes picker's tool: every shape and table (key `S` opens the picker) | prepare, teach |
 | `rect`, `ellipse`, `line`, `arrow` | Single shape tools (keys `R`, `O`, `N`, `A`) | prepare, teach |
 | `hand` | Pan | all |
@@ -314,7 +315,7 @@ student view gets no pages panel.
           "type": "array",
           "uniqueItems": true,
           "items": {
-            "enum": ["pen", "highlighter", "eraser", "lasso", "laser", "text", "rect", "ellipse", "line", "arrow",
+            "enum": ["pen", "highlighter", "eraser", "lasso", "laser", "text", "stamp", "rect", "ellipse", "line", "arrow",
                      "hand", "interact", "smartink", "undo", "redo", "replay", "pager", "exit"]
           }
         },
@@ -337,7 +338,7 @@ student view gets no pages panel.
               "type": "array",
               "uniqueItems": true,
               "items": {
-                "enum": ["shapes", "lasso", "text", "rect", "ellipse", "line", "arrow", "hand", "interact", "smartink",
+                "enum": ["shapes", "lasso", "text", "stamp", "rect", "ellipse", "line", "arrow", "hand", "interact", "smartink",
                          "redo", "replay", "pager", "exit"]
               }
             }

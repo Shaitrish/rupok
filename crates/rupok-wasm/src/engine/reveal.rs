@@ -179,6 +179,7 @@ impl<S: InkSink> Engine<S> {
             width: s.width,
             color: s.color,
             opacity: s.opacity,
+            brush: s.brush(),
         })
     }
 

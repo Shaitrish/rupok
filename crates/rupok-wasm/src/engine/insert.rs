@@ -120,6 +120,7 @@ impl<S: InkSink> Engine<S> {
                 width: st.width,
                 color: st.color,
                 opacity: st.opacity,
+                brush: st.brush,
             }));
         }
         out
@@ -149,6 +150,7 @@ impl<S: InkSink> Engine<S> {
             width: st.width,
             opacity: st.opacity,
             fill: self.shape_opts.fill,
+            brush: st.brush,
         };
         if let Some(ids) = self.insert_placement(&page, pl, &style, &[], started) {
             self.shape_opts.placed = Some(ids);
@@ -181,6 +183,7 @@ impl<S: InkSink> Engine<S> {
                 offset: [0.0, 0.0],
                 shape: Some(part.shape.into()),
                 geom: Some(g),
+                brush: style.brush.key().map(Into::into),
             }));
         }
         for Label { text, at, size } in pl.labels {
@@ -198,6 +201,7 @@ impl<S: InkSink> Engine<S> {
                 text,
                 size,
                 color: style.color,
+                stamp: None,
             }));
         }
         for (geom, text, size, color) in texts {
@@ -207,6 +211,7 @@ impl<S: InkSink> Engine<S> {
                 text: text.clone(),
                 size: *size,
                 color: *color,
+                stamp: None,
             }));
         }
         if add.is_empty() {
@@ -428,6 +433,7 @@ impl<S: InkSink> Engine<S> {
                 text: text.into(),
                 size,
                 color: s.color,
+                stamp: None,
             }),
             created: now_ms,
             group: Some(group),
@@ -591,6 +597,7 @@ impl<S: InkSink> Engine<S> {
                         .as_ref()
                         .map(|f| apply::parse_color(f).map_err(err))
                         .transpose()?,
+                    brush: Brush::Pen,
                 };
                 (pl, style, texts, preset.shape_name())
             }
@@ -670,6 +677,7 @@ impl<S: InkSink> Engine<S> {
                     width: 3.0,
                     opacity: 1.0,
                     fill: None,
+                    brush: Brush::Pen,
                 };
                 (pl, style, texts, "table")
             }
@@ -696,6 +704,8 @@ struct Style {
     width: f32,
     opacity: f32,
     fill: Option<u32>,
+    /// Pen style of the outline (the Shapes popover's line style).
+    brush: Brush,
 }
 
 /// Cell rects `[x, y, w, h]` (world, unrotated box, offset applied) of a

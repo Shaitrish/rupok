@@ -25,6 +25,12 @@ import { forgetLessonPath, openLessonFiles, openLessonInto, saveLessonBytes } fr
 import { attachMedia, fileKind, insertFile as insertMediaOrModel, mediaKey } from "./media/media";
 import { onPresentFullscreenLost, presentFullscreen, toggleFullscreen } from "./fullscreen";
 import { openShapesPicker, shapeToolName } from "./shapes";
+import { brushOf, opacityOf } from "./brushes";
+import { currentStamp, freshStamps, setQuickMenu, stampToPlace } from "./stamps";
+
+/** Long-press with the pen (held still this long) opens the stamps menu. */
+const QUICK_MENU_MS = 650;
+const QUICK_MENU_SLOP = 8;
 
 /** Clipboard JSON from `Board.export_items_json` starts with this. */
 const CLIP_RE = /^\s*\{"rupok":"clipboard\/v1"/;
@@ -134,6 +140,20 @@ export class Controller {
     this.board.set_smart_families(smartFamilies(p));
     this.board.set_eraser_mode(p.eraserMode);
     this.board.set_clip_ink(p.keepInkOnPage);
+    for (const k of ["pen", "highlighter", "shape"] as const) this.board.set_brush(k, brushOf(k, p), opacityOf(k, p));
+  }
+
+  /** Place a stamp centred on the board point (`x`, `y`, CSS px of the
+   * board): the Stamps tool's current stamp unless one is given. */
+  placeStamp(x: number, y: number, id = currentStamp().id, emoji = currentStamp().emoji): string | undefined {
+    if (isView()) return undefined;
+    const s = stampToPlace(id, emoji);
+    const placed = this.board.add_stamp(s.kind, s.text, x, y, s.w, s.h, s.color);
+    if (placed) {
+      freshStamps.add(placed);
+      this.sync(false);
+    }
+    return placed;
   }
 
   /** Toolbar / M key: Smart shapes off, or back to the last on-mode. */
@@ -296,11 +316,11 @@ export class Controller {
     // shortcuts and the clicker reach the board again.
     if (t !== "interact" && document.activeElement instanceof HTMLIFrameElement) document.activeElement.blur();
     setTool(t);
-    if (t === "interact" || t === "text") {
+    if (t === "interact" || t === "text" || t === "stamp") {
       // A just-placed object stays selected in "use objects" so it can be
       // resized right away; the text tool starts fresh.
       this.board.set_tool("lasso");
-      if (t === "text") this.board.select_json("[]");
+      if (t === "text" || t === "stamp") this.board.select_json("[]");
     } else {
       this.board.set_tool(t === "shape" ? shapeToolName() : t);
     }
@@ -475,6 +495,16 @@ export class Controller {
         this.setTool("lasso");
         return;
       }
+      if (tool() === "stamp" && e.button === 0 && !isView()) {
+        // Tap, tap, tap: the Stamps tool stays on.
+        const [x, y] = pos(e);
+        this.placeStamp(x, y);
+        e.preventDefault();
+        return;
+      }
+      // A press the quick menu took may have ended over the menu, where
+      // this layer never saw its pointerup: the id is free again.
+      this.menuPointers.delete(e.pointerId);
       el.setPointerCapture(e.pointerId);
       this.pointersDown++;
       notePointerDown();
@@ -484,11 +514,16 @@ export class Controller {
       this.inking.set(e.pointerId, drawsInk(e, x, y));
       this.board.pointer_down(e.pointerId, x, y, e.pressure, e.timeStamp, e.pointerType, e.button);
       e.preventDefault();
+      this.armQuickMenu(e, x, y);
     });
     el.addEventListener("pointermove", (e) => {
       if (!el.hasPointerCapture(e.pointerId)) {
         this.hover(e);
         return;
+      }
+      if (this.hold && this.hold.id === e.pointerId) {
+        const [mx, my] = pos(e);
+        if (Math.hypot(mx - this.hold.x, my - this.hold.y) > QUICK_MENU_SLOP) this.disarmQuickMenu();
       }
       const c = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
       const samples = c.length ? c : [e];
@@ -505,20 +540,34 @@ export class Controller {
       this.lastNav = performance.now();
     };
     const up = (e: PointerEvent) => {
+      if (this.hold?.id === e.pointerId) this.disarmQuickMenu();
+      if (this.menuPointers.delete(e.pointerId)) return;
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
       released(e);
       this.board.pointer_up(e.pointerId);
     };
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", (e) => {
+      if (this.hold?.id === e.pointerId) this.disarmQuickMenu();
+      if (this.menuPointers.delete(e.pointerId)) return;
       released(e);
       this.board.pointer_cancel(e.pointerId);
     });
+    // The pen held still opens the stamps quick menu: the dot it started is
+    // dropped, and the rest of that press belongs to the menu.
+    this.openQuickMenu = (id: number) => {
+      if (el.hasPointerCapture(id)) el.releasePointerCapture(id);
+      this.inking.delete(id);
+      notePointerUp();
+      this.pointersDown = Math.max(0, this.pointersDown - 1);
+      this.board.pointer_cancel(id);
+      this.menuPointers.add(id);
+    };
     el.addEventListener("contextmenu", (e) => e.preventDefault());
     el.addEventListener("dblclick", (e) => {
       // Double-click a text item to edit it.
       const hit = this.itemAt(e.clientX, e.clientY);
-      if (hit?.kind === "text") setEditingText(hit.id);
+      if (hit?.kind === "text" && !hit.stamp) setEditingText(hit.id);
       else if (hit?.kind === "object") this.objects.activate(hit.id);
     });
 
@@ -541,6 +590,32 @@ export class Controller {
       this.lastNav = performance.now();
       this.board.zoom_at(f, x, y);
     });
+  }
+
+  // ------------------------------------------------------ stamps quick menu
+
+  private hold: { id: number; x: number; y: number; timer: number } | null = null;
+  private menuPointers = new Set<number>();
+  private openQuickMenu: (id: number) => void = () => {};
+
+  private armQuickMenu(e: PointerEvent, x: number, y: number) {
+    this.disarmQuickMenu();
+    if (!prefs().stampQuickMenu || isView() || e.button !== 0 || tool() !== "pen" || this.pointersDown > 1) return;
+    // Only a press that draws ink (not a finger that navigates).
+    if (!this.inking.get(e.pointerId)) return;
+    const id = e.pointerId;
+    const timer = window.setTimeout(() => {
+      if (this.hold?.id !== id) return;
+      this.hold = null;
+      this.openQuickMenu(id);
+      setQuickMenu({ x, y });
+    }, QUICK_MENU_MS);
+    this.hold = { id, x, y, timer };
+  }
+
+  private disarmQuickMenu() {
+    if (this.hold) clearTimeout(this.hold.timer);
+    this.hold = null;
   }
 
   eraserCursor: ((x: number, y: number, show: boolean) => void) | null = null;
@@ -629,7 +704,7 @@ export class Controller {
       if (e.key === "Escape") { this.board.select_json("[]"); if (this.board.replay_state().length) this.board.replay_stop(); return; }
       const map: Record<string, Tool> = {
         p: "pen", h: "highlighter", e: "eraser", v: "lasso", l: "laser", i: "interact",
-        t: "text", r: "rect", o: "ellipse", a: "arrow", n: "line",
+        t: "text", r: "rect", o: "ellipse", a: "arrow", n: "line", k: "stamp",
       };
       // Tool keys work for the tools this mode's toolbar has (all in Prepare).
       if (map[k] && (mode() === "prepare" || modeConfig().tools.includes(map[k]))) { this.setTool(map[k]); return; }

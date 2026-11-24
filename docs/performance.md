@@ -56,8 +56,17 @@ node pen-latency.mjs --headed --present           # adds the compositor estimate
   dry with `finish_clipped`, both by `clip_points` with the same inset. The OS
   ink trail is not drawn off the page, nor for a stroke that started off it
   (`wetInk.ts` `onPage`). Any new wet path must clip the same way.
-- Guarded by `crates/rupok-render/tests/wet_dry.rs` (GPU), the bench budget
-  "wet vs dry pixels differ", and the latency harness's "pen-up changed pixels".
+- Pen styles (`rupok_ink::Brush`, spec "Brushes") follow it by
+  construction: widths come from `Brush::radii` (pressure, the brush's taper
+  measured from the ends, the nib's direction measured a stroke width back
+  along the path, never between neighbouring points), textures are sampled
+  in page space from one cached GPU noise texture, and dashes, dots and the
+  rainbow follow the distance along the path, so those strokes are stored
+  unsimplified (`Brush::keeps_every_point`). Magic ink is never saved: after
+  pen-up its last wet frame stays on screen, then fades.
+- Guarded by `crates/rupok-render/tests/wet_dry.rs` (GPU, every brush), the
+  bench budgets "wet vs dry pixels differ" (plain pen and worst brush), and
+  the latency harness's "pen-up changed pixels" (`--brush NAME`).
 
 ### Page design and the pen
 

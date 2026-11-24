@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use bytemuck::{Pod, Zeroable};
 use rupok_core::StrokeData;
-use rupok_ink::{StrokePoint, point_radius};
+use rupok_ink::{Brush, StrokePoint};
 
 use crate::{Camera, pack_color};
 
@@ -15,6 +15,10 @@ pub struct InkVertex {
     pub radius: f32,
     pub color: [u8; 4],
     pub depth: f32,
+    /// Distance along the stroke from its first point (dashes, rainbow).
+    pub arc: f32,
+    /// `[brush id, width × 64 (u16, little end first), 0]` (`ink.wgsl`).
+    pub style: [u8; 4],
 }
 
 const STRIDE: u64 = std::mem::size_of::<InkVertex>() as u64;
@@ -23,6 +27,8 @@ const SEP: InkVertex = InkVertex {
     radius: -1.0,
     color: [0; 4],
     depth: 1.0,
+    arc: 0.0,
+    style: [0; 4],
 };
 /// Vertices per culling chunk.
 const CHUNK: usize = 2048;
@@ -33,10 +39,11 @@ const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 // The same vertex buffer is bound four times (prev, a, b, next).
 const A_PREV: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x3];
-const A_CUR: [wgpu::VertexAttribute; 3] =
-    wgpu::vertex_attr_array![1 => Float32x3, 2 => Unorm8x4, 3 => Float32];
+const A_CUR: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![1 => Float32x3, 2 => Unorm8x4, 3 => Float32, 6 => Float32, 7 => Unorm8x4];
 const A_B: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![4 => Float32x3];
 const A_NEXT: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![5 => Float32x3];
+/// Side of the square noise texture (pencil grain, chalk).
+const NOISE_SIZE: u32 = 256;
 
 #[derive(Clone, Copy, Debug)]
 struct Slot {
@@ -117,10 +124,56 @@ fn grow(b: &mut [f32; 4], v: &InkVertex) {
     if v.radius < 0.0 {
         return;
     }
-    b[0] = b[0].min(v.pos[0] - v.radius);
-    b[1] = b[1].min(v.pos[1] - v.radius);
-    b[2] = b[2].max(v.pos[0] + v.radius);
-    b[3] = b[3].max(v.pos[1] + v.radius);
+    let r = v.radius * reach_of(v.style[0]);
+    b[0] = b[0].min(v.pos[0] - r);
+    b[1] = b[1].min(v.pos[1] - r);
+    b[2] = b[2].max(v.pos[0] + r);
+    b[3] = b[3].max(v.pos[1] + r);
+}
+
+fn reach_of(id: u8) -> f32 {
+    Brush::ALL.get(usize::from(id)).map_or(1.0, |b| b.reach())
+}
+
+/// Tileable value noise (`NOISE_SIZE`², R8): four octaves on integer
+/// lattices that divide the size, so it wraps without a seam. Made once per
+/// renderer and kept on the GPU; never per frame.
+pub fn noise_texels() -> Vec<u8> {
+    fn hash(x: u32, y: u32, o: u32) -> f32 {
+        let mut h =
+            x.wrapping_mul(0x8da6_b343) ^ y.wrapping_mul(0xd816_3841) ^ o.wrapping_mul(0xcb1a_b31f);
+        h ^= h >> 13;
+        h = h.wrapping_mul(0x5bd1_e995);
+        h ^= h >> 15;
+        (h & 0xffff) as f32 / 65535.0
+    }
+    let n = NOISE_SIZE;
+    let mut acc = vec![0.0f32; (n * n) as usize];
+    let octaves = [(64u32, 0.5f32), (32, 0.25), (16, 0.15), (4, 0.1)];
+    for (o, (cells, amp)) in octaves.into_iter().enumerate() {
+        let step = n / cells;
+        for y in 0..n {
+            for x in 0..n {
+                let (cx, cy) = (x / step, y / step);
+                let (fx, fy) = (
+                    (x % step) as f32 / step as f32,
+                    (y % step) as f32 / step as f32,
+                );
+                let s = |t: f32| t * t * (3.0 - 2.0 * t);
+                let (sx, sy) = (s(fx), s(fy));
+                let at = |i: u32, j: u32| hash(i % cells, j % cells, o as u32);
+                let top = at(cx, cy) + (at(cx + 1, cy) - at(cx, cy)) * sx;
+                let bot = at(cx, cy + 1) + (at(cx + 1, cy + 1) - at(cx, cy + 1)) * sx;
+                acc[(y * n + x) as usize] += amp * (top + (bot - top) * sy);
+            }
+        }
+    }
+    let (lo, hi) = acc
+        .iter()
+        .fold((f32::MAX, f32::MIN), |(a, b), v| (a.min(*v), b.max(*v)));
+    acc.iter()
+        .map(|v| (((v - lo) / (hi - lo).max(1e-6)) * 255.0).round() as u8)
+        .collect()
 }
 
 /// Morton (Z-order) code of the 512-world-unit cell containing (x, y).
@@ -143,48 +196,130 @@ fn intersects(a: &[f32; 4], b: &[f32; 4]) -> bool {
     a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1]
 }
 
-/// Convert stroke points into GPU vertices (single-point strokes become a dot).
+/// Convert stroke points into GPU vertices (single-point strokes become a
+/// dot). Radii come from the brush ([`Brush::radii`]); each vertex carries
+/// its distance along the stroke and the brush for the shader.
+#[allow(clippy::too_many_arguments)]
 pub fn stroke_vertices(
     points: &[StrokePoint],
     width: f32,
+    brush: Brush,
     offset: [f32; 2],
     color: [u8; 4],
     depth: f32,
     out: &mut Vec<InkVertex>,
 ) {
-    let mut push = |p: &StrokePoint| {
+    let w64 = (width * 64.0).round().clamp(0.0, 65535.0) as u16;
+    let style = [brush.shader_id(), w64 as u8, (w64 >> 8) as u8, 0];
+    let tapered = brush.shapes_by_path();
+    let mut radii = Vec::new();
+    if tapered {
+        brush.radii(points, width, &mut radii);
+    }
+    let mut arc = 0.0f32;
+    let mut prev: Option<&StrokePoint> = None;
+    for (i, p) in points.iter().enumerate() {
+        if let Some(q) = prev {
+            arc += (p.x - q.x).hypot(p.y - q.y);
+        }
+        prev = Some(p);
         out.push(InkVertex {
             pos: [p.x + offset[0], p.y + offset[1]],
-            radius: point_radius(p.p, width),
+            radius: if tapered {
+                radii[i]
+            } else {
+                brush.radius(p.p, width)
+            },
             color,
             depth,
-        })
-    };
-    for p in points {
-        push(p);
+            arc,
+            style,
+        });
     }
     if points.len() == 1 {
-        push(&points[0]);
+        let v = out[out.len() - 1];
+        out.push(v);
     }
 }
 
 impl InkRenderer {
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Self {
         let ink_shader = device.create_shader_module(wgpu::include_wgsl!("ink.wgsl"));
         let blit_shader = device.create_shader_module(wgpu::include_wgsl!("blit.wgsl"));
 
         let globals_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("ink globals"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+        // The brush noise texture: uploaded once, sampled by pencil and chalk.
+        let noise = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("brush noise"),
+            size: wgpu::Extent3d {
+                width: NOISE_SIZE,
+                height: NOISE_SIZE,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &noise,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &noise_texels(),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(NOISE_SIZE),
+                rows_per_image: Some(NOISE_SIZE),
+            },
+            wgpu::Extent3d {
+                width: NOISE_SIZE,
+                height: NOISE_SIZE,
+                depth_or_array_layers: 1,
+            },
+        );
+        let noise_view = noise.create_view(&Default::default());
+        let noise_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("brush noise"),
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
         });
         let mk_globals = |label| {
             let buf = device.create_buffer(&wgpu::BufferDescriptor {
@@ -196,10 +331,20 @@ impl InkRenderer {
             let bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some(label),
                 layout: &globals_layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: buf.as_entire_binding(),
-                }],
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: buf.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&noise_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::Sampler(&noise_sampler),
+                    },
+                ],
             });
             (buf, bg)
         };
@@ -426,6 +571,7 @@ impl InkRenderer {
         stroke_vertices(
             &s.points,
             s.width,
+            s.brush(),
             s.offset,
             color,
             Self::depth_of(depth_idx),
@@ -527,12 +673,20 @@ impl InkRenderer {
     }
 
     /// Replace the wet (in-progress) stroke.
-    pub fn set_wet(&mut self, points: &[StrokePoint], width: f32, color: u32, opacity: f32) {
+    pub fn set_wet(
+        &mut self,
+        points: &[StrokePoint],
+        width: f32,
+        brush: Brush,
+        color: u32,
+        opacity: f32,
+    ) {
         self.wet.clear();
         self.wet.push(SEP);
         stroke_vertices(
             points,
             width,
+            brush,
             [0.0, 0.0],
             pack_color(color, opacity),
             0.5,
@@ -545,14 +699,15 @@ impl InkRenderer {
     /// Show several wet strokes at once (multi-pen boards, lasso outline, replay).
     pub fn set_wet_many<'a>(
         &mut self,
-        strokes: impl IntoIterator<Item = (&'a [StrokePoint], f32, u32, f32)>,
+        strokes: impl IntoIterator<Item = (&'a [StrokePoint], f32, Brush, u32, f32)>,
     ) {
         self.wet.clear();
         self.wet.push(SEP);
-        for (i, (pts, w, c, o)) in strokes.into_iter().enumerate() {
+        for (i, (pts, w, b, c, o)) in strokes.into_iter().enumerate() {
             stroke_vertices(
                 pts,
                 w,
+                b,
                 [0.0, 0.0],
                 pack_color(c, o),
                 0.5 - i as f32 * 1e-4,
@@ -870,6 +1025,7 @@ mod tests {
                 dt: 0,
             }],
             4.0,
+            Brush::Pen,
             [10.0, 0.0],
             [0, 0, 0, 255],
             0.5,
@@ -878,6 +1034,61 @@ mod tests {
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].pos, [11.0, 2.0]);
         assert_eq!(out[0].radius, 2.0);
+    }
+
+    #[test]
+    fn vertices_carry_arc_length_brush_and_width() {
+        let pts: Vec<StrokePoint> = (0..4)
+            .map(|i| StrokePoint {
+                x: i as f32 * 3.0,
+                y: 4.0 * (i % 2) as f32,
+                p: 1.0,
+                dt: 0,
+            })
+            .collect();
+        let mut out = Vec::new();
+        stroke_vertices(&pts, 6.5, Brush::Dashed, [0.0; 2], [0; 4], 0.5, &mut out);
+        let arcs: Vec<f32> = out.iter().map(|v| v.arc).collect();
+        assert_eq!(arcs, vec![0.0, 5.0, 10.0, 15.0]);
+        assert_eq!(out[0].style[0], Brush::Dashed.shader_id());
+        let w = u16::from(out[0].style[1]) | (u16::from(out[0].style[2]) << 8);
+        assert_eq!(f32::from(w) / 64.0, 6.5);
+        // Ballpoint ignores pressure, glow widens the culling bounds.
+        let mut out = Vec::new();
+        let soft = [StrokePoint { p: 0.0, ..pts[0] }];
+        stroke_vertices(
+            &soft,
+            4.0,
+            Brush::Ballpoint,
+            [0.0; 2],
+            [0; 4],
+            0.5,
+            &mut out,
+        );
+        assert_eq!(out[0].radius, 2.0);
+        let mut b = empty_bounds();
+        grow(
+            &mut b,
+            &InkVertex {
+                style: [Brush::Neon.shader_id(), 0, 0, 0],
+                ..out[0]
+            },
+        );
+        assert!(b[2] - b[0] > 4.0 * 2.0);
+    }
+
+    #[test]
+    fn noise_is_full_range_and_tiles() {
+        let t = noise_texels();
+        assert_eq!(t.len(), (NOISE_SIZE * NOISE_SIZE) as usize);
+        assert_eq!(*t.iter().min().unwrap(), 0);
+        assert_eq!(*t.iter().max().unwrap(), 255);
+        // Opposite edges are close (no seam when it repeats).
+        let n = NOISE_SIZE as usize;
+        let seam: u32 = (0..n)
+            .map(|y| u32::from(t[y * n].abs_diff(t[y * n + n - 1])))
+            .sum();
+        assert!(seam / (n as u32) < 24, "seam {}", seam / n as u32);
     }
 
     #[test]

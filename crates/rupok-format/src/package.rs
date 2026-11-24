@@ -443,6 +443,7 @@ mod tests {
                     size: 40.0,
                     color: 0xff,
                     latex: false,
+                    stamp: None,
                 }),
                 1.0,
             )
@@ -457,6 +458,7 @@ mod tests {
                     size: 40.0,
                     color: 0xff,
                     latex: true,
+                    stamp: None,
                 }),
                 2.0,
             )
@@ -484,6 +486,7 @@ mod tests {
                         offset: [0.0, 0.0],
                         shape: None,
                         geom: None,
+                        brush: None,
                     }),
                     10.0 + i as f64,
                 )
@@ -515,6 +518,7 @@ mod tests {
                             h: 100.0,
                             ..Default::default()
                         }),
+                        brush: None,
                     }),
                     20.0,
                 )
@@ -638,6 +642,7 @@ mod tests {
             size: 40.0,
             color: 0xff,
             latex: false,
+            stamp: None,
         };
         lesson.add_item(&page, &ItemData::Text(text), 3.0).unwrap();
         // Within the window: doc and manifest move on, the outline is kept.
@@ -718,6 +723,7 @@ mod tests {
                         size: 10.0,
                         color: 0xff,
                         latex: false,
+                        stamp: None,
                     }),
                     i as f64,
                 )

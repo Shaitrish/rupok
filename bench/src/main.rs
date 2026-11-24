@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use rupok_core::{ItemData, Lesson, PageSpec, StrokeData};
 use rupok_format::Package;
-use rupok_ink::{BuilderConfig, InputPoint, StrokeBuilder, StrokeStyle};
+use rupok_ink::{Brush, BuilderConfig, InputPoint, StrokeBuilder, StrokeStyle};
 use rupok_render::{Camera, Gpu, InkRenderer};
 
 struct Rng(u64);
@@ -66,6 +66,7 @@ fn synth_stroke(rng: &mut Rng, cx: f32, cy: f32, t0: f64) -> StrokeData {
         offset: [0.0, 0.0],
         shape: None,
         geom: None,
+        brush: None,
     }
 }
 
@@ -244,7 +245,7 @@ fn main() {
         view_formats: &[],
     });
     let view = target.create_view(&Default::default());
-    let mut r = InkRenderer::new(&gpu.device, format);
+    let mut r = InkRenderer::new(&gpu.device, &gpu.queue, format);
 
     // Correctness: a single thick red stroke must produce red pixels.
     let probe = StrokeData {
@@ -269,6 +270,7 @@ fn main() {
         offset: [0.0, 0.0],
         shape: None,
         geom: None,
+        brush: None,
     };
     r.add_stroke("probe", &probe);
     r.render(&gpu.device, &gpu.queue, &view, w, h, Camera::default(), 1.0);
@@ -303,12 +305,12 @@ fn main() {
     let time_frames = |r: &mut InkRenderer,
                        cam_fn: &dyn Fn(usize) -> Camera,
                        frames: usize,
-                       wet: bool|
+                       wet: Option<Brush>|
      -> (f64, f64, u32) {
         let mut times = Vec::with_capacity(frames);
         let mut segs = 0;
         for f in 0..frames {
-            if wet {
+            if let Some(brush) = wet {
                 let pts: Vec<_> = (0..(50 + f))
                     .map(|i| rupok_ink::StrokePoint {
                         x: 300.0 + i as f32 * 2.0,
@@ -317,7 +319,7 @@ fn main() {
                         dt: i as u32,
                     })
                     .collect();
-                r.set_wet(&pts, 3.0, 0x2563ebff, 1.0);
+                r.set_wet(&pts, 3.0, brush, 0x2563ebff, 1.0);
             }
             let t = Instant::now();
             let st = r.render(&gpu.device, &gpu.queue, &view, w, h, cam_fn(f), 1.0);
@@ -334,7 +336,7 @@ fn main() {
     };
 
     // Warm-up (pipeline compile, uploads).
-    time_frames(&mut r, &|_| Camera::default(), 5, false);
+    time_frames(&mut r, &|_| Camera::default(), 5, None);
 
     let (p50, p99, segs) = time_frames(
         &mut r,
@@ -344,7 +346,7 @@ fn main() {
             zoom: 1.0,
         },
         120,
-        false,
+        None,
     );
     println!(
         "pan @100% zoom      p50 {:>6.2} ms  p99 {:>6.2} ms   ({segs} segments/frame)",
@@ -365,7 +367,7 @@ fn main() {
             zoom: 0.11,
         },
         120,
-        false,
+        None,
     );
     println!(
         "pan, whole board    p50 {:>6.2} ms  p99 {:>6.2} ms   ({segs} segments/frame, everything visible)",
@@ -377,8 +379,8 @@ fn main() {
         y: 0.0,
         zoom: 1.0,
     };
-    time_frames(&mut r, &|_| still, 2, false);
-    let (p50, p99, segs) = time_frames(&mut r, &|_| still, 240, true);
+    time_frames(&mut r, &|_| still, 2, None);
+    let (p50, p99, segs) = time_frames(&mut r, &|_| still, 240, Some(Brush::Pen));
     println!(
         "writing (wet only)  p50 {:>6.2} ms  p99 {:>6.2} ms   ({segs} segments/frame, dry layer cached)",
         p50, p99
@@ -389,10 +391,35 @@ fn main() {
         limit: 4.0,
         unit: "ms",
     });
+    // Every brush on the same path (pen styles, docs/performance.md).
+    let mut worst = (0.0f64, Brush::Pen);
+    for brush in Brush::ALL {
+        let (p50, p99, _) = time_frames(&mut r, &|_| still, 120, Some(brush));
+        println!(
+            "  wet {:<10} p50 {:>6.2} ms  p99 {:>6.2} ms",
+            brush.as_str(),
+            p50,
+            p99
+        );
+        if p99 > worst.0 {
+            worst = (p99, brush);
+        }
+    }
+    println!(
+        "writing, worst brush ({}) p99 {:.2} ms",
+        worst.1.as_str(),
+        worst.0
+    );
+    budgets.push(Budget {
+        name: "wet frame p99, worst brush",
+        value: worst.0,
+        limit: 4.0,
+        unit: "ms",
+    });
 
     // The pen path through the engine: a 10 s stroke at 240 Hz (2400
     // samples), each pointer move rebuilding the wet stroke, then frames.
-    let (move_p99, wet_frame_p99) = pen_path(&gpu, &view, w, h, format);
+    let (move_p99, wet_frame_p99) = pen_path(&gpu, &view, w, h, format, Brush::Pen);
     println!(
         "pen path, 10 s stroke  move p99 {move_p99:>6.3} ms   wet frame at the end p99 {wet_frame_p99:>6.2} ms"
     );
@@ -402,13 +429,45 @@ fn main() {
         limit: 0.5,
         unit: "ms",
     });
+    let mut worst_move = (0.0f64, Brush::Pen);
+    for brush in Brush::ALL {
+        let (m, f) = pen_path(&gpu, &view, w, h, format, brush);
+        println!(
+            "  pen path {:<10} move p99 {m:>6.3} ms   wet frame p99 {f:>6.2} ms",
+            brush.as_str()
+        );
+        if m > worst_move.0 {
+            worst_move = (m, brush);
+        }
+    }
+    budgets.push(Budget {
+        name: "pen move → wet update p99, worst brush",
+        value: worst_move.0,
+        limit: 0.5,
+        unit: "ms",
+    });
 
-    // Wet and dry must look the same, or the stroke jumps at pen-up.
-    let changed = wet_dry_diff(&gpu, &target, &view, w, h, format);
+    // Wet and dry must look the same, or the stroke jumps at pen-up: for
+    // every brush.
+    let changed = wet_dry_diff(&gpu, &target, &view, w, h, format, Brush::Pen);
     println!("wet vs dry          {changed:>6.2} % of ink pixels differ");
     budgets.push(Budget {
         name: "wet vs dry pixels differ",
         value: changed,
+        limit: 0.5,
+        unit: "%",
+    });
+    let mut worst_diff = (0.0f64, Brush::Pen);
+    for brush in Brush::ALL {
+        let c = wet_dry_diff(&gpu, &target, &view, w, h, format, brush);
+        println!("  wet vs dry {:<10} {c:>6.2} %", brush.as_str());
+        if c > worst_diff.0 {
+            worst_diff = (c, brush);
+        }
+    }
+    budgets.push(Budget {
+        name: "wet vs dry pixels differ, worst brush",
+        value: worst_diff.0,
         limit: 0.5,
         unit: "%",
     });
@@ -424,10 +483,16 @@ fn pen_path(
     w: u32,
     h: u32,
     format: wgpu::TextureFormat,
+    brush: Brush,
 ) -> (f64, f64) {
     use rupok_wasm::engine::{Engine, PointerKind};
-    let mut e = Engine::new(InkRenderer::new(&gpu.device, format), "bench", 0.0);
+    let mut e = Engine::new(
+        InkRenderer::new(&gpu.device, &gpu.queue, format),
+        "bench",
+        0.0,
+    );
     e.set_view(w as f32, h as f32);
+    e.set_brush(brush);
     let at = |i: usize| {
         let t = i as f64 * (1000.0 / 240.0);
         let x = 100.0 + (i as f64 * 0.7) % 1600.0;
@@ -475,6 +540,7 @@ fn wet_dry_diff(
     w: u32,
     h: u32,
     format: wgpu::TextureFormat,
+    brush: Brush,
 ) -> f64 {
     let pts: Vec<_> = (0..1200)
         .map(|i| {
@@ -489,11 +555,11 @@ fn wet_dry_diff(
         .collect();
     let cam = Camera::default();
     let region = (180u32, 220u32, 640u32, 160u32);
-    let mut r = InkRenderer::new(&gpu.device, format);
-    r.set_wet(&pts, 4.0, 0x1c2024ff, 1.0);
+    let mut r = InkRenderer::new(&gpu.device, &gpu.queue, format);
+    r.set_wet(&pts, 4.0, brush, 0x1c2024ff, 1.0);
     r.render(&gpu.device, &gpu.queue, view, w, h, cam, 1.0);
     let wet = read_region(gpu, target, region);
-    let mut r = InkRenderer::new(&gpu.device, format);
+    let mut r = InkRenderer::new(&gpu.device, &gpu.queue, format);
     r.add_stroke(
         "dry",
         &StrokeData {
@@ -501,10 +567,16 @@ fn wet_dry_diff(
             color: 0x1c2024ff,
             width: 4.0,
             opacity: 1.0,
-            points: rupok_ink::simplify::simplify(&pts, 0.2, 0.06),
+            // As `StrokeBuilder::finish` does.
+            points: if brush.keeps_every_point() {
+                pts.clone()
+            } else {
+                rupok_ink::simplify::simplify(&pts, 0.2, 0.06)
+            },
             offset: [0.0, 0.0],
             shape: None,
             geom: None,
+            brush: Some(brush.as_str().into()),
         },
     );
     r.render(&gpu.device, &gpu.queue, view, w, h, cam, 1.0);

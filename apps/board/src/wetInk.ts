@@ -17,12 +17,15 @@
 // - The pointer kind (pen, touch, mouse) for the board's cursor: no cursor
 //   over a pen's ink, a small dot for a mouse.
 //
-// A pen-styles change builds here: anything that changes how the wet stroke
-// looks must change the dry stroke the same way (see the wet/dry test in
-// crates/rupok-render/tests/wet_dry.rs and bench/latency).
+// Pen styles (brushes.ts) build on this: anything that changes how the wet
+// stroke looks must change the dry stroke the same way (see the wet/dry test
+// in crates/rupok-render/tests/wet_dry.rs and bench/latency). The OS trail is
+// one solid, opaque line, so styles it cannot imitate (dashes, the rainbow,
+// a see-through marker) go without it and keep the browser's prediction.
 
 import { createSignal } from "solid-js";
 import { camera, color, pageIndex, pages, prefs, tool, width } from "./state";
+import { brushOf } from "./brushes";
 
 /** At most this far ahead (ms) of the newest real sample when predicting. */
 const PREDICT_MS = 12;
@@ -63,6 +66,9 @@ export function attachTrail(canvas: HTMLCanvasElement) {
 }
 
 const inking = () => tool() === "pen";
+/** Pen styles the OS trail can lead: a solid line in the pen's colour. */
+const TRAIL_OFF = ["dashed", "dotted", "rainbow", "marker"];
+const trailFits = () => !TRAIL_OFF.includes(brushOf("pen"));
 let penSeen = false;
 
 /** Whether this pointer's press draws ink (mirrors the engine's palm
@@ -98,11 +104,13 @@ function onPage(x: number, y: number, margin: number): boolean {
 /** After the board took a pen move: hand the OS trail its start point.
  * `x`, `y`: the move's position on the board (CSS px from its corner). */
 export function trailAfterMove(e: PointerEvent, drawing: boolean, x: number, y: number) {
-  if (!presenter || !drawing || !inking()) return;
-  // Mirror rupok_ink::point_radius (MIN_WIDTH_RATIO 0.35) and the pressure
-  // curve, so the trail is as wide as the ink it leads.
+  if (!presenter || !drawing || !inking() || !trailFits()) return;
+  // Mirror rupok_ink::Brush::radius and the pressure curve, so the trail is
+  // as wide as the ink it leads.
   const p = e.pointerType === "pen" && e.pressure > 0 ? Math.pow(Math.min(1, e.pressure), prefs().pressure) : 0.5;
-  const diameter = Math.max(1, width() * camera()[2] * (0.35 + 0.65 * p));
+  const b = brushOf("pen");
+  const k = b === "ballpoint" ? 1 : b === "brush" ? 0.15 + 0.85 * p : b === "pencil" ? 0.6 + 0.4 * p : 0.35 + 0.65 * p;
+  const diameter = Math.max(1, width() * camera()[2] * k);
   // Off the page the engine cuts the ink; the OS trail must not draw there
   // either, or the tip would show ink that never lands. Skipping an update
   // leaves that frame without a trail.
@@ -117,7 +125,7 @@ export function trailAfterMove(e: PointerEvent, drawing: boolean, x: number, y: 
 
 /** The browser's predicted samples to draw for this move. */
 export function predictedFor(e: PointerEvent): PointerEvent[] {
-  if (presenter && inking()) return [];
+  if (presenter && inking() && trailFits()) return [];
   const list = e.getPredictedEvents ? e.getPredictedEvents() : [];
   return list.filter((p) => p.timeStamp - e.timeStamp <= PREDICT_MS);
 }

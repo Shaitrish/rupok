@@ -284,7 +284,7 @@ fn recolour_and_rethicken_ink_and_text_in_one_undo_step() {
     e.set_tool(ToolKind::Lasso);
     e.select_all();
     let before = items(&e);
-    assert!(e.restyle_selection(Some(0xe5484dff), None, Some(2.0)));
+    assert!(e.restyle_selection(Some(0xe5484dff), None, Some(2.0), None));
     for it in items(&e) {
         match it.data {
             ItemData::Stroke(s) => {
@@ -304,14 +304,14 @@ fn recolour_and_rethicken_ink_and_text_in_one_undo_step() {
     let meta: serde_json::Value = serde_json::from_str(&e.selection_meta_json()).unwrap();
     assert_eq!(meta["style"]["color"], "#e5484dff");
     assert!(
-        !e.restyle_selection(Some(0xe5484dff), None, None),
+        !e.restyle_selection(Some(0xe5484dff), None, None, None),
         "no change, no step"
     );
     assert!(e.undo());
     assert_eq!(items(&e), before, "one undo restores colour and width");
     // An absolute width.
     e.select_all();
-    assert!(e.restyle_selection(None, Some(9.0), None));
+    assert!(e.restyle_selection(None, Some(9.0), None, None));
     assert!(strokes(&e).iter().all(|s| s.width == 9.0));
 }
 
@@ -324,7 +324,7 @@ fn shapes_keep_their_geometry_when_rethickened_and_scaled() {
     e.set_tool(ToolKind::Lasso);
     e.select(vec![id.clone()]);
     let g0 = strokes(&e)[0].geom.clone().unwrap();
-    assert!(e.restyle_selection(None, None, Some(3.0)));
+    assert!(e.restyle_selection(None, None, Some(3.0), None));
     let s = &strokes(&e)[0];
     assert_eq!(s.shape.as_deref(), Some("rect"));
     let g1 = s.geom.clone().unwrap();

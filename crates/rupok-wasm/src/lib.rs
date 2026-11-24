@@ -18,6 +18,7 @@ pub mod templates;
 #[cfg(target_arch = "wasm32")]
 mod web {
     use rupok_core::{BoxGeom, Pattern};
+    use rupok_ink::Brush;
     use rupok_render::{Gpu, InkRenderer};
     use wasm_bindgen::prelude::*;
 
@@ -100,7 +101,7 @@ mod web {
                 )
                 .into(),
             );
-            let renderer = InkRenderer::new(&gpu.device, format);
+            let renderer = InkRenderer::new(&gpu.device, &gpu.queue, format);
             let mut engine = Engine::new(renderer, "Untitled lesson", now());
             engine.set_view(css[0], css[1]);
             engine.fit_page();
@@ -213,6 +214,21 @@ mod web {
 
         pub fn set_width(&mut self, w: f32) {
             self.engine.set_width(w);
+        }
+
+        /// Pen style and opacity (0.1..1) of one tool's new strokes:
+        /// `kind` is `pen`, `highlighter` or `shape`; `brush` is `pen`,
+        /// `ballpoint`, `fountain`, `marker`, `pencil`, `chalk`, `brush`,
+        /// `dashed`, `dotted`, `neon`, `rainbow`, or `magic` (disappearing
+        /// ink, pen only, never saved). Unknown names are the plain pen.
+        pub fn set_brush(&mut self, kind: &str, brush: &str, opacity: f32) {
+            self.engine
+                .set_tool_brush(kind, Brush::parse(brush), opacity);
+        }
+
+        /// The current tool's pen style.
+        pub fn brush(&mut self) -> String {
+            self.engine.brush().as_str().into()
         }
 
         /// Eraser tool and palm duster: "partial" rubs out only the ink
@@ -600,16 +616,23 @@ mod web {
             self.engine.resize_shape(id, [x0, y0, x1, y1], commit)
         }
 
-        /// Recolour (0xRRGGBBAA) and/or re-thicken the selection: `width`
-        /// sets every stroke's width, `width_scale` multiplies it. Text takes
-        /// the colour. One undo step; false when nothing changed.
+        /// Recolour (0xRRGGBBAA), re-thicken and/or change the pen style of
+        /// the selection: `width` sets every stroke's width, `width_scale`
+        /// multiplies it, `brush` names a pen style (see `set_brush`). Text
+        /// takes the colour. One undo step; false when nothing changed.
         pub fn restyle_selection(
             &mut self,
             color: Option<u32>,
             width: Option<f32>,
             width_scale: Option<f32>,
+            brush: Option<String>,
         ) -> bool {
-            self.engine.restyle_selection(color, width, width_scale)
+            self.engine.restyle_selection(
+                color,
+                width,
+                width_scale,
+                brush.as_deref().map(Brush::parse),
+            )
         }
 
         /// Scale the selection so its bounds become the box: ink, shapes
@@ -810,6 +833,28 @@ mod web {
 
         pub fn add_text(&mut self, x: f32, y: f32, text: &str, size: f64) -> Option<String> {
             self.engine.add_text(x, y, text, size, now())
+        }
+
+        /// Place a classroom stamp (`star`, `tick`, `badge`, `emoji`, …)
+        /// centred on the screen point, `w` × `h` world units; `text` is
+        /// the emoji or label a reader without stamps shows. Returns its id.
+        #[allow(clippy::too_many_arguments)]
+        pub fn add_stamp(
+            &mut self,
+            kind: &str,
+            text: &str,
+            x: f32,
+            y: f32,
+            w: f64,
+            h: f64,
+            rgba: u32,
+        ) -> Option<String> {
+            self.engine.add_stamp(kind, text, x, y, w, h, rgba, now())
+        }
+
+        /// Move, resize and rotate (radians) a stamp: one undo step.
+        pub fn set_stamp_geom(&mut self, id: &str, x: f64, y: f64, w: f64, h: f64, rot: f64) {
+            self.engine.set_stamp_geom(id, BoxGeom { x, y, w, h, rot });
         }
 
         /// Recolour a text item, 0xRRGGBBAA (one undo step).

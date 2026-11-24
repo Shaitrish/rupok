@@ -1147,6 +1147,7 @@ pub fn add_text(path: &Path, nt: NewText) -> Result<AddedText> {
         text: nt.text,
         size,
         color: nt.color.unwrap_or(0x000000ff),
+        stamp: None,
     });
     let item_id = lesson.add_item(&page.id, &data, now_ms())?;
     save(path, &mut pkg, &lesson)?;
@@ -1251,6 +1252,7 @@ pub fn replace_strokes_with_text(
         text: text.to_string(),
         size,
         color: color.unwrap_or(ink),
+        stamp: None,
     });
     let item_id = lesson.replace_items(&p.id, &ids, &data, now_ms())?;
     save(path, &mut pkg, &lesson)?;

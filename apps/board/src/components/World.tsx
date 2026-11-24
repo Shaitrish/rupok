@@ -10,6 +10,7 @@ import { MediaItem } from "./MediaItem";
 import { BOARD_COLORS, type DomItem, editingText, items, pageIndex, pages, setEditingText, tool } from "../state";
 import { brandingFor, designPreview, lessonBranding } from "../design";
 import { PageBackdrop } from "./PageBackdrop";
+import { StampItem } from "./Stamps";
 
 function ObjectItem(props: { item: DomItem }) {
   let iframe!: HTMLIFrameElement;
@@ -202,6 +203,9 @@ export default function World(props: { ref: (el: HTMLDivElement) => void }) {
               >
                 <img src={controller.assetUrl(item.asset!)} alt="" draggable={false} />
               </div>
+            </Match>
+            <Match when={item.kind === "text" && item.stamp}>
+              <StampItem item={item} />
             </Match>
             <Match when={item.kind === "text" && item.latex}>
               <MathItem item={item} />

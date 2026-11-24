@@ -1,0 +1,121 @@
+/* Pen styles (InkOptions.tsx) and stamps (Stamps.tsx). FigJam-flat, tokens
+ * only (DESIGN.md), 44px touch targets. */
+
+/* ------------------------------------------------------------ pen styles */
+
+.ink-label {
+  padding: 2px var(--s2) 0; font: 650 11px/16px var(--font); letter-spacing: 0.02em; text-transform: uppercase; color: var(--text-3);
+}
+.ink-styles { display: grid; grid-template-columns: repeat(4, 60px); gap: var(--s1); }
+.ink-styles.row { display: flex; gap: 2px; max-width: min(540px, calc(100vw - 32px)); overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.ink-style {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  width: 60px; height: 52px; padding: 2px 0 3px; border: 0; border-radius: 10px; background: transparent; cursor: pointer;
+  color: var(--text-2); font: 550 11px/12px var(--font); transition: background-color 120ms var(--ease);
+}
+.ink-styles.row .ink-style { flex: none; width: 56px; height: 48px; }
+.ink-style canvas { width: 52px; height: 32px; display: block; pointer-events: none; }
+.ink-styles.row .ink-style canvas { height: 28px; }
+.ink-style span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56px; }
+.ink-style:hover { background: var(--hover); color: var(--text); }
+.ink-style:active { background: var(--pressed); }
+.ink-style.on { background: var(--accent-3); color: var(--accent-11); box-shadow: inset 0 0 0 2px var(--accent-9); }
+.ink-style:focus-visible { outline: 2px solid var(--accent-9); outline-offset: 2px; }
+.ink-size { display: flex; align-items: center; gap: var(--s1); }
+.ink-size .dock-sizes { flex: none; }
+.ink-size input { flex: 1; min-width: 64px; margin: 0 var(--s1); }
+.dock-pop-pen .dock-palette, .dock-pop-highlighter .dock-palette { grid-template-columns: repeat(4, 60px); gap: var(--s1); }
+.dock-pop-pen .dock-palette .tool, .dock-pop-highlighter .dock-palette .tool { width: 60px; }
+.sel-styles { padding: var(--s1); }
+
+/* ---------------------------------------------------------- stamp palette */
+
+.stamps { display: flex; flex-direction: column; gap: var(--s1); max-width: min(328px, calc(100vw - 32px)); }
+.stamp-grid { display: grid; grid-template-columns: repeat(6, 48px); gap: 2px; }
+.stamp-cell { width: 48px; height: 48px; position: relative; }
+.stamp-cell.fav::after {
+  /* In the quick menu. */
+  content: ""; position: absolute; right: 5px; top: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-9);
+}
+.stamp-icon { display: grid; place-items: center; width: var(--s, 28px); height: var(--s, 28px); line-height: 1; pointer-events: none; }
+.stamp-icon svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.stamp-cell.wide { width: auto; grid-column: span 2; }
+.stamp-pill {
+  display: inline-flex; align-items: center; height: 26px; padding: 0 var(--s3); border-radius: 13px; pointer-events: none;
+  font: 750 12px/16px var(--font); white-space: nowrap;
+}
+.quick-item.wide { width: 112px; height: 48px; margin: -24px 0 0 -56px; border-radius: 24px; }
+.stamp-icon.emoji-glyph { font-size: 24px; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+.emoji-grid { display: grid; grid-template-columns: repeat(6, 48px); gap: 2px; max-height: 200px; overflow-y: auto; overscroll-behavior: contain; }
+.emoji-cell { width: 48px; height: 44px; font-size: 24px; line-height: 1; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+.emoji-field { margin: var(--s1) 2px 0; height: 40px; }
+.stamp-hint { margin: 0; padding: 0 var(--s2) var(--s1); font: 550 11px/16px var(--font); color: var(--text-3); white-space: normal; }
+
+/* -------------------------------------------------------- stamp on the board */
+
+.item.stamp { position: absolute; transform-origin: 50% 50%; pointer-events: none; }
+.item.stamp svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.item.stamp.pop svg { animation: stamp-pop 420ms var(--ease) both; transform-origin: 50% 50%; }
+.item.stamp.pop::before, .item.stamp.pop::after {
+  /* A little sparkle around a new stamp. */
+  content: ""; position: absolute; inset: -18%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, transparent 54%, rgba(245, 179, 1, 0.55) 56%, transparent 62%);
+  animation: stamp-ring 520ms var(--ease) both;
+}
+.item.stamp.pop::after {
+  inset: -30%;
+  background:
+    radial-gradient(circle at 50% 4%, #f5b301 0 3%, transparent 4%),
+    radial-gradient(circle at 96% 50%, #20c997 0 3%, transparent 4%),
+    radial-gradient(circle at 50% 96%, #3e63dd 0 3%, transparent 4%),
+    radial-gradient(circle at 4% 50%, #e5484d 0 3%, transparent 4%),
+    radial-gradient(circle at 84% 16%, #f76b15 0 2.5%, transparent 3.5%),
+    radial-gradient(circle at 16% 84%, #8e4ec6 0 2.5%, transparent 3.5%);
+  animation: stamp-sparks 560ms var(--ease) both;
+}
+@keyframes stamp-pop { 0% { transform: scale(0.3); opacity: 0; } 55% { transform: scale(1.14); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes stamp-ring { 0% { transform: scale(0.5); opacity: 0.9; } 100% { transform: scale(1.25); opacity: 0; } }
+@keyframes stamp-sparks { 0% { transform: scale(0.4) rotate(0deg); opacity: 1; } 100% { transform: scale(1.15) rotate(25deg); opacity: 0; } }
+
+/* Turning knob of a selected stamp, above its top edge. */
+.sel-rotate {
+  position: absolute; left: 50%; top: -40px; width: 40px; height: 40px; transform: translateX(-50%);
+  display: grid; place-items: center; pointer-events: auto; touch-action: none; cursor: grab;
+}
+.sel-rotate::before { content: ""; position: absolute; left: 50%; top: 28px; width: 2px; height: 12px; background: var(--select); transform: translateX(-50%); }
+.sel-rotate::after {
+  content: ""; width: 14px; height: 14px; border-radius: 50%; background: var(--page-bg, var(--surface-solid)); box-shadow: inset 0 0 0 2px var(--select);
+}
+.sel-rotate:hover::after, .sel-frame.resizing .sel-rotate::after { background: var(--select); }
+.sel-frame.stamped { transform-origin: 50% 50%; }
+
+/* ------------------------------------------------------------ quick menu */
+
+.quick-menu { position: fixed; inset: 0; z-index: 40; touch-action: none; }
+.quick-ring { position: absolute; width: 0; height: 0; }
+.quick-item {
+  position: absolute; left: 0; top: 0; width: 56px; height: 56px; margin: -28px 0 0 -28px; border: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; background: var(--surface-solid); box-shadow: var(--dock-shadow, var(--shadow-1));
+  transform: translate(var(--dx, 0), var(--dy, 0)); animation: quick-in 200ms var(--ease) both; animation-delay: calc(var(--i, 0) * 18ms);
+  transition: background-color 120ms var(--ease);
+}
+.quick-item:hover, .quick-item:focus-visible { background: var(--accent-3); outline: none; box-shadow: var(--dock-shadow, var(--shadow-1)), 0 0 0 2px var(--accent-9); }
+.quick-center { width: 48px; height: 48px; margin: -24px 0 0 -24px; background: var(--accent-3); color: var(--accent-11); }
+@keyframes quick-in { from { transform: translate(0, 0) scale(0.4); opacity: 0; } }
+
+/* ------------------------------------------------------------ celebration */
+
+.celebrate { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 45; pointer-events: none; }
+.celebrate-still {
+  position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 45; pointer-events: none;
+  display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s5); border-radius: 999px;
+  background: var(--surface-solid); box-shadow: var(--shadow-2); font: 700 24px/32px var(--font); color: var(--text);
+}
+.celebrate-still span { width: 40px; height: 40px; display: grid; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .item.stamp.pop svg, .item.stamp.pop::before, .item.stamp.pop::after, .quick-item { animation: none; }
+  .item.stamp.pop::before, .item.stamp.pop::after { display: none; }
+}
