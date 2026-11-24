@@ -78,7 +78,8 @@ export function dockLayout(m: ModeConfig, core: boolean, allowMore: boolean, roo
   const overflow: ToolbarItem[] = [];
   let shapes = false;
   for (const t of m.tools) {
-    if (SHAPES.includes(t as Tool) || (t === "smartink" && shapesOn)) {
+    // Smart shapes folds into the Shapes button unless it is pinned on its own (Teach).
+    if (SHAPES.includes(t as Tool) || (t === "smartink" && shapesOn && !pinned.has("smartink"))) {
       if (!shapesOn) overflow.push(t);
       else if (!shapes) {
         shapes = true;
