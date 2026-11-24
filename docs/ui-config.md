@@ -99,7 +99,7 @@ Settings → Teaching modes) resets that memory, so the config takes effect.
 | `pen`, `highlighter`, `eraser` | Ink tools | prepare, teach |
 | `lasso` | Select & move | prepare, teach |
 | `laser` | Laser pointer | prepare, teach |
-| `text`, `rect`, `ellipse`, `line`, `arrow` | Text and shapes | prepare, teach |
+| `text`, `stamp`, `rect`, `ellipse`, `line`, `arrow` | Text, stamps and shapes | prepare, teach |
 | `hand` | Pan | all |
 | `interact` | Use Smart Objects | all |
 | `smartink` | Smart shapes on/off: switches between Off and the last on-mode (Auto by default; set in Settings → Pen & ink → Smart shapes). Key `M` | prepare, teach |
@@ -312,7 +312,7 @@ student view gets no pages panel.
           "type": "array",
           "uniqueItems": true,
           "items": {
-            "enum": ["pen", "highlighter", "eraser", "lasso", "laser", "text", "rect", "ellipse", "line", "arrow",
+            "enum": ["pen", "highlighter", "eraser", "lasso", "laser", "text", "stamp", "rect", "ellipse", "line", "arrow",
                      "hand", "interact", "smartink", "undo", "redo", "replay", "pager", "exit"]
           }
         },
@@ -335,7 +335,7 @@ student view gets no pages panel.
               "type": "array",
               "uniqueItems": true,
               "items": {
-                "enum": ["shapes", "lasso", "text", "rect", "ellipse", "line", "arrow", "hand", "interact", "smartink",
+                "enum": ["shapes", "lasso", "text", "stamp", "rect", "ellipse", "line", "arrow", "hand", "interact", "smartink",
                          "redo", "replay", "pager", "exit"]
               }
             }

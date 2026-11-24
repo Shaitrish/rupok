@@ -26,6 +26,8 @@ only when, they appear in all capitals.
 - [doc.loro](#docloro)
 - [Stroke points](#stroke-points)
 - [Stroke width and rendering](#stroke-width-and-rendering)
+- [Brushes](#brushes)
+- [Stamps](#stamps)
 - [Assets](#assets)
 - [Smart Object bundles](#smart-object-bundles)
 - [Thumbnails and layers](#thumbnails-and-layers)
@@ -301,6 +303,7 @@ gets `z = (max z on the page) + 1`; "bring to front" assigns a new top `z`.
 | `ox`, `oy` | `f64` | no | `0` | Translation applied at render time. |
 | `shape` | `String` | no | absent | Set when a shape tool or Smart Ink made the stroke: `rect`, `ellipse`, `line`, `arrow`, and from Smart Ink also `circle`, `square`, `triangle`, `diamond`, `pentagon`, `hexagon` or `star`. Readers MUST accept other values. |
 | `geom` | `Map` | no | absent | Editable geometry of a shape stroke (see [Shape geometry](#shape-geometry)). |
+| `brush` | `String` | no | absent | Pen style (proposed, pending RFC; see [Brushes](#brushes)). Absent is the plain pen. Readers MUST draw unknown values as a plain stroke. |
 
 - Moving a stroke changes `ox`/`oy` and never rewrites `pts`. This keeps moves
   cheap and the recorded timing intact. Writers MAY omit `ox`/`oy` when both
@@ -390,6 +393,7 @@ Box geometry, plus:
 | `size` | `f64` | yes | `32.0` | Font size in world units. |
 | `color` | `i64` (colour) | yes | `0x000000ff` | Text colour. |
 | `latex` | `bool` | no | `false` | `text` is LaTeX maths (no delimiters), shown typeset (KaTeX subset). Readers that can't typeset show `text` as is. Writers omit it when false. |
+| `stamp` | `String` | no | absent | A classroom stamp (proposed, pending RFC; see [Stamps](#stamps)). `text` holds what a reader without stamps shows. |
 
 #### `kind: "image"`
 
@@ -640,6 +644,60 @@ Renderers MUST draw a stroke as:
 
 Renderers MAY enforce a minimum on-screen radius (the reference uses about
 0.6 device pixels) so zoomed-out ink stays visible.
+
+## Brushes
+
+> **Status: proposed, pending RFC.** The `brush` key is additive and
+> optional; the reference writer emits it today. A reader that ignores it
+> draws the stroke as described in [Stroke width and
+> rendering](#stroke-width-and-rendering), which is always readable ink.
+
+`brush` names how a stroke's points become ink. Values are short lowercase
+ASCII words (`a-z`, `0-9`, `-`, at most 32 bytes); writers MUST NOT write
+other values and readers MUST treat them as absent. Writers omit the key for
+the plain pen. Readers MUST draw a value they do not know as a plain stroke
+and MUST keep it when they rewrite the stroke.
+
+Each brush changes only what is listed. Everything is a function of the
+stored points and the page position, never of how densely the stroke is
+sampled, so a stroke looks the same however it is simplified.
+
+| Value | Radius at a point (`w` = `width`, `p` = pressure) | Look |
+|---|---|---|
+| `ballpoint` | `0.5 w` | Constant width. |
+| `fountain` | `radius(p, w) × (0.16 + 0.84 × a)` | A flat nib at −0.698 rad: `a = |d × n|`, where `n = (cos −0.698, sin −0.698)` and `d` is the unit direction from the point one `w` back along the path (or the first point) to this point; before the path has gone `0.25 w`, the direction of its first stretch longer than 0.5. |
+| `marker` | `0.5 w × (0.45 + 0.55 × a)` | The same with a chisel at −1.05 rad. Usually written with `opacity` < 1. |
+| `pencil` | `0.5 w × (0.6 + 0.4 p)` | A fine paper grain lowers the coverage. |
+| `chalk` | `radius(p, w)` | A broken edge and dusty body from a texture scaled to `w`. |
+| `brush` | `0.5 w × (0.15 + 0.85 p) × taper` | Tapered ends: `taper = 0.12 + 0.88 × (1 − (1 − t)²)` with `t = min(1, s / 3w)`, `s` the distance along the path to the nearer end. A soft edge about a third of the radius deep. |
+| `dashed` | `radius(p, w)` | Round-capped dashes along the path: centres at `w + k × 4w` of distance from the first point, each dash's straight part `2w` long. |
+| `dotted` | `radius(p, w)` | Dots centred every `2w` of distance, starting at the first point. |
+| `neon` | `radius(p, w)` | A light core and a glow reaching `1.6 ×` the radius past the line. |
+| `rainbow` | `radius(p, w)` | The colour's hue turns once every `max(40 w, 160)` world units of distance, starting at red; the colour's alpha and `opacity` still apply. |
+
+`radius(p, w)` is the plain-pen radius. `magic` (disappearing ink) is a
+board-only style and is never written. Strokes with `dashed`, `dotted` or
+`rainbow` are written unsimplified, so the pattern does not shift; writers
+SHOULD do the same. Renderers that cannot draw a texture or a glow MAY
+approximate it (the reference PDF export draws pencil and chalk as the plain
+shape at 80–85 % opacity and the glow as a wider translucent outline).
+
+## Stamps
+
+> **Status: proposed, pending RFC.** The `stamp` key on text items is
+> additive and optional; the reference writer emits it today.
+
+A stamp is a text item with a `stamp` key naming its picture: `star`,
+`tick`, `cross`, `heart`, `question`, `badge` (a numbered circle; `text` is
+the number), `excellent`, `good-job`, `try-again`, `important` (pills
+showing `text`), `arrow-right`, `arrow-down`, `arrow-left`, `arrow-up`,
+`thumbs-up`, `hundred`, `trophy` and `emoji` (`text` is the emoji). Values
+follow the `brush` naming rules. The stamp fills its box (`x`, `y`, `w`,
+`h`, `rot`) in `color` (emoji keep their own colours). `text` MUST be what a
+reader without stamps should show instead (`⭐`, `✅`, `Excellent!`, the
+number or the emoji), and `size` about `0.7 h`. Readers that do not know a
+stamp value draw `text`. Replay shows a stamp at its `created` time, like
+any item.
 
 ## Assets
 
