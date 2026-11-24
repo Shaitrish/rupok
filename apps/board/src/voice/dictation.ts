@@ -101,6 +101,9 @@ export interface CustomTarget {
   interim?(text: string): void;
   /** Where the live-text bubble and the hint are shown. */
   element?: HTMLElement | null;
+  /** The text already there, so new words get a space and sentence
+   * capitals the way they do in a field (default: none). */
+  before?(): string;
 }
 export type DictationTarget = EditableEl | CustomTarget;
 
@@ -112,6 +115,9 @@ export interface DictationOptions {
   onFinal?(text: string): void;
   /** Called when the session ends (stopped, cancelled or failed). */
   onEnd?(reason: "stopped" | "cancelled" | "error"): void;
+  /** Show the live-text bubble (default true). Voice text on the board
+   * shows the words in its own box. */
+  bubble?: boolean;
 }
 
 export type VoiceStatus = "idle" | "listening" | "finishing";
@@ -126,7 +132,10 @@ const [lastError, setLastError] = createSignal<VoiceError | null>(null);
 /** The OS-dictation hint popover, anchored to an element. */
 const [hint, setHint] = createSignal<HTMLElement | null>(null);
 
-export { activeAnchor, activeLang, activeTarget, hint, interim, lastError, level, setHint, status as voiceStatus };
+/** The live-text bubble is wanted for the running session. */
+const [bubbleOn, setBubbleOn] = createSignal(true);
+
+export { activeAnchor, activeLang, activeTarget, bubbleOn, hint, interim, lastError, level, setHint, status as voiceStatus };
 
 let session: DictationSession | null = null;
 let sessionOpts: DictationOptions = {};
@@ -158,7 +167,7 @@ function deliver(text: string) {
   if (!t) return;
   const p = voicePrefs.read();
   if (isCustom(t)) {
-    const out = joinDictation("", text, "", { lang: activeLang(), autoPunctuation: p.autoPunctuation });
+    const out = joinDictation(t.before?.() ?? "", text, "", { lang: activeLang(), autoPunctuation: p.autoPunctuation });
     if (out) { t.insert(out); sessionOpts.onFinal?.(out); }
     return;
   }
@@ -200,6 +209,7 @@ export function startDictation(target?: DictationTarget | null, opts: DictationO
   setActiveLang(lang);
   setActiveTarget(() => t);
   setActiveAnchor(opts.anchor ?? el);
+  setBubbleOn(opts.bubble !== false);
   setLastError(null);
   setInterim("");
   setLevel(0);

@@ -181,7 +181,7 @@ House rules (projectors in bright rooms, chalk-dusted fingers):
 | `get_board_status`, `connect_board(code)` | Pairing. |
 | `get_current_page(page?)`, `get_selection()`, `get_page_snapshot(page?, item_ids?, region?, width?)` | Read and see. |
 | `add_page_after_current(title?, pattern?, color?, show?)`, `go_to_page(page)` | Pages. |
-| `add_text`, `add_smart_object`, `update_smart_object`, `delete_item`, `set_page_background`, `add_page`, `get_lesson_outline` with `path: "live"` | Edit the open lesson. |
+| `add_text`, `add_smart_object`, `update_smart_object`, `delete_item`, `set_page_background`, `add_page`, `get_lesson_outline` with `path: "live"` | Edit the open lesson (`add_text` with `w` wraps inside `w` on the board). |
 | `add_youtube`, `add_media`, `add_3d_model` with `path: "live"` | A YouTube video or trusted web embed by link, a video/audio file, or a `.glb` 3D model from the workspace (files are sent to the board). |
 | `replace_items_with_text(item_ids, text, …)` | Ink to text (confirm first). |
 | `step_object(item_id?, step?, delta?)` | Next / back inside a Smart Object. |
@@ -190,6 +190,7 @@ House rules (projectors in bright rooms, chalk-dusted fingers):
 | `point_at(x, y, w?, h?, label?, seconds?)` | Show the class where to look. |
 | `write_handwriting(lines, anchor?, style?, speed?, color?, size?, step_mode?)` | Write a solution in handwriting next to the problem (see Solve this). |
 | `set_board_theme(page_color?, pattern?, ui?)` | Chalkboard, grid, dark mode. |
+| `start_voice_text(x?, y?, w?, lang?, mode?, style?)`, `stop_voice_text(cancel?)` | Live only: the teacher speaks and the words appear as text in a box on the page (`lang` `en-US` or `bn-BD`; `mode: "ask"` makes them a chat prompt). Only when the teacher asks; stop puts the words on the board as one text item. |
 | `set_page_design(path, page?, all_pages?, color?, pattern?, background_svg?, background_image?, background_fit?, background_opacity?, background_dim?, remove_background?)` | Page colour, pattern and background image (see Page design). |
 | `set_branding(path, scope?, page?, logo_svg?, logo_image?, logo_corner?, logo_width?, …, school?, teacher?, class?, date?, text_position?, text_align?, hidden?, remove?)` | Logo and header/footer on every page or one. |
 

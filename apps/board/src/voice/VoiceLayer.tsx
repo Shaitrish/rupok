@@ -10,7 +10,7 @@ import { MicButton } from "../components/MicButton";
 import { openSettings } from "../settings/open";
 import { editingText } from "../state";
 import {
-  activeAnchor, activeLang, cancelDictation, hint, interim, privacyShort, privacyText, setDictationLang, setHint,
+  activeAnchor, activeLang, bubbleOn, cancelDictation, hint, interim, privacyShort, privacyText, setDictationLang, setHint,
   startDictation, stopDictation, voiceEnv, voicePrefs, voiceStatus,
 } from "./dictation";
 import { osDictationHint } from "./select";
@@ -54,7 +54,7 @@ function Bubble() {
   const listening = () => voiceStatus() === "listening";
   const lang = () => activeLang();
   return (
-    <Show when={voiceStatus() !== "idle" && rect()}>
+    <Show when={voiceStatus() !== "idle" && bubbleOn() && rect()}>
       {(r) => (
         <div class="voice-bubble surface" role="status" aria-live="polite" style={place(r(), 360, 96)} onMouseDown={(e) => e.preventDefault()}>
           <div class="voice-bubble-row">

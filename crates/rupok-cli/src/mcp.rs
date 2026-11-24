@@ -50,6 +50,8 @@ current one; show it with `go_to_page` when it is ready. Never delete or replace
 without asking first. Match the page `scheme` (light/dark) so objects stay themed.\n\
 - `point_at`, `step_object`, `replace_items_with_text` (ink to text) and `set_board_theme` help \
 you teach on the board.\n\
+- `start_voice_text` / `stop_voice_text`: the teacher speaks and the words appear as text on the board \
+(or, with `mode: \"ask\"`, become a prompt to you); use them only when the teacher asks.\n\
 - Page design (`set_page_design`, `set_branding`): when asked for a background, a theme or a school logo. \
 Draw it as SVG; keep the content area calm, ink readable (light ink on dark pages) and the logo small in a \
 corner; read the current design first by calling the tool with only `path`.\n\

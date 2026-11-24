@@ -204,6 +204,9 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
         // Shape geometry lives in the board engine (rupok-wasm `live.rs`).
         Op::AddShape { .. } => Err(LiveError::Unsupported("add_shape")),
         Op::AddTable { .. } => Err(LiveError::Unsupported("add_table")),
+        // Voice text needs the board's microphone (apps/board/src/voice/board.ts).
+        Op::StartVoiceText { .. } => Err(LiveError::Unsupported("start_voice_text")),
+        Op::StopVoiceText { .. } => Err(LiveError::Unsupported("stop_voice_text")),
 
         Op::GoToPage { page } => {
             let (idx, info) = page_ref(ctx.lesson, ctx.page_id, Some(*page))?;

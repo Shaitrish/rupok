@@ -2544,6 +2544,56 @@ impl<S: InkSink> Engine<S> {
         self.add_box_item(data, now_ms).ok()
     }
 
+    /// A text box at world (`x`, `y`), `w` wide, holding `text` whose lines
+    /// the caller already broke to fit `w` (Voice text, `voice/wrap.ts`), in
+    /// `rgba`. Kept on the page when ink is: the box is narrowed to the page
+    /// width and moved inside it. One undo step; the new item is selected.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_text_box(
+        &mut self,
+        x: f64,
+        y: f64,
+        w: f64,
+        text: &str,
+        size: f64,
+        rgba: u32,
+        now_ms: f64,
+    ) -> Option<ItemId> {
+        let ok = |v: f64| v.is_finite();
+        if text.trim().is_empty()
+            || !(ok(x) && ok(y) && ok(w) && ok(size))
+            || w <= 0.0
+            || size <= 0.0
+        {
+            return None;
+        }
+        let size = size.clamp(4.0, 2000.0);
+        let lines = text.split('\n').count().max(1) as f64;
+        let h = lines * size * 1.25;
+        let (mut x, mut y, mut w) = (x, y, w.clamp(size, 20_000.0));
+        if let Some(r) = self.ink_bounds() {
+            let r = r.map(f64::from);
+            w = w.min(r[2] - r[0]);
+            x = x.clamp(r[0], r[2] - w);
+            y = y.clamp(r[1], (r[3] - h).max(r[1]));
+        }
+        let data = ItemData::Text(TextData {
+            latex: false,
+            geom: BoxGeom {
+                x,
+                y,
+                w,
+                h,
+                rot: 0.0,
+            },
+            text: text.into(),
+            size,
+            color: rgba,
+            stamp: None,
+        });
+        self.add_box_item(data, now_ms).ok()
+    }
+
     /// Place a classroom stamp centred on the screen point (`x`, `y`): a
     /// text item with the `stamp` key, `w` × `h` world units, holding
     /// `text` (the emoji or label older readers show). Kept on the page
@@ -4163,6 +4213,49 @@ pub(crate) mod tests {
             [300.0, 300.0],
         );
         assert_eq!(v.stroke_count(), 3);
+    }
+
+    #[test]
+    fn add_text_box_stays_on_the_page_in_one_undo_step() {
+        let mut e = engine();
+        let t = e
+            .add_text_box(1700.0, 1050.0, 600.0, "one\ntwo", 48.0, 0x087f5bff, 1.0)
+            .unwrap();
+        let Ok(Item {
+            data: ItemData::Text(d),
+            ..
+        }) = e.lesson.item(&e.page.clone(), &t)
+        else {
+            panic!("not a text item");
+        };
+        // Moved left and up so the whole box is on the 1920×1080 slide.
+        assert_eq!((d.geom.x, d.geom.w), (1320.0, 600.0));
+        assert_eq!(d.geom.y, 1080.0 - 2.0 * 48.0 * 1.25);
+        assert_eq!((d.text.as_str(), d.color), ("one\ntwo", 0x087f5bff));
+        assert_eq!(e.selection(), [t.clone()]);
+        // One undo step takes it away.
+        assert!(e.undo());
+        assert!(e.lesson.item(&e.page.clone(), &t).is_err());
+        // Wider than the page: narrowed to it. Nothing to say: nothing added.
+        let t = e
+            .add_text_box(-50.0, 10.0, 5000.0, "wide", 40.0, 0, 2.0)
+            .unwrap();
+        let Ok(Item {
+            data: ItemData::Text(d),
+            ..
+        }) = e.lesson.item(&e.page.clone(), &t)
+        else {
+            panic!("not a text item");
+        };
+        assert_eq!((d.geom.x, d.geom.w), (0.0, 1920.0));
+        assert!(
+            e.add_text_box(0.0, 0.0, 100.0, "  ", 40.0, 0, 3.0)
+                .is_none()
+        );
+        assert!(
+            e.add_text_box(0.0, f64::NAN, 100.0, "x", 40.0, 0, 3.0)
+                .is_none()
+        );
     }
 
     #[test]

@@ -20,6 +20,7 @@ import { registerSettingsOpener } from "./components/ToText";
 import LivePanel from "./components/LivePanel";
 import ChatPanel from "./components/ChatPanel";
 import VoiceLayer from "./voice/VoiceLayer";
+import VoiceBoard from "./voice/VoiceBoard";
 import { LibraryRoot } from "./components/Library";
 import { UpgradeHost } from "./components/Billing";
 import { openUpgrade, refreshBilling, takeBillingParams } from "./cloud/billing";
@@ -163,6 +164,8 @@ export default function App() {
         <div class="input-layer" classList={{ interact: tool() === "interact" }} ref={input} style={{ cursor: cursorFor(tool()) }} />
         <div class="eraser-cursor" ref={eraser} style={{ display: "none", width: `${sizes().eraser ?? 64}px`, height: `${sizes().eraser ?? 64}px` }} />
         <GestureLayer onSettings={openSettings} />
+        {/* Voice text: speak, and the words go on the board (voice/board.ts). */}
+        <Show when={ready()}><VoiceBoard /></Show>
       </div>
       <Show when={ready()}>
         <TopBar onObject={() => setObjectDialog(true)} onSettings={() => openSettings()} />

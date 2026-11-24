@@ -440,6 +440,32 @@ pub enum Op {
         #[serde(default)]
         delta: Option<i32>,
     },
+    /// Start "Voice text" on the board: the teacher's speech appears as text
+    /// in a box at `x, y` (slide pixels; default the last place or the middle
+    /// of the page), `w` wide, wrapped inside the page. `mode` is `text`
+    /// (default) or `ask` (the speech becomes a prompt to the AI chat);
+    /// `style` is `typed` (default) or `handwriting`; `lang` is a BCP 47 tag
+    /// (`en-US`, `bn-BD`). Run by the board app, which owns the microphone.
+    StartVoiceText {
+        #[serde(default)]
+        x: Option<f64>,
+        #[serde(default)]
+        y: Option<f64>,
+        #[serde(default)]
+        w: Option<f64>,
+        #[serde(default)]
+        lang: Option<String>,
+        #[serde(default)]
+        mode: Option<String>,
+        #[serde(default)]
+        style: Option<String>,
+    },
+    /// Stop "Voice text": what was said becomes a text item (one undo step),
+    /// or is thrown away with `cancel`. Run by the board app.
+    StopVoiceText {
+        #[serde(default)]
+        cancel: Option<bool>,
+    },
 }
 
 /// How an op touches the board, for the teacher's "Allow AI to edit live"
@@ -481,6 +507,8 @@ impl Op {
             Op::WriteHandwriting { .. } => "write_handwriting",
             Op::AddShape { .. } => "add_shape",
             Op::AddTable { .. } => "add_table",
+            Op::StartVoiceText { .. } => "start_voice_text",
+            Op::StopVoiceText { .. } => "stop_voice_text",
         }
     }
 
@@ -528,6 +556,8 @@ impl Op {
             Op::WriteHandwriting { .. } => "wrote on the board",
             Op::AddShape { .. } => "drew a shape",
             Op::AddTable { .. } => "drew a table",
+            Op::StartVoiceText { .. } => "started voice text",
+            Op::StopVoiceText { .. } => "stopped voice text",
         }
     }
 }
@@ -570,5 +600,11 @@ mod tests {
         let t: Op =
             serde_json::from_str(r#"{"op":"add_table","x":0,"y":0,"rows":3,"cols":4}"#).unwrap();
         assert_eq!(t.name(), "add_table");
+        let v: Op =
+            serde_json::from_str(r#"{"op":"start_voice_text","x":100,"y":200,"lang":"bn-BD"}"#)
+                .unwrap();
+        assert_eq!((v.name(), v.access()), ("start_voice_text", Access::Write));
+        let v: Op = serde_json::from_str(r#"{"op":"stop_voice_text"}"#).unwrap();
+        assert_eq!(v, Op::StopVoiceText { cancel: None });
     }
 }
