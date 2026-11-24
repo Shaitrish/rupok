@@ -33,7 +33,7 @@ import { pagesShown, togglePages } from "../viewport";
 import "./Header.css";
 import { MicButton } from "./MicButton";
 import { insertVideo, insertWebEmbed, pickMedia, pickModel } from "./MediaDialog";
-import { startTour } from "../tour/tour";
+import { startTour } from "../tour/state";
 
 function pickFiles(accept: string, multiple = false): Promise<File[]> {
   return new Promise((resolve) => {

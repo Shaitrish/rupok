@@ -3,7 +3,7 @@
 import { setPrefs, prefs, mode } from "../../state";
 import { AboutSection, GraphicsInfo } from "../../components/settings/About";
 import { UpdateCheck } from "../../updates/UpdateCheck";
-import { startTour } from "../../tour/tour";
+import { startTour } from "../../tour/state";
 import { controller } from "../../controller";
 import { closeSettings } from "../open";
 import { isDesktop } from "../../platform";

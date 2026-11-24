@@ -7,7 +7,7 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { mode } from "../state";
 import { libraryOpen } from "../library/session";
-import { endTour, setTourStep, startTour, tourStep, wantsAutoTour } from "./tour";
+import { endTour, setTourStep, startTour, tourStep, wantsAutoTour } from "./state";
 import "./tour.css";
 
 interface Step {
