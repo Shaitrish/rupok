@@ -29,6 +29,8 @@ export const AGENT_SETTINGS: readonly string[] = [
   "general.voiceBoardMode", "general.voiceBoardTalk", "general.voiceBoardStyle", "general.voiceBoardPause",
   // AI presentation (never permissions, keys or the preview check)
   "ai.solveStyle", "ai.solveSpeed", "ai.solveTeachStep", "ai.chatAttach", "ai.chatPosition",
+  // AI in action: how results show (never Class mode or what students may do)
+  "ai.progress", "ai.celebrate", "ai.sound", "ai.streamSolve",
   // Statistics overlay
   "about.stats",
 ];

@@ -351,6 +351,11 @@ pub struct AnchorArg {
     /// full the board tries the other, then a new page.
     #[serde(default)]
     pub side: Option<String>,
+    /// Continue earlier writing: the `group` an earlier write_handwriting
+    /// returned. The lines go right below it and join it, so you can write a
+    /// solution line by line as you work it out.
+    #[serde(default)]
+    pub group: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
@@ -366,7 +371,8 @@ pub struct WriteHandwritingParams {
     #[serde(default)]
     pub anchor: Option<AnchorArg>,
     /// `teacher` (default): the teacher's own handwriting where they have
-    /// taught it to Rupok; `neat`: a neat standard hand.
+    /// taught it to Rupok; `neat`: a neat standard hand; `joined`: neat
+    /// letters joined within words, like quick cursive.
     #[serde(default)]
     pub style: Option<String>,
     /// Pen speed, 0.25 to 4. Default: the teacher's setting (1 = brisk).
@@ -550,6 +556,7 @@ with the lesson tools and the live tools (get_current_page, get_page_snapshot, â
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -646,6 +653,7 @@ the teacher asks, or once a page you built is ready to present.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -661,6 +669,7 @@ content on it with path \"live\" and that page, then go_to_page when ready (or p
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -684,6 +693,7 @@ object you built, or when the teacher says \"next step\" / \"show the answer\"."
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -705,6 +715,7 @@ teacher's Ctrl+Z brings the ink back). Read the handwriting first with get_page_
         annotations(
             read_only_hint = false,
             destructive_hint = true,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -732,6 +743,7 @@ Coordinates are slide pixels on the page being shown.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -760,6 +772,7 @@ do NOT call it again; explain the steps in chat instead.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -778,6 +791,7 @@ do NOT call it again; explain the steps in chat instead.",
             x: a.x,
             y: a.y,
             side: a.side,
+            group: a.group,
         });
         self.live_call(Op::WriteHandwriting {
             page: p.page,
@@ -802,6 +816,7 @@ their own shapes. One undo step; returns the new item ids.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -829,6 +844,7 @@ can move, resize and edit (add or remove rows and columns, type in cells). One u
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -857,6 +873,7 @@ page colour automatically; new text you add picks a readable colour for it. Use 
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -889,6 +906,7 @@ the teacher can also tap the box or press Esc.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -914,6 +932,7 @@ text and the new item id (or, in `ask` mode, the prompt sent to the chat).",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]

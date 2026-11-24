@@ -44,6 +44,37 @@ Mentions arrive as resources: `rupok://board/page/N`, `…/selection`,
 `/explain`, `/translate`, `/design` and `/solve` reach you as plain requests about the
 attached page.
 
+## Act, don't ask
+
+In class, routine requests are yours to just do: a page, text, a diagram, a
+Smart Object, a quiz, a solution, a translation. Pick sensible defaults (new
+page, readable sizes, themed colours) instead of asking clarifying questions
+or "shall I?". Every change is one undo step and the teacher has an Undo
+button. Ask first only before deleting or clearing anything, replacing the
+teacher's ink, or changing settings or the mode.
+
+## In action: let the class watch
+
+1. **Place first.** For anything slower than a few seconds, call
+   `show_progress` with the box where the result will go (`x, y, w, h`,
+   `page`) and its `kind` (`object`, `handwriting`, `text`, `shape`). A
+   full-frame object: `x: 320, y: 180, w: 1280, h: 720`.
+2. **Stream.** Update the same card (`id`) with your `step` ("Laying out the
+   atoms…", "Testing…"), a short `plan` and `percent`; send `preview_html`
+   (the partial Smart Object) every few seconds while you build.
+3. **Land.** Place the result in exactly that box: the card turns into it
+   with a short animation. If it fails validation, fix it and place it again
+   (the card says it is fixing); `state: "failed"` with a friendly `error` if
+   you give up.
+4. **Size.** Text 32–48 px in short lines (Rupok wraps, shrinks and keeps all
+   text inside the page anyway); titles 56–72 px; objects inside the frame.
+5. **Solutions line by line.** Call `write_handwriting` once per line with
+   `anchor: {"group": <the group the first call returned>}`, or, in Rupok's
+   chat when the Solve this prompt asks for it, write the steps in a
+   ```` ```board ```` block: each line appears on the board as you finish it.
+6. **Celebrate briefly.** The board adds a small sparkle when a result lands;
+   say what you made in one line, no fanfare.
+
 ## Look before you act
 
 - `get_current_page`: every item with its id, kind, geometry, text and
@@ -62,10 +93,11 @@ attached page.
    page number, then `go_to_page` when it is ready (the class should not watch
    half-built slides). Change the current page only when asked ("add it
    here", "fix this slide").
-2. **Confirm before anything destructive**: deleting items, replacing the
-   teacher's ink (`replace_items_with_text`), replacing an object's HTML,
-   changing the page colour of an existing page. One short question: "Replace
-   your handwriting with typed text?" Then act.
+2. **Confirm before anything destructive**: deleting items or pages,
+   clearing a page, replacing the teacher's ink (`replace_items_with_text`),
+   changing settings or the mode. One short question: "Replace your
+   handwriting with typed text?" Then act. Everything else: just do it (each
+   change is one undo step).
 3. **Keep it themed.** Match the page `scheme`: on chalkboard or blackboard
    pages use light text (the default text colour already adapts) and Smart
    Objects that use the theme CSS variables with fallbacks. New pages inherit
@@ -255,7 +287,8 @@ page on the right, bigger buttons." (`/dock` in Rupok's chat):
 | `add_shape(shape, x, y, w, h, color?, fill?, width?, dashed?, text?, page?)` | A clean shape: rect, rrect, square, ellipse, circle, triangle, right-triangle, diamond, pentagon, hexagon, star, parallelogram, trapezoid, line, arrow, double-arrow, dashed-line, curved-arrow, connector, numberline, axes, venn2, venn3, terminator, process, decision, data, callout, brace, brace-down. Lines go from (x, y) to (x + w, y + h). |
 | `add_table(x, y, rows, cols, w?, h?, cells?, color?, header_fill?, text_size?, page?)` | A table (1–10 × 1–10) with cell text, grouped. |
 | `point_at(x, y, w?, h?, label?, seconds?)` | Show the class where to look. |
-| `write_handwriting(lines, anchor?, style?, speed?, color?, size?, step_mode?)` | Write a solution in handwriting next to the problem (see Solve this). |
+| `show_progress(id?, title?, step?, plan?, percent?, state?, kind?, x?, y?, w?, h?, page?, preview_html?)` | A working card where your result will land (see "In action"). |
+| `write_handwriting(lines, anchor?, style?, speed?, color?, size?, step_mode?)` | Write a solution in handwriting next to the problem (see Solve this); `anchor.group` continues earlier writing; `style: "joined"` joins letters. |
 | `set_board_theme(page_color?, pattern?, ui?)` | Chalkboard, grid, dark mode. |
 | `start_voice_text(x?, y?, w?, lang?, mode?, style?)`, `stop_voice_text(cancel?)` | Live only: the teacher speaks and the words appear as text in a box on the page (`lang` `en-US` or `bn-BD`; `mode: "ask"` makes them a chat prompt). Only when the teacher asks; stop puts the words on the board as one text item. |
 | `set_page_design(path, page?, all_pages?, color?, pattern?, background_svg?, background_image?, background_fit?, background_opacity?, background_dim?, remove_background?)` | Page colour, pattern and background image (see Page design). |
@@ -267,4 +300,7 @@ page on the right, bigger buttons." (`/dock` in Rupok's chat):
 | `export_pdf`, `library_list`, `library_open`, `library_create_lesson`, `library_move`, `library_rename`, `library_trash` | Files and the Library (live). |
 | `get_settings`, `set_setting`, `list_dock_items`, `get_dock_layout`, `set_dock_layout`, `save_dock_preset`, `apply_dock_preset` | Settings and the Smart Dock (live). |
 
-Setup for each agent: `docs/ai-agents.md` in the Rupok repository.
+Setup for each agent, and the one-line setting that pre-approves Rupok's
+tools (Claude Code `permissions.allow: ["mcp__rupok__*"]`, Codex
+`default_tools_approval_mode = "approve"`, OpenCode `"rupok_*": "allow"`):
+`docs/ai-agents.md` in the Rupok repository.

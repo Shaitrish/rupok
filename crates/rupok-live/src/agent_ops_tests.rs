@@ -485,6 +485,24 @@ fn draw_stroke_and_update_text() {
         }
         _ => panic!(),
     }
+    // A long edit at title size stays inside the page (fit.rs).
+    let long =
+        "Ohm's law: the current through a conductor is proportional to the voltage across it. "
+            .repeat(4);
+    let r = b
+        .one_step(json!({"op": "update_text", "item_id": t, "text": long, "size": 120, "x": 1700}));
+    match b.item(&t).data {
+        ItemData::Text(tx) => {
+            assert!(tx.size < 120.0, "shrunk to fit: {}", tx.size);
+            assert!(
+                tx.geom.x + tx.geom.w <= 1920.0 && tx.geom.y + tx.geom.h <= 1080.0,
+                "{:?}",
+                tx.geom
+            );
+        }
+        _ => panic!(),
+    }
+    assert!(!r["warnings"].as_array().unwrap().is_empty());
     assert!(
         b.err(json!({"op": "update_text", "item_id": t}))
             .contains("nothing to change")

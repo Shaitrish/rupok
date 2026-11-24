@@ -47,8 +47,100 @@ fn from_hershey(rec: &str) -> Option<Glyph> {
         })
         .collect::<Vec<_>>();
     Some(Glyph {
-        strokes: join_touching(strokes),
+        strokes: pen_order(join_touching(strokes)),
         adv: right - left,
+    })
+}
+
+/// Reorder and join a font glyph's strokes the way a hand writes them, so
+/// the pen lifts only where a person's would:
+///
+/// - dots (of `i`, `j`, `!`, `?`…) come after the stroke they sit on;
+/// - two strokes meeting end to end become one (`v`, `w`: down and up);
+/// - a stroke that starts on the previous one continues it by retracing
+///   (`a`, `d`, `n`, `m`, `h`: down the stem, back up, round the bowl);
+/// - a stroke that ends on the next one runs straight on into it (`u`).
+fn pen_order(strokes: Vec<Vec<Pt>>) -> Vec<Vec<Pt>> {
+    const NEAR: f32 = 0.8;
+    let is_dot = |s: &Vec<Pt>| BBox::of(s).size() < 2.5;
+    let (dots, mut rest): (Vec<Vec<Pt>>, Vec<Vec<Pt>>) =
+        strokes.into_iter().partition(|s| is_dot(s));
+    if rest.is_empty() {
+        return dots;
+    }
+    let mut out: Vec<Vec<Pt>> = vec![rest.remove(0)];
+    for mut s in rest {
+        let Some(prev) = out.last_mut() else { break };
+        let (Some(&end), Some(&first), Some(&last)) = (prev.last(), s.first(), s.last()) else {
+            continue;
+        };
+        if end.dist(last) < NEAR && end.dist(first) >= NEAR {
+            s.reverse();
+        }
+        let first = s[0];
+        if end.dist(first) < NEAR {
+            prev.extend_from_slice(&s[1..]);
+            continue;
+        }
+        // Starts on the previous stroke: retrace back to that point.
+        if let Some((i, q)) = near_on_path(prev, first, NEAR, true) {
+            let back: Vec<Pt> = prev[i + 1..prev.len() - 1].iter().rev().copied().collect();
+            prev.extend(back);
+            prev.push(q);
+            prev.extend_from_slice(&s);
+            continue;
+        }
+        // Ends on this stroke, on a straight part: run on into its start.
+        if let Some((i, q)) = near_on_path(&s, end, NEAR, false)
+            && straight(&s[..=i + 1])
+            && q.dist(first) > NEAR
+        {
+            prev.push(q);
+            prev.extend(s[..=i].iter().rev().copied());
+            prev.extend_from_slice(&s[1..]);
+            continue;
+        }
+        out.push(s);
+    }
+    out.extend(dots);
+    out
+}
+
+/// The segment of `path` passing within `tol` of `p` (the last such segment
+/// when `from_end`), with the point on it closest to `p`.
+fn near_on_path(path: &[Pt], p: Pt, tol: f32, from_end: bool) -> Option<(usize, Pt)> {
+    let n = path.len().checked_sub(1)?;
+    let test = |i: usize| {
+        let (a, b) = (path[i], path[i + 1]);
+        let (dx, dy) = (b.x - a.x, b.y - a.y);
+        let l2 = dx * dx + dy * dy;
+        let t = if l2 > 0.0 {
+            (((p.x - a.x) * dx + (p.y - a.y) * dy) / l2).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let q = a.lerp(b, t);
+        (q.dist(p) < tol).then_some((i, q))
+    };
+    if from_end {
+        (0..n).rev().find_map(test)
+    } else {
+        (0..n).find_map(test)
+    }
+}
+
+/// True when the polyline is (nearly) a straight segment.
+fn straight(pts: &[Pt]) -> bool {
+    let (Some(&a), Some(&b)) = (pts.first(), pts.last()) else {
+        return true;
+    };
+    let len = a.dist(b);
+    if len < 1e-3 {
+        return true;
+    }
+    pts.iter().all(|p| {
+        let cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+        (cross / len).abs() < 0.6
     })
 }
 
@@ -227,9 +319,12 @@ impl GlyphSet {
     }
 }
 
-/// Round a polyline's curves (Chaikin corner cutting, two passes) while
-/// keeping its sharp corners and its end points: Hershey curves are coarse
-/// polygons, a pen draws them smooth.
+/// Round a polyline's curves while keeping its sharp corners and its end
+/// points: Hershey curves are coarse polygons, a pen draws them smooth.
+///
+/// Each run between corners is resampled along a centripetal Catmull-Rom
+/// spline *through* the original points, so bowls keep their size (corner
+/// cutting would shrink them) and the curve has no kinks at the vertices.
 pub fn smooth(pts: &[Pt]) -> Vec<Pt> {
     if pts.len() < 3 {
         return pts.to_vec();
@@ -255,20 +350,7 @@ pub fn smooth(pts: &[Pt]) -> Vec<Pt> {
     }
     let mut out: Vec<Pt> = Vec::with_capacity(pts.len() * 4);
     for piece in pieces {
-        let mut cur = piece;
-        for _ in 0..2 {
-            if cur.len() < 3 {
-                break;
-            }
-            let mut next = Vec::with_capacity(cur.len() * 2);
-            next.push(cur[0]);
-            for w in cur.windows(2) {
-                next.push(w[0].lerp(w[1], 0.25));
-                next.push(w[0].lerp(w[1], 0.75));
-            }
-            next.push(cur[cur.len() - 1]);
-            cur = next;
-        }
+        let cur = catmull_rom(&piece);
         if out
             .last()
             .is_some_and(|l: &Pt| cur.first().is_some_and(|f| l.dist(*f) < 1e-4))
@@ -276,6 +358,68 @@ pub fn smooth(pts: &[Pt]) -> Vec<Pt> {
             out.extend_from_slice(&cur[1..]);
         } else {
             out.extend_from_slice(&cur);
+        }
+    }
+    out
+}
+
+/// Sample a centripetal Catmull-Rom spline through `pts` (ends kept), about
+/// one point per writing unit and at least four per segment.
+fn catmull_rom(pts: &[Pt]) -> Vec<Pt> {
+    // Drop repeated points: they make the parametrisation degenerate.
+    let mut p: Vec<Pt> = Vec::with_capacity(pts.len());
+    for q in pts {
+        if p.last().is_none_or(|l: &Pt| l.dist(*q) > 1e-3) {
+            p.push(*q);
+        }
+    }
+    if p.len() < 3 {
+        return p;
+    }
+    let n = p.len();
+    // Phantom end points continue the first and last segments.
+    let first = Pt::new(2.0 * p[0].x - p[1].x, 2.0 * p[0].y - p[1].y);
+    let last = Pt::new(2.0 * p[n - 1].x - p[n - 2].x, 2.0 * p[n - 1].y - p[n - 2].y);
+    let at = |i: isize| -> Pt {
+        if i < 0 {
+            first
+        } else if i as usize >= n {
+            last
+        } else {
+            p[i as usize]
+        }
+    };
+    let mut out = Vec::with_capacity(n * 6);
+    out.push(p[0]);
+    for i in 0..n - 1 {
+        let (p0, p1, p2, p3) = (
+            at(i as isize - 1),
+            at(i as isize),
+            at(i as isize + 1),
+            at(i as isize + 2),
+        );
+        let knot = |a: Pt, b: Pt| a.dist(b).max(1e-4).sqrt();
+        let t1 = knot(p0, p1);
+        let t2 = t1 + knot(p1, p2);
+        let t3 = t2 + knot(p2, p3);
+        let steps = (p1.dist(p2).ceil() as usize).clamp(4, 24);
+        for k in 1..=steps {
+            let t = t1 + (t2 - t1) * k as f32 / steps as f32;
+            let lerp = |a: Pt, b: Pt, ta: f32, tb: f32| -> Pt {
+                let w = if (tb - ta).abs() < 1e-6 {
+                    0.0
+                } else {
+                    (t - ta) / (tb - ta)
+                };
+                a.lerp(b, w)
+            };
+            let a1 = lerp(p0, p1, 0.0, t1);
+            let a2 = lerp(p1, p2, t1, t2);
+            let a3 = lerp(p2, p3, t2, t3);
+            let b1 = lerp(a1, a2, 0.0, t2);
+            let b2 = lerp(a2, a3, t1, t3);
+            let c = lerp(b1, b2, t1, t2);
+            out.push(if k == steps { p2 } else { c });
         }
     }
     out

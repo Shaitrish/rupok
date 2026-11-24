@@ -28,6 +28,8 @@ const MARGIN: f64 = 40.0;
 const MAX_STROKES: usize = 4_000;
 /// Default capital height when nothing on the board says otherwise.
 const DEFAULT_CAP: f64 = 40.0;
+/// Sizes tried (of the asked letter height) to make the writing fit.
+const SCALES: [f32; 5] = [1.0, 0.85, 0.7, 0.58, 0.48];
 
 /// How the problem is written, so the solution matches it.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -192,12 +194,13 @@ pub fn run(
         }
     };
     let teacher_available = glyphs.user_chars() > 0;
-    let prefer_user = match style.as_deref() {
-        None | Some("teacher") | Some("mine") => true,
-        Some("neat") => false,
+    let (prefer_user, connect) = match style.as_deref() {
+        None | Some("teacher") | Some("mine") => (true, false),
+        Some("neat") => (false, false),
+        Some("joined") | Some("cursive") => (false, true),
         Some(other) => {
             return Err(LiveError::Invalid(format!(
-                "style must be \"teacher\" or \"neat\", not {other:?}"
+                "style must be \"teacher\", \"neat\" or \"joined\", not {other:?}"
             )));
         }
     };
@@ -210,7 +213,20 @@ pub fn run(
     // What we write next to: the anchor's items, else its region, else the
     // teacher's selection (on the board's page).
     let mut target_items: Vec<&Item> = Vec::new();
-    if let Some(ids) = &anchor.item_ids {
+    let mut join_group: Option<String> = None;
+    if let Some(g) = &anchor.group {
+        target_items = items
+            .iter()
+            .filter(|i| i.group.as_deref() == Some(g.as_str()))
+            .collect();
+        if target_items.is_empty() {
+            return Err(LiveError::NotFound(format!(
+                "no writing with group {g:?} on page {}; use the group an earlier write_handwriting returned (and its page)",
+                idx + 1
+            )));
+        }
+        join_group = Some(g.clone());
+    } else if let Some(ids) = &anchor.item_ids {
         let missing: Vec<&str> = ids
             .iter()
             .filter(|id| !items.iter().any(|i| &i.id == *id))
@@ -270,6 +286,7 @@ pub fn run(
                 x_height: xh,
                 max_width: Some(max_w as f32),
                 prefer_user,
+                connect,
                 speed: speed as f32,
                 seed: joined.len() as u64,
                 ..WriteOptions::default()
@@ -296,13 +313,21 @@ pub fn run(
     let mut placed: Option<(f64, f64, Written)> = None;
     let mut new_page = false;
     if let (Some(x), Some(y)) = (anchor.x, anchor.y) {
-        let x = finite("anchor.x", x)?;
-        let y = finite("anchor.y", y)?;
-        let w = synth(
-            (frame.w - x - MARGIN).max(f64::from(x_height) * 6.0),
-            x_height,
-        );
-        placed = Some((x, y, w));
+        // An explicit spot, kept on the page: wrap at the room to the right,
+        // shrink if the block runs off the bottom, else continue on a new page.
+        let x = finite("anchor.x", x)?.clamp(MARGIN * 0.5, frame.w - MARGIN * 4.0);
+        let y = finite("anchor.y", y)?.clamp(MARGIN * 0.5, frame.h - MARGIN * 2.0);
+        let max_w = (frame.w - x - MARGIN).max(f64::from(x_height) * 6.0);
+        for scale in SCALES {
+            let w = synth(max_w, x_height * scale);
+            if y + f64::from(w.height) <= frame.h - MARGIN * 0.5 {
+                placed = Some((x, y, w));
+                break;
+            }
+        }
+        if placed.is_none() {
+            new_page = true;
+        }
     } else {
         let t = target.unwrap_or([
             MARGIN * 2.0,
@@ -312,12 +337,15 @@ pub fn run(
         ]);
         let below = (t[0].clamp(MARGIN, frame.w - MARGIN * 4.0), t[3] + gap);
         let right = (t[2] + gap * 1.5, t[1]);
-        let sides = if anchor.side.as_deref() == Some("right") {
+        let sides = if join_group.is_some() {
+            // Continuing: always straight below, left-aligned with it.
+            [below, below]
+        } else if anchor.side.as_deref() == Some("right") {
             [right, below]
         } else {
             [below, right]
         };
-        'search: for scale in [1.0f32, 0.8, 0.65] {
+        'search: for scale in SCALES {
             for (x, y) in sides {
                 let max_w = frame.w - x - MARGIN;
                 if max_w < f64::from(x_height) * 8.0 {
@@ -350,7 +378,26 @@ pub fn run(
         tag(ctx.lesson, msg);
         page_id = ctx.lesson.add_page(Some(idx + 1), spec)?;
         page_no = idx + 2;
-        let w = synth(frame.w - MARGIN * 4.0, x_height);
+        // The whole block must fit the new page: shrink until it does.
+        let room = frame.h - MARGIN * 3.0;
+        let max_w = frame.w - MARGIN * 4.0;
+        let mut xh = x_height;
+        let mut w = synth(max_w, xh);
+        for scale in SCALES {
+            xh = x_height * scale;
+            w = synth(max_w, xh);
+            if f64::from(w.height) <= room {
+                break;
+            }
+        }
+        // Still too tall (many lines, huge letters): scale to the room.
+        for _ in 0..4 {
+            if f64::from(w.height) <= room {
+                break;
+            }
+            xh = (xh * (room / f64::from(w.height).max(1.0)) as f32 * 0.97).max(5.0);
+            w = synth(max_w, xh);
+        }
         placed = Some((MARGIN * 2.0, MARGIN * 2.0, w));
     }
     let Some((x0, y0, written)) = placed else {
@@ -363,7 +410,11 @@ pub fn run(
         )));
     }
 
-    let group = ctx.lesson.new_group_id();
+    // Continuing earlier writing on the same page joins its group.
+    let group = match &join_group {
+        Some(g) if !new_page => g.clone(),
+        _ => ctx.lesson.new_group_id(),
+    };
     let (ox, oy) = (x0 as f32, y0 as f32);
     let list: Vec<NewItem> = written
         .strokes
@@ -416,7 +467,7 @@ pub fn run(
             "h": (f64::from(written.height) * 10.0).round() / 10.0,
         },
         "duration_ms": written.duration_ms.round(),
-        "style": if used_teacher { "teacher" } else { "neat" },
+        "style": if connect { "joined" } else if used_teacher { "teacher" } else { "neat" },
         "step_mode": step_mode,
         "speed": speed,
         "ink": { "color": crate::apply::color_hex(color), "width": width, "letter_height": (cap * 10.0).round() / 10.0 },
@@ -643,6 +694,77 @@ mod tests {
             )
             .unwrap();
         assert_eq!(out.result["style"], "neat");
+    }
+
+    fn bounds(r: &Value) -> [f64; 4] {
+        let b = &r["bounds"];
+        let (x, y) = (b["x"].as_f64().unwrap(), b["y"].as_f64().unwrap());
+        [
+            x,
+            y,
+            x + b["w"].as_f64().unwrap(),
+            y + b["h"].as_f64().unwrap(),
+        ]
+    }
+
+    #[test]
+    fn handwriting_always_fits_the_page() {
+        // An explicit spot near the bottom right, big letters, many lines.
+        let mut b = Board::new();
+        let lines: Vec<String> = (0..14)
+            .map(|i| format!("Line {i}: $a_{i} + b = c$"))
+            .collect();
+        let out = b
+            .run(json!({"op": "write_handwriting", "lines": lines, "anchor": {"x": 1800, "y": 1000}, "size": 90}))
+            .unwrap();
+        let r = &out.result;
+        let bb = bounds(r);
+        assert!(bb[0] >= 0.0 && bb[1] >= 0.0, "{bb:?}");
+        assert!(
+            bb[2] <= 1920.0 && bb[3] <= 1080.0,
+            "inside the slide: {bb:?}"
+        );
+        // Every stroke point is on the page it was written on.
+        let page = r["page"].as_u64().unwrap() as usize - 1;
+        let pid = b.lesson.page_id_at(page).unwrap();
+        for it in b.lesson.items(&pid).unwrap() {
+            let a = it.data.aabb();
+            assert!(
+                a[0] >= 0.0 && a[1] >= 0.0 && a[2] <= 1920.0 && a[3] <= 1080.0,
+                "{a:?}"
+            );
+        }
+        // Huge sizes are clamped and still fit.
+        let mut b = Board::new();
+        let out = b
+            .run(json!({"op": "write_handwriting", "lines": vec!["$x^2 + y^2 = r^2$"; 12], "size": 200}))
+            .unwrap();
+        let bb = bounds(&out.result);
+        assert!(bb[2] <= 1920.0 && bb[3] <= 1080.0, "{bb:?}");
+    }
+
+    #[test]
+    fn streamed_lines_continue_the_same_group() {
+        let mut b = Board::new();
+        let ids = b.problem(200.0, 100.0);
+        let first = b
+            .run(json!({"op": "write_handwriting", "lines": ["$2x = 4$"], "anchor": {"item_ids": ids}}))
+            .unwrap();
+        let group = first.result["group"].as_str().unwrap().to_string();
+        let b1 = bounds(&first.result);
+        let second = b
+            .run(json!({"op": "write_handwriting", "lines": ["$x = 2$"], "anchor": {"group": group}, "style": "joined"}))
+            .unwrap();
+        assert_eq!(second.result["group"], first.result["group"]);
+        assert_eq!(second.result["style"], "joined");
+        let b2 = bounds(&second.result);
+        assert!(b2[1] >= b1[3] - 1.0, "below the first line: {b1:?} {b2:?}");
+        assert!((b2[0] - b1[0]).abs() < 30.0, "left-aligned: {b1:?} {b2:?}");
+        // Unknown groups are an error, not a guess.
+        assert!(
+            b.run(json!({"op": "write_handwriting", "lines": ["x"], "anchor": {"group": "nope"}}))
+                .is_err()
+        );
     }
 
     #[test]

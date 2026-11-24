@@ -14,7 +14,8 @@
 .chat-panel.left .chat-resize { left: auto; right: 0; }
 .chat-panel.left .chat-resize:hover, .chat-panel.left .chat-resize:active { box-shadow: inset -2px 0 0 var(--accent-5); }
 /* Teach: a sheet over the slide, summoned and hidden by the teacher. */
-.chat-panel.overlay { top: var(--inset); max-height: calc(100dvh - 2 * var(--inset)); box-shadow: var(--shadow-2); }
+.chat-panel.overlay { top: calc(var(--inset) + var(--bar) + var(--s2)); max-height: calc(100dvh - 2 * var(--inset) - var(--bar) - var(--s2)); box-shadow: var(--shadow-2); }
+/* (Below the floating AI button, which stays clickable to hide and show the chat.) */
 @keyframes chat-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
 
 .chat-resize { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 2; touch-action: none; }

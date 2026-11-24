@@ -28,6 +28,8 @@ pub const DEFAULT_TEXT_SIZE: f64 = 32.0;
 pub const MIN_PROJECTOR_TEXT: f64 = 24.0;
 const MAX_TEXT_CHARS: usize = 20_000;
 const MAX_ITEMS_PER_OP: usize = 5_000;
+/// Most new pages one `add_text` may continue onto.
+const MAX_SPILL_PAGES: usize = 8;
 const OUTLINE_TEXT_CHARS: usize = 4_000;
 /// Largest step a Smart Object without declared steps may be moved to.
 const MAX_STEPS: u32 = 500;
@@ -214,6 +216,7 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
         Op::Snapshot { .. } => Err(LiveError::Unsupported("snapshot")),
         Op::WriteHandwriting { .. } => crate::handwriting::run(ctx, op, msg, now, None),
         Op::PointAt { .. } => Err(LiveError::Unsupported("point_at")),
+        Op::ShowProgress(_) => Err(LiveError::Unsupported("show_progress")),
         // Shape geometry lives in the board engine (rupok-wasm `live.rs`).
         Op::AddShape { .. } => Err(LiveError::Unsupported("add_shape")),
         Op::AddTable { .. } => Err(LiveError::Unsupported("add_table")),
@@ -341,7 +344,9 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
             color,
         } => {
             check_text(text)?;
-            let size = positive("size", size.unwrap_or(DEFAULT_TEXT_SIZE))?;
+            if let Some(s) = size {
+                positive("size", *s)?;
+            }
             let x = finite("x", *x)?;
             let y = finite("y", *y)?;
             if let Some(w) = w {
@@ -349,14 +354,9 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
             }
             let (idx, info) = page_ref(ctx.lesson, ctx.page_id, *page)?;
             let frame = info.frame.unwrap_or(Frame::SLIDE_16_9);
-            let (w, h) = text_box(text, size, *w, x, frame);
-            let geom = BoxGeom {
-                x,
-                y,
-                w,
-                h,
-                rot: 0.0,
-            };
+            let items = ctx.lesson.items(&info.id)?;
+            // Sensible size: as asked, else like the page's other text.
+            let size = size.unwrap_or_else(|| page_text_size(&items).unwrap_or(DEFAULT_TEXT_SIZE));
             let color = match color {
                 Some(c) => parse_color(c)?,
                 None => default_ink(info.bg_color),
@@ -370,22 +370,91 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
                     ),
                 ));
             }
+            // Fit it inside the page: size, wrap, place; spill to new pages.
+            let above = free_above(&items, x, y, frame);
+            let fit = crate::fit::fit_text(text, size, x, y, *w, frame, Some(above));
+            for n in &fit.notes {
+                warnings.push(warning("fit", n.clone()));
+            }
+            let geom = BoxGeom {
+                x: fit.x,
+                y: fit.y,
+                w: fit.w,
+                h: fit.h,
+                rot: 0.0,
+            };
             warnings.extend(placement_warning(&geom, info.frame));
             let data = ItemData::Text(TextData {
                 latex: false,
                 geom,
-                text: text.clone(),
-                size,
+                text: fit.text.clone(),
+                size: fit.size,
                 color,
                 stamp: None,
             });
             tag(ctx.lesson, msg);
             let item_id = ctx.lesson.add_item(&info.id, &data, now)?;
+            // Text that does not fit continues on new pages after this one.
+            let mut more = Vec::new();
+            let mut rest = fit.rest.clone();
+            let mut at = idx;
+            while let Some(r) = rest.take() {
+                if more.len() >= MAX_SPILL_PAGES {
+                    warnings.push(warning(
+                        "fit",
+                        format!("the text is too long: stopped after {MAX_SPILL_PAGES} extra pages; split it into shorter parts"),
+                    ));
+                    break;
+                }
+                let spec = new_page_spec(ctx.lesson, &info.id, &None, None, &None)?;
+                tag(ctx.lesson, msg);
+                let pid = ctx.lesson.add_page(Some(at + 1), spec)?;
+                at += 1;
+                let f = crate::fit::fit_text(
+                    &r,
+                    fit.size,
+                    crate::fit::MARGIN,
+                    crate::fit::MARGIN,
+                    *w,
+                    frame,
+                    None,
+                );
+                let data = ItemData::Text(TextData {
+                    latex: false,
+                    geom: BoxGeom {
+                        x: f.x,
+                        y: f.y,
+                        w: f.w,
+                        h: f.h,
+                        rot: 0.0,
+                    },
+                    text: f.text.clone(),
+                    size: f.size,
+                    color,
+                    stamp: None,
+                });
+                tag(ctx.lesson, msg);
+                let id = ctx.lesson.add_item(&pid, &data, now)?;
+                more.push(json!({ "page": at + 1, "item_id": id }));
+                rest = f.rest;
+            }
+            if !more.is_empty() {
+                warnings.push(warning(
+                    "fit",
+                    format!(
+                        "the text did not fit on page {}; it continues on {} new page(s) after it",
+                        idx + 1,
+                        more.len()
+                    ),
+                ));
+            }
             Ok(Outcome::changed(json!({
                 "item_id": item_id,
                 "page": idx + 1,
                 "page_id": info.id,
                 "geometry": geometry_of(&geom),
+                "size": fit.size,
+                "continued": more,
                 "warnings": warnings,
             })))
         }
@@ -731,9 +800,27 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
             };
             let x = finite("x", x.unwrap_or(b.x))?;
             let y = finite("y", y.unwrap_or(b.y))?;
-            let (est_w, _) = text_box(text, size, None, x, frame);
-            let w = est_w.max(b.w.min((frame.w - x).max(size * 2.0)));
-            let (w, h) = text_box(text, size, Some(w), x, frame);
+            // As wide as the ink (at least), wrapped and kept on the page.
+            let want_w = crate::fit::text_width(
+                text.split('\n')
+                    .max_by_key(|l| l.chars().count())
+                    .unwrap_or(""),
+                size,
+            )
+            .max(b.w);
+            let mut fit = crate::fit::fit_text(text, size, x, y, Some(want_w), frame, Some(y));
+            if fit.rest.is_some() {
+                // One undo step replaces the ink: keep it all in one box.
+                let min = MIN_PROJECTOR_TEXT.min(size);
+                let f =
+                    crate::fit::fit_text(text, min, x, y, None, frame, Some(crate::fit::MARGIN));
+                fit = crate::fit::TextFit {
+                    text: text.clone(),
+                    rest: None,
+                    ..f
+                };
+            }
+            let (x, y, w, h, size) = (fit.x, fit.y, fit.w, fit.h, fit.size);
             let color = match color {
                 Some(c) => parse_color(c)?,
                 None => chosen
@@ -768,6 +855,8 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
                 "removed": ids.len(),
                 "page": idx + 1,
                 "geometry": geometry_of(&geom),
+                "size": size,
+                "notes": fit.notes,
             })))
         }
         Op::StepObject {
@@ -1245,27 +1334,36 @@ pub fn default_ink(bg: u32) -> u32 {
     if is_dark(bg) { 0xf1f3f5ff } else { 0x1c2024ff }
 }
 
-/// Rough text box size: ~0.55em per character, 1.3em line height (the same
-/// estimate the file tools use).
-fn text_box(text: &str, size: f64, w: Option<f64>, x: f64, frame: Frame) -> (f64, f64) {
-    let char_w = size * 0.55;
-    let lines: Vec<&str> = text.split('\n').collect();
-    let longest = lines
+/// The size of the page's own text (median of its text boxes, stamps
+/// aside), so added text matches what is already there.
+fn page_text_size(items: &[Item]) -> Option<f64> {
+    let mut sizes: Vec<f64> = items
         .iter()
-        .map(|l| l.chars().count())
-        .max()
-        .unwrap_or(0)
-        .max(1) as f64;
-    let w = w.unwrap_or_else(|| (longest * char_w + size * 0.5).min((frame.w - x).max(size * 4.0)));
-    let rows: f64 = lines
-        .iter()
-        .map(|l| {
-            ((l.chars().count().max(1) as f64 * char_w) / w)
-                .ceil()
-                .max(1.0)
+        .filter_map(|i| match &i.data {
+            ItemData::Text(t) if t.stamp.is_none() && t.size.is_finite() => Some(t.size),
+            _ => None,
         })
-        .sum();
-    (w, rows * size * 1.3)
+        .collect();
+    if sizes.is_empty() {
+        return None;
+    }
+    sizes.sort_by(f64::total_cmp);
+    Some(sizes[sizes.len() / 2].clamp(MIN_PROJECTOR_TEXT, 72.0))
+}
+
+/// The top-most y a text block starting at (`x`, `y`) may move up to
+/// without covering what is above it on the page.
+fn free_above(items: &[Item], x: f64, y: f64, frame: Frame) -> f64 {
+    items
+        .iter()
+        .map(|i| i.data.aabb())
+        .filter(|a| {
+            f64::from(a[2]) > x
+                && f64::from(a[0]) < frame.w - crate::fit::MARGIN
+                && f64::from(a[3]) <= y + 1.0
+        })
+        .map(|a| f64::from(a[3]) + 16.0)
+        .fold(crate::fit::MARGIN, f64::max)
 }
 
 pub(crate) fn placement_warning(g: &BoxGeom, frame: Option<Frame>) -> Option<Diagnostic> {
@@ -1478,6 +1576,122 @@ mod tests {
             size: Some(48.0),
             color: None,
         }
+    }
+
+    fn text_geom(b: &Board, id: &str) -> (BoxGeom, f64) {
+        let it = b.lesson.item(&b.page, id).unwrap();
+        let ItemData::Text(t) = it.data else { panic!() };
+        (t.geom, t.size)
+    }
+
+    #[test]
+    fn agent_text_never_leaves_the_page() {
+        // Regression: a paragraph at 96px near the right edge crossed the
+        // slide frame and the window.
+        let mut b = Board::new();
+        let para = "Ohm's law: the current through a conductor is proportional to the voltage \
+across it when the temperature stays the same. We write V = IR, where R is the resistance in \
+ohms, I the current in amperes and V the voltage in volts. Doubling V doubles I.";
+        let out = b
+            .run(Op::AddText {
+                page: None,
+                text: para.into(),
+                x: 1500.0,
+                y: 900.0,
+                w: None,
+                size: Some(96.0),
+                color: None,
+            })
+            .unwrap();
+        let id = out.result["item_id"].as_str().unwrap().to_string();
+        let (g, size) = text_geom(&b, &id);
+        let f = Frame::SLIDE_16_9;
+        assert!(g.x >= 0.0 && g.y >= 0.0, "{g:?}");
+        assert!(g.x + g.w <= f.w && g.y + g.h <= f.h, "{g:?}");
+        assert!((MIN_PROJECTOR_TEXT..=48.0).contains(&size), "{size}");
+        // The board wraps at the box width: every line fits it.
+        for l in crate::fit::wrap(para, size, g.w) {
+            assert!(crate::fit::text_width(&l, size) <= g.w + 0.5);
+        }
+        assert!(
+            out.result["warnings"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|w| w["code"] == "fit"),
+            "the agent is told what changed: {}",
+            out.result
+        );
+        assert!(
+            !out.result["warnings"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|w| w["code"] == "placement")
+        );
+        // Without a size, text matches the page's other text.
+        let out = b
+            .run(Op::AddText {
+                page: None,
+                text: "Next".into(),
+                x: 100.0,
+                y: 100.0,
+                w: None,
+                size: None,
+                color: None,
+            })
+            .unwrap();
+        assert_eq!(out.result["size"].as_f64(), Some(size));
+        // Still one undo step each.
+        assert!(b.lesson.undo().unwrap());
+        assert!(b.lesson.undo().unwrap());
+        assert!(b.items().is_empty());
+    }
+
+    #[test]
+    fn very_long_agent_text_flows_onto_new_pages() {
+        let mut b = Board::new();
+        let long: String = (0..1500)
+            .map(|i| format!("w{i}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let out = b.run(text(&long)).unwrap();
+        let more = out.result["continued"].as_array().unwrap();
+        assert!(!more.is_empty(), "{}", out.result);
+        assert_eq!(b.lesson.page_count(), 1 + more.len());
+        // Every piece is inside its page and nothing is lost.
+        let mut words = 0;
+        for i in 0..b.lesson.page_count() {
+            let pid = b.lesson.page_id_at(i).unwrap();
+            for it in b.lesson.items(&pid).unwrap() {
+                let ItemData::Text(t) = it.data else { continue };
+                assert!(t.geom.y + t.geom.h <= 1080.0 && t.geom.x + t.geom.w <= 1920.0);
+                words += t.text.split_whitespace().count();
+            }
+        }
+        assert_eq!(words, 1500);
+        // Each change is attributed to the agent.
+        assert!(last_message(&b.lesson).unwrap().contains("add_text"));
+    }
+
+    #[test]
+    fn ink_to_text_stays_on_the_page() {
+        let mut b = Board::new();
+        let id = b.stroke();
+        let out = b
+            .run(Op::ReplaceItemsWithText {
+                page: None,
+                item_ids: vec![id],
+                text: "A much longer sentence than the scribble it replaces, which would run far past the right edge of the slide".into(),
+                x: Some(1700.0),
+                y: None,
+                size: Some(64.0),
+                color: None,
+            })
+            .unwrap();
+        let tid = out.result["item_id"].as_str().unwrap().to_string();
+        let (g, _) = text_geom(&b, &tid);
+        assert!(g.x + g.w <= 1920.0 && g.y + g.h <= 1080.0, "{g:?}");
     }
 
     fn last_message(l: &Lesson) -> Option<String> {

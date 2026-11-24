@@ -655,6 +655,7 @@ and how many items it has. Lighter than get_lesson_outline. Omit `path` for the 
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -675,6 +676,7 @@ One undo step brings them all back.",
         annotations(
             read_only_hint = false,
             destructive_hint = true,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -688,6 +690,7 @@ One undo step; returns the copies' page numbers.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -701,6 +704,7 @@ One undo step; returns the copies' page numbers.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -722,6 +726,7 @@ appears). `[]` clears it. Use it to show the teacher what you mean before changi
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -739,6 +744,7 @@ Ink, text, shapes, images and Smart Objects all move. One undo step.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -764,6 +770,7 @@ handwritten word) move as one. One undo step.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -788,6 +795,7 @@ Smart Objects are skipped. One undo step.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -815,6 +823,7 @@ shapes), text (font size too), images and Smart Objects. One undo step.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -835,6 +844,7 @@ shapes), text (font size too), images and Smart Objects. One undo step.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -854,6 +864,7 @@ shapes), text (font size too), images and Smart Objects. One undo step.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -873,6 +884,7 @@ shapes), text (font size too), images and Smart Objects. One undo step.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -893,6 +905,7 @@ shapes), text (font size too), images and Smart Objects. One undo step.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -914,6 +927,7 @@ delete the teacher's work without asking first. One undo step brings them all ba
         annotations(
             read_only_hint = false,
             destructive_hint = true,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -936,6 +950,7 @@ or tick; for shapes prefer add_shape, for words add_text or write_handwriting. O
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -971,6 +986,7 @@ or tick; for shapes prefer add_shape, for words add_text or write_handwriting. O
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1013,6 +1029,7 @@ stamps\" and the lesson. One undo step. Keep stamps readable on a projector, cel
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -1027,6 +1044,7 @@ colour, size, behaviour, Smart stamp html). Every placement shows the new look. 
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1054,6 +1072,7 @@ those stamps). Ask the teacher first.",
         annotations(
             read_only_hint = false,
             destructive_hint = true,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1076,6 +1095,7 @@ or the teacher's own. Its behaviour (animation, burst, sound) plays on the board
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -1104,6 +1124,7 @@ teacher does that).",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1122,6 +1143,7 @@ fit_page goes back.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1139,6 +1161,7 @@ fit_page goes back.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1152,6 +1175,7 @@ was built).",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -1168,6 +1192,7 @@ was built).",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1181,6 +1206,7 @@ achievement. Nothing is saved.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -1194,6 +1220,7 @@ stamp, hand, interact) and, for ink, its colour, width and pen style, e.g. \"giv
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1212,7 +1239,8 @@ stamp, hand, interact) and, for ink, its colour, width and pen style, e.g. \"giv
 undoes the teacher's work).",
         annotations(
             read_only_hint = false,
-            destructive_hint = true,
+            destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -1227,6 +1255,7 @@ saves it on the teacher's board. Returns where it was saved.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -1312,6 +1341,7 @@ sees the new lesson, so do it when asked.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1325,6 +1355,7 @@ optionally opening it. Returns its id.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -1346,6 +1377,7 @@ optionally opening it. Returns its id.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1362,6 +1394,7 @@ optionally opening it. Returns its id.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1382,6 +1415,7 @@ forever is the teacher's call). Ask first.",
         annotations(
             read_only_hint = false,
             destructive_hint = true,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1407,6 +1441,7 @@ chalk). The teacher is asked like for an edit, and the AI chip's Undo puts it ba
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1442,6 +1477,7 @@ like for an edit and can undo it from the AI chip.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1467,6 +1503,7 @@ whether they must stay), and the named layouts (built-in and the teacher's).",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -1487,6 +1524,7 @@ whether they must stay), and the named layouts (built-in and the teacher's).",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]

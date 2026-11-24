@@ -78,6 +78,26 @@ export type ChatItem =
   | { kind: "notice"; id: string; text: string; tone: "info" | "error" };
 
 export const [chatOpen, setChatOpen] = createSignal(false);
+/** Teach: the open panel is tucked into its chip (the teacher drew on the
+ * slide). The AI button reveals it rather than closing it. */
+export const [chatTucked, setChatTucked] = createSignal(false);
+
+/** Listeners for the "AI in action" layer (aiAction/): what the teacher
+ * asked, what the agent streams, when the turn ends, and the class-mode
+ * permission policy. Kept as hooks so chat.ts stays the one place that
+ * speaks the chat protocol. */
+export const chatHooks = {
+  prompt: new Set<(text: string, source: "chat" | "solve" | "student") => void>(),
+  update: new Set<(u: any) => void>(),
+  done: new Set<(f: { stop_reason?: string; error?: string }) => void>(),
+  /** Return a label to approve a permission request without asking (class mode). */
+  autoApprove: null as null | ((toolCall: any) => string | null),
+  /** The teacher approved (or refused) a request: `title`, the option's kind. */
+  answered: new Set<(title: string, kind: string) => void>(),
+};
+const fire = <A extends unknown[]>(set: Set<(...a: A) => void>, ...a: A) => {
+  for (const fn of set) { try { fn(...a); } catch (e) { console.warn("rupok chat hook", e); } }
+};
 export const [chatStatus, setChatStatus] = createSignal<ChatStatus>({ state: "idle" });
 export const [chatAgents, setChatAgents] = createSignal<AgentChoice[]>([]);
 export const [chatAgent, setChatAgent] = createSignal<string | null>(null);
@@ -120,6 +140,7 @@ export const pendingPermissions = () => chat.items.filter((x) => x.kind === "per
 export function openAiPanel() {
   if (isView()) return;
   setChatOpen(true);
+  setChatTucked(false);
   // Not connected yet: look for `rupok agent` / the desktop relay.
   const p = livePhase();
   if (p === "idle" || p === "unreachable") startRelay();
@@ -265,7 +286,7 @@ function onFrame(f: any) {
       if (f.session && f.session !== prev.session && f.state === "ready") setAgentSessions(null);
       break;
     }
-    case "update": onUpdate(f.update ?? {}); break;
+    case "update": onUpdate(f.update ?? {}); fire(chatHooks.update, f.update ?? {}); break;
     case "permission": void onPermission(f); break;
     case "done":
       streaming = null;
@@ -275,6 +296,7 @@ function onFrame(f: any) {
       else if (f.stop_reason === "max_tokens" || f.stop_reason === "max_turn_requests") note("The assistant stopped early (it hit its limit). Ask it to continue.");
       setChat("items", produce((l) => { for (const it of l) if (it.kind === "agent") it.done = true; }));
       saveHistory();
+      fire(chatHooks.done, { stop_reason: f.stop_reason, error: f.error });
       break;
     case "notice":
       if (f.error) note(f.error, "error");
@@ -386,6 +408,13 @@ async function onPermission(f: any) {
   const tc = f.tool_call ?? {};
   const opts: { optionId: string; name: string; kind: string }[] = f.options ?? [];
   const allow = opts.find((o) => o.kind === "allow_once") ?? opts.find((o) => o.kind === "allow_always");
+  // Class mode: routine board edits go straight through (destructive ones still ask).
+  const classLabel = allow ? chatHooks.autoApprove?.(tc) ?? null : null;
+  if (allow && classLabel) {
+    live.sendChat({ t: "permission_reply", id: f.id, option: allow.optionId });
+    push({ kind: "permission", id: nid(), reqId: f.id, title: tc.title ?? "Board edit", options: [], answered: classLabel });
+    return;
+  }
   if (autoApprove() && allow && isBoardTool(tc)) {
     live.sendChat({ t: "permission_reply", id: f.id, option: allow.optionId });
     push({ kind: "permission", id: nid(), reqId: f.id, title: tc.title ?? "Board edit", options: [], answered: "Approved automatically (auto-approve board edits is on)" });
@@ -585,7 +614,17 @@ export function setConfig(id: string, value: unknown) {
 
 export function answerPermission(itemId: string, reqId: number, optionId: string | null, label: string) {
   live.sendChat({ t: "permission_reply", id: reqId, option: optionId });
-  patch(itemId, (it) => { it.answered = label; });
+  patch(itemId, (it) => {
+    it.answered = label;
+    const kind = (it.options ?? []).find((o: any) => o.optionId === optionId)?.kind ?? "reject_once";
+    fire(chatHooks.answered, String(it.title ?? ""), optionId ? kind : "reject_once");
+  });
+}
+
+/** Tell the AI-in-action layer a prompt went out (Solve this and student
+ * asks send their own `prompt` frames). */
+export function notePrompt(text: string, source: "chat" | "solve" | "student") {
+  fire(chatHooks.prompt, text, source);
 }
 
 export function goToPage(page?: number, itemId?: string) {
@@ -611,6 +650,7 @@ async function autoContext(images: boolean, skip: boolean): Promise<{ ctx: CtxEn
 
 function sendNow(text: string, ctx: CtxEntry[]) {
   live.sendChat({ t: "prompt", text, context: ctx, agent: chatAgent() ?? undefined });
+  notePrompt(text, "chat");
 }
 
 function flushQueue() {

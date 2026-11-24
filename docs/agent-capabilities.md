@@ -39,7 +39,7 @@ changes alike (Auto-approve covers them the same way).
 | Undo | ✗ | ✅ the agent's own last change; teacher's history 🔒 |
 | Modes, view, replay | ◐ go to page, point | ✅ Prepare/Teach/Student, zoom, fit, replay, tool |
 | Library, export, save | ◐ workspace files | ✅ list, open, create, move, rename, trash, export PDF |
-| Settings | ◐ theme | ✅ allowlisted settings (52), dock layout; secrets 🔒 |
+| Settings | ◐ theme | ✅ allowlisted settings (56), dock layout; secrets 🔒 |
 | Smart Dock | ✗ | ✅ position, groups, split dock, sizes, named layouts |
 | Solve this, To text, maths, voice | ◐ | ✅ write handwriting, ink to text, Voice on the board (start, stop); recognition and dictation 🔒 (local input) |
 | Cloud and payments | ✗ | 🔒 account, sharing links, payments |
@@ -159,6 +159,7 @@ changes alike (Auto-approve covers them the same way).
 | Feature | Before | Now | How | File | Live |
 |---|---|---|---|---|---|
 | Solve this | ✅ | ✅ | `write_handwriting` (the agent is the solver) | – | ✅ |
+| Show the AI working (a live card where the result will land) | ✗ | ✅ | `show_progress` | – | ✅ |
 | To text (ink to text) | ✅ | ✅ | `replace_items_with_text` | ✅ | ✅ |
 | Handwriting maths recognition | ✗ | 🔒 | Teacher only: it reads the pen as it writes; agents read handwriting with `get_page_snapshot`. | | |
 | Teach Rupok my handwriting | ✗ | 🔒 | Teacher only: needs the teacher's own writing (physical input). | | |
@@ -177,6 +178,7 @@ board and on files; **board** operations run in the board app
 | `get_page`, `get_outline`, `get_selection` | document | read |
 | `snapshot` | board | read |
 | `go_to_page`, `point_at` | board / document | control |
+| `show_progress` | board (`aiAction/`, the working card; not saved) | control |
 | `set_board_theme` | document + board | control or write |
 | `add_page`, `add_page_after_current`, `add_text`, `add_smart_object`, `update_smart_object`, `add_media`, `add_model`, `delete_item`, `set_page_background`, `set_page_design`, `set_branding`, `replace_items_with_text`, `write_handwriting`, `step_object` | document | write |
 | `add_shape`, `add_table` | board engine | write |
@@ -287,6 +289,14 @@ the AI chip's Undo puts it back.
 | `ai.solvePreview` | teacher only | The teacher's check on AI output: an agent never turns off its own review. |
 | `ai.solveTeachStep` | agent | `set_setting` |
 | `ai.solveStudents` | teacher only | Permission: whether students may use the AI. |
+| `ai.classMode` | teacher only | Permission: which AI edits go through without asking. |
+| `ai.preapprove` | teacher only | Permission: pre-approving tools in the teacher's own agent settings. |
+| `ai.progress` | agent | `set_setting` |
+| `ai.celebrate` | agent | `set_setting` |
+| `ai.sound` | agent | `set_setting` |
+| `ai.streamSolve` | agent | `set_setting` |
+| `ai.studentsAsk` | teacher only | Permission: whether students may ask the AI. |
+| `ai.studentLimit` | teacher only | Permission: how much students may ask the AI. |
 | `about.info` | teacher only | Read-only information. |
 | `about.updates` | teacher only | Installing app updates. |
 | `about.tour` | teacher only | A walkthrough for the person at the board. |

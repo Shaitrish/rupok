@@ -15,11 +15,18 @@
 //!   ([`GlyphSet::add_user`]; the same samples teach the recogniser), else
 //!   from the Hershey single-stroke fonts, smoothed (see [`font`] for the
 //!   data licence).
-//! - **Variation** (slant, size, baseline wobble, rotation, spacing) is
-//!   gentle and comes from a seeded generator: the same input and seed always
-//!   give the same ink.
+//! - **Variation** (slant, size, a slowly wandering baseline, rotation,
+//!   spacing) is gentle and comes from a seeded generator: the same input and
+//!   seed always give the same ink.
+//! - **Spacing** follows the ink: letters sit an even, close gap apart (with
+//!   small optical corrections), not at the font's side bearings.
+//! - **Pen order** is a hand's: strokes that meet are one movement (`v`,
+//!   retraced stems in `a`, `n`, `d`), dots come last, and the joined style
+//!   ([`WriteOptions::connect`]) links the letters of a word.
 //! - **Timing**: slower in curves, eased at pen-down and lift, pauses between
 //!   strokes, glyphs, words and lines; `speed` scales it all.
+//! - **Pressure** rises on downstrokes and in slow curves and tapers at both
+//!   ends, so the line breathes like a felt pen on a board.
 //!
 //! Pure Rust with no clock, so it runs in `wasm32-unknown-unknown`.
 
@@ -61,6 +68,9 @@ pub struct WriteOptions {
     pub line_pitch: f32,
     /// Use the teacher's own glyphs where the set has them.
     pub prefer_user: bool,
+    /// Join the letters of a word where a hand would (a cursive-ish,
+    /// "joined" print). Off: neat separate letters.
+    pub connect: bool,
 }
 
 impl Default for WriteOptions {
@@ -74,6 +84,7 @@ impl Default for WriteOptions {
             max_width: None,
             line_pitch: 3.0,
             prefer_user: true,
+            connect: false,
         }
     }
 }
@@ -166,9 +177,11 @@ pub fn write<S: AsRef<str>>(lines: &[S], glyphs: &GlyphSet, opts: &WriteOptions)
         var: Variation {
             jitter,
             prefer_user: opts.prefer_user,
+            connect: opts.connect,
         },
         rng: Rng::new(fnv(&joined, opts.seed)),
         missing: Vec::new(),
+        drift: 0.0,
     };
 
     // Lay out every visual line in writing units, baseline at y = 0.
@@ -200,7 +213,7 @@ pub fn write<S: AsRef<str>>(lines: &[S], glyphs: &GlyphSet, opts: &WriteOptions)
             baseline = (baseline + pitch).max(prev_bottom - top + XH * 0.5);
         }
         let wobble = 0.5 * jitter * lay.rng.normal().clamp(-2.0, 2.0);
-        let drift = 0.004 * jitter * lay.rng.normal().clamp(-2.0, 2.0); // baseline tilt
+        let drift = 0.003 * jitter * lay.rng.normal().clamp(-2.0, 2.0); // baseline tilt
         let mut first = true;
         let mut x1 = 0.0f32;
         for s in b.strokes {

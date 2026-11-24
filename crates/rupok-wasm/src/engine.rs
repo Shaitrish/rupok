@@ -4232,7 +4232,7 @@ pub(crate) mod tests {
         assert_eq!((d.geom.x, d.geom.w), (1320.0, 600.0));
         assert_eq!(d.geom.y, 1080.0 - 2.0 * 48.0 * 1.25);
         assert_eq!((d.text.as_str(), d.color), ("one\ntwo", 0x087f5bff));
-        assert_eq!(e.selection(), [t.clone()]);
+        assert_eq!(e.selection(), std::slice::from_ref(&t));
         // One undo step takes it away.
         assert!(e.undo());
         assert!(e.lesson.item(&e.page.clone(), &t).is_err());

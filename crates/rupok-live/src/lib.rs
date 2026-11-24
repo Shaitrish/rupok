@@ -29,9 +29,11 @@
 pub mod apply;
 pub mod attribution;
 pub mod design;
+pub mod fit;
 pub mod handwriting;
 pub mod items;
 pub mod op;
+pub mod progress;
 pub mod protocol;
 pub mod stamps;
 

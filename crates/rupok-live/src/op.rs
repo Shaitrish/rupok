@@ -59,6 +59,11 @@ pub struct Anchor {
     /// `below` (default) or `right` of the items or region.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub side: Option<String>,
+    /// Continue earlier writing: the `group` an earlier `write_handwriting`
+    /// returned. The new lines go right below it, in its ink, and join its
+    /// group (so a solution streamed line by line selects and moves as one).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 /// Arguments of [`Op::SetPageDesign`].
@@ -515,6 +520,11 @@ pub enum Op {
         #[serde(default)]
         text_size: Option<f64>,
     },
+    /// A "working" card on the board while the agent builds something: the
+    /// spot where the result will appear, the current step, the plan and an
+    /// optional live preview. Run by the board app; not saved in the lesson.
+    /// See [`crate::progress`].
+    ShowProgress(Box<crate::progress::ProgressArgs>),
     /// Move a Smart Object's build step: absolute `step`, or `delta` (default +1).
     StepObject {
         #[serde(default)]
@@ -948,6 +958,7 @@ impl Op {
             Op::ListDockItems => "list_dock_items",
             Op::SaveDockPreset { .. } => "save_dock_preset",
             Op::ApplyDockPreset { .. } => "apply_dock_preset",
+            Op::ShowProgress(_) => "show_progress",
         }
     }
 
@@ -974,7 +985,8 @@ impl Op {
             | Op::Celebrate { .. }
             | Op::SetTool { .. }
             | Op::ExportPdf { .. }
-            | Op::LibraryOpen { .. } => Access::Control,
+            | Op::LibraryOpen { .. }
+            | Op::ShowProgress(_) => Access::Control,
             Op::SetBoardTheme {
                 page_color,
                 pattern,
@@ -1021,6 +1033,7 @@ impl Op {
                 | Op::ApplyDockPreset { .. }
                 | Op::StartVoiceText { .. }
                 | Op::StopVoiceText { .. }
+                | Op::ShowProgress(_)
         )
     }
 
@@ -1092,6 +1105,7 @@ impl Op {
             Op::ListDockItems => "read the dock",
             Op::SaveDockPreset { .. } => "saved a dock layout",
             Op::ApplyDockPreset { .. } => "changed the dock",
+            Op::ShowProgress(_) => "showed its progress",
         }
     }
 }

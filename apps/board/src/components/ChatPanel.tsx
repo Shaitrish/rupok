@@ -13,7 +13,7 @@ import {
   chatBusy, chatHistory, chatOpen, chatPrefs, chatStatus, chatUsage, chatWidth, closeAiPanel, composerDraft, setComposerDraft, currentMode,
   currentModel, denyAllAndStop, editMessage, editsAutoApproved, forgetChat, formatUsage, goToPage, initChat,
   listAgentSessions, modeAutoApproves, models, modes, newChat, pendingPermissions, pickAgent, recallSent, refreshAgents,
-  replaying, resumeAgentSession, resumeChat, retryAgent, retryLast, sendPrompt, setAttachPage, setAutoApprove,
+  replaying, resumeAgentSession, resumeChat, retryAgent, retryLast, sendPrompt, setAttachPage, setAutoApprove, chatTucked, setChatTucked,
   setChatOpen, setChatWidth, setMode, setModel, startRelay, stopChat, unqueue, type ChatItem,
 } from "../chat";
 import {
@@ -27,6 +27,7 @@ import { Icon } from "./Icon";
 import { MicButton } from "./MicButton";
 import { SolveChipAction } from "../solve/SolveUI";
 import { openSettings } from "../settings/open";
+import { classModeOn } from "../aiAction/state";
 import "../chat.css";
 
 const DOCS = "https://github.com/shaitrish/rupok/blob/main/docs/ai-agents.md#chat-in-rupok";
@@ -258,6 +259,12 @@ function ModePicker() {
 function AutoApproveChip() {
   const byMode = modeAutoApproves;
   return (
+    <Show when={!classModeOn() || editsAutoApproved()} fallback={
+      <button class="chat-auto on" aria-pressed="true" onClick={() => openSettings("ai.classMode")}
+        title="Class mode: board edits apply at once with an Undo button; deleting, clearing and settings still ask. Click to change.">
+        <span class="chat-auto-dot" aria-hidden="true" />Class mode
+      </button>
+    }>
     <button
       class="chat-auto"
       classList={{ on: editsAutoApproved() }}
@@ -269,6 +276,7 @@ function AutoApproveChip() {
       <span class="chat-auto-dot" aria-hidden="true" />
       {editsAutoApproved() ? "Auto-approve" : "Ask first"}
     </button>
+    </Show>
   );
 }
 
@@ -712,7 +720,8 @@ function Conversation() {
 }
 
 export default function ChatPanel() {
-  const [hidden, setHidden] = createSignal(false); // Teach: tucked away while drawing
+  // Teach: tucked away while drawing (chat.ts, so the AI button can bring it back).
+  const hidden = chatTucked, setHidden = setChatTucked;
   onMount(() => initChat(controller));
   const teach = () => mode() === "teach";
   const docked = () => chatOpen() && !teach() && !isView();
@@ -733,7 +742,7 @@ export default function ChatPanel() {
     const down = (e: PointerEvent) => {
       if (!teach() || !chatOpen()) return;
       const t = e.target as Element;
-      if (t.closest?.(".chat-panel, .chat-peek, [data-ai-toggle], .topbar, .dock")) return;
+      if (t.closest?.(".chat-panel, .chat-peek, [data-ai-toggle], .topbar, .dock, .ai-float, .aia-card, .aia-toast, .aia-confirm, .solve-peek-row")) return;
       setHidden(true);
     };
     const key = (e: KeyboardEvent) => {
@@ -746,6 +755,8 @@ export default function ChatPanel() {
     onCleanup(() => { window.removeEventListener("pointerdown", down, true); window.removeEventListener("keydown", key); });
   });
   createEffect(on(chatOpen, (o) => { if (o) setHidden(false); }));
+  // Student view has no chat: close it so it never covers the board.
+  createEffect(on(isView, (v) => { if (v) closeAiPanel(); }, { defer: true }));
 
   // Resize from the inner edge.
   const startResize = (e: PointerEvent) => {

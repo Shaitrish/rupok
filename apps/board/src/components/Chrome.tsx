@@ -28,8 +28,10 @@ export function TopBar(props: { onObject: () => void; onSettings: () => void }) 
       <Show when={hasTopBar(modeConfig())}>
         <Header onObject={props.onObject} onSettings={props.onSettings} />
       </Show>
-      <Show when={!hasTopBar(modeConfig()) && !isView() && aiAround()}>
-        <FloatingAiStatus />
+      {/* Teach has no top bar: the AI button floats top right, always, so the
+          AI is one tap away (labelled until an AI is connected). */}
+      <Show when={!hasTopBar(modeConfig()) && !isView()}>
+        <FloatingAiStatus label={!aiAround() || livePhase() === "unreachable"} />
       </Show>
       {/* Mounted here because the top bar component is always rendered; the
           overlay itself is a full-screen layer. */}

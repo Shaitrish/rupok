@@ -86,6 +86,12 @@ function MathItem(props: { item: DomItem }) {
 
 function TextItem(props: { item: DomItem }) {
   let el!: HTMLDivElement;
+  // Wrap at the page's right edge at the latest: text never runs off the
+  // slide (agent text is also sized and placed to fit, rupok-live fit.rs).
+  const maxW = () => {
+    const f = pages()[pageIndex()]?.frame;
+    return f ? `${Math.max(props.item.w, f.w - props.item.x)}px` : undefined;
+  };
   const editing = () => editingText() === props.item.id;
   createEffect(() => {
     if (editing()) {
@@ -118,6 +124,7 @@ function TextItem(props: { item: DomItem }) {
         left: `${props.item.x}px`,
         top: `${props.item.y}px`,
         "min-width": `${props.item.w}px`,
+        "max-width": maxW(),
         "font-size": `${props.item.size}px`,
         color: props.item.color ? props.item.color.slice(0, 7) : undefined,
         "pointer-events": editing() ? "auto" : "none",

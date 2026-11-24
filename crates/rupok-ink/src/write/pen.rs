@@ -9,7 +9,7 @@ use crate::StrokePoint;
 use crate::math::geom::Pt;
 
 /// Writing speed at `speed = 1`, in x-heights per second of pen travel.
-const XH_PER_S: f32 = 22.0;
+const XH_PER_S: f32 = 30.0;
 /// Time between emitted samples, ms (a pen digitiser reports ~120–240 Hz).
 const SAMPLE_MS: f32 = 7.0;
 /// Most points one stroke may have.
@@ -38,10 +38,10 @@ impl PenStroke {
 
 fn pause_ms(p: Pause) -> f32 {
     match p {
-        Pause::Stroke => 45.0,
-        Pause::Glyph => 70.0,
-        Pause::Word => 200.0,
-        Pause::Line => 480.0,
+        Pause::Stroke => 32.0,
+        Pause::Glyph => 46.0,
+        Pause::Word => 140.0,
+        Pause::Line => 320.0,
     }
 }
 
@@ -112,7 +112,10 @@ fn time_stroke(pts: &[Pt], xh_px: f32, speed: f32) -> Vec<StrokePoint> {
     let mut t = 0.0f32;
     let mut last_emit = f32::NEG_INFINITY;
     let mut out: Vec<StrokePoint> = Vec::with_capacity(n / 2 + 2);
+    let mut p_smooth = f32::NAN;
     for i in 0..n {
+        let mut down = 0.0f32;
+        let mut rel_v = 0.6f32;
         if i > 0 {
             let ds = r[i - 1].dist(r[i]);
             s_acc += ds;
@@ -127,20 +130,37 @@ fn time_stroke(pts: &[Pt], xh_px: f32, speed: f32) -> Vec<StrokePoint> {
             } else {
                 0.0
             };
-            let curve = 0.3 + 0.7 / (1.0 + 2.6 * turn);
+            let curve = 0.35 + 0.65 / (1.0 + 2.2 * turn);
             let start = (0.3 + 0.7 * (s_acc / ease)).min(1.0);
             let end = (0.35 + 0.65 * ((len - s_acc) / ease)).min(1.0);
-            let v = vmax * curve * start.min(end).max(0.2);
-            t += ds / v.max(1e-4);
+            let k = curve * start.min(end).max(0.2);
+            t += ds / (vmax * k).max(1e-4);
+            rel_v = k;
+            if ds > 0.0 {
+                down = (r[i].y - r[i - 1].y) / ds; // y grows downwards
+            }
         }
+        // Pressure: heavier on downstrokes and where the pen slows, lighter
+        // on fast upstrokes, tapering at both ends; smoothed so the width
+        // swells and thins gradually.
+        let edge = (s_acc / ease).min((len - s_acc) / ease).clamp(0.0, 1.0);
+        let raw = 0.34 + 0.24 * edge.sqrt() + 0.12 * down - 0.12 * (rel_v - 0.6);
+        p_smooth = if p_smooth.is_nan() {
+            raw
+        } else {
+            p_smooth + 0.3 * (raw - p_smooth)
+        };
         let last = i + 1 == n;
         if i == 0 || last || t - last_emit >= SAMPLE_MS {
-            let edge = (s_acc / ease).min((len - s_acc) / ease).clamp(0.0, 1.0);
-            let p = (0.38 + 0.3 * edge).clamp(0.0, 1.0);
+            let p = if i == 0 || last {
+                p_smooth.min(0.4)
+            } else {
+                p_smooth
+            };
             out.push(StrokePoint {
                 x: r[i].x,
                 y: r[i].y,
-                p,
+                p: p.clamp(0.15, 0.95),
                 dt: t.round() as u32,
             });
             last_emit = t;
@@ -159,7 +179,7 @@ fn time_stroke(pts: &[Pt], xh_px: f32, speed: f32) -> Vec<StrokePoint> {
 pub fn time_all(strokes: &[(Vec<Pt>, Pause, usize)], xh_px: f32, speed: f32) -> Vec<PenStroke> {
     let speed = speed.clamp(0.1, 10.0);
     let xh_px = xh_px.max(1.0);
-    let air = XH_PER_S * xh_px * speed / 1000.0 * 2.4;
+    let air = XH_PER_S * xh_px * speed / 1000.0 * 3.0;
     let mut out = Vec::with_capacity(strokes.len());
     let mut clock = 0.0f64;
     let mut prev_end: Option<Pt> = None;
@@ -206,6 +226,31 @@ mod tests {
         assert!(tc > tl, "circle {tc} ms vs line {tl} ms");
         let fast = time_stroke(&line, 30.0, 2.0).last().unwrap().dt;
         assert!(fast < tl);
+    }
+
+    #[test]
+    fn pressure_varies_downstrokes_heavier() {
+        // A zigzag: down, up, down at the same pace.
+        let mut pts = Vec::new();
+        for k in 0..4 {
+            for i in 0..=20 {
+                let y = if k % 2 == 0 {
+                    i as f32
+                } else {
+                    20.0 - i as f32
+                };
+                pts.push(Pt::new(k as f32 * 6.0 + i as f32 * 0.3, y * 2.0));
+            }
+        }
+        let s = time_stroke(&pts, 30.0, 1.0);
+        let ps: Vec<f32> = s.iter().map(|p| p.p).collect();
+        let (lo, hi) = ps
+            .iter()
+            .fold((1.0f32, 0.0f32), |(a, b), p| (a.min(*p), b.max(*p)));
+        assert!(hi - lo > 0.15, "pressure should vary: {lo}..{hi}");
+        assert!(ps.iter().all(|p| (0.0..=1.0).contains(p)));
+        // Ends are lighter than the middle of a downstroke.
+        assert!(ps[0] < hi && ps[ps.len() - 1] < hi);
     }
 
     #[test]

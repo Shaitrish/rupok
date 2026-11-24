@@ -246,6 +246,30 @@ pub(crate) fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Resul
             if let Some(v) = w {
                 g.w = positive("w", *v)?;
             }
+            // New words or a new size are fitted inside the page like
+            // `add_text` (fit.rs), within the box's width; an edit never
+            // spills onto a new page.
+            let mut warnings = Vec::new();
+            if text.is_some() || size.is_some() {
+                let frame = info.frame.unwrap_or(Frame::SLIDE_16_9);
+                let words = text.as_deref().unwrap_or(&t.text);
+                let want = new_size.unwrap_or(t.size);
+                let f = crate::fit::fit_text(words, want, g.x, g.y, Some(g.w), frame, None);
+                if f.rest.is_none() {
+                    (g.x, g.y, g.w, g.h) = (f.x, f.y, f.w, f.h);
+                    if (f.size - want).abs() > 0.01 {
+                        new_size = Some(f.size);
+                    }
+                    for n in f.notes {
+                        warnings.push(crate::apply::warning("fit", n));
+                    }
+                } else {
+                    warnings.push(crate::apply::warning(
+                        "fit",
+                        "the text is too long to fit this page even at the smallest readable size; shorten it or continue with add_text on a new page".into(),
+                    ));
+                }
+            }
             if g != t.geom || new_size.is_some() {
                 e.boxes.push((item.id.clone(), g, new_size));
             }
@@ -259,6 +283,7 @@ pub(crate) fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Resul
                 "page": idx + 1,
                 "item_id": item.id,
                 "geometry": geometry_of(&g),
+                "warnings": warnings,
             })))
         }
         _ => Err(LiveError::Unsupported(op.name())),

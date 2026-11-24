@@ -19,6 +19,8 @@ import { overlayRole } from "./overlay/role";
 import { registerSettingsOpener } from "./components/ToText";
 import LivePanel from "./components/LivePanel";
 import ChatPanel from "./components/ChatPanel";
+import AiActionLayer from "./aiAction/AiActionLayer";
+import { initAiAction } from "./aiAction";
 import VoiceLayer from "./voice/VoiceLayer";
 import VoiceBoard from "./voice/VoiceBoard";
 import { LibraryRoot } from "./components/Library";
@@ -114,6 +116,7 @@ export default function App() {
       setReady(true);
       startUpdateChecks(); // desktop: new release; web: offline service worker, new build
       void import("./solve").then((m) => m.initSolve()); // Solve this: AI handwriting, preview, reveal
+      initAiAction(controller); // AI in action: working cards, class mode, live solve, students ask
       startLibrary(controller); // the Library home and saving lessons to their files (before files below arrive)
       // Back from a payment page (?billing=…) or sent by the pricing page (?upgrade=pro).
       const billingParams = takeBillingParams();
@@ -186,6 +189,8 @@ export default function App() {
         <LivePanel />
         {/* AI chat with the teacher's own agent (chat.ts, `rupok agent`). */}
         <ChatPanel />
+        {/* AI in action: working cards, Undo toasts, students' own layer (aiAction/). */}
+        <AiActionLayer />
         <VoiceLayer />
         <LibraryRoot />
         <UpdateNotice />

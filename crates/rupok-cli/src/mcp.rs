@@ -64,7 +64,16 @@ Document tools take an optional `path` (omit for the board). Settings and mode c
 like edits; AI keys, accounts, payments and permissions are never yours to change.\n\
 - To solve a problem written on the board, read it (`get_page_snapshot` with its item_ids), check every \
 step, then `write_handwriting` the solution as short lines; the board writes it in handwriting next to \
-the problem. If the result says `preview`, the teacher is checking it first: do not write it again.",
+the problem. If the result says `preview`, the teacher is checking it first: do not write it again. To write \
+line by line as you work, call it once per line with `anchor: {{\"group\": <the group the first call returned>}}`.\n\
+\n\
+In class, act; don't ask. Routine requests (a page, text, a diagram, a Smart Object, a quiz, a solution, a \
+translation) are yours to just do with sensible defaults: no clarifying questions, no \"shall I?\". Ask only \
+before deleting or clearing anything, replacing the teacher's ink, or changing settings or the mode.\n\
+AI in action: for anything that takes more than a few seconds, first call `show_progress` with the box where \
+the result will go (and `kind`), update its `step` as you work (same `id`; `preview_html` for a partial Smart \
+Object), then place the result in exactly that box: the card turns into it in front of the class. Text you add \
+is fitted to the page (wrapped, shrunk if needed, never off the slide); prefer short lines and 32–48px.",
         libs = rupok_format::LIBS.join(", ")
     )
 }
@@ -90,7 +99,10 @@ impl McpServer {
         Self {
             tools: Arc::new(tools),
             live,
-            tool_router: Self::tool_router() + Self::live_tool_router() + Self::agent_tool_router(),
+            tool_router: Self::tool_router()
+                + Self::live_tool_router()
+                + Self::agent_tool_router()
+                + Self::progress_tool_router(),
         }
     }
 
@@ -164,6 +176,7 @@ Fails if the file already exists. Returns the page ids.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -193,6 +206,7 @@ title, bundle_id, declared steps and current step). Call this before editing an 
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -212,6 +226,7 @@ update_smart_object), the placed geometry and any warnings. Default size 1280×7
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -234,6 +249,7 @@ autoplay when the page is shown; offline, the board shows the poster and says it
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -249,6 +265,7 @@ Khan Academy (other sites are refused: write the link as text instead). Returns 
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -264,6 +281,7 @@ with the clicker. Returns item_id and bundle_id.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -296,7 +314,7 @@ Optionally change its step count or allowed network hosts. Re-validated first: o
 the diagnostics are returned.",
         annotations(
             read_only_hint = false,
-            destructive_hint = true,
+            destructive_hint = false,
             idempotent_hint = true,
             open_world_hint = false
         )
@@ -319,6 +337,7 @@ frame. Font size defaults to 32px; keep it 24px or larger so it is readable on a
         annotations(
             read_only_hint = false,
             destructive_hint = false,
+            idempotent_hint = false,
             open_world_hint = false
         )
     )]
@@ -354,7 +373,7 @@ the item id shown in get_lesson_outline.",
         annotations(
             read_only_hint = false,
             destructive_hint = true,
-            idempotent_hint = false,
+            idempotent_hint = true,
             open_world_hint = false
         )
     )]
@@ -370,7 +389,7 @@ the item id shown in get_lesson_outline.",
 as #rrggbb.",
         annotations(
             read_only_hint = false,
-            destructive_hint = true,
+            destructive_hint = false,
             idempotent_hint = true,
             open_world_hint = false
         )
@@ -494,4 +513,57 @@ pub async fn serve_stdio_with(workspace: Workspace, live: Arc<LiveHub>) -> anyho
     }
     running.waiting().await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod annotation_tests {
+    use super::*;
+
+    /// Clients auto-allow safe calls from these hints: reads say read-only,
+    /// only real deletes say destructive, and every tool says whether
+    /// repeating it changes anything.
+    #[test]
+    fn every_tool_declares_its_safety() {
+        let router = McpServer::tool_router()
+            + McpServer::live_tool_router()
+            + McpServer::agent_tool_router()
+            + McpServer::progress_tool_router();
+        let tools = router.list_all();
+        assert!(tools.len() >= 30, "{}", tools.len());
+        let destructive = [
+            "delete_item",
+            "delete_items",
+            "delete_pages",
+            "delete_stamp",
+            "library_trash",
+            "replace_items_with_text",
+            "replace_strokes_with_text",
+        ];
+        for t in &tools {
+            let name = t.name.as_ref();
+            let a = t
+                .annotations
+                .as_ref()
+                .unwrap_or_else(|| panic!("{name}: no annotations"));
+            let read = a.read_only_hint == Some(true);
+            let looks_read = name.starts_with("get_")
+                || name.starts_with("list_")
+                || name.starts_with("read_")
+                || name.starts_with("validate_")
+                || name == "library_list";
+            assert_eq!(read, looks_read, "{name}: readOnlyHint");
+            assert_eq!(a.open_world_hint, Some(false), "{name}: openWorldHint");
+            if !read {
+                assert_eq!(
+                    a.destructive_hint,
+                    Some(destructive.contains(&name)),
+                    "{name}: destructiveHint only for real deletes"
+                );
+                assert!(a.idempotent_hint.is_some(), "{name}: idempotentHint");
+            }
+        }
+        for name in ["show_progress", "start_voice_text", "set_dock_layout"] {
+            assert!(tools.iter().any(|t| t.name == name), "{name}");
+        }
+    }
 }
