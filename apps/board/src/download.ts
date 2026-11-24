@@ -4,56 +4,13 @@
 // device. On /download/, links marked data-asset="exe|msi|deb|appimage|dmg"
 // get the latest release's direct URL, and data-meta="<kind>" its version and
 // size. Detection is synchronous (no layout jump); the release comes from the
-// GitHub API, cached for the session, falling back to the releases page.
+// GitHub API (release.ts), cached for the session, falling back to the
+// releases page.
 
-import { ASSET_SUFFIX, DL_ICONS, RELEASES_API, RELEASES_URL } from "../site/icons.mjs";
+import { DL_ICONS } from "../site/icons.mjs";
+import { RELEASES_URL, detectPlatform, latestRelease, type AssetKind as Kind, type Platform, type Release } from "./release";
 
-type Kind = keyof typeof ASSET_SUFFIX;
-type Platform = "windows" | "mac" | "linux" | "mobile";
-interface Asset { url: string; size: number }
-interface Release { version: string; notes: string; assets: Partial<Record<Kind, Asset>> }
-
-const CACHE = "rupok.release";
-
-/** Phones, tablets and ChromeOS get the web app (no installer). */
-export function detectPlatform(): Platform {
-  const uad = (navigator as Navigator & { userAgentData?: { platform?: string; mobile?: boolean } }).userAgentData;
-  const ua = navigator.userAgent;
-  const p = (uad?.platform ?? "").toLowerCase();
-  if (uad?.mobile || /android|iphone|ipad|ipod|cros|chrome os/i.test(p + " " + ua)) return "mobile";
-  // iPadOS reports a Mac; a touch screen gives it away.
-  if (p === "macos" || /macintosh|mac os x/i.test(ua)) return navigator.maxTouchPoints > 1 ? "mobile" : "mac";
-  if (p === "windows" || /windows/i.test(ua)) return "windows";
-  if (p === "linux" || /linux|x11/i.test(ua)) return "linux";
-  return "mobile";
-}
-
-let pending: Promise<Release | null> | null = null;
-export function latestRelease(): Promise<Release | null> {
-  if (pending) return pending;
-  pending = (async () => {
-    try {
-      const hit = sessionStorage.getItem(CACHE);
-      if (hit) return JSON.parse(hit) as Release;
-    } catch { /* storage unavailable */ }
-    try {
-      const r = await fetch(RELEASES_API, { headers: { Accept: "application/vnd.github+json" } });
-      if (!r.ok) return null; // rate limit or no release: the fallback links stay
-      const j = await r.json();
-      const assets: Release["assets"] = {};
-      for (const [kind, suffix] of Object.entries(ASSET_SUFFIX) as [Kind, string][]) {
-        const a = (j.assets ?? []).find((x: { name: string }) => x.name.endsWith(suffix));
-        if (a) assets[kind] = { url: a.browser_download_url, size: a.size };
-      }
-      const rel: Release = { version: String(j.tag_name ?? "").replace(/^v/, ""), notes: j.html_url ?? RELEASES_URL, assets };
-      try { sessionStorage.setItem(CACHE, JSON.stringify(rel)); } catch { /* fine */ }
-      return rel;
-    } catch {
-      return null;
-    }
-  })();
-  return pending;
-}
+export { detectPlatform, latestRelease };
 
 const T = {
   en: {

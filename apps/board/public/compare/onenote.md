@@ -21,7 +21,7 @@ Many teachers write on OneNote at the front of the class. OneNote is a superb no
 | Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | Notes, ink and embedded files |
 | PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Insert PDF printouts and ink on them; export to PDF[^8] |
 | Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ◐ Bangla (Bangladesh) gets proofing tools only; Bangla (India) is partly localized[^6] |
-| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Native apps work offline and sync later[^9] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app) | ✓ Native apps work offline and sync later[^9] |
 | Real-time collaboration | ◷ Live class and share links: coming soon with Rupok Cloud | ✓ Co-editing; Class Notebook gives each student a private section[^3] |
 | Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Actively developed. OneNote for Windows 10 reached end of support on 14 Oct 2025[^4] |
 

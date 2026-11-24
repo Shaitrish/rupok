@@ -16,6 +16,10 @@ function trackErrors(page: Page): string[] {
 }
 
 async function openBoard(page: Page) {
+  // The first-run tour stays out of these flows (docs/offline.md).
+  await page.addInitScript(() => {
+    try { localStorage.setItem("rupok.tour", "1"); } catch { /* storage blocked */ }
+  });
   await page.goto("/board/");
   await expect(page.locator(".loading")).toHaveCount(0, { timeout: 30_000 });
   await expect(page.locator("canvas.ink")).toBeVisible();

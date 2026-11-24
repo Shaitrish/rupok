@@ -32,6 +32,9 @@ import { isPhone, pagesDrawer, pagesShown } from "./viewport";
 import { PageDesignHost } from "./components/PageDesign";
 import { drawCursor } from "./wetInk";
 import { Celebrate, QuickMenu } from "./components/Stamps";
+import { UpdateNotice } from "./updates/UpdateNotice";
+import { startUpdateChecks } from "./updates/updates";
+import { Tour } from "./tour/Tour";
 import DonateCard from "./components/DonateCard";
 import { startDonateCard } from "./donate";
 
@@ -106,6 +109,7 @@ export default function App() {
       input.addEventListener("pointerdown", eraserAt);
       for (const t of ["pointerup", "pointercancel", "pointerleave"]) input.addEventListener(t, eraserOff as EventListener);
       setReady(true);
+      startUpdateChecks(); // desktop: new release; web: offline service worker, new build
       void import("./solve").then((m) => m.initSolve()); // Solve this: AI handwriting, preview, reveal
       startLibrary(controller); // the Library home and saving lessons to their files (before files below arrive)
       // Back from a payment page (?billing=…) or sent by the pricing page (?upgrade=pro).
@@ -177,6 +181,8 @@ export default function App() {
         <ChatPanel />
         <VoiceLayer />
         <LibraryRoot />
+        <UpdateNotice />
+        <Tour />
         <DonateCard />
       </Show>
       <Show when={objectDialog()}>

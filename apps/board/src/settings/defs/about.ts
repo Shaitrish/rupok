@@ -1,7 +1,12 @@
 // Settings → About: version and licences, Support Rupok, then troubleshooting switches.
 
-import { setPrefs, prefs } from "../../state";
+import { setPrefs, prefs, mode } from "../../state";
 import { AboutSection, GraphicsInfo } from "../../components/settings/About";
+import { UpdateCheck } from "../../updates/UpdateCheck";
+import { startTour } from "../../tour/state";
+import { controller } from "../../controller";
+import { closeSettings } from "../open";
+import { isDesktop } from "../../platform";
 import { pref } from "../bind";
 import { registerSettings } from "../registry";
 import { openDonatePage } from "../../donate";
@@ -14,7 +19,26 @@ registerSettings([
     component: AboutSection,
   },
   {
-    id: "about.support", category: "about", order: 20, type: "action", label: "Support Rupok",
+    id: "about.updates", category: "about", order: 20, type: "custom", label: "Updates",
+    description: isDesktop
+      ? "Rupok looks for a new release once a day and offers the installer for this computer."
+      : "The web version updates itself, and works without internet after the first visit.",
+    keywords: ["update", "upgrade", "new version", "release", "download", "offline", "আপডেট", "নতুন সংস্করণ"],
+    component: UpdateCheck,
+  },
+  {
+    id: "about.tour", category: "about", order: 30, type: "action", label: "Quick tour",
+    description: "A short walk through the pen, pages, Insert, Teach mode and saving.",
+    keywords: ["tour", "help", "guide", "tutorial", "first run", "onboarding", "intro", "সাহায্য", "পরিচিতি"],
+    button: "Show the tour", icon: "play",
+    run: () => {
+      closeSettings();
+      if (mode() !== "prepare") controller.setMode("prepare");
+      startTour();
+    },
+  },
+  {
+    id: "about.support", category: "about", order: 40, type: "action", label: "Support Rupok",
     description: "Rupok is free and open source. A donation pays for signing certificates, test devices and development time.",
     keywords: ["donate", "donation", "sponsor", "support", "bkash", "contribute", "অনুদান", "সহায়তা", "ডোনেট"],
     button: "Donate", icon: "heart",

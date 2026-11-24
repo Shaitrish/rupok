@@ -1,0 +1,28 @@
+/* Update card (UpdateNotice.tsx): floating chrome, top right under the bar. */
+.update-card {
+  position: fixed; z-index: 20;
+  top: calc(var(--inset) + var(--bar) + var(--s2)); right: var(--inset);
+  width: min(340px, calc(100vw - 2 * var(--inset)));
+  display: grid; grid-template-columns: 28px 1fr 40px; align-items: start; gap: var(--s3);
+  padding: var(--s3) var(--s2) var(--s3) var(--s4); border-radius: 18px;
+  background: var(--surface-solid); color: var(--text);
+  animation: pop 180ms var(--ease);
+}
+.update-card > svg { width: 28px; height: 28px; margin-top: 6px; }
+.update-body { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); padding-top: var(--s2); }
+.update-title { margin: 0; font: 650 14px/20px var(--font); }
+.update-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.update-actions .btn { text-decoration: none; background: var(--gray-a3); padding: 0 var(--s3); }
+.update-actions .btn:hover { background: var(--gray-a4); }
+.update-actions .btn.solid { background: var(--accent-9); color: var(--accent-contrast); width: auto; padding: 0 var(--s3) 0 10px; }
+.update-actions .btn.solid:hover { background: var(--accent-10); }
+.update-actions .btn .label { display: inline; }
+.update-skip {
+  min-height: 40px; margin: 0 0 calc(-1 * var(--s2)); padding: 0; border: 0; background: none; cursor: pointer;
+  font: 550 13px/16px var(--font); color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--gray-a7);
+}
+.update-skip:hover { color: var(--text); }
+.update-card .update-close { color: var(--text-2); }
+.update-card :focus-visible { outline: 2px solid var(--accent-9); outline-offset: 2px; }
+/* Phones: the bar is shorter on room; the card spans the width. */
+@media (max-width: 560px) { .update-card { left: var(--inset); width: auto; } }

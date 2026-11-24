@@ -22,7 +22,7 @@ Note3 is Prestigio’s paid, Windows-only whiteboard software, the updated EasiN
 | Handwriting and shapes | ✓ Smart shapes, offline: hand-drawn shapes, graphs, flowcharts, logic gates, tables and Venn diagrams snap clean. Handwritten maths to LaTeX, offline. Other handwriting to text with your own Claude API key. Bangla handwriting: coming soon | ✓ Handwriting and formula recognition[^4] |
 | PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports PDF and PowerPoint; exports PDF, PPTX, DOCX and JPG[^4] |
 | Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ About 29 interface languages in the installer, no Bangla[^4] |
-| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Installed Windows app (activation needs internet)[^4] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app) | ✓ Installed Windows app (activation needs internet)[^4] |
 | Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ✓ Panels, PCs, laptops and projectors running Windows[^2] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.enb` (the EasiNote format)[^4] |
 

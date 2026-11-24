@@ -138,6 +138,7 @@ export function MenuButton(props: {
       <button
         ref={btn}
         id={props.id}
+        data-tour={props.id}
         class={`btn hdr-menu-btn ${props.class ?? ""}`}
         classList={{ icon: !props.text, open: open() }}
         aria-label={props.label}

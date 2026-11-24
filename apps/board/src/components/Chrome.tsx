@@ -326,7 +326,7 @@ export function PagesPanel() {
         </Show>
         <span class="grow" />
         <Show when={editable()}>
-          <button class="btn icon" title="Add page after this one (same look)" aria-label="Add page" onClick={() => addPageLike(false)}>
+          <button class="btn icon" data-tour="pages-add" title="Add page after this one (same look)" aria-label="Add page" onClick={() => addPageLike(false)}>
             <Icon name="plus" size={20} />
           </button>
         </Show>

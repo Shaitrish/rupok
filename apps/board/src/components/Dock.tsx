@@ -524,6 +524,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
       <button
         ref={btn}
         class="tool"
+        data-tour={p.id === "pen" ? "pen" : undefined}
         classList={{ on: on(), "has-options": options }}
         title={tipOf(p.id, p.id === "stamp" ? "  ·  tap again for all stamps" : options ? "  ·  tap again for styles, colours and sizes" : "")}
         aria-label={labelOf(p.id)}
@@ -575,6 +576,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
           <button
             ref={btn}
             class="tool dock-color"
+            data-tour="color"
             classList={{ on: on() }}
             title={`${hex(shown())}  ·  hold for all colours`}
             aria-label={`Colour ${hex(shown())}`}

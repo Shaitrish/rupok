@@ -261,7 +261,7 @@ Rupok ওপেন সোর্স (AGPL-3.0), তাই কেউ ফ্রি 
 
 ### ইন্টারনেট ছাড়া কি চলে?
 
-ডেস্কটপ অ্যাপ পুরোপুরি ইন্টারনেট ছাড়াই চলে। ব্রাউজারে বোর্ড চালু করতে ইন্টারনেট লাগে, তবে একবার খুলে গেলে লেখা, স্লাইড আর রিপ্লে আপনার ডিভাইসেই চলে।
+ডেস্কটপ অ্যাপ পুরোপুরি ইন্টারনেট ছাড়াই চলে। ব্রাউজারেও চলে: প্রথমবার বোর্ড খোলার পর ইন্টারনেট ছাড়াই চালু হয়, আর লেখা, স্লাইড আর রিপ্লে আপনার ডিভাইসেই চলে।
 
 ### RPK ফাইল কী, আর শিক্ষার্থীরা কীভাবে খুলবে?
 
@@ -308,7 +308,7 @@ Note3 হলো Prestigio-র পেইড স্মার্ট বোর্ড
 | বিষয়ভিত্তিক টুল | ◐ এআই দিয়ে বানিয়ে নিতে হয় | ✓ গণিত, পদার্থ, রসায়নের তৈরি টুল; হাতের লেখা ও সূত্র শনাক্তকরণ[^2][^4] |
 | PDF ও পাওয়ারপয়েন্ট | ◐ PDF আনা ও PDF নামানো যায়, সাথে হ্যান্ডআউট (প্রতি পাতায় ২–৩টি স্লাইড, নোট লেখার লাইনসহ); পাওয়ারপয়েন্ট আগে PDF করতে হয় | ✓ PDF ও PowerPoint আনা যায়; PDF, PPTX, DOCX, JPG-তে রপ্তানি[^4] |
 | বাংলা | ◐ লেসনে বাংলা লেখা চলে; বাংলা ইন্টারফেস আসছে | ✗ প্রায় ২৯টি ভাষা, বাংলা নেই[^4] |
-| অফলাইন | ✓ হ্যাঁ: ডেস্কটপ অ্যাপ ইন্টারনেট ছাড়াই চলে; ব্রাউজারে চালু করতে ইন্টারনেট লাগে | ✓ ইনস্টল করা Windows অ্যাপ (অ্যাক্টিভেশনে ইন্টারনেট লাগে)[^4] |
+| অফলাইন | ✓ হ্যাঁ: ডেস্কটপ অ্যাপ ইন্টারনেট ছাড়াই চলে; ব্রাউজারেও প্রথমবারের পর অফলাইনে চালু হয় | ✓ ইনস্টল করা Windows অ্যাপ (অ্যাক্টিভেশনে ইন্টারনেট লাগে)[^4] |
 
 ## যেখানে Note3 এগিয়ে
 
@@ -821,7 +821,7 @@ The free whiteboard for teachers, as a desktop app for Windows, Mac and Linux. O
 
 ## Install as an app
 
-On a phone, tablet or Chromebook, the web app works like an installed one: its own window, on the home screen. (It still needs internet to start; for fully offline use, get the desktop app.)
+On a phone, tablet or Chromebook, the web app works like an installed one: its own window, on the home screen. After the first visit it also starts without internet: the board, your lessons and the student viewer work offline.
 
 ### Android, Chromebook, Windows
 
@@ -861,7 +861,7 @@ Canonical: https://rupok.app/bn/download/ · Language: bn · Updated: 2026-11-23
 
 ## অ্যাপ হিসেবে ইনস্টল করুন
 
-ফোন, ট্যাবলেট বা Chromebook-এ ওয়েব অ্যাপ ইনস্টল করা অ্যাপের মতোই চলে: নিজের উইন্ডো, হোম স্ক্রিনে। (চালু হতে ইন্টারনেট লাগে; পুরোপুরি অফলাইনে চালাতে ডেস্কটপ অ্যাপ নিন।)
+ফোন, ট্যাবলেট বা Chromebook-এ ওয়েব অ্যাপ ইনস্টল করা অ্যাপের মতোই চলে: নিজের উইন্ডো, হোম স্ক্রিনে। প্রথমবার খোলার পর ইন্টারনেট ছাড়াও চালু হয়: বোর্ড, আপনার লেসন আর স্টুডেন্ট ভিউয়ার অফলাইনে চলে।
 
 ### Android, Chromebook, Windows
 
@@ -1183,7 +1183,7 @@ Yes. Rupok runs on the computer connected to the board and uses its touch and pe
 
 ### Does Rupok work offline?
 
-Yes, with the [desktop app](https://rupok.app/download/) for Windows, Mac and Linux: drawing, slides, replay, PDF export and handwritten-maths recognition work without internet (the AI features need it). In the browser, the board runs on your device once it’s open.
+Yes, with the [desktop app](https://rupok.app/download/) for Windows, Mac and Linux: drawing, slides, replay, PDF export and handwritten-maths recognition work without internet (the AI features need it). The web version works offline too: after your first visit to [rupok.app/board](https://rupok.app/board/), the board starts without internet, and you can install it as an app.
 
 ### Can I use my PowerPoint slides?
 
@@ -1504,7 +1504,7 @@ Note3 is Prestigio’s paid, Windows-only whiteboard software, the updated EasiN
 | Handwriting and shapes | ✓ Smart shapes, offline: hand-drawn shapes, graphs, flowcharts, logic gates, tables and Venn diagrams snap clean. Handwritten maths to LaTeX, offline. Other handwriting to text with your own Claude API key. Bangla handwriting: coming soon | ✓ Handwriting and formula recognition[^4] |
 | PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports PDF and PowerPoint; exports PDF, PPTX, DOCX and JPG[^4] |
 | Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ About 29 interface languages in the installer, no Bangla[^4] |
-| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Installed Windows app (activation needs internet)[^4] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app) | ✓ Installed Windows app (activation needs internet)[^4] |
 | Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ✓ Panels, PCs, laptops and projectors running Windows[^2] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.enb` (the EasiNote format)[^4] |
 
@@ -1602,7 +1602,7 @@ SMART Notebook is the most established smartboard software, with a free basic ve
 | Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ✓ Game templates, assessments and SMART Blocks in Plus[^2]; Lumio games and widgets[^6] |
 | PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports PDF, and PowerPoint on Windows[^4] |
 | Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ 38 interface languages on Windows, no Bangla[^3] |
-| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Installed desktop app; some features need internet[^3] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app) | ✓ Installed desktop app; some features need internet[^3] |
 | Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ◐ Without Plus, touch on non-SMART displays is limited; Plus works with any brand[^2] |
 | Real-time collaboration | ◷ Live class and share links: coming soon with Rupok Cloud | ◐ Student-device activities through Lumio[^6] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.notebook`; imports ActivInspire `.flipchart` files[^4] |
@@ -1698,7 +1698,7 @@ OpenBoard is a mature, free desktop whiteboard maintained in Geneva. Rupok is a 
 | Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ✓ Web widgets and about 25 built-in activities (memory, word games)[^6] |
 | PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports and exports PDF[^5]; IWB (Common File Format) import and export[^3] |
 | Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ 35 interface languages, no Bangla translation[^3] |
-| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Installed desktop app[^1] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app) | ✓ Installed desktop app[^1] |
 | Smartboards and panels | ✓ Any smartboard, interactive panel, projector or laptop with Chrome, Edge or Safari | ✓ Any interactive whiteboard, graphics tablet or mouse[^1] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.ubz`[^5] |
 | Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Actively maintained: version 1.7.7 released 30 March 2026; 1.8 in development[^2] |
@@ -2052,7 +2052,7 @@ Explain Everything, now part of Promethean, records polished video lessons on ta
 | Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ◐ AI-made crossword, memory and matching activities; polls, timers and spinners in Advanced[^1][^5] |
 | PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports PDF; exports PDF, video, images and `.explain` files[^2] |
 | Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ 15 interface languages, no Bangla[^2] |
-| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ◐ Tablet apps work offline with some features missing; the browser app is online-only[^4] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app) | ◐ Tablet apps work offline with some features missing; the browser app is online-only[^4] |
 | Real-time collaboration | ◷ Live class and share links: coming soon with Rupok Cloud | ✓ Real-time collaboration; one-to-one sessions of 15 minutes on the free plan[^1] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.explain`[^2] |
 | Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Actively developed; owned by Promethean since November 2022[^3] |
@@ -2140,7 +2140,7 @@ Many teachers write on OneNote at the front of the class. OneNote is a superb no
 | Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | Notes, ink and embedded files |
 | PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Insert PDF printouts and ink on them; export to PDF[^8] |
 | Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ◐ Bangla (Bangladesh) gets proofing tools only; Bangla (India) is partly localized[^6] |
-| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ✓ Native apps work offline and sync later[^9] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app) | ✓ Native apps work offline and sync later[^9] |
 | Real-time collaboration | ◷ Live class and share links: coming soon with Rupok Cloud | ✓ Co-editing; Class Notebook gives each student a private section[^3] |
 | Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Actively developed. OneNote for Windows 10 reached end of support on 14 Oct 2025[^4] |
 

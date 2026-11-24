@@ -10,7 +10,7 @@ The free whiteboard for teachers, as a desktop app for Windows, Mac and Linux. O
 
 ## Install as an app
 
-On a phone, tablet or Chromebook, the web app works like an installed one: its own window, on the home screen. (It still needs internet to start; for fully offline use, get the desktop app.)
+On a phone, tablet or Chromebook, the web app works like an installed one: its own window, on the home screen. After the first visit it also starts without internet: the board, your lessons and the student viewer work offline.
 
 ### Android, Chromebook, Windows
 

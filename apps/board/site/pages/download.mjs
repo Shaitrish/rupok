@@ -79,7 +79,7 @@ const en = {
     {
       id: "install",
       h2: "Install as an app",
-      lede: "On a phone, tablet or Chromebook, the web app works like an installed one: its own window, on the home screen. (It still needs internet to start; for fully offline use, get the desktop app.)",
+      lede: "On a phone, tablet or Chromebook, the web app works like an installed one: its own window, on the home screen. After the first visit it also starts without internet: the board, your lessons and the student viewer work offline.",
       blocks: [{ cols: [
         [{ h3: "Android, Chromebook, Windows" }, "Open [rupok.app/board](/board/) in Chrome, Edge or Safari, open the browser menu and choose **Install app** (or **Add to Home screen**)."],
         [{ h3: "iPhone and iPad" }, "Open [rupok.app/board](/board/) in Safari, tap **Share**, then **Add to Home Screen**."],
@@ -143,7 +143,7 @@ const bn = {
     {
       id: "install",
       h2: "অ্যাপ হিসেবে ইনস্টল করুন",
-      lede: "ফোন, ট্যাবলেট বা Chromebook-এ ওয়েব অ্যাপ ইনস্টল করা অ্যাপের মতোই চলে: নিজের উইন্ডো, হোম স্ক্রিনে। (চালু হতে ইন্টারনেট লাগে; পুরোপুরি অফলাইনে চালাতে ডেস্কটপ অ্যাপ নিন।)",
+      lede: "ফোন, ট্যাবলেট বা Chromebook-এ ওয়েব অ্যাপ ইনস্টল করা অ্যাপের মতোই চলে: নিজের উইন্ডো, হোম স্ক্রিনে। প্রথমবার খোলার পর ইন্টারনেট ছাড়াও চালু হয়: বোর্ড, আপনার লেসন আর স্টুডেন্ট ভিউয়ার অফলাইনে চলে।",
       blocks: [{ cols: [
         [{ h3: "Android, Chromebook, Windows" }, "Chrome, Edge বা Safari-তে [rupok.app/board](/board/) খুলুন, ব্রাউজারের মেনু থেকে **Install app** (বা **Add to Home screen**) বেছে নিন।"],
         [{ h3: "iPhone ও iPad" }, "Safari-তে [rupok.app/board](/board/) খুলুন, **Share** চাপুন, তারপর **Add to Home Screen**।"],

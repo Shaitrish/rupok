@@ -21,7 +21,7 @@ Explain Everything, now part of Promethean, records polished video lessons on ta
 | Interactive content | ✓ AI-made simulations, 3D models and quizzes that run live on the slide, plus a gallery of ready-made presets (physics, chemistry, maths, ICT, history, quiz) | ◐ AI-made crossword, memory and matching activities; polls, timers and spinners in Advanced[^1][^5] |
 | PDF and slides | ✓ Import a PDF and write on every page; export slides, or handouts with 2 or 3 slides per page and lines for notes | ✓ Imports PDF; exports PDF, video, images and `.explain` files[^2] |
 | Bangla | ◐ Bangla text and fonts in lessons; Bangla voice typing and settings search. Bangla interface: coming soon | ✗ 15 interface languages, no Bangla[^2] |
-| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board runs on your device once it is open | ◐ Tablet apps work offline with some features missing; the browser app is online-only[^4] |
+| Offline | ✓ The desktop app works without internet, including maths recognition (AI features need internet). In the browser, the board starts offline too after the first visit (it is an installable web app) | ◐ Tablet apps work offline with some features missing; the browser app is online-only[^4] |
 | Real-time collaboration | ◷ Live class and share links: coming soon with Rupok Cloud | ✓ Real-time collaboration; one-to-one sessions of 15 minutes on the free plan[^1] |
 | File format | Open `.rpk` (a ZIP package with a published spec) | `.explain`[^2] |
 | Status (Nov 2026) | Actively developed: early alpha, v0.2.0 released 23 Nov 2026 | Actively developed; owned by Promethean since November 2022[^3] |

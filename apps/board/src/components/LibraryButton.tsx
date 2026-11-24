@@ -19,7 +19,7 @@ export function LibraryTopButton() {
     if (path && !studentEntry) await openLesson(path);
   };
   return (
-    <div class="cluster surface lib-top">
+    <div class="cluster surface lib-top" data-tour="library">
       <button class="btn" onClick={() => void openLibrary()} title="Library: all your lessons" aria-label="Library">
         <LIcon name="library" /><span class="label">Library</span>
       </button>
