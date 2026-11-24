@@ -127,8 +127,15 @@ function Sparkle() {
 }
 
 function Toast() {
+  // Every toast goes by itself after a while (Undo stays on the AI button).
+  let t: number | undefined;
+  createEffect(on(aiToast, (x) => {
+    clearTimeout(t);
+    if (x) t = window.setTimeout(() => setAiToast((cur) => (cur?.id === x.id ? null : cur)), 7000);
+  }));
+  onCleanup(() => clearTimeout(t));
   return (
-    <Show when={aiToast()} keyed>
+    <Show when={aiToast() && !isView() ? aiToast() : null} keyed>
       {(t) => (
         <div class="aia-toast" role="status">
           <span class="aia-toast-dot" aria-hidden="true" />

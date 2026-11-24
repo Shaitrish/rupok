@@ -504,3 +504,48 @@ pub async fn serve_stdio_with(workspace: Workspace, live: Arc<LiveHub>) -> anyho
     running.waiting().await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod annotation_tests {
+    use super::*;
+
+    /// Clients auto-allow safe calls from these hints: reads say read-only,
+    /// only real deletes say destructive, and every tool says whether
+    /// repeating it changes anything.
+    #[test]
+    fn every_tool_declares_its_safety() {
+        let router = McpServer::tool_router()
+            + McpServer::live_tool_router()
+            + McpServer::progress_tool_router();
+        let tools = router.list_all();
+        assert!(tools.len() >= 30, "{}", tools.len());
+        let destructive = [
+            "delete_item",
+            "replace_items_with_text",
+            "replace_strokes_with_text",
+        ];
+        for t in &tools {
+            let name = t.name.as_ref();
+            let a = t
+                .annotations
+                .as_ref()
+                .unwrap_or_else(|| panic!("{name}: no annotations"));
+            let read = a.read_only_hint == Some(true);
+            let looks_read = name.starts_with("get_")
+                || name.starts_with("list_")
+                || name.starts_with("read_")
+                || name.starts_with("validate_");
+            assert_eq!(read, looks_read, "{name}: readOnlyHint");
+            assert_eq!(a.open_world_hint, Some(false), "{name}: openWorldHint");
+            if !read {
+                assert_eq!(
+                    a.destructive_hint,
+                    Some(destructive.contains(&name)),
+                    "{name}: destructiveHint only for real deletes"
+                );
+                assert!(a.idempotent_hint.is_some(), "{name}: idempotentHint");
+            }
+        }
+        assert!(tools.iter().any(|t| t.name == "show_progress"));
+    }
+}

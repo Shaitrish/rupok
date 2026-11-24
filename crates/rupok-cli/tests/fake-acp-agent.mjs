@@ -265,13 +265,13 @@ async function caffeine(sid) {
   }
   // First try: loads a library from the network, which Rupok refuses.
   try {
-    await tool("add_smart_object", { path: "live", title: "Caffeine", x: box.x, y: box.y, width: box.w, height: box.h, html: MOLECULE(ATOMS).replace("</head>", '<script src="https://cdn.example.com/three.min.js"></script></head>') });
+    await tool("add_smart_object", { path: "live", page: card.page ?? 1, title: "Caffeine", x: box.x, y: box.y, width: box.w, height: box.h, html: MOLECULE(ATOMS).replace("</head>", '<script src="https://cdn.example.com/three.min.js"></script></head>') });
   } catch {
     update(sid, { sessionUpdate: "tool_call_update", toolCallId: "c1", status: "failed" });
     await sleep(900);
   }
   update(sid, { sessionUpdate: "tool_call", toolCallId: "c2", title: "mcp__rupok__add_smart_object", kind: "edit", status: "in_progress", rawInput: { path: "live", title: "Caffeine", x: box.x, y: box.y, width: box.w, height: box.h } });
-  const o = await tool("add_smart_object", { path: "live", title: "Caffeine", x: box.x, y: box.y, width: box.w, height: box.h, html: MOLECULE(ATOMS) });
+  const o = await tool("add_smart_object", { path: "live", page: card.page ?? 1, title: "Caffeine", x: box.x, y: box.y, width: box.w, height: box.h, html: MOLECULE(ATOMS) });
   update(sid, { sessionUpdate: "tool_call_update", toolCallId: "c2", status: "completed" });
   update(sid, { sessionUpdate: "plan", entries: plan(4) });
   await say(sid, `Done: caffeine is on page ${o.page}.`);
@@ -282,7 +282,8 @@ async function longText(sid) {
   update(sid, { sessionUpdate: "tool_call", toolCallId: "l1", title: "mcp__rupok__add_text", kind: "edit", status: "pending" });
   if (!(await permission(sid, "l1", "mcp__rupok__add_text", { path: "live" }))) return "end_turn";
   const text = "Ohm's law says that the current through a conductor between two points is directly proportional to the voltage across the two points, as long as the temperature stays the same. We write it as V = IR, where V is the voltage in volts, I is the current in amperes and R is the resistance in ohms. If you double the voltage across a resistor, the current through it doubles too.";
-  const r = await tool("add_text", { path: "live", text, x: 1300, y: 700, size: 96 });
+  const pg = await tool("get_current_page", {});
+  const r = await tool("add_text", { path: "live", page: pg.page ?? 1, text, x: 1300, y: 700, size: 96 });
   update(sid, { sessionUpdate: "tool_call_update", toolCallId: "l1", status: "completed" });
   await say(sid, `Added the explanation (${r.size}px).`);
   return "end_turn";
@@ -290,7 +291,7 @@ async function longText(sid) {
 
 async function deleteSomething(sid) {
   const pg = await tool("get_current_page", {});
-  const victim = (pg.items ?? [])[0];
+  const victim = (pg.items ?? []).filter((i) => i.kind === "text").pop() ?? (pg.items ?? [])[0];
   if (!victim) { await say(sid, "There is nothing to delete."); return "end_turn"; }
   update(sid, { sessionUpdate: "tool_call", toolCallId: "d1", title: "mcp__rupok__delete_item", kind: "delete", status: "pending" });
   const r = await request("session/request_permission", {
@@ -326,8 +327,7 @@ async function studentAsk(sid) {
   await sleep(800);
   update(sid, { sessionUpdate: "tool_call", toolCallId: "u1", title: "mcp__rupok__add_smart_object", kind: "edit", status: "pending" });
   if (!(await permission(sid, "u1", "mcp__rupok__add_smart_object", { path: "live", title: "Caffeine" }))) return "end_turn";
-  const r = await tool("add_smart_object", { path: "live", title: "Caffeine", ...{ x: box.x, y: box.y, width: box.w, height: box.h }, html: MOLECULE(ATOMS) });
-  void card;
+  const r = await tool("add_smart_object", { path: "live", page: card.page ?? 1, title: "Caffeine", ...{ x: box.x, y: box.y, width: box.w, height: box.h }, html: MOLECULE(ATOMS) });
   await say(sid, r.status === "student_layer" ? "I made a caffeine model just for you." : "Placed it.");
   return "end_turn";
 }

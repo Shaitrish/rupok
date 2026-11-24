@@ -25,6 +25,8 @@ the board and the agent.
 ```
 
 - [Chat in Rupok](#chat-in-rupok): chat with your agent inside the board (`rupok agent`, or the desktop app).
+- [AI in action](#ai-in-action): working cards, class mode, live solutions, students asking AI.
+- [Make AI smoother: pre-approve Rupok tools](#make-ai-smoother-pre-approve-rupok-tools).
 - [Setup](#setup): install `rupok`, add it to your agent.
 - [In class](#in-class): connect the board, then ask.
 - [Prompt library](#prompt-library) for science, maths and ICT teachers.
@@ -112,9 +114,11 @@ In the panel:
 - **Usage**: tokens used of the context window, and cost, when the assistant
   reports them.
 - **Prepare**: the panel docks on the right (or left, in Settings) and the
-  slide re-fits beside it, resizable from its edge. **Teach**: it floats over
-  the slide and tucks into a small chip as soon as you draw; tap the chip to
-  bring it back. **Student view**: chat is off.
+  slide re-fits beside it, resizable from its edge. **Teach**: the AI button
+  floats top right (always, labelled *Ask AI* until an AI is connected); the
+  chat floats under it and tucks into a small chip as soon as you draw; tap
+  the chip or the AI button to bring it back. **Student view**: chat is off
+  (the AI button says so); see [Students ask AI](#students-ask-ai).
 
 When something is missing the panel says what to do: no relay (start
 `rupok agent`), no assistant installed (the install commands), not logged in
@@ -122,6 +126,156 @@ When something is missing the panel says what to do: no relay (start
 assistant stopped (*Restart*).
 
 Every change is still one undo step, tagged with the assistant's name.
+
+## AI in action
+
+The class should *see* the AI work: on the board, live, with nothing to
+click. Settings → AI & agents → *AI in action* has the switches.
+
+### Working cards
+
+As soon as the teacher asks (chat, voice *Ask AI*, or Solve this), a card
+appears on the board where the result will go: a soft moving outline, the
+agent's name, its current step (*Planning…*, *Reading the spec…*, *Building
+the Smart Object…*, *Testing…*), its plan as a checklist with a progress
+bar, a live preview of a Smart Object being built, and ✕ to stop. In Teach
+it is large enough to read from the back of the room.
+
+- **Where it comes from.** The in-app chat makes the card from the agent's
+  ACP stream: a prompt starts it, `plan` updates fill the checklist,
+  `tool_call` titles become plain steps, and a tool call with `x`, `y`,
+  `width`, `height` moves the card to that box at once. Any agent can also
+  post it explicitly with [`show_progress`](#show_progress).
+- **When the result lands** the card moves onto it and resolves: a Smart
+  Object fades and scales into its spot, handwriting writes stroke by stroke,
+  shapes and tables are drawn on, and a small mint sparkle marks the spot
+  (*Sparkle when a result lands*; a soft chime is available, off by default).
+- **When something fails** (a Smart Object that does not pass Rupok's checks)
+  the card stays and says it is being fixed; if the turn ends without a
+  result it offers *Try again*, which sends the agent what went wrong.
+
+### `show_progress`
+
+The op (and MCP tool) behind the cards, for any agent, including Claude Code
+in a terminal (`rupok_live::progress`, `rupok-cli/src/mcp_progress.rs`):
+
+```json
+{"op": "show_progress", "id": "caffeine", "title": "Caffeine molecule", "kind": "object",
+ "step": "Placing the atoms…", "percent": 40,
+ "plan": [{"content": "Atoms", "status": "completed"}, {"content": "Bonds", "status": "in_progress"}],
+ "x": 320, "y": 180, "w": 1280, "h": 720, "preview_html": "<!doctype html>…partial object…"}
+```
+
+All fields are optional. `id` updates a card (the first call returns it);
+`state` is `working` (default), `done`, `failed` (with a friendly `error`)
+or `clear`; `kind` is `object`, `handwriting`, `text`, `shape` or `other`;
+`preview_html` (≤ 512 KiB) renders in the Smart Object sandbox as a live
+thumbnail. Access level **control** (like `point_at`): nothing is saved, no
+undo step, no permission needed. A card ends when a result lands in its box,
+on `done`/`clear`, or after two minutes without an update. In the in-app
+chat the agent's card takes over the chat's own card for the request.
+
+**Guide for agents ("in action"):**
+
+1. **Place first.** Decide the box (a full-frame object: `x: 320, y: 180,
+   w: 1280, h: 720`; a solution: below the problem) and call `show_progress`
+   with it and the right `kind` before the slow part.
+2. **Size.** Objects 1280×720 or full frame; text 32–48 px (titles 56–72);
+   handwriting matches the problem. Add text in short lines: Rupok fits any
+   text to the page anyway (below).
+3. **Stream.** Update `step` (and `percent`) as you go; send `preview_html`
+   with the partial object every few seconds while building, or
+   `update_smart_object` an object you already placed.
+4. **Land.** Place the result in exactly that box (`add_smart_object` with the
+   same `page`, `x`, `y`, `width`, `height`): the card turns into it and the
+   board celebrates, briefly. Say what you made in one line.
+
+### Text always fits the page
+
+`add_text` and `replace_items_with_text` fit what an agent writes inside the
+slide frame (48 px safe margin), on the board and in files alike
+(`rupok-live/src/fit.rs`): the asked size (else the size of the page's other
+text, else 32 px) is capped for long passages (64 px over 40 characters, 48
+over 120, 40 over 400; never more than an eighth of the page height); the
+start is pulled inside the page; lines wrap at the room left (Inter's
+character widths, estimated generously); a block that is still too tall moves
+up into free space, then shrinks step by step to 24 px, then continues on new
+pages after this one. The result says what changed (`warnings` with code
+`fit`, `size`, `continued`). The board also wraps every text box at the
+page's right edge. `write_handwriting` fits the same way: an explicit spot is
+pulled inside, letters shrink until the block fits, else it continues on a new
+page, scaled to fit.
+
+### Class mode
+
+On by default in Teach (*Class mode*: In Teach / Always / Off):
+
+- The AI's board edits apply at once: permission requests for Rupok's board
+  tools are approved automatically (the chat notes *Approved automatically
+  (Class mode)* and the header chip says *Class mode*).
+- Each edit shows a toast, *"Claude added a Smart Object · Undo"*; Undo takes
+  back exactly that step (a streamed solution: all its lines).
+- **Destructive actions still ask**: deleting items or pages, clearing a page,
+  replacing the teacher's ink with text, and changing settings or the mode
+  (including the app theme). If such an op reaches the board without a fresh
+  approval (an agent in a no-ask mode, or an outside MCP client), the board
+  asks the teacher itself, *Allow* / *Don't allow*, and refuses it after 25 s.
+- Solve this writes straight away (no preview check), streaming line by line.
+
+### Solve this, live
+
+With *Write solutions line by line* on (default) and no teacher check (or in
+class mode), the Solve this prompt asks the agent to write its steps in its
+reply inside a ```` ```board ```` block, one step per line. The card says
+*Thinking…* below the problem; each line is written on the board in
+handwriting the moment the agent finishes it, below the problem and the lines
+before it, in the same group (`write_handwriting` with `anchor.group`), so the
+class watches the solution arrive. Writing that arrives while a line is still
+being drawn queues behind it. Agents outside the chat do the same by calling
+`write_handwriting` once per line with `anchor: {"group": …}`.
+
+### Students ask AI
+
+*Students can ask AI* (off by default) adds **Ask AI to show me** in Student
+view, with the asks left (*Asks per student*, default 3 every 10 minutes, per
+Student view session). The question goes to the AI connected to this board,
+with a prompt to make **one** thing (a Smart Object, or a few lines of
+handwriting) and to post a working card. Whatever the AI adds lands on the
+**student's own layer**: drawn over the page on this screen only, marked
+*Only you see this*, never written into the teacher's lesson, and cleared when
+the board leaves Student view (`aiAction/student.ts`; the board answers the
+agent `{"status": "student_layer"}`). Only additions are routed there; every
+other write is refused as in any Student view.
+
+- **On a classroom board** the AI is the teacher's (`rupok agent` or the
+  desktop app), so the teacher's switch decides.
+- **At home** a student opens a lesson in their own Rupok and connects their
+  own assistant the same way (Setup below); in Prepare it is simply their copy.
+- **Rupok AI** (planned, Rupok Cloud) will answer the same prompt the same way.
+- With no AI connected the box explains these options instead.
+
+## Make AI smoother: pre-approve Rupok tools
+
+Every Rupok tool declares MCP annotations: `readOnlyHint` for reads
+(`get_*`, `get_page_snapshot`, `list_lessons`, `validate_smart_object`…),
+`destructiveHint` only for real deletes and ink replacement (`delete_item`,
+`replace_items_with_text`, `replace_strokes_with_text`), and `idempotentHint`
+where repeating changes nothing (`go_to_page`, `set_page_design`,
+`update_smart_object`, `show_progress`…). Clients that honour them stop
+asking for safe calls. To stop the prompts for board edits too, pre-approve
+the Rupok tools once (Settings → AI & agents → *Make AI smoother* has these
+to copy):
+
+| Agent | Where | Add |
+|---|---|---|
+| Claude Code | `~/.claude/settings.json` (all projects) or `.claude/settings.json` in your lessons folder | `{ "permissions": { "allow": ["mcp__rupok__*"] } }` |
+| Codex | `~/.codex/config.toml` | `[mcp_servers.rupok]` then `default_tools_approval_mode = "approve"` |
+| OpenCode | `opencode.json` | `{ "permission": { "rupok_*": "allow" } }` |
+
+Each board change stays one undo step, so pre-approving is safe in class; in
+Rupok's own chat, class mode still asks before destructive actions. (`rupok
+agent` names the server `rupok`, so the same rules cover the in-app chat
+where the agent reads them.)
 
 ## Setup
 
@@ -319,7 +473,8 @@ tools (`get_lesson_outline`, `add_page`, `add_text`, `add_smart_object`,
 | `add_shape(shape, x, y, w, h, color?, fill?, width?, dashed?, text?, page?)` | A clean shape from the Shapes picker (rect, circle, star, arrows, Venn, flowchart, number line, axes, speech bubble, braces…) with optional fill, dashes and centred text; one undo step. Run by the board's engine, which owns shape geometry. |
 | `add_table(x, y, rows, cols, w?, h?, cells?, color?, header_fill?, text_size?, page?)` | A table (1–10 × 1–10) with cell text and an optional filled header row, grouped; one undo step. |
 | `point_at(x, y, w?, h?, label?, seconds?)` | A temporary laser ring or highlight box (not saved). |
-| `write_handwriting(lines, anchor?, style?, speed?, color?, size?, step_mode?)` | Write lines (text with inline LaTeX) in handwriting, animated stroke by stroke, below the anchor; one undo step. See [Solve this](#solve-this). |
+| `show_progress(id?, title?, step?, plan?, percent?, state?, kind?, x?, y?, w?, h?, page?, preview_html?, error?)` | A working card where your result will land, live for the class (not saved). See [AI in action](#show_progress). |
+| `write_handwriting(lines, anchor?, style?, speed?, color?, size?, step_mode?)` | Write lines (text with inline LaTeX) in handwriting, animated stroke by stroke, below the anchor (or below earlier writing: `anchor.group`); one undo step. See [Solve this](#solve-this). |
 | `set_board_theme(page_color?, pattern?, ui?)` | Page colour (white, paper, chalkboard, blackboard, #hex) and pattern; app light/dark. |
 | `set_page_design(path, page?, all_pages?, color?, pattern?, background_svg?, background_image?, background_fit?, background_opacity?, background_dim?, remove_background?)` | Page design: colour, pattern and a background image (SVG, or base64 PNG/JPEG), for a page or every page. Only `path`: read the design. Live or on a file. |
 | `set_branding(path, scope?, page?, logo_svg?, logo_image?, logo_corner?, logo_x?, logo_y?, logo_width?, logo_opacity?, remove_logo?, school?, teacher?, class?, date?, text_position?, text_align?, hidden?, remove?)` | Logo and header/footer line on every page (`scope: "lesson"`) or one page; text placeholders `{lesson}`, `{page}`, `{pages}`, `{date}`, `{teacher}`, `{school}`, `{subject}`, `{course}`, `{chapter}`. Only `path`: read it. |
@@ -404,11 +559,14 @@ The teacher checks the solution before the class sees it: when write_handwriting
 **`write_handwriting`** (op `write_handwriting`, `rupok_live::handwriting`):
 `lines` (≤ 40, ≤ 400 characters each; text with inline LaTeX: `\frac`, `^`,
 `_`, `\sqrt`, Greek, operators, `\text`), `anchor` (`item_ids`, `region`,
-or `x`/`y`; `side`: `below` or `right`; default: the selection), `style`
-(`teacher` | `neat`), `speed` (0.25–4), `color`, `size` (capital height, px),
+or `x`/`y`; `side`: `below` or `right`; `group`: continue below an earlier
+call's writing and join its group; default: the selection), `style`
+(`teacher` | `neat` | `joined`: neat letters joined within words), `speed` (0.25–4), `color`, `size` (capital height, px),
 `step_mode` (`all` | `one-line-per-click`). The board synthesises the strokes
 (`rupok_ink::write`: Hershey single-stroke glyphs or the teacher's own,
-maths layout, natural variation, pen timing), matches the problem's ink
+smoothed with a Catmull-Rom spline and written in a hand's pen order,
+spaced by their ink, on a slowly wandering baseline, with pressure that
+swells on downstrokes, maths layout and brisk pen timing), matches the problem's ink
 colour, pen width and letter size, and places them below (else right of) the
 anchor without covering anything, else on a new page. All strokes are one
 Loro commit (one undo), grouped, attributed to the agent; each stroke's
@@ -542,8 +700,8 @@ An operation is `{"op": "<name>", …fields}`; the names and fields are the
 `update_smart_object`, `add_media`, `add_model`, `delete_item`,
 `set_page_background`, `set_page_design`, `set_branding`,
 `replace_items_with_text`, `step_object`, `write_handwriting`, `add_shape`,
-`add_table`; the last two run in the board's engine, `crates/rupok-wasm`
-`engine/insert.rs`). `add_media`
+`add_table`, `show_progress`; `add_shape` and `add_table` run in the board's engine, `crates/rupok-wasm`
+`engine/insert.rs`, and are drawn on stroke by stroke; `show_progress` runs in the web app). `add_media`
 carries a `url` (YouTube or a trusted embed) or a base64 `file_base64` (video
 or audio); `add_model` a base64 `.glb` as `file_base64`. The MCP tools
 `add_youtube`, `add_media` and `add_3d_model` read files from the workspace and
@@ -552,7 +710,7 @@ omitted means the page on screen; coordinates are slide pixels in the
 1920 × 1080 frame.
 
 Each op has an access level: **read** (`get_*`, `snapshot`), **control**
-(`go_to_page`, `point_at`, `set_board_theme` with only `ui`) or **write**
+(`go_to_page`, `point_at`, `show_progress`, `set_board_theme` with only `ui`) or **write**
 (everything else). With *Allow AI to edit live* off the board refuses control
 and write ops; in Student view it refuses write ops. A write runs as **one**
 Loro commit with the message `rupok-agent/1 {"agent": …, "op": …}` and the

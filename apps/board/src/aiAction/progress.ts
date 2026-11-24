@@ -235,7 +235,7 @@ function onUpdate(u: any) {
       break;
     }
     case "tool_call_update":
-      if (u.status === "failed") patchCard(card.id, (x) => { x.step = "That step failed; trying again…"; });
+      if (u.status === "failed" && !card.fixes) patchCard(card.id, (x) => { x.step = "That step failed; trying again…"; });
       break;
   }
 }
@@ -340,7 +340,23 @@ export function runShowProgress(op: any, agent: string): any {
   const fallback = existing?.rect ?? defaultRect((kind as CardKind) ?? "other");
   const rect: Rect = { x: x ?? fallback.x, y: y ?? fallback.y, w: w && w > 0 ? w : fallback.w, h: h && h > 0 ? h : fallback.h };
   let cardId = existing?.id;
-  if (!cardId) {
+  // The in-app chat already shows a card for this request: the agent's own
+  // card takes it over (one card per request, not two).
+  const adopt = !existing ? activeCard() : undefined;
+  if (adopt) {
+    cardId = adopt.id;
+    patchCard(adopt.id, (cd) => {
+      cd.agent = agent;
+      if (title) cd.title = title;
+      if (step) cd.step = step;
+      if (kind) cd.kind = kind as CardKind;
+      if (plan) cd.plan = plan;
+      if (percent != null) cd.percent = percent;
+      if (preview != null) cd.preview = preview;
+      if (x != null || y != null || w != null || h != null) cd.rect = rect;
+      if (page != null) cd.page = page;
+    });
+  } else if (!cardId) {
     cardId = startCard({ id, source: "agent", agent, kind: (kind as CardKind) ?? "other", title: title ?? "", step: step ?? "Working…", rect, page: page ?? currentPage(), plan, percent, preview }) ?? undefined;
     if (!cardId) return { shown: false, note: "the teacher has turned off progress cards; carry on" };
   } else {

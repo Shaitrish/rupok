@@ -27,6 +27,7 @@ import { Icon } from "./Icon";
 import { MicButton } from "./MicButton";
 import { SolveChipAction } from "../solve/SolveUI";
 import { openSettings } from "../settings/open";
+import { classModeOn } from "../aiAction/state";
 import "../chat.css";
 
 const DOCS = "https://github.com/shaitrish/rupok/blob/main/docs/ai-agents.md#chat-in-rupok";
@@ -258,6 +259,12 @@ function ModePicker() {
 function AutoApproveChip() {
   const byMode = modeAutoApproves;
   return (
+    <Show when={!classModeOn() || editsAutoApproved()} fallback={
+      <button class="chat-auto on" aria-pressed="true" onClick={() => openSettings("ai.classMode")}
+        title="Class mode: board edits apply at once with an Undo button; deleting, clearing and settings still ask. Click to change.">
+        <span class="chat-auto-dot" aria-hidden="true" />Class mode
+      </button>
+    }>
     <button
       class="chat-auto"
       classList={{ on: editsAutoApproved() }}
@@ -269,6 +276,7 @@ function AutoApproveChip() {
       <span class="chat-auto-dot" aria-hidden="true" />
       {editsAutoApproved() ? "Auto-approve" : "Ask first"}
     </button>
+    </Show>
   );
 }
 
@@ -747,6 +755,8 @@ export default function ChatPanel() {
     onCleanup(() => { window.removeEventListener("pointerdown", down, true); window.removeEventListener("keydown", key); });
   });
   createEffect(on(chatOpen, (o) => { if (o) setHidden(false); }));
+  // Student view has no chat: close it so it never covers the board.
+  createEffect(on(isView, (v) => { if (v) closeAiPanel(); }, { defer: true }));
 
   // Resize from the inner edge.
   const startResize = (e: PointerEvent) => {

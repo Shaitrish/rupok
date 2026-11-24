@@ -181,7 +181,16 @@ pub fn fit_text(
     };
 
     let (mut bw, mut bh, mut ok) = fits(size, y);
-    // Too tall: shrink, a step at a time, down to the minimum.
+    // Too tall: first move up into free space above (keeps the asked size).
+    if !ok && let Some(top) = above_free {
+        let ny = (frame.h - MARGIN - bh).max(top.max(MARGIN));
+        if ny < y - 0.5 {
+            notes.push(format!("moved up to y {ny:.0} to fit the page"));
+            y = ny;
+            ok = y + bh <= frame.h - MARGIN + 0.5;
+        }
+    }
+    // Still too tall: shrink, a step at a time, down to the minimum.
     if !ok {
         let start = size;
         while !ok && size > min_size {
@@ -192,15 +201,6 @@ pub fn fit_text(
             notes.push(format!(
                 "shrank the text from {start:.0}px to {size:.0}px to fit the page"
             ));
-        }
-    }
-    // Still too tall: move up into free space above.
-    if !ok && let Some(top) = above_free {
-        let ny = (frame.h - MARGIN - bh).max(top.max(MARGIN));
-        if ny < y {
-            notes.push(format!("moved up to y {ny:.0} to fit the page"));
-            y = ny;
-            ok = y + bh <= frame.h - MARGIN + 0.5;
         }
     }
     // Still too tall: what fits stays here, the rest goes on a new page.

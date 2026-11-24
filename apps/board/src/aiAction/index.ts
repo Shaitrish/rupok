@@ -6,9 +6,9 @@ import { chatHooks } from "../chat";
 import { live } from "../live";
 import { attachProgress, initProgress, onOpFailed, onOpLanded, runShowProgress } from "./progress";
 import { classAutoApprove, gateOp, noteAnswered, toastFor } from "./classMode";
-import { initSolveStream, onStreamDone, onStreamUpdate, streamed } from "./solveStream";
+import { initSolveStream, onStreamDone, onStreamUpdate, streamLog, streamed } from "./solveStream";
 import { initStudent, routeStudentOp } from "./student";
-import { cards } from "./state";
+import { aiPrefs, cards } from "./state";
 
 /** Ops that change what the class sees but are not edits (no Undo toast). */
 const NOT_EDITS = new Set(["go_to_page", "point_at", "show_progress", "snapshot"]);
@@ -35,5 +35,5 @@ export function initAiAction(c: Controller) {
   });
   live.onOpFailed((e) => onOpFailed(e.agent, e.op, e.error, e.data));
   // For tests and the e2e harness.
-  (window as any).rupokAiAction = { cards: () => cards.list, streamed };
+  (window as any).rupokAiAction = { cards: () => cards.list, streamed, streamLog, prefs: aiPrefs, gateOp };
 }

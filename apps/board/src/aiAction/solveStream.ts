@@ -27,6 +27,8 @@ let c: Controller | null = null;
 let s: Stream | null = null;
 /** For tests and the e2e: the lines written so far in the current stream. */
 export const streamed: string[] = [];
+/** Where each streamed line went (for the e2e harness). */
+export const streamLog: any[] = [];
 
 export function initSolveStream(controller: Controller) {
   c = controller;
@@ -43,6 +45,7 @@ export const STREAM_INSTRUCTIONS = [
 /** Start streaming the next agent reply's ```board lines below `ids`. */
 export function startStream(ids: string[], card: string | null) {
   streamed.length = 0;
+  streamLog.length = 0;
   s = { ids, agent: chatStatus().label ?? "AI", card, buf: "", inside: false, lines: 0 };
 }
 
@@ -69,6 +72,7 @@ function writeLine(line: string) {
   c.sync(true);
   void import("../solve").then((m) => m.watchReveal());
   streamed.push(line);
+  streamLog.push({ line, page: r.page, bounds: r.bounds, note: r.note, anchor: op.anchor });
   s.lines++;
   s.vv = c.board.live_version();
   if (typeof r.group === "string") s.group = r.group;
