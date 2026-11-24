@@ -66,6 +66,7 @@ export const TOOLBAR_ITEMS: { id: ToolbarItem; icon: IconName; label: string; ke
   { id: "lasso", icon: "select", label: "Select & move", key: "V", kind: "tool" },
   { id: "laser", icon: "laser", label: "Laser pointer", key: "L", kind: "tool" },
   { id: "text", icon: "text", label: "Text", key: "T", kind: "tool" },
+  { id: "stamp", icon: "stamp", label: "Stamps", key: "K", kind: "tool" },
   { id: "rect", icon: "rect", label: "Rectangle", key: "R", kind: "tool" },
   { id: "ellipse", icon: "ellipse", label: "Ellipse", key: "O", kind: "tool" },
   { id: "line", icon: "line", label: "Line", key: "N", kind: "tool" },
@@ -121,13 +122,13 @@ const chrome = (on: ChromeKey[]): Record<ChromeKey, boolean> =>
 export const DEFAULT_MODES: ModesConfig = {
   prepare: {
     chrome: chrome(["switcher", "title", "pagesToggle", "history", "insert", "replay", "open", "theme", "fullscreen", "settings", "save", "ai", "overflow", "pages", "zoom", "stats", "colors", "sizes"]),
-    tools: ["pen", "highlighter", "eraser", "rect", "ellipse", "line", "arrow", "smartink", "text", "lasso", "laser", "hand", "interact", "undo", "redo"],
-    dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["shapes", "text", "lasso"] },
+    tools: ["pen", "highlighter", "eraser", "rect", "ellipse", "line", "arrow", "smartink", "text", "stamp", "lasso", "laser", "hand", "interact", "undo", "redo"],
+    dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["shapes", "text", "stamp", "lasso"] },
   },
   teach: {
     chrome: chrome(["colors", "sizes"]),
-    tools: ["pen", "highlighter", "eraser", "lasso", "laser", "smartink", "undo", "pager", "exit"],
-    dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["lasso", "smartink", "pager", "exit"] },
+    tools: ["pen", "highlighter", "eraser", "stamp", "lasso", "laser", "smartink", "undo", "pager", "exit"],
+    dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["stamp", "lasso", "smartink", "pager", "exit"] },
   },
   view: {
     chrome: chrome(["switcher", "title", "pagesToggle", "open", "theme", "fullscreen", "overflow", "pages", "zoom"]),

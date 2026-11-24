@@ -30,6 +30,10 @@ import { addPageLike } from "./Chrome";
 import { Icon } from "./Icon";
 import type { IconName } from "../icons.generated";
 import { APP_SLUG, FILE_EXT } from "../brand";
+import { MarkerOpacity, SizeControl, StylePicker } from "./InkOptions";
+import { StampIcon, StampsPanel } from "./Stamps";
+import { brushOf } from "../brushes";
+import { celebrate, currentStamp } from "../stamps";
 
 const META = new Map(TOOLBAR_ITEMS.map((t) => [t.id, t]));
 const INK_TOOLS: Tool[] = ["pen", "highlighter", "rect", "ellipse", "line", "arrow"];
@@ -55,14 +59,14 @@ type Group = "ink" | "colors" | "create" | "point" | "context" | "history" | "na
 type Kind = "tool" | "colors" | "shapes" | "smartink" | "undo" | "redo" | "pager" | "replay" | "exit" | "context" | "more";
 interface Entry { key: string; kind: Kind; group: Group; id?: ToolbarItem }
 const GROUP: Partial<Record<ToolbarItem, Group>> = {
-  pen: "ink", highlighter: "ink", eraser: "ink", smartink: "create", text: "create",
+  pen: "ink", highlighter: "ink", eraser: "ink", smartink: "create", text: "create", stamp: "create",
   lasso: "point", laser: "point", hand: "point", interact: "point", undo: "history", redo: "history", pager: "nav", replay: "nav", exit: "exit",
 };
 
 /** On a phone, what moves into ⋯ first when the dock is too long for the
  * screen ("colors:N" keeps N recent colours). Pen, eraser, the pager and ⋯
  * always stay; exit and undo go last (on the narrowest phones in Teach). */
-const PHONE_DROP = ["redo", "hand", "laser", "colors:2", "lasso", "colors:1", "smartink", "interact", "replay", "text", "shapes", "highlighter", "colors:0", "exit", "undo"];
+const PHONE_DROP = ["redo", "hand", "laser", "stamp", "colors:2", "lasso", "colors:1", "smartink", "interact", "replay", "text", "shapes", "highlighter", "colors:0", "exit", "undo"];
 /** Phone dock metrics (Dock.css): 44px cells with no gap; a 1px separator with 1.5px margins. */
 const PHONE_CELL = 44, PHONE_SEP = 4;
 
@@ -218,7 +222,7 @@ function pickFile(accept: string): Promise<File | undefined> {
   });
 }
 
-type Pop = { kind: "pen" | "highlighter" | "eraser" | "shapes" | "more"; anchor: HTMLElement };
+type Pop = { kind: "pen" | "highlighter" | "eraser" | "shapes" | "stamp" | "more"; anchor: HTMLElement };
 
 export default function Dock(props: { onSettings?: (section?: string) => void }) {
   const cfg = () => modeConfig();
@@ -501,7 +505,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
 
   const ToolButton = (p: { id: Tool }) => {
     const on = () => tool() === p.id;
-    const options = p.id === "pen" || p.id === "highlighter" || p.id === "eraser";
+    const options = p.id === "pen" || p.id === "highlighter" || p.id === "eraser" || p.id === "stamp";
     let btn!: HTMLButtonElement;
     const lp = longPress(() => options && setPop({ kind: p.id as Pop["kind"], anchor: btn }));
     return (
@@ -509,7 +513,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
         ref={btn}
         class="tool"
         classList={{ on: on(), "has-options": options }}
-        title={tipOf(p.id, options ? "  ·  tap again for colours and sizes" : "")}
+        title={tipOf(p.id, p.id === "stamp" ? "  ·  tap again for all stamps" : options ? "  ·  tap again for styles, colours and sizes" : "")}
         aria-label={labelOf(p.id)}
         aria-pressed={on()}
         aria-haspopup={options ? "dialog" : undefined}
@@ -520,10 +524,14 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
           else {
             setPop(null);
             pick(p.id);
+            // The first tap on Stamps shows the palette: there is a choice to make.
+            if (p.id === "stamp") setPop({ kind: "stamp", anchor: btn });
           }
         }}
       >
-        <Icon name={iconOf(p.id)} size={iconSize()} active={on()} />
+        <Show when={p.id === "stamp" && on()} fallback={<Icon name={iconOf(p.id)} size={iconSize()} active={on()} />}>
+          <StampIcon id={currentStamp().id} emoji={currentStamp().emoji} size={iconSize()} />
+        </Show>
         <Show when={p.id === "pen" || p.id === "highlighter"}>
           <span
             class="dock-dot"
@@ -966,13 +974,20 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
             dock={() => el}
             vertical={vertical()}
             hand={prefs().hand}
-            label={p().kind === "more" ? "More tools" : p().kind === "shapes" ? "Shapes" : `${labelOf(p().kind as Tool)} options`}
+            label={p().kind === "more" ? "More tools" : p().kind === "shapes" ? "Shapes" : p().kind === "stamp" ? "Stamps" : `${labelOf(p().kind as Tool)} options`}
             onClose={() => setPop(null)}
             class={`dock-pop-${p().kind}`}
           >
             <Switch>
               <Match when={p().kind === "pen" || p().kind === "highlighter"}>
                 <div class="dock-pop-title">{p().kind === "pen" ? "Pen" : "Highlighter"}</div>
+                <div class="ink-label">Style</div>
+                <StylePicker
+                  kind={p().kind as "pen" | "highlighter"}
+                  color={p().kind === "pen" ? color() : hlColor()}
+                  size={sizes()[sizeKey(popTool())] ?? width()}
+                />
+                <div class="ink-label">Colour</div>
                 <div class="dock-palette" role="group" aria-label="Colours">
                   <For each={p().kind === "pen" ? PEN_COLORS : HL_COLORS}>
                     {(c) => (
@@ -981,16 +996,16 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                         classList={{ on: same(c, activeColor()) }}
                         title={hex(c)}
                         aria-label={`Colour ${hex(c)}`}
-                        onClick={() => {
-                          pickColor(c);
-                          setPop(null);
-                        }}
+                        onClick={() => pickColor(c)}
                       >
                         <span class="swatch-dot" style={{ background: hex(c) }} />
                       </button>
                     )}
                   </For>
                 </div>
+              </Match>
+              <Match when={p().kind === "stamp"}>
+                <StampsPanel onClose={() => setPop(null)} />
               </Match>
               <Match when={p().kind === "eraser"}>
                 <div class="dock-pop-title">Eraser</div>
@@ -1015,24 +1030,37 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
               </Match>
             </Switch>
             <Show when={(p().kind === "pen" || p().kind === "highlighter" || p().kind === "eraser") && cfg().chrome.sizes}>
-              <div class="dock-sizes" role="group" aria-label="Sizes">
-                <For each={sizeOptions()}>
-                  {(w, i) => (
-                    <button
-                      class="tool"
-                      classList={{ on: sizes()[sizeKey(popTool())] === w }}
-                      title={`Size ${w}`}
-                      aria-label={`Size ${w}`}
-                      aria-pressed={sizes()[sizeKey(popTool())] === w}
-                      onClick={() => setSize(w)}
-                    >
-                      <span class="size-dot" classList={{ ring: popTool() === "eraser" }} style={{ width: `${4 + i() * 4}px`, height: `${4 + i() * 4}px` }} />
-                    </button>
-                  )}
-                </For>
-              </div>
+              <Show when={p().kind !== "eraser"} fallback={
+                <div class="dock-sizes" role="group" aria-label="Sizes">
+                  <For each={sizeOptions()}>
+                    {(w, i) => (
+                      <button
+                        class="tool"
+                        classList={{ on: sizes()[sizeKey(popTool())] === w }}
+                        title={`Size ${w}`}
+                        aria-label={`Size ${w}`}
+                        aria-pressed={sizes()[sizeKey(popTool())] === w}
+                        onClick={() => setSize(w)}
+                      >
+                        <span class="size-dot ring" style={{ width: `${4 + i() * 4}px`, height: `${4 + i() * 4}px` }} />
+                      </button>
+                    )}
+                  </For>
+                </div>
+              }>
+                <SizeControl
+                  presets={sizeOptions()}
+                  value={sizes()[sizeKey(popTool())] ?? width()}
+                  min={popTool() === "highlighter" ? 8 : 1}
+                  max={popTool() === "highlighter" ? 60 : 40}
+                  onChange={setSize}
+                />
+              </Show>
             </Show>
             <Show when={p().kind === "pen"}>
+              <MarkerOpacity />
+            </Show>
+            <Show when={p().kind === "pen" && !["ballpoint", "marker", "magic"].includes(brushOf("pen"))}>
               <label class="dock-slider">
                 <span>Pressure · {prefs().pressure < 0.8 ? "soft" : prefs().pressure > 1.2 ? "firm" : "normal"}</span>
                 <input
@@ -1087,6 +1115,10 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
             </Show>
             <Show when={p().kind === "shapes"}>
               <div class="dock-pop-title">Shapes</div>
+              <div class="ink-label">Line style</div>
+              <StylePicker kind="shape" color={color()} size={sizes().pen ?? width()} />
+              <MarkerOpacity />
+              <div class="dock-hr" />
               <div class="dock-shapes" role="group" aria-label="Shapes">
                 <For each={SHAPES}>
                   {(s) => (
@@ -1153,7 +1185,10 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                         else if (t === "replay") controller.board.replay_start();
                         else if (t === "exit") controller.exitMode();
                         else if (t === "interact") toggleUse();
-                        else pick(t as Tool);
+                        else if (t === "stamp") {
+                          pick("stamp");
+                          setPop({ kind: "stamp", anchor: moreBtn });
+                        } else pick(t as Tool);
                       }}
                     >
                       <Icon name={iconOf(t)} size={20} active={tool() === t} />
@@ -1166,6 +1201,31 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                 </For>
                 <Show when={layout().overflow.length}>
                   <div class="dock-hr" />
+                </Show>
+                <Show when={!isView()}>
+                  <Show when={!layout().bar.some((e) => e.id === "stamp") && !layout().overflow.includes("stamp")}>
+                    <button
+                      class="dock-row"
+                      role="menuitem"
+                      classList={{ on: tool() === "stamp" }}
+                      onClick={() => {
+                        pick("stamp");
+                        setPop({ kind: "stamp", anchor: moreBtn });
+                      }}
+                    >
+                      <Icon name="stamp" size={20} active={tool() === "stamp"} /><span class="grow">Stamps</span>
+                    </button>
+                  </Show>
+                  <button
+                    class="dock-row"
+                    role="menuitem"
+                    onClick={() => {
+                      setPop(null);
+                      celebrate();
+                    }}
+                  >
+                    <Icon name="celebrate" size={20} /><span class="grow">Celebrate</span><span class="dock-state">Great answer!</span>
+                  </button>
                 </Show>
                 <Show when={!isView()}>
                   <button

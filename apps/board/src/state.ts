@@ -5,7 +5,7 @@ import { type Mode, type ModeConfig, type ModesConfig, resolveMode, sanitizeMode
 
 export type Tool =
   | "pen" | "highlighter" | "eraser" | "lasso" | "hand" | "laser" | "interact" | "text"
-  | "rect" | "ellipse" | "line" | "arrow";
+  | "rect" | "ellipse" | "line" | "arrow" | "stamp";
 
 export interface DomItem {
   id: string;
@@ -18,6 +18,8 @@ export interface DomItem {
   /** An image item that is the poster of a video, audio clip or web embed
    * (spec/rupok-format.md "Media items"); `asset` is the poster. */
   media?: MediaInfo;
+  /** A text item that is a classroom stamp (stamps.ts). */
+  stamp?: string;
   selected: boolean;
 }
 
@@ -73,7 +75,7 @@ export const [selectionMeta, setSelectionMeta] = createSignal<{
   /** An axes-and-curve graph "Make it live" can replace. */
   live?: boolean;
   /** Shared colour (#rrggbbaa) and stroke width when uniform; all ink is highlighter. */
-  style?: { color: string | null; width: number | null; highlighter: boolean };
+  style?: { color: string | null; width: number | null; highlighter: boolean; brush?: string | null };
 }>({ count: 0, strokes: 0, boxes: 0, groups: 0, grouped: false });
 /** Opened as the student viewer (`/board/?view`): starts in the Student
  * mode and never touches the teacher's autosave. */
@@ -143,6 +145,16 @@ export interface Prefs {
   keepInkOnPage: boolean;
   /** The pages drawer stays open after a jump (Teach, phones, "Show pages"). */
   pagesPinned: boolean;
+  /** Pen style of each ink tool (brushes.ts). */
+  penBrush: string;
+  hlBrush: string;
+  shapeBrush: string;
+  /** Opacity of marker strokes. */
+  markerOpacity: number;
+  /** The stamps in the long-press quick menu, in order (stamps.ts ids). */
+  stampFavorites: string[];
+  /** Long-press with the pen opens the stamps quick menu. */
+  stampQuickMenu: boolean;
 }
 // WebGL2 is the default until WebGPU presentation is verified on real boards (see ROADMAP).
 const defaults: Prefs = {
@@ -151,6 +163,8 @@ const defaults: Prefs = {
   smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right", eraserMode: "partial", keepInkOnPage: true, pagesPinned: false,
   smartGraphs: true, smartFlowchart: true, smartGates: true, smartNumberLine: true,
   smartGeometry: true, smartTables: true, smartScience: false, smartMath: true,
+  penBrush: "pen", hlBrush: "pen", shapeBrush: "pen", markerOpacity: 0.8,
+  stampFavorites: ["star", "tick", "cross", "thumbs-up", "hundred", "excellent"], stampQuickMenu: true,
 };
 
 /** Smart ink families that are on, as the engine's comma-separated list. */
@@ -176,6 +190,11 @@ function loadPrefs(): Prefs {
     if (saved.hand !== "left") saved.hand = "right";
     if (saved.eraserMode !== "stroke") saved.eraserMode = "partial";
     saved.keepInkOnPage = saved.keepInkOnPage !== false;
+    for (const k of ["penBrush", "hlBrush", "shapeBrush"] as const) if (typeof saved[k] !== "string") saved[k] = "pen";
+    if (!(typeof saved.markerOpacity === "number" && saved.markerOpacity >= 0.2 && saved.markerOpacity <= 1)) saved.markerOpacity = 0.8;
+    if (!Array.isArray(saved.stampFavorites)) saved.stampFavorites = [...defaults.stampFavorites];
+    saved.stampFavorites = saved.stampFavorites.filter((v: unknown) => typeof v === "string").slice(0, 8);
+    saved.stampQuickMenu = saved.stampQuickMenu !== false;
     saved.modes = sanitizeModes(saved.modes);
     return saved;
   } catch {

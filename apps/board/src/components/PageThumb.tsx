@@ -19,8 +19,8 @@ const CURRENT_DEBOUNCE_MS = 450;
 
 type Rect = [number, number, number, number];
 type PreviewItem =
-  | { kind: "stroke"; color: string; width: number; opacity: number; pts: number[] }
-  | { kind: "text"; rect: Rect; text: string; size: number; color: string }
+  | { kind: "stroke"; color: string; width: number; opacity: number; pts: number[]; brush?: string }
+  | { kind: "text"; rect: Rect; text: string; size: number; color: string; stamp?: string }
   | { kind: "image"; rect: Rect; asset: string }
   | { kind: "object"; rect: Rect; title: string };
 interface Preview {
@@ -148,7 +148,10 @@ function draw(canvas: HTMLCanvasElement, p: Preview, redraw: () => void, index: 
       ctx.beginPath();
       ctx.moveTo(pts[0], pts[1]);
       for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+      brushLook(ctx, it, lw);
       ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
     } else if (it.kind === "image") {
       const [x, y, w, h] = it.rect;
       const img = imageFor(it.asset, redraw);
@@ -182,6 +185,15 @@ function draw(canvas: HTMLCanvasElement, p: Preview, redraw: () => void, index: 
       ctx.quadraticCurveTo(x + w / 2, y + h / 2, x + w / 2, y + h / 2 - d);
       ctx.fillStyle = objectTint;
       ctx.fill();
+    } else if (it.kind === "text" && it.stamp) {
+      // A stamp: its emoji or label, centred in its box.
+      const [x, y, w, h] = it.rect;
+      ctx.fillStyle = it.color;
+      ctx.font = `700 ${Math.min(h * 0.7, (w / Math.max(1, [...it.text].length)) * 1.6)}px ${css.fontFamily}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(it.text, x + w / 2, y + h / 2);
+      ctx.textAlign = "start";
     } else if (it.kind === "text") {
       const [x, y, w] = it.rect;
       ctx.fillStyle = it.color;
@@ -242,6 +254,24 @@ function drawBranding(ctx: CanvasRenderingContext2D, p: Preview, redraw: () => v
     const x = b.text_align === "left" ? rect[0] : b.text_align === "right" ? rect[0] + rect[2] : rect[0] + rect[2] / 2;
     ctx.fillText(line, x, rect[1] + rect[3] / 2, rect[2]);
     ctx.textAlign = "left";
+  }
+}
+
+/** A thumbnail's sketch of a pen style (brushes.ts): dashes, dots, the
+ * rainbow, a glow; textured styles a little lighter. */
+function brushLook(ctx: CanvasRenderingContext2D, it: { pts: number[]; brush?: string; color: string }, lw: number) {
+  switch (it.brush) {
+    case "dashed": ctx.setLineDash([lw * 2, lw * 2]); break;
+    case "dotted": ctx.setLineDash([0.01, lw * 2]); break;
+    case "neon": ctx.shadowColor = it.color; ctx.shadowBlur = lw * 2; break;
+    case "pencil": case "chalk": ctx.globalAlpha *= 0.8; break;
+    case "rainbow": {
+      const n = it.pts.length;
+      const g = ctx.createLinearGradient(it.pts[0], it.pts[1], it.pts[n - 2], it.pts[n - 1]);
+      for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, `hsl(${k * 60}, 72%, 56%)`);
+      ctx.strokeStyle = g;
+      break;
+    }
   }
 }
 

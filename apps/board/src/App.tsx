@@ -27,6 +27,7 @@ import { setBrandVars } from "./design";
 import { isPhone, pagesDrawer, pagesShown } from "./viewport";
 import { PageDesignHost } from "./components/PageDesign";
 import { drawCursor } from "./wetInk";
+import { Celebrate, QuickMenu } from "./components/Stamps";
 
 const OverlayApp = lazy(() => import("./overlay/OverlayApp"));
 
@@ -149,6 +150,8 @@ export default function App() {
         <PageDesignHost />
         {/* The Smart Dock; it also holds the replay controls while a replay runs. */}
         <Dock onSettings={openSettings} />
+        <QuickMenu />
+        <Celebrate />
         <StatusChips />
         {/* Connect AI: the teacher's own agent edits the board live (live.ts). */}
         <LivePanel />
@@ -191,6 +194,7 @@ function cursorFor(t: string): string {
   switch (t) {
     case "hand": return "grab";
     case "text": return "text";
+    case "stamp": return "copy";
     case "lasso": return "default";
     case "eraser": return "none";
     case "interact": return "default";
