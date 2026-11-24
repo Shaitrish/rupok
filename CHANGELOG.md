@@ -5,10 +5,20 @@ notes come after each list. Downloads are on
 [rupok.app/download](https://rupok.app/download/) and on
 [GitHub Releases](https://github.com/Shaitrish/rupok/releases).
 
-## Unreleased
+## v0.2.2 (24 November 2026)
 
 ### For teachers
 
+- **Zoom that stays on the slide:** a slide zooms from fit to 500 %, and
+  you can only pan around the page, so the slide never gets lost in empty
+  board. A pinch that goes smaller than fit springs back. The zoom chip
+  shows 100 % for the fitted slide. Infinite pages zoom and pan freely as
+  before.
+- **Ink keeps up with the pen:** no "+" cursor under the pen on smartboards,
+  wet ink reaches the pen tip instead of trailing behind it, and on Windows
+  the system draws the last bit of ink right up to the pen. Autosave waits
+  for a pause in your writing. Settings → About → Troubleshooting has a
+  performance and pen-latency overlay to check your board.
 - **Show pages anywhere:** press G, tap the page counter on the dock, or
   use ⋯ → Show pages, in Teach, Prepare and Student view. Big thumbnails
   slide in over the slide without moving it; tap one to jump (pin it to
@@ -60,9 +70,20 @@ notes come after each list. Downloads are on
   and Docs, Wikipedia and Khan Academy links embed live. Other links are not
   embedded; Rupok offers to open them in the browser.
 - The Smart Object library has a **Media** tab.
+- **Website:** a privacy policy and terms of service at
+  [rupok.app/privacy](https://rupok.app/privacy/) and
+  [rupok.app/terms](https://rupok.app/terms/).
 
 ### For developers
 
+- Slide camera bounds (`engine.rs`): fit to 5 × fit on framed pages, pan
+  clamped to the page, pinch overshoot springs back; `set_camera` stays
+  unbounded.
+- Pen latency: `StrokeBuilder::tip` (wet ink ends at the raw pen point),
+  `OneEuroParams::RAW` for smoothing 0, prediction capped at 12 ms, the
+  delegated ink trail (`navigator.ink`) in `wetInk.ts`, and the
+  pen-to-pixel harness `bench/latency/pen-latency.mjs` with budgets
+  (docs/performance.md).
 - Board engine: the partial eraser (`engine/duster.rs`, `set_eraser_mode`),
   ink kept on the page (`engine/clip.rs`, `set_clip_ink`) and selection
   editing (`engine/restyle.rs`: `restyle_selection`, `scale_selection`,
