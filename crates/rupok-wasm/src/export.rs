@@ -11,10 +11,18 @@
 //! the non-zero rule it covers exactly the capsule chain, with no holes where
 //! the inner side folds over itself, and a translucent highlighter is painted
 //! once, as on the board.
+//!
+//! Brushes ([`rupok_ink::Brush`]) export as vectors too ([`brush_fills`]):
+//! widths, the brush's end taper and the nib of the fountain pen and marker
+//! go into the capsule chain (`Brush::radii`), dashes and dots are cut along the stroke, neon is a glow, a body and a
+//! light core, and the rainbow is cut into short pieces of one colour each.
+//! Pencil grain and chalk dust are drawn as the plain shape at a lower
+//! opacity.
 
 use rupok_core::{BoxGeom, Branding, Frame, ItemData, Lesson, PageBackground};
 use rupok_format::Package;
-use rupok_ink::{StrokePoint, point_radius};
+use rupok_ink::brush::GLOW_RADII;
+use rupok_ink::{Brush, StrokePoint};
 use serde::Serialize;
 use std::f32::consts::{PI, TAU};
 
@@ -46,15 +54,15 @@ fn dist(a: P, b: P) -> f32 {
 /// disc lies inside its neighbour the outer tangents do not exist, so the
 /// chain ends there and a new one starts: the union of the chains is still
 /// exactly the stroke. Inside every chain `|r0 - r1| < distance`.
-fn chains(points: &[StrokePoint], width: f32, offset: [f32; 2]) -> Vec<Vec<Disc>> {
+fn chains(points: &[StrokePoint], radii: &[f32], offset: [f32; 2]) -> Vec<Vec<Disc>> {
     const EPS: f32 = 1e-3;
     let mut out: Vec<Vec<Disc>> = Vec::new();
     let mut cur: Vec<Disc> = Vec::with_capacity(points.len());
-    for p in points {
+    for (p, r) in points.iter().zip(radii) {
         let d = Disc {
             x: p.x + offset[0],
             y: p.y + offset[1],
-            r: point_radius(p.p, width).max(0.05),
+            r: r.max(0.05),
         };
         if !(d.x.is_finite() && d.y.is_finite() && d.r.is_finite()) {
             continue;
@@ -158,12 +166,171 @@ pub fn stroke_outline(
     offset: [f32; 2],
     tol: f32,
 ) -> Vec<Vec<f32>> {
+    let mut radii = Vec::new();
+    Brush::Pen.radii(points, width, &mut radii);
+    radii_outline(points, &radii, offset, tol)
+}
+
+/// [`stroke_outline`] with a radius per point.
+fn radii_outline(
+    points: &[StrokePoint],
+    radii: &[f32],
+    offset: [f32; 2],
+    tol: f32,
+) -> Vec<Vec<f32>> {
     let tol = tol.max(0.01);
-    chains(points, width, offset)
+    chains(points, radii, offset)
         .iter()
         .map(|d| flatten(simplify_closed(&chain_outline(d, tol), SIMPLIFY_TOLERANCE)))
         .filter(|p| p.len() >= 6)
         .collect()
+}
+
+/// One filled layer of an exported stroke: polygons (filled together with
+/// the non-zero rule), a colour (0xRRGGBBAA) and an opacity.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Fill {
+    pub outline: Vec<Vec<f32>>,
+    pub color: u32,
+    pub opacity: f32,
+}
+
+/// The point at distance `s` along the stroke, interpolated.
+fn point_at(points: &[StrokePoint], radii: &[f32], arc: &[f32], s: f32) -> (StrokePoint, f32) {
+    let i = arc.partition_point(|a| *a < s).clamp(1, points.len() - 1);
+    let (a, b) = (arc[i - 1], arc[i]);
+    let t = if b > a {
+        ((s - a) / (b - a)).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let (p, q) = (points[i - 1], points[i]);
+    (
+        StrokePoint {
+            x: p.x + (q.x - p.x) * t,
+            y: p.y + (q.y - p.y) * t,
+            p: p.p + (q.p - p.p) * t,
+            dt: p.dt,
+        },
+        radii[i - 1] + (radii[i] - radii[i - 1]) * t,
+    )
+}
+
+/// The part of the stroke between distances `s0` and `s1` along it.
+fn piece(
+    points: &[StrokePoint],
+    radii: &[f32],
+    arc: &[f32],
+    s0: f32,
+    s1: f32,
+) -> (Vec<StrokePoint>, Vec<f32>) {
+    let (a, ra) = point_at(points, radii, arc, s0);
+    let (mut pts, mut rs) = (vec![a], vec![ra]);
+    for (k, s) in arc.iter().enumerate() {
+        if *s > s0 && *s < s1 {
+            pts.push(points[k]);
+            rs.push(radii[k]);
+        }
+    }
+    if s1 > s0 {
+        let (b, rb) = point_at(points, radii, arc, s1);
+        pts.push(b);
+        rs.push(rb);
+    }
+    (pts, rs)
+}
+
+/// The vector layers of a stroke drawn with `brush`, painted in order.
+pub fn brush_fills(
+    points: &[StrokePoint],
+    width: f32,
+    brush: Brush,
+    offset: [f32; 2],
+    color: u32,
+    opacity: f32,
+    tol: f32,
+) -> Vec<Fill> {
+    let mut radii = Vec::new();
+    brush.radii(points, width, &mut radii);
+    let fill = |outline: Vec<Vec<f32>>, color: u32, opacity: f32| Fill {
+        outline,
+        color,
+        opacity,
+    };
+    if points.is_empty() {
+        return Vec::new();
+    }
+    let mut arc = Vec::new();
+    rupok_ink::brush::arc_lengths(points, &mut arc);
+    let total = *arc.last().unwrap_or(&0.0);
+    match brush {
+        Brush::Dashed | Brush::Dotted if points.len() > 1 => {
+            let (period, on) = brush.dash(width).unwrap_or((1.0, 0.0));
+            let period = period.max(0.1);
+            let mut polys = Vec::new();
+            let mut c = on * 0.5;
+            while c - on * 0.5 <= total {
+                let (s0, s1) = ((c - on * 0.5).max(0.0), (c + on * 0.5).min(total));
+                let (pts, rs) = piece(points, &radii, &arc, s0, s1);
+                polys.extend(radii_outline(&pts, &rs, offset, tol));
+                c += period;
+            }
+            vec![fill(polys, color, opacity)]
+        }
+        Brush::Neon | Brush::Magic => {
+            let scaled = |k: f32| radii.iter().map(|r| r * k).collect::<Vec<f32>>();
+            vec![
+                fill(
+                    radii_outline(points, &scaled(1.0 + GLOW_RADII * 0.6), offset, tol),
+                    color,
+                    opacity * 0.22,
+                ),
+                fill(radii_outline(points, &radii, offset, tol), color, opacity),
+                fill(
+                    radii_outline(points, &scaled(0.45), offset, tol),
+                    0xffffffff,
+                    opacity * 0.6,
+                ),
+            ]
+        }
+        Brush::Rainbow if points.len() > 1 => {
+            let step = (Brush::rainbow_period(width) / 24.0).max(1.0);
+            let mut out = Vec::new();
+            let mut s0 = 0.0f32;
+            while s0 < total {
+                let s1 = (s0 + step).min(total);
+                let (pts, rs) = piece(points, &radii, &arc, s0, s1);
+                let rgb = rupok_ink::brush::rainbow_rgb((s0 + s1) * 0.5, width);
+                out.push(fill(
+                    radii_outline(&pts, &rs, offset, tol),
+                    (rgb << 8) | (color & 0xff),
+                    opacity,
+                ));
+                s0 = s1;
+            }
+            out
+        }
+        Brush::Rainbow => vec![fill(
+            radii_outline(points, &radii, offset, tol),
+            (rupok_ink::brush::rainbow_rgb(0.0, width) << 8) | (color & 0xff),
+            opacity,
+        )],
+        Brush::Pencil => vec![fill(
+            radii_outline(points, &radii, offset, tol),
+            color,
+            opacity * 0.8,
+        )],
+        Brush::Chalk => vec![fill(
+            radii_outline(points, &radii, offset, tol),
+            color,
+            opacity * 0.85,
+        )],
+        _ => vec![fill(
+            radii_outline(points, &radii, offset, tol),
+            color,
+            opacity,
+        )],
+    }
 }
 
 fn chain_outline(d: &[Disc], tol: f32) -> Vec<P> {
@@ -321,8 +488,14 @@ enum ExportItem<'a> {
         opacity: f32,
         tool: &'a str,
         shape: Option<&'a str>,
-        /// Outline polygons, see [`stroke_outline`].
+        /// Outline polygons, see [`stroke_outline`] (the plain-pen shape).
         outline: Vec<Vec<f32>>,
+        /// The pen style, when not the plain pen.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        brush: Option<&'a str>,
+        /// Layers to paint instead of `outline` for a brush ([`brush_fills`]).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        fills: Option<Vec<Fill>>,
     },
     Text {
         rect: [f64; 4],
@@ -332,6 +505,12 @@ enum ExportItem<'a> {
         /// `text` is LaTeX maths.
         #[serde(skip_serializing_if = "std::ops::Not::not")]
         latex: bool,
+        /// A classroom stamp, drawn instead of `text`.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stamp: Option<&'a str>,
+        /// Rotation in radians about the box centre.
+        #[serde(skip_serializing_if = "is_zero")]
+        rot: f64,
     },
     Image {
         rect: [f64; 4],
@@ -358,6 +537,10 @@ struct ExportMedia<'a> {
     /// The link (YouTube, web embeds), for a caption and a QR code.
     #[serde(skip_serializing_if = "Option::is_none")]
     url: Option<String>,
+}
+
+fn is_zero(v: &f64) -> bool {
+    *v == 0.0
 }
 
 fn rect(g: &BoxGeom) -> [f64; 4] {
@@ -394,19 +577,36 @@ pub fn page_export_json(lesson: &Lesson, pkg: &Package, index: usize, strokes: b
         });
         out.push(match &it.data {
             ItemData::Stroke(_) if !strokes => continue,
-            ItemData::Stroke(s) => ExportItem::Stroke {
-                color: s.color,
-                opacity: s.opacity,
-                tool: &s.tool,
-                shape: s.shape.as_deref(),
-                outline: stroke_outline(&s.points, s.width, s.offset, OUTLINE_TOLERANCE),
-            },
+            ItemData::Stroke(s) => {
+                let brush = s.brush();
+                ExportItem::Stroke {
+                    color: s.color,
+                    opacity: s.opacity,
+                    tool: &s.tool,
+                    shape: s.shape.as_deref(),
+                    outline: stroke_outline(&s.points, s.width, s.offset, OUTLINE_TOLERANCE),
+                    brush: (brush != Brush::Pen).then_some(brush.as_str()),
+                    fills: (brush != Brush::Pen).then(|| {
+                        brush_fills(
+                            &s.points,
+                            s.width,
+                            brush,
+                            s.offset,
+                            s.color,
+                            s.opacity,
+                            OUTLINE_TOLERANCE,
+                        )
+                    }),
+                }
+            }
             ItemData::Text(t) => ExportItem::Text {
                 rect: rect(&t.geom),
                 text: &t.text,
                 size: t.size,
                 color: t.color,
                 latex: t.latex,
+                stamp: t.stamp.as_deref(),
+                rot: t.geom.rot,
             },
             ItemData::Image(i) => ExportItem::Image {
                 rect: rect(&i.geom),
@@ -445,6 +645,69 @@ pub fn page_export_json(lesson: &Lesson, pkg: &Package, index: usize, strokes: b
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rupok_ink::point_radius;
+
+    fn line_pts(n: usize, dx: f32, dy: f32) -> Vec<StrokePoint> {
+        (0..n)
+            .map(|i| StrokePoint {
+                x: i as f32 * dx,
+                y: i as f32 * dy,
+                p: 1.0,
+                dt: 0,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn dashes_and_dots_export_as_separate_pieces() {
+        let pts = line_pts(101, 1.0, 0.0); // 100 units long
+        let f = brush_fills(&pts, 4.0, Brush::Dashed, [0.0; 2], 0xff, 1.0, 0.12);
+        assert_eq!(f.len(), 1);
+        // Period 16: dashes at 0, 16, …, 96.
+        assert_eq!(f[0].outline.len(), 7);
+        let f = brush_fills(&pts, 4.0, Brush::Dotted, [0.0; 2], 0xff, 1.0, 0.12);
+        assert_eq!(f[0].outline.len(), 13); // a dot every 8 units, 0..=96
+    }
+
+    #[test]
+    fn the_nib_is_wide_across_and_thin_along_its_angle() {
+        // Along the nib (its angle) the swept nib is thin, across it wide.
+        let ang = rupok_ink::brush::NIB_ANGLE;
+        let (c, s) = (ang.cos(), ang.sin());
+        let along = line_pts(20, c * 2.0, s * 2.0);
+        let across = line_pts(20, -s * 2.0, c * 2.0);
+        // Half the line's width: the farthest outline point from its axis.
+        let half = |pts: &[StrokePoint], d: P| -> f32 {
+            let f = brush_fills(pts, 8.0, Brush::Fountain, [0.0; 2], 0xff, 1.0, 0.12);
+            f[0].outline
+                .iter()
+                .flat_map(|p| pairs(p))
+                .map(|q| (q[0] * d[1] - q[1] * d[0]).abs())
+                .fold(0.0, f32::max)
+        };
+        let (wa, wx) = (half(&along, [c, s]), half(&across, [-s, c]));
+        assert!(wx > 3.5 && wa < 1.0, "across {wx}, along {wa}");
+    }
+
+    #[test]
+    fn neon_glows_and_rainbow_changes_colour() {
+        let pts = line_pts(400, 1.0, 0.0);
+        let f = brush_fills(&pts, 4.0, Brush::Neon, [0.0; 2], 0x3e63ddff, 1.0, 0.12);
+        assert_eq!(f.len(), 3);
+        assert!(f[0].opacity < 0.5 && f[2].color == 0xffffffff);
+        let f = brush_fills(&pts, 4.0, Brush::Rainbow, [0.0; 2], 0x000000ff, 1.0, 0.12);
+        assert!(f.len() > 10);
+        assert_ne!(f[0].color, f[8].color);
+        assert!(f.iter().all(|x| x.color & 0xff == 0xff));
+        // Brush ends taper: the export is narrower at the ends.
+        let f = brush_fills(&pts, 8.0, Brush::Brush, [0.0; 2], 0xff, 1.0, 0.12);
+        let ys: Vec<f32> = pairs(&f[0].outline[0])
+            .into_iter()
+            .filter(|p| p[0] < 2.0)
+            .map(|p| p[1].abs())
+            .collect();
+        assert!(ys.iter().all(|y| *y < 4.0 * 0.5), "{ys:?}");
+    }
 
     fn pt(x: f32, y: f32, p: f32) -> StrokePoint {
         StrokePoint { x, y, p, dt: 0 }
@@ -648,7 +911,8 @@ mod tests {
         let pts: Vec<_> = (0..300)
             .map(|i| pt(i as f32 * 0.5, (i as f32 * 0.01).sin() * 4.0, 0.5))
             .collect();
-        let raw = chain_outline(&chains(&pts, 4.0, [0.0, 0.0])[0], OUTLINE_TOLERANCE).len();
+        let radii: Vec<f32> = pts.iter().map(|q| point_radius(q.p, 4.0)).collect();
+        let raw = chain_outline(&chains(&pts, &radii, [0.0, 0.0])[0], OUTLINE_TOLERANCE).len();
         let kept = stroke_outline(&pts, 4.0, [0.0, 0.0], OUTLINE_TOLERANCE)[0].len() / 2;
         assert!(kept * 3 < raw, "{kept} of {raw} vertices kept");
     }
@@ -688,6 +952,7 @@ mod tests {
             offset: [5.0, 0.0],
             shape: None,
             geom: None,
+            brush: None,
         };
         lesson
             .add_items(
@@ -706,6 +971,7 @@ mod tests {
                             text: "বাংলা লেখা".into(),
                             size: 40.0,
                             color: 0x1c2024ff,
+                            stamp: None,
                         }),
                         created: 2.0,
                         group: None,

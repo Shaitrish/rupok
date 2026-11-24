@@ -885,7 +885,7 @@ impl Lesson {
             return Err(CoreError::ItemNotFound(id.clone()));
         }
         let mut f = ValueFields::from(&v);
-        for key in ["ox", "oy", "shape", "geom"] {
+        for key in ["ox", "oy", "shape", "geom", "brush"] {
             f.remove(key);
         }
         write_item_data(&mut f, &ItemData::Stroke(data.clone()))?;
@@ -1301,6 +1301,15 @@ fn read_geom(m: &impl Fields) -> BoxGeom {
     }
 }
 
+/// A `brush` or `stamp` name: short, lowercase ASCII words (`a-z`, `0-9`,
+/// `-`). Anything else is treated as absent.
+fn valid_name(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 32
+        && s.bytes()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+}
+
 fn write_item_data(m: &mut impl FieldsMut, data: &ItemData) -> loro::LoroResult<()> {
     match data {
         ItemData::Stroke(s) => {
@@ -1319,6 +1328,9 @@ fn write_item_data(m: &mut impl FieldsMut, data: &ItemData) -> loro::LoroResult<
             if let Some(g) = s.geom.as_ref().filter(|g| g.is_valid()) {
                 m.insert("geom", shape_geom_value(g))?;
             }
+            if let Some(b) = s.brush.as_deref().filter(|b| valid_name(b)) {
+                m.insert("brush", b)?;
+            }
         }
         ItemData::Text(t) => {
             write_geom_to(m, &t.geom)?;
@@ -1327,6 +1339,9 @@ fn write_item_data(m: &mut impl FieldsMut, data: &ItemData) -> loro::LoroResult<
             m.insert("color", i64::from(t.color))?;
             if t.latex {
                 m.insert("latex", true)?;
+            }
+            if let Some(st) = t.stamp.as_deref().filter(|b| valid_name(b)) {
+                m.insert("stamp", st)?;
             }
         }
         ItemData::Image(i) => {
@@ -1490,10 +1505,12 @@ fn read_item(id: &str, m: &impl Fields) -> Result<Item> {
                 ],
                 shape: str_of(m, "shape"),
                 geom: read_shape_geom(m),
+                brush: str_of(m, "brush").filter(|b| valid_name(b)),
             })
         }
         "text" => ItemData::Text(TextData {
             latex: matches!(value_of(m, "latex"), Some(LoroValue::Bool(true))),
+            stamp: str_of(m, "stamp").filter(|b| valid_name(b)),
             geom: read_geom(m),
             text: str_of(m, "text").unwrap_or_default(),
             size: f64_of(m, "size").unwrap_or(32.0),
@@ -1548,6 +1565,7 @@ mod tests {
             offset: [0.0, 0.0],
             shape: None,
             geom: None,
+            brush: None,
         })
     }
 
@@ -1653,6 +1671,73 @@ mod tests {
     }
 
     #[test]
+    fn brush_and_stamp_keys_round_trip_and_bad_names_read_as_absent() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let with = |b: Option<&str>| {
+            let ItemData::Stroke(mut s) = stroke(0.0) else {
+                unreachable!()
+            };
+            s.points.iter_mut().for_each(|q| q.p = 1.0);
+            s.brush = b.map(Into::into);
+            s
+        };
+        // Known and unknown (a newer writer's) brushes are kept as written.
+        for b in ["fountain", "chalk", "watercolour-2"] {
+            let s = with(Some(b));
+            let id = l.add_item(&p, &ItemData::Stroke(s.clone()), 1.0).unwrap();
+            let back = Lesson::load(&l.save()).unwrap().item(&p, &id).unwrap();
+            assert_eq!(back.data, ItemData::Stroke(s));
+        }
+        // The plain pen writes no key at all.
+        let id = l.add_item(&p, &ItemData::Stroke(with(None)), 1.0).unwrap();
+        let ItemData::Stroke(b) = l.item(&p, &id).unwrap().data else {
+            panic!()
+        };
+        assert_eq!(b.brush, None);
+        // A name that is not a short lowercase word is never written.
+        let id = l
+            .add_item(&p, &ItemData::Stroke(with(Some("Bad Brush!"))), 1.0)
+            .unwrap();
+        let ItemData::Stroke(b) = l.item(&p, &id).unwrap().data else {
+            panic!()
+        };
+        assert_eq!(b.brush, None);
+        // Rewriting a stroke (an edit) keeps its brush.
+        let s = with(Some("dashed"));
+        let id = l.add_item(&p, &ItemData::Stroke(s.clone()), 1.0).unwrap();
+        let moved = StrokeData {
+            offset: [0.0, 0.0],
+            width: 9.0,
+            ..s
+        };
+        l.edit_strokes(&p, &[(id.clone(), moved.clone())], &[])
+            .unwrap();
+        let ItemData::Stroke(b) = l.item(&p, &id).unwrap().data else {
+            panic!()
+        };
+        assert_eq!(b.brush.as_deref(), Some("dashed"));
+        // Stamps: text items with a `stamp` key.
+        let t = TextData {
+            latex: false,
+            geom: BoxGeom {
+                x: 1.0,
+                y: 2.0,
+                w: 100.0,
+                h: 100.0,
+                rot: 0.3,
+            },
+            text: "⭐".into(),
+            size: 70.0,
+            color: 0xf5b301ff,
+            stamp: Some("star".into()),
+        };
+        let id = l.add_item(&p, &ItemData::Text(t.clone()), 3.0).unwrap();
+        let back = Lesson::load(&l.save()).unwrap().item(&p, &id).unwrap();
+        assert_eq!(back.data, ItemData::Text(t));
+    }
+
+    #[test]
     fn latex_text_round_trips_and_plain_text_has_no_key() {
         let mut l = Lesson::new("t", 0.0);
         let p = l.page_id_at(0).unwrap();
@@ -1668,6 +1753,7 @@ mod tests {
             text: "x^2".into(),
             size: 32.0,
             color: 0x000000ff,
+            stamp: None,
         };
         let a = l.add_item(&p, &ItemData::Text(t(true)), 1.0).unwrap();
         let b = l.add_item(&p, &ItemData::Text(t(false)), 2.0).unwrap();
@@ -1704,6 +1790,7 @@ mod tests {
             text: "x".into(),
             size: 24.0,
             color: 0x000000ff,
+            stamp: None,
         });
         let t = l.add_item(&p, &text, 3.0).unwrap();
         let mut moved = shape_stroke();
@@ -1953,6 +2040,7 @@ mod tests {
             text: "Hello".into(),
             size: 40.0,
             color: 0x112233ff,
+            stamp: None,
         })
     }
 

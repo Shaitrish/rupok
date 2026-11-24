@@ -112,6 +112,7 @@ impl Replay {
             width: s.width,
             color: s.color,
             opacity: s.opacity,
+            brush: s.brush(),
         })
     }
 

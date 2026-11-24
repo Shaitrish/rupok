@@ -291,6 +291,7 @@ mod tests {
             width: 4.0,
             color: 0,
             opacity: 1.0,
+            brush: rupok_ink::Brush::Pen,
         };
         push_wet(&mut out, w.clone(), None);
         assert_eq!(out.len(), 1);

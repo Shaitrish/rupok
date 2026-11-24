@@ -276,6 +276,7 @@ mod tests {
             offset: [0.0, 0.0],
             shape: None,
             geom: None,
+            brush: None,
         }
     }
 

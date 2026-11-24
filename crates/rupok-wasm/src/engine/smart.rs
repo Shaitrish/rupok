@@ -13,10 +13,10 @@ use std::collections::{HashMap, HashSet};
 use rupok_core::{
     BoxGeom, Edits, Item, ItemData, ItemId, NewItem, ShapeGeom, StrokeData, TextData,
 };
-use rupok_ink::StrokePoint;
 use rupok_ink::recognize::{
     self, Context, Neighbour, Options, Proposal, Registry, ShapeKind, family,
 };
+use rupok_ink::{Brush, StrokePoint};
 
 use super::{Engine, Gesture, InkSink, WetStroke};
 use crate::shapes;
@@ -329,6 +329,7 @@ impl<S: InkSink> Engine<S> {
             width: st.width,
             color: st.color,
             opacity: st.opacity,
+            brush: st.brush,
         })
     }
 
@@ -657,6 +658,7 @@ impl<S: InkSink> Engine<S> {
                     text: l.text.clone(),
                     size,
                     color: src.color,
+                    stamp: None,
                 }),
                 created: t,
                 group: group.clone(),
@@ -1032,6 +1034,7 @@ impl<S: InkSink> Engine<S> {
             width: s.width,
             color: FLASH_COLOR,
             opacity,
+            brush: Brush::Pen,
         };
         let mut strokes = vec![wet(scratch, 0.55)];
         for id in &covered {
@@ -1610,6 +1613,7 @@ impl<S: InkSink> Engine<S> {
             text: text.to_string(),
             size,
             color,
+            stamp: None,
         });
         let id = self
             .lesson
@@ -1710,6 +1714,21 @@ mod tests {
         assert_eq!(s.len(), 1, "the hand-drawn circle is back");
         assert_eq!((s[0].shape.clone(), s[0].geom.clone()), (None, None));
         assert!(e.undo());
+        assert!(strokes(&e).is_empty());
+    }
+
+    #[test]
+    fn a_snapped_shape_keeps_the_pen_style() {
+        let mut e = engine(SmartMode::Auto);
+        e.set_brush(Brush::Chalk);
+        draw(&mut e, &circle([500.0, 400.0], 120.0), 1000.0);
+        let s = strokes(&e);
+        assert_eq!(s[0].shape.as_deref(), Some("circle"));
+        assert_eq!(s[0].brush.as_deref(), Some("chalk"));
+        // Magic ink never snaps (nor is it saved).
+        let mut e = engine(SmartMode::Auto);
+        e.set_brush(Brush::Magic);
+        draw(&mut e, &circle([500.0, 400.0], 120.0), 1000.0);
         assert!(strokes(&e).is_empty());
     }
 

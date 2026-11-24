@@ -16,7 +16,7 @@ use rupok_format::package::OUTLINE_MAX_AGE_MS;
 use rupok_format::{ObjectBundle, ObjectManifest, Package};
 use rupok_ink::filter::OneEuroParams;
 use rupok_ink::pressure::PressureCurve;
-use rupok_ink::{BuilderConfig, InputPoint, StrokeBuilder, StrokePoint, StrokeStyle, Tool};
+use rupok_ink::{Brush, BuilderConfig, InputPoint, StrokeBuilder, StrokePoint, StrokeStyle, Tool};
 use rupok_render::Camera;
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +24,8 @@ use crate::b64;
 use crate::replay::Replay;
 use crate::shapes::{ShapeKind, shape_points};
 
+#[cfg(test)]
+mod brush_tests;
 mod clip;
 mod duster;
 mod restyle;
@@ -46,6 +48,9 @@ const MAX_ZOOM_OVER_FIT: f32 = 5.0;
 const PINCH_UNDER_FIT: f32 = 0.7;
 const SETTLE_MS: f64 = 220.0;
 const LASER_LIFETIME_MS: f64 = 1400.0;
+/// Magic ink stays this long after the pen lifts, then fades out.
+pub const MAGIC_HOLD_MS: f64 = 2600.0;
+pub const MAGIC_FADE_MS: f64 = 900.0;
 const DEFAULT_FIT_MARGIN: f32 = 0.03;
 /// Clipboard format marker, the first key of every clipboard JSON.
 pub const CLIP_MARKER: &str = "clipboard/v1";
@@ -73,6 +78,7 @@ pub struct WetStroke {
     pub width: f32,
     pub color: u32,
     pub opacity: f32,
+    pub brush: Brush,
 }
 
 impl InkSink for rupok_render::InkRenderer {
@@ -92,7 +98,7 @@ impl InkSink for rupok_render::InkRenderer {
             self.set_wet_many(
                 strokes
                     .iter()
-                    .map(|w| (w.points.as_slice(), w.width, w.color, w.opacity)),
+                    .map(|w| (w.points.as_slice(), w.width, w.brush, w.color, w.opacity)),
             );
         }
     }
@@ -201,6 +207,14 @@ struct LaserTrail {
     points: Vec<(StrokePoint, f64)>,
 }
 
+/// Magic ink after pen-up: drawn exactly like its last wet frame (same
+/// points, brush and page clip), then faded out. Never saved.
+struct MagicTrail {
+    stroke: WetStroke,
+    clip: Option<[f32; 4]>,
+    lifted: f64,
+}
+
 #[derive(Clone, Copy)]
 struct Pinch {
     centroid: [f32; 2],
@@ -241,6 +255,9 @@ pub struct DomItem<'a> {
     /// An image item that is the poster of a video, audio clip or embed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub media: Option<&'a MediaData>,
+    /// A text item that is a classroom stamp (`stamp` key).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stamp: Option<&'a str>,
     pub selected: bool,
 }
 
@@ -287,6 +304,7 @@ pub struct Engine<S: InkSink> {
     selection: Vec<ItemId>,
     drag_offset: [f32; 2],
     lasers: Vec<LaserTrail>,
+    magic: Vec<MagicTrail>,
     replay: Option<Replay>,
     /// AI handwriting being written stroke by stroke (`reveal.rs`).
     reveal: Option<reveal::Reveal>,
@@ -353,6 +371,9 @@ enum PreviewItem<'a> {
         opacity: f32,
         /// Flat `[x0, y0, x1, y1, …]`.
         pts: Vec<f64>,
+        /// Pen style, when not the plain pen.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        brush: Option<&'static str>,
     },
     Text {
         rect: [f64; 4],
@@ -361,6 +382,8 @@ enum PreviewItem<'a> {
         color: String,
         #[serde(skip_serializing_if = "std::ops::Not::not")]
         latex: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stamp: Option<&'a str>,
     },
     Image {
         rect: [f64; 4],
@@ -432,6 +455,9 @@ struct ClipStrokeJson {
     /// Editable shape geometry (`geom`), so pasted shapes stay resizable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     geom: Option<ShapeGeom>,
+    /// Pen style (`brush`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    brush: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -463,6 +489,7 @@ impl Clip {
                         oy: s.offset[1],
                         shape: s.shape.clone(),
                         geom: s.geom.clone(),
+                        brush: s.brush.clone(),
                     }),
                     ItemData::Text(t) => ClipItemJson::Text(t.clone()),
                     ItemData::Image(i) => ClipItemJson::Image(i.clone()),
@@ -547,6 +574,7 @@ impl Clip {
                                 to: None,
                                 ..g
                             }),
+                            brush: s.brush.filter(|b| b.len() <= 32),
                         })
                     }
                     ClipItemJson::Text(t) if finite_geom(&t.geom) && t.size.is_finite() => {
@@ -613,18 +641,21 @@ impl<S: InkSink> Engine<S> {
                 color: 0x1d2433ff,
                 width: 3.0,
                 opacity: 1.0,
+                brush: Brush::Pen,
             },
             highlighter: StrokeStyle {
                 tool: Tool::Highlighter,
                 color: 0xffd60aff,
                 width: 22.0,
                 opacity: 0.38,
+                brush: Brush::Pen,
             },
             shape_style: StrokeStyle {
                 tool: Tool::Pen,
                 color: 0x1d2433ff,
                 width: 3.0,
                 opacity: 1.0,
+                brush: Brush::Pen,
             },
             eraser_radius: 32.0,
             eraser_mode: EraserMode::Partial,
@@ -643,6 +674,7 @@ impl<S: InkSink> Engine<S> {
             selection: Vec::new(),
             drag_offset: [0.0, 0.0],
             lasers: Vec::new(),
+            magic: Vec::new(),
             replay: None,
             reveal: None,
             revision: 1,
@@ -693,6 +725,7 @@ impl<S: InkSink> Engine<S> {
 
     pub fn has_animation(&self) -> bool {
         !self.lasers.is_empty()
+            || !self.magic.is_empty()
             || !self.flashes.is_empty()
             || self.replay.as_ref().is_some_and(|r| r.playing)
             || self.reveal_animating()
@@ -764,6 +797,46 @@ impl<S: InkSink> Engine<S> {
         }
     }
 
+    /// Pen style of the current tool's new strokes (pen, highlighter or the
+    /// shape tools; each remembers its own). Magic ink is for the pen only.
+    pub fn set_brush(&mut self, b: Brush) {
+        let b = if b == Brush::Magic && self.tool != ToolKind::Pen {
+            Brush::Pen
+        } else {
+            b
+        };
+        self.style_mut().brush = b;
+    }
+
+    pub fn brush(&mut self) -> Brush {
+        self.style_mut().brush
+    }
+
+    /// Pen style and opacity of one tool's new strokes, whatever tool is
+    /// active: `"pen"`, `"highlighter"` or `"shape"`. The highlighter keeps
+    /// its own opacity (`set_highlighter_opacity`); magic ink is pen-only.
+    pub fn set_tool_brush(&mut self, kind: &str, b: Brush, opacity: f32) {
+        let opacity = if opacity.is_finite() {
+            opacity.clamp(0.1, 1.0)
+        } else {
+            1.0
+        };
+        match kind {
+            "pen" => {
+                self.pen.brush = b;
+                self.pen.opacity = opacity;
+            }
+            "highlighter" => {
+                self.highlighter.brush = if b == Brush::Magic { Brush::Pen } else { b }
+            }
+            "shape" => {
+                self.shape_style.brush = if b == Brush::Magic { Brush::Pen } else { b };
+                self.shape_style.opacity = opacity;
+            }
+            _ => {}
+        }
+    }
+
     pub fn set_width(&mut self, w: f32) {
         if self.tool == ToolKind::Eraser {
             self.eraser_radius = (w * 0.5).clamp(2.0, 200.0);
@@ -813,6 +886,7 @@ impl<S: InkSink> Engine<S> {
         self.selection.clear();
         self.gestures.clear();
         self.cut = None;
+        self.magic.clear();
         self.sink.set_wet(&[]);
         self.bump();
     }
@@ -1481,7 +1555,7 @@ impl<S: InkSink> Engine<S> {
                         pressure: s[2] as f32,
                         t_ms: s[3],
                     });
-                    if hold_mode {
+                    if hold_mode && builder.style.brush != Brush::Magic {
                         Self::hold_move(hold, w, now_ms, zoom);
                     }
                 }
@@ -1606,7 +1680,22 @@ impl<S: InkSink> Engine<S> {
             } => {
                 let style = builder.style;
                 let pts = builder.finish();
-                if !pts.is_empty() {
+                if style.brush == Brush::Magic {
+                    // Disappearing ink: kept on screen as drawn, never saved.
+                    if !pts.is_empty() {
+                        self.magic.push(MagicTrail {
+                            stroke: WetStroke {
+                                points: pts,
+                                width: style.width,
+                                color: style.color,
+                                opacity: style.opacity,
+                                brush: Brush::Magic,
+                            },
+                            clip: self.ink_clip,
+                            lifted: now_ms,
+                        });
+                    }
+                } else if !pts.is_empty() {
                     self.finish_clipped(
                         StrokeData {
                             tool: style.tool.as_str().into(),
@@ -1617,6 +1706,7 @@ impl<S: InkSink> Engine<S> {
                             offset: [0.0, 0.0],
                             shape: None,
                             geom: None,
+                            brush: style.brush.key().map(Into::into),
                         },
                         started,
                         hold.snapped,
@@ -1672,6 +1762,7 @@ impl<S: InkSink> Engine<S> {
                             offset: [0.0, 0.0],
                             shape: Some(kind.as_str().into()),
                             geom: Some(crate::shapes::shape_geom(kind, start, end)),
+                            brush: st.brush.key().map(Into::into),
                         },
                         started,
                     );
@@ -2399,8 +2490,71 @@ impl<S: InkSink> Engine<S> {
             text: text.into(),
             size,
             color: self.pen.color,
+            stamp: None,
         });
         self.add_box_item(data, now_ms).ok()
+    }
+
+    /// Place a classroom stamp centred on the screen point (`x`, `y`): a
+    /// text item with the `stamp` key, `w` × `h` world units, holding
+    /// `text` (the emoji or label older readers show). Kept on the page
+    /// like ink; not selected, so stamps can be tapped down one after
+    /// another.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_stamp(
+        &mut self,
+        kind: &str,
+        text: &str,
+        x: f32,
+        y: f32,
+        w: f64,
+        h: f64,
+        color: u32,
+        now_ms: f64,
+    ) -> Option<ItemId> {
+        let ok = |v: f64| v.is_finite() && v > 0.0 && v < 1e5;
+        if self.read_only || kind.is_empty() || kind.len() > 32 || !ok(w) || !ok(h) {
+            return None;
+        }
+        let c = self.world(x, y);
+        let (mut cx, mut cy) = (f64::from(c[0]), f64::from(c[1]));
+        if let Some(r) = self.ink_bounds() {
+            // Keep the stamp on a slide page, as ink is.
+            let half = |a: f32, b: f32, s: f64| {
+                let (a, b) = (f64::from(a), f64::from(b));
+                (a + s / 2.0).min((a + b) / 2.0)..=(b - s / 2.0).max((a + b) / 2.0)
+            };
+            let (rx, ry) = (half(r[0], r[2], w), half(r[1], r[3], h));
+            cx = cx.clamp(*rx.start(), *rx.end());
+            cy = cy.clamp(*ry.start(), *ry.end());
+        }
+        let data = ItemData::Text(TextData {
+            latex: false,
+            geom: BoxGeom {
+                x: cx - w / 2.0,
+                y: cy - h / 2.0,
+                w,
+                h,
+                rot: 0.0,
+            },
+            text: text.chars().take(64).collect(),
+            size: (h * 0.7).max(4.0),
+            color,
+            stamp: Some(kind.to_ascii_lowercase()),
+        });
+        let id = self.add_box_item(data, now_ms).ok()?;
+        self.selection.clear();
+        self.bump();
+        Some(id)
+    }
+
+    /// Move, resize and rotate a stamp (one undo step): the box and its
+    /// rotation in radians; the fallback text follows the size.
+    pub fn set_stamp_geom(&mut self, id: &str, g: BoxGeom) {
+        if !finite_geom(&g) || g.h <= 0.0 {
+            return;
+        }
+        self.resize_text(id, g, (g.h * 0.7).max(4.0));
     }
 
     pub fn set_text_color(&mut self, id: &str, rgba: u32) {
@@ -2790,6 +2944,7 @@ impl<S: InkSink> Engine<S> {
                     asset: None,
                     latex: None,
                     media: None,
+                    stamp: None,
                     selected,
                 };
                 match &it.data {
@@ -2806,6 +2961,7 @@ impl<S: InkSink> Engine<S> {
                         size: Some(t.size),
                         color: Some(css_color(t.color)),
                         latex: t.latex.then_some(true),
+                        stamp: t.stamp.as_deref(),
                         ..base(&t.geom, "text")
                     },
                     ItemData::Image(i) => DomItem {
@@ -2871,6 +3027,7 @@ impl<S: InkSink> Engine<S> {
                         width: s.width,
                         opacity: s.opacity,
                         pts,
+                        brush: s.brush().key(),
                     }
                 }
                 ItemData::Text(t) => PreviewItem::Text {
@@ -2879,6 +3036,7 @@ impl<S: InkSink> Engine<S> {
                     size: t.size,
                     color: css_color(t.color),
                     latex: t.latex,
+                    stamp: t.stamp.as_deref(),
                 },
                 ItemData::Image(i) => PreviewItem::Image {
                     rect: rect(&i.geom),
@@ -2960,6 +3118,7 @@ impl<S: InkSink> Engine<S> {
                             width: st.width,
                             color: st.color,
                             opacity: st.opacity,
+                            brush: st.brush,
                         },
                         self.ink_clip,
                     );
@@ -2980,6 +3139,7 @@ impl<S: InkSink> Engine<S> {
                         width: 2.4 / zoom,
                         color: 0x3b82f6ff,
                         opacity: 0.9,
+                        brush: Brush::Pen,
                     });
                 }
                 Gesture::Shape {
@@ -2991,6 +3151,7 @@ impl<S: InkSink> Engine<S> {
                         width: st.width,
                         color: st.color,
                         opacity: st.opacity,
+                        brush: st.brush,
                     });
                 }
                 Gesture::Laser { points } => wet.push(laser_wet(points, now_ms, zoom)),
@@ -3004,6 +3165,19 @@ impl<S: InkSink> Engine<S> {
         });
         for l in &self.lasers {
             wet.push(laser_wet(&l.points, now_ms, zoom));
+        }
+        self.magic
+            .retain(|m| now_ms - m.lifted < MAGIC_HOLD_MS + MAGIC_FADE_MS);
+        for m in &self.magic {
+            let k = magic_fade(now_ms - m.lifted);
+            clip::push_wet(
+                &mut wet,
+                WetStroke {
+                    opacity: m.stroke.opacity * k,
+                    ..m.stroke.clone()
+                },
+                m.clip,
+            );
         }
         self.flash_wet(now_ms, &mut wet);
         if let Some(r) = &self.replay
@@ -3038,6 +3212,7 @@ impl<S: InkSink> Engine<S> {
         if snapped
             || revealing
             || !self.lasers.is_empty()
+            || !self.magic.is_empty()
             || !self.flashes.is_empty()
             || self
                 .gestures
@@ -3056,6 +3231,7 @@ impl<S: InkSink> Engine<S> {
         let r = Replay::new(items);
         let d = r.duration;
         self.replay = Some(r);
+        self.magic.clear();
         self.sink.clear();
         self.selection.clear();
         self.gestures.clear();
@@ -3111,7 +3287,15 @@ fn laser_wet(points: &[(StrokePoint, f64)], now_ms: f64, zoom: f32) -> WetStroke
         width: 9.0 / zoom,
         color: 0xff2d55ff,
         opacity: 0.85,
+        brush: Brush::Pen,
     }
+}
+
+/// Opacity factor of magic ink `age` ms after pen-up: full while it holds,
+/// then an ease-out fade to nothing.
+pub fn magic_fade(age: f64) -> f32 {
+    let t = ((age - MAGIC_HOLD_MS) / MAGIC_FADE_MS).clamp(0.0, 1.0) as f32;
+    (1.0 - t) * (1.0 - t)
 }
 
 #[cfg(test)]
@@ -3144,7 +3328,7 @@ pub(crate) mod tests {
     }
 
     impl Engine<MockSink> {
-        fn can_undo_for_tests(&self) -> bool {
+        pub(crate) fn can_undo_for_tests(&self) -> bool {
             self.lesson.can_undo()
         }
     }

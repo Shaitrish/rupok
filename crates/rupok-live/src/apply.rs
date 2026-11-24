@@ -335,6 +335,7 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
                 text: text.clone(),
                 size,
                 color,
+                stamp: None,
             });
             tag(ctx.lesson, msg);
             let item_id = ctx.lesson.add_item(&info.id, &data, now)?;
@@ -715,6 +716,7 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
                 text: text.clone(),
                 size,
                 color,
+                stamp: None,
             });
             let ids: Vec<String> = chosen.iter().map(|i| i.id.clone()).collect();
             tag(ctx.lesson, msg);
@@ -1418,6 +1420,7 @@ mod tests {
                 offset: [0.0, 0.0],
                 shape: None,
                 geom: None,
+                brush: None,
             });
             self.lesson
                 .add_item(&self.page.clone(), &data, 4_000.0)

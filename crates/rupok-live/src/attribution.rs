@@ -100,6 +100,7 @@ mod tests {
                     text: "mine".into(),
                     size: 32.0,
                     color: 0xff,
+                    stamp: None,
                 }),
                 2.0,
             )

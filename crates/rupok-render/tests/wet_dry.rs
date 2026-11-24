@@ -1,10 +1,11 @@
 //! Wet ink (dense, unsimplified points) and the same stroke dry (simplified)
 //! must look the same, or the stroke visibly changes at pen-up
-//! (docs/performance.md). Needs a GPU adapter; skipped without one.
+//! (docs/performance.md), for every brush. Needs a GPU adapter; skipped
+//! without one.
 
 use rupok_core::StrokeData;
-use rupok_ink::StrokePoint;
 use rupok_ink::simplify::simplify;
+use rupok_ink::{Brush, StrokePoint};
 use rupok_render::{Camera, Gpu, InkRenderer};
 
 const W: u32 = 320;
@@ -92,29 +93,43 @@ fn dense_wet_ink_matches_the_dry_stroke() {
     let cam = Camera::default();
     let pts = dense_wave();
 
-    for width in [3.0f32, 8.0] {
+    for (brush, width) in Brush::ALL.into_iter().flat_map(|b| [(b, 3.0f32), (b, 8.0)]) {
         // Wet: every sample.
-        let mut r = InkRenderer::new(&gpu.device, format);
-        r.set_wet(&pts, width, 0x1c2024ff, 1.0);
+        let mut r = InkRenderer::new(&gpu.device, &gpu.queue, format);
+        r.set_wet(&pts, width, brush, 0x1c2024ff, 1.0);
         r.render(&gpu.device, &gpu.queue, &view, W, H, cam, 1.0);
         let wet = read_alpha(&gpu, &target);
 
-        // Dry: simplified as on pen-up.
-        let mut r = InkRenderer::new(&gpu.device, format);
+        // Dry: simplified as on pen-up (`StrokeBuilder::finish`).
+        let mut r = InkRenderer::new(&gpu.device, &gpu.queue, format);
         let s = StrokeData {
             tool: "pen".into(),
             color: 0x1c2024ff,
             width,
             opacity: 1.0,
-            points: simplify(&pts, 0.2, 0.06),
+            points: if brush.keeps_every_point() {
+                pts.clone()
+            } else {
+                simplify(&pts, 0.2, 0.06)
+            },
             offset: [0.0, 0.0],
             shape: None,
             geom: None,
+            brush: Some(brush.as_str().into()),
         };
         r.add_stroke("s", &s);
         r.render(&gpu.device, &gpu.queue, &view, W, H, cam, 1.0);
         let dry = read_alpha(&gpu, &target);
 
+        // RUPOK_WETDRY_DUMP=dir writes both as PGM images to look at.
+        if let Ok(dir) = std::env::var("RUPOK_WETDRY_DUMP") {
+            for (name, img) in [("wet", &wet), ("dry", &dry)] {
+                let mut f = format!("P5 {W} {H} 255\n").into_bytes();
+                f.extend_from_slice(img);
+                let path = format!("{dir}/{}-{width}-{name}.pgm", brush.as_str());
+                std::fs::write(path, f).expect("dump");
+            }
+        }
         let inked = wet
             .iter()
             .zip(&dry)
@@ -125,10 +140,14 @@ fn dense_wet_ink_matches_the_dry_stroke() {
             .zip(&dry)
             .filter(|(a, b)| a.abs_diff(**b) > 64)
             .count();
-        assert!(inked > 500, "stroke did not render ({inked} px)");
+        assert!(inked > 500, "{brush:?}: stroke did not render ({inked} px)");
+        eprintln!(
+            "{:<10} width {width}: {changed} of {inked} px differ",
+            brush.as_str()
+        );
         assert!(
             changed * 200 <= inked,
-            "width {width}: {changed} of {inked} px differ between wet and dry"
+            "{brush:?} width {width}: {changed} of {inked} px differ between wet and dry"
         );
     }
 }

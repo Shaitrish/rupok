@@ -386,6 +386,7 @@ pub fn run(
                 offset: [0.0, 0.0],
                 shape: None,
                 geom: None,
+                brush: None,
             }),
             created: now + s.start_ms,
             group: Some(group.clone()),
@@ -516,6 +517,7 @@ mod tests {
                     offset: [0.0, 0.0],
                     shape: None,
                     geom: None,
+                    brush: None,
                 });
                 ids.push(self.lesson.add_item(&self.page, &d, 2_000.0).unwrap());
             }
