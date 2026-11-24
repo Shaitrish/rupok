@@ -1033,6 +1033,12 @@ fn shape_geom_value(g: &ShapeGeom) -> LoroValue {
     if let Some(id) = &g.to {
         f.set("to", id.as_str());
     }
+    if let Some(c) = g.fill {
+        f.set("fill", i64::from(c));
+    }
+    if g.dash {
+        f.set("dash", true);
+    }
     f.into_value()
 }
 
@@ -1064,6 +1070,9 @@ fn read_shape_geom(m: &impl Fields) -> Option<ShapeGeom> {
         // A malformed link reads as no link (the connector stays put).
         from: str_of(&g, "from").filter(|s| !s.is_empty() && s.len() <= 256),
         to: str_of(&g, "to").filter(|s| !s.is_empty() && s.len() <= 256),
+        // A malformed style reads as none.
+        fill: u32_of(&g, "fill"),
+        dash: matches!(g.get("dash"), Some(LoroValue::Bool(true))),
     };
     geom.is_valid().then_some(geom)
 }
@@ -1222,8 +1231,42 @@ mod tests {
             v: vec![0.5, 0.0, 1.0, 1.0, 0.0, 1.0],
             from: None,
             to: Some("box-2".into()),
+            ..Default::default()
         });
         s
+    }
+
+    #[test]
+    fn shape_fill_and_dash_round_trip_and_bad_style_reads_as_none() {
+        let mut l = Lesson::new("t", 0.0);
+        let p = l.page_id_at(0).unwrap();
+        let mut s = shape_stroke();
+        let g = s.geom.as_mut().unwrap();
+        g.fill = Some(0xa7f3d080);
+        g.dash = true;
+        let id = l.add_item(&p, &ItemData::Stroke(s.clone()), 1.0).unwrap();
+        let back = Lesson::load(&l.save()).unwrap().item(&p, &id).unwrap();
+        assert_eq!(back.data, ItemData::Stroke(s.clone()));
+        // No style: no keys written.
+        let LoroValue::Map(plain) = shape_geom_value(shape_stroke().geom.as_ref().unwrap()) else {
+            panic!()
+        };
+        assert!(plain.get("fill").is_none() && plain.get("dash").is_none());
+        // A string fill or a non-bool dash reads as no style, keeping the geometry.
+        let mut f = ValueFields::default();
+        f.set("kind", "rect");
+        for k in ["x", "y", "w", "h"] {
+            f.set(k, 10.0);
+        }
+        f.set("fill", "red");
+        f.set("dash", 1i64);
+        let mut m = ValueFields::default();
+        m.set("geom", f.into_value());
+        let LoroValue::Map(mv) = m.into_value() else {
+            panic!()
+        };
+        let g = read_shape_geom(&mv).unwrap();
+        assert_eq!((g.fill, g.dash), (None, false));
     }
 
     #[test]

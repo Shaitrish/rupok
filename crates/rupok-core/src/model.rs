@@ -140,6 +140,9 @@ pub struct StrokeData {
 ///
 /// `from` / `to` link a connector (`line`, `arrow`) to the items its ends
 /// are attached to, so it follows them when they move.
+///
+/// `fill` and `dash` are style: a soft fill under a closed shape and a dashed
+/// outline. They travel with the geometry (a cut shape loses both).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct ShapeGeom {
     pub kind: String,
@@ -155,6 +158,13 @@ pub struct ShapeGeom {
     pub from: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
+    /// Fill colour (0xRRGGBBAA) of a closed shape, drawn under the ink
+    /// (the optional `fill` key, proposed, pending RFC).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<u32>,
+    /// Draw the outline dashed (the optional `dash` key, proposed, pending RFC).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dash: bool,
 }
 
 impl ShapeGeom {
