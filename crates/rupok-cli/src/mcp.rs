@@ -107,6 +107,27 @@ impl McpServer {
     }
 }
 
+impl McpServer {
+    async fn add_media_impl(&self, p: AddMediaParams) -> CallToolResult {
+        if is_live(&p.path) {
+            let tools = self.tools.clone();
+            let q = p.clone();
+            let input = tokio::task::spawn_blocking(move || tools.media_input(&q)).await;
+            return match input {
+                Ok(Ok(input)) => {
+                    self.live_call(crate::mcp_live::op_add_media(&p, input))
+                        .await
+                }
+                Ok(Err(e)) => CallToolResult::structured_error(error_json(&e)),
+                Err(e) => {
+                    CallToolResult::error(vec![ContentBlock::text(format!("internal error: {e}"))])
+                }
+            };
+        }
+        self.run(move |t| t.add_media(p)).await
+    }
+}
+
 #[tool_router]
 impl McpServer {
     #[tool(
@@ -195,6 +216,68 @@ update_smart_object), the placed geometry and any warnings. Default size 1280×7
                 .await;
         }
         self.run(move |t| t.add_smart_object(p)).await
+    }
+
+    #[tool(
+        description = "Put a YouTube video on a page by its link. It plays in class from youtube-nocookie.com \
+(privacy-enhanced) with a poster picture, start/end times (a `t=` in the link sets the start), mute, loop and \
+autoplay when the page is shown; offline, the board shows the poster and says it needs internet. Returns the item id.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn add_youtube(&self, Parameters(p): Parameters<AddYoutubeParams>) -> CallToolResult {
+        self.add_media_impl(p.into()).await
+    }
+
+    #[tool(
+        description = "Put a video, audio clip or trusted web embed on a page. Either `file`: an mp4, webm, mp3, \
+m4a, ogg or wav in the workspace, stored inside the lesson so it plays offline (keep it small; 200 MB at most); or \
+`url`: a YouTube link or a page on PhET, GeoGebra, Desmos, published Google Slides/Docs/Sheets/Forms, Wikipedia or \
+Khan Academy (other sites are refused: write the link as text instead). Returns the item id, kind and stored src.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn add_media(&self, Parameters(p): Parameters<AddMediaParams>) -> CallToolResult {
+        self.add_media_impl(p).await
+    }
+
+    #[tool(
+        description = "Put a 3D model on a page: a glTF 2.0 `.glb` (or a `.gltf` with everything embedded) from \
+the workspace, at most 18 MB. It becomes a built-in Smart Object viewer that works offline: orbit, zoom, pan, \
+auto-rotate, reset view, the model's own animations, light/dark backdrop, and saved views the teacher steps through \
+with the clicker. Returns item_id and bundle_id.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn add_3d_model(&self, Parameters(p): Parameters<AddModelParams>) -> CallToolResult {
+        if is_live(&p.path) {
+            let tools = self.tools.clone();
+            let file = p.file.clone();
+            let read = tokio::task::spawn_blocking(move || {
+                tools.read_workspace_file(&file, rupok_format::model3d::MAX_MODEL_BYTES)
+            })
+            .await;
+            return match read {
+                Ok(Ok((bytes, name))) => {
+                    self.live_call(crate::mcp_live::op_add_model(&p, &bytes, name))
+                        .await
+                }
+                Ok(Err(e)) => CallToolResult::structured_error(error_json(&e)),
+                Err(e) => {
+                    CallToolResult::error(vec![ContentBlock::text(format!("internal error: {e}"))])
+                }
+            };
+        }
+        self.run(move |t| t.add_model(p)).await
     }
 
     #[tool(

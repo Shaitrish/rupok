@@ -252,6 +252,59 @@ pub enum Op {
         #[serde(default)]
         network_hosts: Option<Vec<String>>,
     },
+    /// A YouTube video or a trusted web embed (PhET, GeoGebra, Desmos,
+    /// Google Slides/Docs, Wikipedia, Khan Academy) by `url`, or a video or
+    /// audio file (`file_base64`) stored in the lesson.
+    AddMedia {
+        #[serde(default)]
+        page: Option<u32>,
+        #[serde(default)]
+        url: Option<String>,
+        #[serde(default)]
+        file_base64: Option<String>,
+        #[serde(default)]
+        file_name: Option<String>,
+        #[serde(default)]
+        title: Option<String>,
+        /// Play from / to, seconds.
+        #[serde(default)]
+        start: Option<f64>,
+        #[serde(default)]
+        end: Option<f64>,
+        #[serde(default)]
+        muted: Option<bool>,
+        #[serde(default, rename = "loop")]
+        looped: Option<bool>,
+        #[serde(default)]
+        autoplay: Option<bool>,
+        #[serde(default)]
+        x: Option<f64>,
+        #[serde(default)]
+        y: Option<f64>,
+        #[serde(default)]
+        width: Option<f64>,
+        #[serde(default)]
+        height: Option<f64>,
+    },
+    /// A 3D model (`.glb`, or `.gltf` with everything embedded) as the
+    /// built-in viewer Smart Object.
+    AddModel {
+        #[serde(default)]
+        page: Option<u32>,
+        file_base64: String,
+        #[serde(default)]
+        file_name: Option<String>,
+        #[serde(default)]
+        title: Option<String>,
+        #[serde(default)]
+        x: Option<f64>,
+        #[serde(default)]
+        y: Option<f64>,
+        #[serde(default)]
+        width: Option<f64>,
+        #[serde(default)]
+        height: Option<f64>,
+    },
     UpdateSmartObject {
         bundle_id: String,
         html: String,
@@ -365,6 +418,8 @@ impl Op {
             Op::AddText { .. } => "add_text",
             Op::AddSmartObject { .. } => "add_smart_object",
             Op::UpdateSmartObject { .. } => "update_smart_object",
+            Op::AddMedia { .. } => "add_media",
+            Op::AddModel { .. } => "add_model",
             Op::DeleteItem { .. } => "delete_item",
             Op::SetPageBackground { .. } => "set_page_background",
             Op::SetPageDesign(_) => "set_page_design",
@@ -408,6 +463,8 @@ impl Op {
             Op::AddText { .. } => "added text",
             Op::AddSmartObject { .. } => "added a Smart Object",
             Op::UpdateSmartObject { .. } => "updated a Smart Object",
+            Op::AddMedia { .. } => "added media",
+            Op::AddModel { .. } => "added a 3D model",
             Op::DeleteItem { .. } => "deleted an item",
             Op::SetPageBackground { .. } => "changed the background",
             Op::SetPageDesign(_) => "changed the page design",

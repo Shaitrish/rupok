@@ -6,6 +6,7 @@
 import { For, Match, Show, Switch, createEffect, onCleanup, onMount } from "solid-js";
 import { controller } from "../controller";
 import { renderTex } from "../katex";
+import { MediaItem } from "./MediaItem";
 import { BOARD_COLORS, type DomItem, editingText, items, pageIndex, pages, setEditingText, tool } from "../state";
 import { brandingFor, designPreview, lessonBranding } from "../design";
 import { PageBackdrop } from "./PageBackdrop";
@@ -177,6 +178,9 @@ export default function World(props: { ref: (el: HTMLDivElement) => void }) {
               >
                 <ObjectItem item={item} />
               </div>
+            </Match>
+            <Match when={item.kind === "image" && item.media}>
+              <MediaItem item={item} />
             </Match>
             <Match when={item.kind === "image"}>
               <div

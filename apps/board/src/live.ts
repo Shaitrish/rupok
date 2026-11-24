@@ -100,7 +100,7 @@ const LABELS: Record<string, string> = {
   delete_item: "deleted an item", set_page_background: "changed the background",
   set_page_design: "changed the page design", set_branding: "changed the branding",
   replace_items_with_text: "turned ink into text", step_object: "stepped a Smart Object",
-  write_handwriting: "is writing on the board",
+  write_handwriting: "is writing on the board", add_media: "added media", add_model: "added a 3D model",
 };
 export const opLabel = (op: any) => LABELS[op?.op] ?? "is working";
 

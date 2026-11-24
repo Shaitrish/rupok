@@ -532,7 +532,15 @@ mod tests {
         let mut pkg = Package::from_lesson(&lesson, "test", 2.0);
         let asset = pkg.add_asset(vec![9; 16], "png");
         lesson
-            .add_item(&p2, &ItemData::Image(ImageData { geom: g, asset }), 3.0)
+            .add_item(
+                &p2,
+                &ItemData::Image(ImageData {
+                    geom: g,
+                    asset,
+                    media: None,
+                }),
+                3.0,
+            )
             .unwrap();
         lesson
             .add_item(

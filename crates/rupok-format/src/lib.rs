@@ -14,6 +14,8 @@
 //! layers/<peer>.loro   optional student annotation layers
 //! ```
 
+pub mod media;
+pub mod model3d;
 pub mod object;
 pub mod package;
 pub mod readable;

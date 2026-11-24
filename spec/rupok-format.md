@@ -398,6 +398,51 @@ Box geometry, plus:
 | Key | Type | Req. | Default | Meaning |
 |---|---|---|---|---|
 | `asset` | `String` | yes | `""` | Asset name `<blake3>.<ext>`; the bytes are at `assets/<asset>`. |
+| `media` | `Map` | no | absent | Makes the image the poster of a video, an audio clip or a web embed. See [Media items](#media-items). |
+
+##### Media items
+
+> **Status: proposed, pending RFC.** An additive, optional key, approved for
+> the reference implementation; the normative wording below is a draft for
+> the format RFC (see ROADMAP).
+
+A **media item** is an `image` item with a `media` map. Its `asset` is the
+**poster**: the picture shown before it plays, offline, in thumbnails and in
+PDF exports. A reader that does not know `media` shows the poster as a plain
+image, so older readers degrade gracefully, and writers MUST always give a
+media item a poster.
+
+| Key | Type | Req. | Default | Meaning |
+|---|---|---|---|---|
+| `type` | `String` | yes | none | `youtube`, `video`, `audio` or `web`. |
+| `src` | `String` | yes | none | `youtube`, `web`: a canonical `https` link (below). `video`, `audio`: an asset name `<blake3>.<ext>`; the clip is at `assets/<src>`. At most 2048 bytes. |
+| `title` | `String` | no | `""` | Title for people and the readable outline. At most 300 bytes. |
+| `site` | `String` | no | `""` | The trusted site of a `web` embed (`phet`, `geogebra`, `desmos`, `google`, `wikipedia`, `khan`), or `youtube`. |
+| `start`, `end` | `f64` | no | absent | Play from / to, seconds, in `[0, 86400]`; `end > start` when both are present. |
+| `muted` | `bool` | no | `false` | Start muted. |
+| `loop` | `bool` | no | `false` | Play again from `start` at the end. |
+| `autoplay` | `bool` | no | `false` | Start playing when the page is shown while presenting. |
+
+- Writers omit `title`, `site` and the flags when empty or false.
+- `youtube` links are stored as `https://www.youtube.com/watch?v=<id>` (an
+  11-character id); `web` links in the canonical form of their site.
+- Readers MUST treat a malformed `media` map (a missing `type` or `src`, an
+  unknown `type`, non-finite or out-of-order times) as absent: the item is
+  then its poster image. Readers MUST ignore unknown keys inside it.
+- A clip named by `src` is an asset like any other (content-addressed,
+  sniffed by content, never trusted by extension). Readers SHOULD accept
+  MP4/M4A, WebM, Ogg, MP3 and WAV. The reference writer refuses clips over
+  200 MiB.
+- **Hosts never embed `src` as is.** A host that plays `youtube` and `web`
+  items MUST re-check the link against its own allowlist of trusted sites
+  and build the frame URL itself; it MUST NOT load a link from a package in
+  a frame that shares the host's origin. The reference allowlist and URL
+  builder is `crates/rupok-format/src/media.rs`: YouTube (played from
+  `youtube-nocookie.com`), PhET, GeoGebra, Desmos, published Google
+  Slides/Docs/Sheets/Forms, Wikipedia and Khan Academy. Links to other sites
+  are not embedded.
+- 3D models are not media items: they are Smart Objects (a viewer bundle with
+  the model inside), see `spec/smart-object.md`.
 
 #### `kind: "object"` (Smart Object)
 
@@ -695,6 +740,8 @@ to bottom, then left to right):
 - shapes and Smart Ink templates by `shape` value and plain-English name
   (`axes` → "coordinate axes", `and-gate` → "AND gate"), in stacking order;
 - images by entry path (`assets/<asset>`) and size;
+- media items (proposed, pending RFC) by kind, title, link (`youtube`, `web`)
+  or clip entry path (`video`, `audio`), and start/end times;
 - Smart Objects by title, step count, the bundle's `description` and the
   entry HTML path (`objects/<bundle>/<entry>`).
 
@@ -708,8 +755,10 @@ optional `title`, `layout` (`slide` with `width`/`height`, or `board`),
 page's own) and `branding_hidden`, `text`
 (`[{text, latex?}]`), `ink` (`{strokes, highlighter?, recognized?:
 [{latex, confidence, strokes}]}`), `shapes` (`[{kind, name, count}]`),
-`images` (`[{file, width, height}]`) and `objects` (`[{title, bundle,
-steps, description?, html?}]`). Readers MUST ignore unknown keys.
+`images` (`[{file, width, height}]`), optional `media` (`[{kind, title?,
+url?, file?, site?, start?, end?, poster?}]`, proposed, pending RFC) and
+`objects` (`[{title, bundle, steps, description?, html?}]`). Readers MUST
+ignore unknown keys.
 
 ## Reader limits and safety
 

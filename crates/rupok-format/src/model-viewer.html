@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{TITLE}}</title>
+<style>
+  :root { --bg: var(--rupok-color-bg, #ffffff); --fg: var(--rupok-color-fg, #111418); --muted: var(--rupok-color-muted, #5f6670);
+          --line: var(--rupok-color-line, rgba(17,20,24,.12)); --accent: var(--rupok-color-accent, #0ca678);
+          --on-accent: var(--rupok-color-on-accent, #04241b); --soft: var(--rupok-color-accent-soft, #e6fcf5);
+          --btn: clamp(56px, 8.4vmin, 104px); }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--stage, var(--bg)); color: var(--fg);
+               font-family: var(--rupok-font-body, system-ui, sans-serif); -webkit-user-select: none; user-select: none; }
+  body[data-bg="light"] { --stage: #f1f3f5; --fg: #111418; --muted: #5f6670; --line: rgba(17,20,24,.12); }
+  body[data-bg="dark"] { --stage: #15171a; --fg: #eef0f2; --muted: #a6adb7; --line: rgba(255,255,255,.16); }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+  .title { position: absolute; left: 2.4vmin; top: 2.2vmin; font-size: clamp(18px, 3.4vmin, 44px); font-weight: 700; letter-spacing: -.01em;
+           pointer-events: none; max-width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .title small { display: block; font-weight: 500; color: var(--muted); font-size: .72em; margin-top: 2px; }
+  .bar { position: absolute; left: 50%; bottom: 2.2vmin; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px;
+         border-radius: calc(var(--btn) / 2 + 6px); background: var(--stage, var(--bg)); box-shadow: 0 0 0 1px var(--line), 0 6px 20px rgba(0,0,0,.10);
+         max-width: calc(100% - 24px); overflow-x: auto; scrollbar-width: none; }
+  button { all: unset; box-sizing: border-box; min-width: var(--btn); height: var(--btn); border-radius: calc(var(--btn) / 2); display: inline-flex;
+           align-items: center; justify-content: center; gap: 8px; padding: 0 calc(var(--btn) * .25); color: var(--fg); cursor: pointer; font-size: calc(var(--btn) * .3);
+           font-weight: 600; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+  button:hover { background: var(--line); }
+  button:focus-visible { box-shadow: inset 0 0 0 3px var(--accent); }
+  button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+  button[hidden] { display: none; }
+  button svg { width: calc(var(--btn) * .44); height: calc(var(--btn) * .44); flex: none; }
+  .sep { width: 1px; align-self: stretch; margin: 8px 2px; background: var(--line); flex: none; }
+  .views { position: absolute; right: 2.4vmin; top: 2.2vmin; font-size: clamp(16px, 2.8vmin, 32px); font-weight: 650; padding: 6px 12px; border-radius: 999px;
+           background: var(--soft); color: var(--fg); font-variant-numeric: tabular-nums; }
+  .msg { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; font-size: clamp(14px, 2.4vmin, 22px); color: var(--muted); }
+  .msg b { display: block; color: var(--fg); margin-bottom: 6px; }
+  .spin { width: 40px; height: 40px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--accent); animation: s 0.9s linear infinite; margin: 0 auto 12px; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+</style>
+</head>
+<body data-bg="theme">
+<script type="application/octet-stream" id="rupok-model" data-format="{{FORMAT}}" data-file="{{FILE}}">{{MODEL}}</script>
+<canvas id="c" tabindex="0" aria-label="3D model: {{TITLE}}. Drag to turn, pinch or scroll to zoom."></canvas>
+<div class="title">{{TITLE}}<small>{{FILE}}</small></div>
+<div class="views" id="views" hidden></div>
+<div class="msg" id="msg"><div><div class="spin"></div>Loading the model…</div></div>
+<div class="bar" id="bar" hidden>
+  <button id="reset" title="Reset view" aria-label="Reset view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg></button>
+  <button id="spin" title="Auto-rotate" aria-label="Auto-rotate" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="9" ry="4"/><path d="M12 3v18"/><path d="M17 7l2 1-1 2"/></svg></button>
+  <button id="zin" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M20 20l-4-4"/></svg></button>
+  <button id="zout" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-4-4"/></svg></button>
+  <span class="sep" id="animsep" hidden></span>
+  <button id="anim" title="Play animation" aria-label="Play animation" aria-pressed="false" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span id="animname"></span></button>
+  <button id="clip" title="Next animation" aria-label="Next animation" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>
+  <span class="sep"></span>
+  <button id="bg" title="Backdrop: page, light or dark" aria-label="Backdrop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+  <button id="save" title="Save this angle as the next step (the clicker goes through saved views)" aria-label="Save view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Save view</span></button>
+  <button id="forget" title="Forget saved views" aria-label="Forget saved views" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h14M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+</div>
+<script type="module">
+import * as THREE from "rupoklib://three/three.module.js";
+import { OrbitControls } from "rupoklib://three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "rupoklib://three/addons/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "rupoklib://three/addons/environments/RoomEnvironment.js";
+
+const R = window.rupok || { ready: Promise.resolve({}), state: { load() {}, save() {} }, steps: { current: 0, onChange() {}, setCount() {}, goto() {} }, theme: { onChange() {} } };
+const $ = (id) => document.getElementById(id);
+const msg = (html) => { $("msg").innerHTML = html; $("msg").hidden = !html; };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+const canvas = $("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NeutralToneMapping;
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.7;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.35));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(3, 5, 4);
+scene.add(sun);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 1000);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.autoRotateSpeed = 1.6;
+let dirty = true;
+controls.addEventListener("change", () => (dirty = true));
+
+let home = null; // { pos, target } of the fitted view
+let state = { views: [], bg: "theme", spin: false };
+let mixer = null, clips = [], clipIndex = 0, action = null, playing = false;
+let tween = null;
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h);
+  camera.updateProjectionMatrix();
+  dirty = true;
+}
+addEventListener("resize", resize);
+resize();
+
+function fit(object) {
+  const box = new THREE.Box3().setFromObject(object);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const radius = Math.max(size.length() / 2, 1e-3);
+  const dist = radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.05;
+  camera.near = dist / 100;
+  camera.far = dist * 100;
+  camera.updateProjectionMatrix();
+  const dir = new THREE.Vector3(0.9, 0.55, 1.2).normalize();
+  home = { pos: center.clone().addScaledVector(dir, dist).toArray(), target: center.toArray() };
+  controls.minDistance = radius * 0.2;
+  controls.maxDistance = dist * 8;
+  jump(home);
+}
+
+function jump(v) {
+  camera.position.fromArray(v.pos);
+  controls.target.fromArray(v.target);
+  controls.update();
+  dirty = true;
+}
+
+function flyTo(v) {
+  if (!v) return;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) return jump(v);
+  tween = { t0: performance.now(), from: { pos: camera.position.toArray(), target: controls.target.toArray() }, to: v };
+}
+
+function view() { return { pos: camera.position.toArray().map((n) => +n.toFixed(4)), target: controls.target.toArray().map((n) => +n.toFixed(4)) }; }
+
+function applyStep(n) {
+  const v = n > 0 ? state.views[n - 1] : home;
+  flyTo(v);
+  showViews();
+}
+
+function showViews() {
+  const n = state.views.length;
+  $("views").hidden = n === 0;
+  $("views").textContent = `View ${Math.min(R.steps.current || 0, n)} / ${n}`;
+  $("forget").hidden = n === 0;
+}
+
+function save() { try { R.state.save(state); } catch {} }
+
+function setBg(bg) {
+  state.bg = bg;
+  document.body.dataset.bg = bg;
+  dirty = true;
+}
+
+function setSpin(on) {
+  state.spin = on;
+  controls.autoRotate = on;
+  $("spin").setAttribute("aria-pressed", String(on));
+}
+
+function setClip(i) {
+  if (!clips.length) return;
+  clipIndex = (i + clips.length) % clips.length;
+  if (action) action.stop();
+  action = mixer.clipAction(clips[clipIndex]);
+  action.play();
+  action.paused = !playing;
+  $("animname").textContent = clips.length > 1 ? (clips[clipIndex].name || `Animation ${clipIndex + 1}`) : "";
+}
+
+function setPlaying(on) {
+  playing = on;
+  if (action) action.paused = !on;
+  $("anim").setAttribute("aria-pressed", String(on));
+  $("anim").title = on ? "Pause animation" : "Play animation";
+  $("anim").querySelector("svg").innerHTML = on ? '<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+}
+
+$("reset").onclick = () => { flyTo(home); };
+$("spin").onclick = () => { setSpin(!state.spin); save(); };
+$("zout").onclick = () => zoom(1.25);
+function zoom(f) {
+  const d = camera.position.clone().sub(controls.target).multiplyScalar(f);
+  const len = THREE.MathUtils.clamp(d.length(), controls.minDistance, controls.maxDistance);
+  camera.position.copy(controls.target).add(d.setLength(len));
+  controls.update();
+  dirty = true;
+}
+$("zin").onclick = () => zoom(0.8);
+$("bg").onclick = () => { setBg({ theme: "light", light: "dark", dark: "theme" }[state.bg] || "theme"); save(); };
+$("anim").onclick = () => setPlaying(!playing);
+$("clip").onclick = () => setClip(clipIndex + 1);
+$("save").onclick = () => {
+  if (state.views.length >= 50) return;
+  state.views.push(view());
+  save();
+  R.steps.setCount(state.views.length);
+  R.steps.goto(state.views.length);
+  showViews();
+};
+$("forget").onclick = () => {
+  state.views = [];
+  save();
+  R.steps.setCount(0);
+  R.steps.goto(0);
+  showViews();
+};
+
+function b64ToBuffer(b64) {
+  const bin = atob(b64.replace(/\s+/g, ""));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+}
+
+async function load() {
+  const el = $("rupok-model");
+  const data = b64ToBuffer(el.textContent);
+  el.textContent = "";
+  // Embedded textures: the sandbox has no `connect-src`, so the loader must
+  // decode pictures with <img> (img-src blob:) rather than fetch().
+  try { window.createImageBitmap = undefined; } catch {}
+  const loader = new GLTFLoader();
+  const gltf = await new Promise((ok, fail) => {
+    const src = el.dataset.format === "gltf" ? new TextDecoder().decode(data) : data;
+    loader.parse(src, "", ok, fail);
+  });
+  const root = gltf.scene || gltf.scenes?.[0];
+  if (!root) throw new Error("the file has no scene");
+  scene.add(root);
+  clips = gltf.animations || [];
+  if (clips.length) {
+    mixer = new THREE.AnimationMixer(root);
+    setClip(0);
+    setPlaying(false);
+    $("anim").hidden = false;
+    $("animsep").hidden = false;
+    $("clip").hidden = clips.length < 2;
+  }
+  fit(root);
+}
+
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  if (tween) {
+    const k = Math.min(1, (now - tween.t0) / 700);
+    const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+    const lerp = (a, b) => a.map((v, i) => v + (b[i] - v) * e);
+    camera.position.fromArray(lerp(tween.from.pos, tween.to.pos));
+    controls.target.fromArray(lerp(tween.from.target, tween.to.target));
+    if (k >= 1) tween = null;
+    dirty = true;
+  }
+  if (mixer && playing) { mixer.update(dt); dirty = true; }
+  if (controls.update() || controls.autoRotate) dirty = true;
+  if (dirty) { renderer.render(scene, camera); dirty = false; }
+}
+
+R.theme.onChange?.(() => (dirty = true));
+R.steps.onChange?.((n) => applyStep(n));
+
+(async () => {
+  try {
+    await load();
+  } catch (e) {
+    msg(`<div><b>Could not open this model</b>${esc((e && e.message) || e)}</div>`);
+    return;
+  }
+  msg("");
+  $("bar").hidden = false;
+  await R.ready;
+  const saved = R.state.load();
+  if (saved && typeof saved === "object") {
+    if (Array.isArray(saved.views)) state.views = saved.views.filter((v) => v && Array.isArray(v.pos) && Array.isArray(v.target)).slice(0, 50);
+    if (["theme", "light", "dark"].includes(saved.bg)) setBg(saved.bg);
+    setSpin(!!saved.spin);
+  }
+  if (state.views.length) R.steps.setCount(state.views.length);
+  const n = R.steps.current || 0;
+  if (n > 0 && state.views[n - 1]) jump(state.views[n - 1]);
+  showViews();
+})();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

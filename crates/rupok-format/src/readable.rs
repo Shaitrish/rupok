@@ -118,6 +118,9 @@ pub struct PageContent {
     /// Shapes and Smart Ink diagram templates, by kind.
     pub shapes: Vec<ShapeEntry>,
     pub images: Vec<ImageEntry>,
+    /// Videos, audio clips and web embeds (proposed, pending RFC).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub media: Vec<MediaEntry>,
     pub objects: Vec<ObjectEntry>,
 }
 
@@ -215,6 +218,31 @@ pub struct ImageEntry {
     pub file: String,
     pub width: f64,
     pub height: f64,
+}
+
+/// A media item: what plays, where to find it, and its poster.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct MediaEntry {
+    /// `youtube`, `video`, `audio` or `web`.
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub title: String,
+    /// The link, for `youtube` and `web`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub url: String,
+    /// The clip inside the package, `assets/<blake3>.<ext>`, for `video` and `audio`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub file: String,
+    /// Trusted site of a web embed (`phet`, `geogebra`, …).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub site: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<f64>,
+    /// The poster picture, `assets/<blake3>.<ext>`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub poster: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -320,7 +348,34 @@ impl Outline {
                             latex: *latex,
                         });
                     }
-                    LiteKind::Image { asset } => {
+                    LiteKind::Image {
+                        asset,
+                        media: Some(m),
+                    } => {
+                        if page.media.len() >= MAX_PER_PAGE {
+                            out.truncated = true;
+                            continue;
+                        }
+                        let (url, file) = match m.src_asset() {
+                            Some(a) => (String::new(), format!("assets/{}", cap(a, MAX_TITLE))),
+                            None => (cap(&m.src, 2048), String::new()),
+                        };
+                        page.media.push(MediaEntry {
+                            kind: m.kind.clone(),
+                            title: cap(&m.title, MAX_TITLE),
+                            url,
+                            file,
+                            site: m.site.clone(),
+                            start: m.start,
+                            end: m.end,
+                            poster: if asset.is_empty() {
+                                String::new()
+                            } else {
+                                format!("assets/{}", cap(asset, MAX_TITLE))
+                            },
+                        });
+                    }
+                    LiteKind::Image { asset, media: None } => {
                         if page.images.len() >= MAX_PER_PAGE {
                             out.truncated = true;
                             continue;
@@ -505,6 +560,7 @@ enum LiteKind {
     },
     Image {
         asset: String,
+        media: Option<rupok_core::MediaData>,
     },
     Object {
         bundle: String,
@@ -559,6 +615,7 @@ fn read_lite(id: &str, m: &LoroMapValue) -> Option<Lite> {
         },
         "image" => LiteKind::Image {
             asset: text("asset").unwrap_or_default(),
+            media: m.get("media").and_then(rupok_core::media_from_value),
         },
         "object" => LiteKind::Object {
             bundle: text("bundle").unwrap_or_default(),
@@ -794,6 +851,7 @@ fn page_md(s: &mut String, p: &PageContent) {
         && p.ink.highlighter == 0
         && p.shapes.is_empty()
         && p.images.is_empty()
+        && p.media.is_empty()
         && p.objects.is_empty();
     if empty {
         s.push_str("_(empty page)_\n");
@@ -854,6 +912,44 @@ fn page_md(s: &mut String, p: &PageContent) {
             "- Image: `{}` ({} × {})",
             img.file, img.width, img.height
         );
+    }
+    for m in &p.media {
+        let what = match m.kind.as_str() {
+            "youtube" => "YouTube video".to_string(),
+            "video" => "Video".to_string(),
+            "audio" => "Audio".to_string(),
+            _ => match crate::media::site(&m.site) {
+                Some(site) => format!("Web embed ({})", site.name),
+                None => "Web embed".to_string(),
+            },
+        };
+        let _ = write!(s, "- {what}");
+        if !m.title.is_empty() {
+            let _ = write!(s, ": **{}**", md_line(&m.title));
+        }
+        if !m.url.is_empty() {
+            let _ = write!(s, " <{}>", m.url.replace(['<', '>', ' '], ""));
+        }
+        if !m.file.is_empty() {
+            let _ = write!(s, " `{}`", m.file);
+        }
+        let clock = |t: f64| {
+            let t = t.max(0.0).round() as u64;
+            format!("{}:{:02}", t / 60, t % 60)
+        };
+        match (m.start, m.end) {
+            (Some(a), Some(b)) => {
+                let _ = write!(s, " (plays {} to {})", clock(a), clock(b));
+            }
+            (Some(a), None) => {
+                let _ = write!(s, " (from {})", clock(a));
+            }
+            (None, Some(b)) => {
+                let _ = write!(s, " (until {})", clock(b));
+            }
+            _ => {}
+        }
+        s.push('\n');
     }
     for o in &p.objects {
         let _ = write!(s, "- Smart Object: **{}** (", md_line(&o.title));

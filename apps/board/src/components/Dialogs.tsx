@@ -2,6 +2,7 @@ import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { controller } from "../controller";
 import { Icon } from "./Icon";
 import { PresetGallery } from "./PresetGallery";
+import { MediaGallery } from "./MediaDialog";
 import { APP_SLUG } from "../brand";
 
 const SAMPLE = `<!doctype html>
@@ -56,7 +57,7 @@ const SAMPLE = `<!doctype html>
 </body>
 </html>`;
 
-function Dialog(props: { icon: any; title: string; sub: any; width?: number; onClose: () => void; children: any }) {
+export function Dialog(props: { icon: any; title: string; sub: any; width?: number; onClose: () => void; children: any }) {
   // Escape closes it wherever focus is (after a tap, focus is often on the board).
   onMount(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && props.onClose();
@@ -81,7 +82,7 @@ function Dialog(props: { icon: any; title: string; sub: any; width?: number; onC
 }
 
 export function ObjectDialog(props: { onClose: () => void }) {
-  const [tab, setTab] = createSignal<"presets" | "html">("presets");
+  const [tab, setTab] = createSignal<"presets" | "media" | "html">("presets");
   const [html, setHtml] = createSignal("");
   const [title, setTitle] = createSignal("");
   const [steps, setSteps] = createSignal(0);
@@ -119,13 +120,16 @@ export function ObjectDialog(props: { onClose: () => void }) {
       onClose={props.onClose}
     >
       <div class="object-tabs">
-        <Seg value={tab()} options={[["presets", "Presets"], ["html", "Your own HTML"]] as const} onChange={setTab} />
+        <Seg value={tab()} options={[["presets", "Presets"], ["media", "Media"], ["html", "Your own HTML"]] as const} onChange={setTab} />
       </div>
       {/* Both panels share one grid cell, so the dialog keeps its height
           (and the HTML draft) when switching tabs. */}
       <div class="object-panels">
         <div class="object-panel" classList={{ off: tab() !== "presets" }}>
           <PresetGallery onInserted={props.onClose} />
+        </div>
+        <div class="object-panel" classList={{ off: tab() !== "media" }}>
+          <MediaGallery onInserted={props.onClose} />
         </div>
         <div class="object-panel form" classList={{ off: tab() !== "html" }}>
           <Show when={error()}>

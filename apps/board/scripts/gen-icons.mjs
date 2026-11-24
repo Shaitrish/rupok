@@ -70,6 +70,16 @@ const MAP = {
   broom: ["broom"],
   pin: ["pin"],
   pages: ["widget-4"],
+  // Rich media (src/media/, components/Media*.tsx)
+  video: ["videocamera-record"],
+  audio: ["music-note-2"],
+  cube: ["box"],
+  globe: ["global"],
+  volume: ["volume-loud"],
+  mute: ["volume-cross"],
+  openLink: ["square-arrow-right-up"],
+  replace: ["gallery-edit", "refresh"],
+  camera3d: ["camera-rotate"],
 };
 
 function body(name) {

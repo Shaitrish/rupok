@@ -46,6 +46,11 @@ slide pixels in the 1920 × 1080 frame.
 - `add_smart_object(path, page, html, title, width?, height?, steps?, x?, y?, network_hosts?)`
   validates, then saves; returns `item_id` and `bundle_id`
 - `update_smart_object(path, bundle_id, html, steps?, network_hosts?)`
+- `add_youtube(path, page, url, title?, start?, end?, muted?, loop?, autoplay?, x?, y?, width?, height?)`,
+  `add_media(path, page, url? | file?, …)` (a YouTube link, a page on a trusted
+  education site, or an mp4/webm/mp3/m4a/ogg/wav file from the workspace,
+  stored in the lesson), `add_3d_model(path, page, file, title?, …)` (a `.glb`;
+  becomes a 3D viewer Smart Object that works offline)
 - `add_text(path, page, text, x, y, w?, size?, color?)`,
   `delete_item(path, page, item_id)`,
   `replace_strokes_with_text(path, page, stroke_ids, text, size?, color?)`

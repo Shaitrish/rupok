@@ -22,11 +22,16 @@ import { noteFrame, noteSamples } from "./inkLatency";
 import { attachTrail, drawsInk, notePointerDown, notePointerUp, penBusy, predictedFor, setPointerKind, trailAfterMove } from "./wetInk";
 import { APP_NAME, FILE_EXT, LESSON_MIME } from "./brand";
 import { forgetLessonPath, openLessonFiles, openLessonInto, saveLessonBytes } from "./platform";
+import { attachMedia, fileKind, insertFile as insertMediaOrModel, mediaKey } from "./media/media";
 import { onPresentFullscreenLost, presentFullscreen, toggleFullscreen } from "./fullscreen";
 
 /** Clipboard JSON from `Board.export_items_json` starts with this. */
 const CLIP_RE = /^\s*\{"rupok":"clipboard\/v1"/;
 const CLIP_BOUNDS_RE = /^\s*\{"rupok":"clipboard\/v1","bounds":\[([^\]]*)\]/;
+/** Blob types for media assets (images default to image/<ext>). */
+const MEDIA_TYPES: Record<string, string> = {
+  mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg", m4a: "audio/mp4", ogg: "audio/ogg", wav: "audio/wav",
+};
 /** Offset of a duplicate or a repeated paste, world units. */
 const PASTE_STEP = 24;
 
@@ -65,6 +70,7 @@ export class Controller {
   } = {};
 
   async init(root: HTMLElement, canvas: HTMLCanvasElement, world: HTMLElement) {
+    attachMedia(this);
     this.root = root;
     this.canvas = canvas;
     this.world = world;
@@ -572,6 +578,7 @@ export class Controller {
     this.attachClipboard();
     window.addEventListener("keydown", (e) => {
       if (editableTarget(e.target) && !((e.ctrlKey || e.metaKey) && nonTextInput(e.target))) return;
+      if (mediaKey(e)) return; // play/pause the focused video (media/media.ts)
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
       // Modes: F5 presents (Teach), Alt+1/2/3 picks a mode. By key position:
@@ -741,7 +748,7 @@ export class Controller {
     if (this.nextHooks.some((h) => h())) return;
     this.sync(false);
     // Student view cannot change object steps (read-only): pages only.
-    const objs = isView() ? [] : [...items].filter((i) => i.kind === "object" && (i.steps ?? 0) > (i.step ?? 0));
+    const objs = isView() ? [] : [...items].filter((i) => i.kind === "object" && this.objects.stepsOf(i) > (i.step ?? 0));
     if (objs.length) {
       const o = objs[0];
       this.objects.setStep(o.id, (o.step ?? 0) + 1);
@@ -833,6 +840,8 @@ export class Controller {
           this.addObject(html, m?.[1]?.trim() || f.name.replace(/\.html?$/i, ""), 1280, 720, steps);
         } else if (f.type.startsWith("image/")) {
           await this.insertImage(f);
+        } else if (fileKind(f)) {
+          await insertMediaOrModel(f); // video, audio, glTF (media/media.ts)
         }
       } catch (e: any) {
         showToast(`Could not import ${f.name}: ${e?.message ?? e}`, 5000);
@@ -890,7 +899,7 @@ export class Controller {
       const bytes = this.board.asset(name);
       if (!bytes) return "";
       const ext = name.split(".").pop() || "";
-      const type = ext === "svg" ? "image/svg+xml" : ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+      const type = MEDIA_TYPES[ext] ?? (ext === "svg" ? "image/svg+xml" : ext === "jpg" ? "image/jpeg" : `image/${ext}`);
       u = URL.createObjectURL(new Blob([bytes as BlobPart], { type }));
       this.assetUrls.set(name, u);
     }

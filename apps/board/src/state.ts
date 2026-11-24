@@ -15,7 +15,24 @@ export interface DomItem {
   text?: string; size?: number; color?: string; asset?: string;
   /** A text item whose text is LaTeX maths. */
   latex?: boolean;
+  /** An image item that is the poster of a video, audio clip or web embed
+   * (spec/rupok-format.md "Media items"); `asset` is the poster. */
+  media?: MediaInfo;
   selected: boolean;
+}
+
+/** The `media` map of a media item. */
+export interface MediaInfo {
+  type: "youtube" | "video" | "audio" | "web";
+  /** Canonical link (youtube, web) or the clip's asset name (video, audio). */
+  src: string;
+  title?: string;
+  site?: string;
+  start?: number;
+  end?: number;
+  muted?: boolean;
+  loop?: boolean;
+  autoplay?: boolean;
 }
 
 export interface PageInfo {

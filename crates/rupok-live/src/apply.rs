@@ -414,6 +414,140 @@ fn run(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str, now: f64) -> Result<Outcome> 
                 "warnings": warnings,
             })))
         }
+        Op::AddMedia {
+            page,
+            url,
+            file_base64,
+            file_name,
+            title,
+            start,
+            end,
+            muted,
+            looped,
+            autoplay,
+            x,
+            y,
+            width,
+            height,
+        } => {
+            let file = match file_base64 {
+                Some(b) => Some(
+                    rupok_format::media::decode_base64(b)
+                        .ok_or_else(|| LiveError::Invalid("file_base64 is not base64".into()))?,
+                ),
+                None => None,
+            };
+            let input = rupok_format::media::MediaInput {
+                url: url.clone(),
+                file,
+                file_name: file_name.clone(),
+                title: title.clone().filter(|t| !t.trim().is_empty()),
+                start: start.map(|v| finite("start", v)).transpose()?,
+                end: end.map(|v| finite("end", v)).transpose()?,
+                muted: muted.unwrap_or(false),
+                looped: looped.unwrap_or(false),
+                autoplay: autoplay.unwrap_or(false),
+            };
+            let (idx, info) = page_ref(ctx.lesson, ctx.page_id, *page)?;
+            let (media, poster) =
+                rupok_format::media::prepare(ctx.pkg, input).map_err(LiveError::Invalid)?;
+            let frame = info.frame.unwrap_or(Frame::SLIDE_16_9);
+            let (dw, dh) = if media.kind == "audio" {
+                (800.0, 450.0)
+            } else {
+                (DEFAULT_OBJECT_W, DEFAULT_OBJECT_H)
+            };
+            let w = positive("width", width.unwrap_or(dw))?;
+            let h = positive("height", height.unwrap_or(dh))?;
+            let geom = BoxGeom {
+                x: finite("x", x.unwrap_or((frame.w - w) / 2.0))?,
+                y: finite("y", y.unwrap_or((frame.h - h) / 2.0))?,
+                w,
+                h,
+                rot: 0.0,
+            };
+            let warnings: Vec<Diagnostic> =
+                placement_warning(&geom, info.frame).into_iter().collect();
+            let kind = media.kind.clone();
+            let src = media.src.clone();
+            let data = ItemData::Image(rupok_core::ImageData {
+                geom,
+                asset: poster,
+                media: Some(media),
+            });
+            tag(ctx.lesson, msg);
+            let item_id = ctx.lesson.add_item(&info.id, &data, now)?;
+            Ok(Outcome::changed(json!({
+                "item_id": item_id,
+                "kind": kind,
+                "src": src,
+                "page": idx + 1,
+                "page_id": info.id,
+                "geometry": geometry_of(&geom),
+                "warnings": warnings,
+            })))
+        }
+        Op::AddModel {
+            page,
+            file_base64,
+            file_name,
+            title,
+            x,
+            y,
+            width,
+            height,
+        } => {
+            let bytes = rupok_format::media::decode_base64(file_base64)
+                .ok_or_else(|| LiveError::Invalid("file_base64 is not base64".into()))?;
+            let w = positive("width", width.unwrap_or(DEFAULT_OBJECT_W))?;
+            let h = positive("height", height.unwrap_or(DEFAULT_OBJECT_H))?;
+            let name = file_name.clone().unwrap_or_else(|| "model.glb".into());
+            let bundle = rupok_format::model3d::model_bundle(
+                &bytes,
+                &name,
+                title.as_deref().unwrap_or(""),
+                w,
+                h,
+            )
+            .map_err(|e| LiveError::Invalid(e.to_string()))?;
+            let (idx, info) = page_ref(ctx.lesson, ctx.page_id, *page)?;
+            let frame = info.frame.unwrap_or(Frame::SLIDE_16_9);
+            let geom = BoxGeom {
+                x: finite("x", x.unwrap_or((frame.w - w) / 2.0))?,
+                y: finite("y", y.unwrap_or((frame.h - h) / 2.0))?,
+                w,
+                h,
+                rot: 0.0,
+            };
+            let warnings: Vec<Diagnostic> =
+                placement_warning(&geom, info.frame).into_iter().collect();
+            let title = bundle.manifest.title.clone();
+            let bundle_id = unique_bundle_id(&title, &name, &ctx.pkg.objects);
+            ctx.pkg.objects.insert(bundle_id.clone(), bundle);
+            let data = ItemData::Object(ObjectData {
+                geom,
+                bundle: bundle_id.clone(),
+                title,
+                step: 0,
+                state: None,
+            });
+            tag(ctx.lesson, msg);
+            let item_id = match ctx.lesson.add_item(&info.id, &data, now) {
+                Ok(id) => id,
+                Err(e) => {
+                    ctx.pkg.objects.remove(&bundle_id);
+                    return Err(e.into());
+                }
+            };
+            Ok(Outcome::changed(json!({
+                "item_id": item_id,
+                "bundle_id": bundle_id,
+                "page": idx + 1,
+                "page_id": info.id,
+                "geometry": geometry_of(&geom),
+                "warnings": warnings,
+            })))
+        }
         Op::UpdateSmartObject {
             bundle_id,
             html,
@@ -808,6 +942,10 @@ pub struct ItemOutline {
     pub step: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub asset: Option<String>,
+    /// A media item (video, audio, YouTube, web embed): what it plays.
+    /// `asset` is then its poster.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media: Option<rupok_core::MediaData>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -864,6 +1002,7 @@ pub fn item_outline(item: &Item, pkg: &Package, now_ms: f64) -> ItemOutline {
         steps: None,
         step: None,
         asset: None,
+        media: None,
         tool: None,
         shape: None,
         points: None,
@@ -894,6 +1033,10 @@ pub fn item_outline(item: &Item, pkg: &Package, now_ms: f64) -> ItemOutline {
         ItemData::Image(i) => {
             o.geometry = geometry_of(&i.geom);
             o.asset = Some(i.asset.clone());
+            if let Some(m) = &i.media {
+                o.title = Some(m.title.clone()).filter(|t| !t.is_empty());
+                o.media = Some(m.clone());
+            }
         }
         ItemData::Object(ob) => {
             o.geometry = geometry_of(&ob.geom);
@@ -1440,6 +1583,76 @@ mod tests {
         ] {
             assert!(b.run(op(bad.clone())).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn media_and_models_from_agents() {
+        let mut b = Board::new();
+        let out = b
+            .run(Op::AddMedia {
+                page: None,
+                url: Some("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42".into()),
+                file_base64: None,
+                file_name: None,
+                title: Some("Photosynthesis".into()),
+                start: None,
+                end: Some(120.0),
+                muted: Some(true),
+                looped: None,
+                autoplay: None,
+                x: None,
+                y: None,
+                width: None,
+                height: None,
+            })
+            .unwrap();
+        assert_eq!(out.result["kind"], "youtube");
+        let id = out.result["item_id"].as_str().unwrap().to_string();
+        let page = b.lesson.page_id_at(0).unwrap();
+        let ItemData::Image(img) = b.lesson.item(&page, &id).unwrap().data else {
+            panic!("not an image")
+        };
+        let m = img.media.unwrap();
+        assert_eq!((m.start, m.end, m.muted), (Some(42.0), Some(120.0), true));
+        assert!(img.asset.ends_with(".svg") && b.pkg.assets.contains_key(&img.asset));
+        assert!(last_message(&b.lesson).unwrap().contains("add_media"));
+
+        let err = b
+            .run(Op::AddMedia {
+                page: None,
+                url: Some("https://example.com/video".into()),
+                file_base64: None,
+                file_name: None,
+                title: None,
+                start: None,
+                end: None,
+                muted: None,
+                looped: None,
+                autoplay: None,
+                x: None,
+                y: None,
+                width: None,
+                height: None,
+            })
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("not a link Rupok can embed"),
+            "{err}"
+        );
+
+        let err = b
+            .run(Op::AddModel {
+                page: None,
+                file_base64: "PGh0bWw+".into(),
+                file_name: Some("x.glb".into()),
+                title: None,
+                x: None,
+                y: None,
+                width: None,
+                height: None,
+            })
+            .unwrap_err();
+        assert!(err.to_string().contains("glb"), "{err}");
     }
 
     #[test]

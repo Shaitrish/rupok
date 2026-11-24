@@ -821,6 +821,105 @@ mod web {
             self.engine.add_image(bytes, ext, w, h, now())
         }
 
+        /// Place a media item (`media_json`: a `media` map, see
+        /// spec/rupok-format.md "Media items") with its poster picture and,
+        /// for video and audio, the clip. Returns the item id or throws why
+        /// it was refused (a link off the allowlist, a file that is not
+        /// media, too big).
+        #[allow(clippy::too_many_arguments)]
+        pub fn add_media(
+            &mut self,
+            media_json: &str,
+            poster: Vec<u8>,
+            poster_ext: &str,
+            file: Option<Vec<u8>>,
+            file_ext: &str,
+            w: f64,
+            h: f64,
+        ) -> Result<String, JsValue> {
+            let media = serde_json::from_str(media_json).map_err(err)?;
+            self.engine
+                .add_media(
+                    media,
+                    (poster, poster_ext),
+                    file.map(|f| (f, file_ext)),
+                    w,
+                    h,
+                    now(),
+                )
+                .map_err(err)
+        }
+
+        /// Change a media item's settings, and optionally its poster or
+        /// clip, as one undo step.
+        pub fn set_media(
+            &mut self,
+            id: &str,
+            media_json: &str,
+            poster: Option<Vec<u8>>,
+            poster_ext: &str,
+            file: Option<Vec<u8>>,
+            file_ext: &str,
+        ) -> Result<(), JsValue> {
+            let media = serde_json::from_str(media_json).map_err(err)?;
+            self.engine
+                .set_media(
+                    id,
+                    media,
+                    poster.map(|p| (p, poster_ext)),
+                    file.map(|f| (f, file_ext)),
+                )
+                .map_err(err)
+        }
+
+        /// Place a 3D model (`.glb`, or `.gltf` with everything embedded) as
+        /// the built-in viewer object. Returns the item id or throws.
+        pub fn add_model(
+            &mut self,
+            bytes: &[u8],
+            name: &str,
+            title: &str,
+            w: f64,
+            h: f64,
+        ) -> Result<String, JsValue> {
+            self.engine
+                .add_model(bytes, name, title, w, h, now())
+                .map_err(err)
+        }
+
+        /// A link the board can embed, as JSON (`MediaLink`), or `"null"`
+        /// when it is not on the allowlist.
+        pub fn media_link_json(url: &str) -> String {
+            rupok_format::media::parse_link(url)
+                .and_then(|l| serde_json::to_string(&l).ok())
+                .unwrap_or_else(|| "null".into())
+        }
+
+        /// The iframe `src` for a stored `media` map, rebuilt from the
+        /// allowlist; `undefined` when it may not be embedded.
+        pub fn media_embed_url(media_json: &str, origin: &str) -> Option<String> {
+            let media = serde_json::from_str(media_json).ok()?;
+            rupok_format::media::embed_url(&media, Some(origin))
+        }
+
+        /// A normalised `http(s)` link for "Open in browser", else `undefined`.
+        pub fn open_url(url: &str) -> Option<String> {
+            rupok_format::media::open_url(url)
+        }
+
+        /// The trusted embed sites (`Site` list) as JSON.
+        pub fn media_sites_json() -> String {
+            serde_json::to_string(rupok_format::media::SITES).unwrap_or_else(|_| "[]".into())
+        }
+
+        /// What kind of media file this is by content: `["video", "mp4"]`,
+        /// or empty when it is not video or audio.
+        pub fn sniff_media(bytes: &[u8]) -> Vec<String> {
+            rupok_format::media::sniff_media(bytes)
+                .map(|(k, e)| vec![k.to_string(), e.to_string()])
+                .unwrap_or_default()
+        }
+
         pub fn asset(&self, name: &str) -> Option<Vec<u8>> {
             self.engine.asset(name).map(<[u8]>::to_vec)
         }
