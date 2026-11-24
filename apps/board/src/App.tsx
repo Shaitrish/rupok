@@ -1,3 +1,4 @@
+import { initShapes } from "./shapes";
 import { Show, createEffect, createSignal, onMount } from "solid-js";
 import { controller } from "./controller";
 import World from "./components/World";
@@ -83,6 +84,7 @@ export default function App() {
       await controller.init(root, canvas, world);
       controller.attachInput(input);
       controller.attachKeys();
+      initShapes();
       controller.eraserCursor = (x, y, show) => {
         eraser.style.display = show ? "block" : "none";
         eraser.style.left = `${x}px`;

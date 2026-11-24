@@ -522,6 +522,17 @@ pub fn shape_name(kind: &str) -> String {
         "graph-exp" => "exponential graph",
         "venn" => "Venn diagram",
         "benzene" => "benzene ring",
+        "rounded-rect" => "rounded rectangle",
+        "right-triangle" => "right triangle",
+        "trapezoid" => "trapezoid",
+        "process" => "flowchart process",
+        "decision" => "flowchart decision",
+        "data" => "flowchart input/output",
+        "callout" => "speech bubble",
+        "brace" => "brace",
+        "double-arrow" => "double arrow",
+        "curved-arrow" => "curved arrow",
+        "table-header" => "table header",
         other => other,
     };
     name.to_string()

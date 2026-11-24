@@ -5,11 +5,13 @@ import { type Mode, type ModeConfig, type ModesConfig, resolveMode, sanitizeMode
 
 export type Tool =
   | "pen" | "highlighter" | "eraser" | "lasso" | "hand" | "laser" | "interact" | "text"
-  | "rect" | "ellipse" | "line" | "arrow";
+  | "rect" | "ellipse" | "line" | "arrow"
+  /** The Shapes picker's tool; which shape is shapes.ts `currentShape()`. */
+  | "shape";
 
 export interface DomItem {
   id: string;
-  kind: "object" | "text" | "image";
+  kind: "object" | "text" | "image" | "fill";
   x: number; y: number; w: number; h: number; rot: number; z: number;
   title?: string; bundle?: string; step?: number; steps?: number; state?: string;
   text?: string; size?: number; color?: string; asset?: string;
@@ -18,6 +20,8 @@ export interface DomItem {
   /** An image item that is the poster of a video, audio clip or web embed
    * (spec/rupok-format.md "Media items"); `asset` is the poster. */
   media?: MediaInfo;
+  /** A shape's fill (kind "fill", id `<stroke id>#fill`): SVG path data in its box. */
+  path?: string;
   selected: boolean;
 }
 
@@ -74,6 +78,8 @@ export const [selectionMeta, setSelectionMeta] = createSignal<{
   live?: boolean;
   /** Shared colour (#rrggbbaa) and stroke width when uniform; all ink is highlighter. */
   style?: { color: string | null; width: number | null; highlighter: boolean };
+  /** Selected shapes: shared fill, whether any can be filled, all dashed, table rows × cols. */
+  shapeStyle?: { fill: string | null; fillable: boolean; dash: boolean; table: [number, number] | null } | null;
 }>({ count: 0, strokes: 0, boxes: 0, groups: 0, grouped: false });
 /** Opened as the student viewer (`/board/?view`): starts in the Student
  * mode and never touches the teacher's autosave. */

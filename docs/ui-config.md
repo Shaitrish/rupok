@@ -72,9 +72,9 @@ text size while editing text. Everything else in `tools` waits in the ⋯ menu.
   always on the dock in `prepare` and `teach`. They cannot be removed: if
   `tools` leaves one out, it is added at the end.
 - `pinned`: the other tools that sit on the dock, as tool ids, plus
-  `"shapes"` for the one Shapes button (rectangle, ellipse, line, arrow and
-  the Smart shapes toggle in its flyout). Pinning any shape id pins
-  `"shapes"`. Pins that are not in `tools`, and core tools, are dropped.
+  `"shapes"` for the one Shapes button (it opens the Shapes picker: basic
+  shapes, lines and arrows, tables and teaching diagrams, plus the Smart
+  shapes toggle). Pinning any shape id pins `"shapes"`. Pins that are not in `tools`, and core tools, are dropped.
   When `pinned` is missing but `tools` is given (a config written before the
   dock), every tool in `tools` is pinned, so the dock shows them all.
 - `position`: where the dock starts. `"auto"` (follow Settings → Appearance → Dock side:
@@ -99,7 +99,9 @@ Settings → Teaching modes) resets that memory, so the config takes effect.
 | `pen`, `highlighter`, `eraser` | Ink tools | prepare, teach |
 | `lasso` | Select & move | prepare, teach |
 | `laser` | Laser pointer | prepare, teach |
-| `text`, `rect`, `ellipse`, `line`, `arrow` | Text and shapes | prepare, teach |
+| `text` | Text (key `T`) | prepare, teach |
+| `shape` | The Shapes picker's tool: every shape and table (key `S` opens the picker) | prepare, teach |
+| `rect`, `ellipse`, `line`, `arrow` | Single shape tools (keys `R`, `O`, `N`, `A`) | prepare, teach |
 | `hand` | Pan | all |
 | `interact` | Use Smart Objects | all |
 | `smartink` | Smart shapes on/off: switches between Off and the last on-mode (Auto by default; set in Settings → Pen & ink → Smart shapes). Key `M` | prepare, teach |

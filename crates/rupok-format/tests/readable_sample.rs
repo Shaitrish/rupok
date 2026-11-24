@@ -225,3 +225,48 @@ fn sample_fixture_is_current_and_readable() {
         md.lines().next()
     );
 }
+
+#[test]
+fn picker_shapes_with_fill_and_dash_survive_the_package_and_read_well() {
+    let mut lesson = Lesson::new("Shapes", 1.0);
+    let p = lesson.page_id_at(0).unwrap();
+    let pts: Vec<StrokePoint> = (0..5)
+        .map(|i| StrokePoint {
+            x: [0.0, 400.0, 400.0, 0.0, 0.0][i],
+            y: [0.0, 0.0, 200.0, 200.0, 0.0][i],
+            p: 1.0,
+            dt: 0,
+        })
+        .collect();
+    let mut add = |shape: &str, kind: &str, v: Vec<f64>| {
+        let ItemData::Stroke(mut s) = stroke(pts.clone(), Some(shape)) else {
+            unreachable!()
+        };
+        let g = s.geom.as_mut().unwrap();
+        g.kind = kind.into();
+        g.v = v;
+        g.fill = Some(0x30a46c33);
+        g.dash = true;
+        lesson.add_item(&p, &ItemData::Stroke(s), 2.0).unwrap()
+    };
+    let callout = add("callout", "callout", vec![0.22, 1.4]);
+    add("table", "table", vec![0.0, 0.5, 1.0, 0.5]);
+    add("rounded-rect", "rrect", vec![0.18, 0.0]);
+    let bytes = Package::from_lesson(&lesson, "test", 3.0).write().unwrap();
+    let back = Package::read(&bytes).unwrap();
+    let l = back.lesson().unwrap();
+    let ItemData::Stroke(s) = l.item(&p, &callout).unwrap().data else {
+        panic!()
+    };
+    let g = s.geom.unwrap();
+    assert_eq!(
+        (g.kind.as_str(), g.fill, g.dash),
+        ("callout", Some(0x30a46c33), true)
+    );
+    let md = back.content_markdown().unwrap();
+    assert!(md.contains("speech bubble"), "{md}");
+    assert!(
+        md.contains("rounded rectangle") && md.contains("table"),
+        "{md}"
+    );
+}

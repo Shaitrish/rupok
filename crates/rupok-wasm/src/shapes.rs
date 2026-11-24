@@ -18,6 +18,8 @@ pub enum ShapeKind {
     Ellipse,
     Line,
     Arrow,
+    /// Any entry of the Shapes picker (`catalog.rs`).
+    Preset(crate::catalog::Preset),
 }
 
 impl ShapeKind {
@@ -27,6 +29,7 @@ impl ShapeKind {
             ShapeKind::Ellipse => "ellipse",
             ShapeKind::Line => "line",
             ShapeKind::Arrow => "arrow",
+            ShapeKind::Preset(p) => p.shape_name(),
         }
     }
 }
@@ -71,6 +74,7 @@ pub fn shape_geom(kind: ShapeKind, a: [f32; 2], b: [f32; 2]) -> ShapeGeom {
             v: Vec::new(),
             ..Default::default()
         },
+        ShapeKind::Preset(p) => crate::catalog::place(p, a, b).parts.swap_remove(0).geom,
     }
 }
 
@@ -266,9 +270,8 @@ pub fn anchors(g: &ShapeGeom) -> Vec<Anchor> {
 /// (lines, axes, number lines, curves).
 pub fn attach_points(g: &ShapeGeom) -> Vec<[f64; 2]> {
     match g.kind.as_str() {
-        "line" | "arrow" | "harpoon" | "axes" | "numberline" | "path" | "polyline" | "arc" => {
-            Vec::new()
-        }
+        "line" | "arrow" | "harpoon" | "axes" | "numberline" | "path" | "polyline" | "arc"
+        | "arrow2" | "carrow" | "brace" => Vec::new(),
         // Box sides' middles, never the corners.
         "rect" | "ellipse" => anchors(g)
             .into_iter()
@@ -502,9 +505,12 @@ pub fn scale_rotate(g: &ShapeGeom, pivot: [f64; 2], s: f64, rot: f64) -> ShapeGe
                 ..g.clone()
             }
         }
-        "poly" | "path" | "polyline" => poly_kind(
-            &g.kind,
-            &vertices(g).into_iter().map(tf).collect::<Vec<_>>(),
+        "poly" | "path" | "polyline" => keep_style(
+            poly_kind(
+                &g.kind,
+                &vertices(g).into_iter().map(tf).collect::<Vec<_>>(),
+            ),
+            g,
         ),
         _ => {
             let c = tf(center(g));
@@ -551,7 +557,9 @@ pub fn map_box(g: &ShapeGeom, from: [f64; 4], to: [f64; 4]) -> Option<ShapeGeom>
                 ..g.clone()
             }
         }
-        "rect" | "poly" if rotated => poly(&vertices(g).into_iter().map(f).collect::<Vec<_>>()),
+        "rect" | "poly" if rotated => {
+            keep_style(poly(&vertices(g).into_iter().map(f).collect::<Vec<_>>()), g)
+        }
         k if rotated && templates::is_box_kind(k) => {
             // Templates keep their shape and turn: the box scales along its
             // own axes (a quarter turn swaps them).
@@ -606,6 +614,18 @@ pub fn map_box(g: &ShapeGeom, from: [f64; 4], to: [f64; 4]) -> Option<ShapeGeom>
         }
     };
     out.is_valid().then_some(out)
+}
+
+/// `out` with the fill, dash and connector links of `g` (a geometry rebuilt
+/// as a new polygon keeps its style).
+fn keep_style(out: ShapeGeom, g: &ShapeGeom) -> ShapeGeom {
+    ShapeGeom {
+        fill: g.fill,
+        dash: g.dash,
+        from: g.from.clone(),
+        to: g.to.clone(),
+        ..out
+    }
 }
 
 /// Spread `duration` ms over the points by arc length, so replay draws a

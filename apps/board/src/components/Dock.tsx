@@ -30,12 +30,15 @@ import { addPageLike } from "./Chrome";
 import { Icon } from "./Icon";
 import type { IconName } from "../icons.generated";
 import { APP_SLUG, FILE_EXT } from "../brand";
+import { ShapesPicker } from "./ShapesPicker";
+import { ShapeGlyph } from "./ShapeGlyph";
+import { clearShapesRequest, currentShape, openShapesPicker, shapeLabel, shapesRequest } from "../shapes";
 
 const META = new Map(TOOLBAR_ITEMS.map((t) => [t.id, t]));
-const INK_TOOLS: Tool[] = ["pen", "highlighter", "rect", "ellipse", "line", "arrow"];
-const SHAPES: Tool[] = ["rect", "ellipse", "line", "arrow"];
+const INK_TOOLS: Tool[] = ["pen", "highlighter", "rect", "ellipse", "line", "arrow", "shape"];
+const SHAPES: Tool[] = ["shape", "rect", "ellipse", "line", "arrow"];
 /** Tools whose strokes the dock gets out of the way of. */
-const DRAWING: Tool[] = ["pen", "highlighter", "eraser", "laser", "rect", "ellipse", "line", "arrow"];
+const DRAWING: Tool[] = ["pen", "highlighter", "eraser", "laser", "rect", "ellipse", "line", "arrow", "shape"];
 const HL_WIDTHS = [14, 22, 34];
 /** Eraser diameters, CSS px: from a fingertip to a board duster. */
 const ERASER_WIDTHS = [32, 64, 120, 200];
@@ -76,7 +79,8 @@ export function dockLayout(m: ModeConfig, core: boolean, allowMore: boolean, roo
   const overflow: ToolbarItem[] = [];
   let shapes = false;
   for (const t of m.tools) {
-    if (SHAPES.includes(t as Tool) || (t === "smartink" && shapesOn)) {
+    // Smart shapes folds into the Shapes button unless it is pinned on its own (Teach).
+    if (SHAPES.includes(t as Tool) || (t === "smartink" && shapesOn && !pinned.has("smartink"))) {
       if (!shapesOn) overflow.push(t);
       else if (!shapes) {
         shapes = true;
@@ -218,7 +222,7 @@ function pickFile(accept: string): Promise<File | undefined> {
   });
 }
 
-type Pop = { kind: "pen" | "highlighter" | "eraser" | "shapes" | "more"; anchor: HTMLElement };
+type Pop = { kind: "pen" | "highlighter" | "eraser" | "shapes" | "more"; anchor: HTMLElement; focus?: "table" };
 
 export default function Dock(props: { onSettings?: (section?: string) => void }) {
   const cfg = () => modeConfig();
@@ -295,6 +299,14 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   // ------------------------------------------------------------- popovers
   const [pop, setPop] = createSignal<Pop | null>(null);
   const toggle = (kind: Pop["kind"], anchor: HTMLElement) => setPop(pop()?.kind === kind ? null : { kind, anchor });
+  // The Shapes picker on request (Insert ▾ → Shape… / Table…, the S key).
+  let shapesBtn: HTMLButtonElement | undefined;
+  createEffect(on(shapesRequest, (r) => {
+    if (!r) return;
+    clearShapesRequest();
+    const anchor = (shapesBtn?.isConnected ? shapesBtn : moreBtn?.isConnected ? moreBtn : el) as HTMLElement | undefined;
+    if (anchor) setPop({ kind: "shapes", anchor, focus: r.focus });
+  }, { defer: true }));
   createEffect(on([mode, () => !!replay(), () => !!editingText()], () => setPop(null), { defer: true }));
 
   // -------------------------------------------------------------- fading
@@ -572,28 +584,22 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   const ShapesButton = () => {
     let btn!: HTMLButtonElement;
     const on = () => SHAPES.includes(tool());
-    const shown = () => (on() ? tool() : lastShape());
-    const lp = longPress(() => setPop({ kind: "shapes", anchor: btn }));
+    // The picker's shape, or a legacy shape tool (R, O, N, A keys).
+    const legacy = () => (on() && tool() !== "shape" ? tool() : null);
     return (
       <button
-        ref={btn}
+        ref={(b) => (btn = shapesBtn = b)}
         class="tool has-caret"
         classList={{ on: on(), smart: prefs().smartShapes !== "off" }}
-        title={`Shapes: ${labelOf(shown())}  ·  tap again for all shapes and Smart shapes`}
+        title={`Shapes and tables: ${legacy() ? labelOf(legacy()!) : shapeLabel(currentShape())}  ·  S`}
         aria-label="Shapes"
         aria-pressed={on()}
         aria-haspopup="dialog"
-        onPointerDown={lp.onPointerDown}
-        onClick={() => {
-          if (lp.consumed()) return;
-          if (on()) toggle("shapes", btn);
-          else {
-            setPop(null);
-            pick(lastShape());
-          }
-        }}
+        onClick={() => toggle("shapes", btn)}
       >
-        <Icon name={iconOf(shown())} size={iconSize()} active={on()} />
+        <Show when={legacy()} fallback={<ShapeGlyph id={currentShape()} size={iconSize()} />}>
+          <Icon name={iconOf(legacy()!)} size={iconSize()} active />
+        </Show>
         <span class="dock-caret" />
       </button>
     );
@@ -1086,28 +1092,8 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
               </button>
             </Show>
             <Show when={p().kind === "shapes"}>
-              <div class="dock-pop-title">Shapes</div>
-              <div class="dock-shapes" role="group" aria-label="Shapes">
-                <For each={SHAPES}>
-                  {(s) => (
-                    <button
-                      class="tool"
-                      classList={{ on: tool() === s }}
-                      title={tipOf(s)}
-                      aria-label={labelOf(s)}
-                      aria-pressed={tool() === s}
-                      onClick={() => {
-                        pick(s);
-                        setPop(null);
-                      }}
-                    >
-                      <Icon name={iconOf(s)} size={iconSize()} active={tool() === s} />
-                    </button>
-                  )}
-                </For>
-              </div>
+              <ShapesPicker onDone={() => setPop(null)} focus={p().focus} />
               <Show when={cfg().tools.includes("smartink")}>
-                <div class="dock-hr" />
                 <SmartInkToggle row />
               </Show>
             </Show>
@@ -1153,6 +1139,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                         else if (t === "replay") controller.board.replay_start();
                         else if (t === "exit") controller.exitMode();
                         else if (t === "interact") toggleUse();
+                        else if (t === "shape") openShapesPicker();
                         else pick(t as Tool);
                       }}
                     >

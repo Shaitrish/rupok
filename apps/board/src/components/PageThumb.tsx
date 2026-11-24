@@ -19,7 +19,7 @@ const CURRENT_DEBOUNCE_MS = 450;
 
 type Rect = [number, number, number, number];
 type PreviewItem =
-  | { kind: "stroke"; color: string; width: number; opacity: number; pts: number[] }
+  | { kind: "stroke"; color: string; width: number; opacity: number; pts: number[]; fill?: string; dash?: boolean }
   | { kind: "text"; rect: Rect; text: string; size: number; color: string }
   | { kind: "image"; rect: Rect; asset: string }
   | { kind: "object"; rect: Rect; title: string };
@@ -148,7 +148,18 @@ function draw(canvas: HTMLCanvasElement, p: Preview, redraw: () => void, index: 
       ctx.beginPath();
       ctx.moveTo(pts[0], pts[1]);
       for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+      if (it.fill) {
+        // A shape's soft fill, under its outline (catalog.rs fill).
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = it.fill;
+        ctx.fill("evenodd");
+        ctx.restore();
+      }
+      // The dash pattern of catalog.rs `dash_pattern`.
+      if (it.dash) ctx.setLineDash([2.5 * it.width + 8, 1.8 * it.width + 7]);
       ctx.stroke();
+      if (it.dash) ctx.setLineDash([]);
     } else if (it.kind === "image") {
       const [x, y, w, h] = it.rect;
       const img = imageFor(it.asset, redraw);

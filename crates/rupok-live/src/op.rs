@@ -2,7 +2,8 @@
 //!
 //! An [`Op`] is what an MCP tool call becomes when a board is paired. The
 //! server serialises it into an `op` message; the board runs it with
-//! [`crate::apply`] (document operations) or in the web app (`snapshot`,
+//! [`crate::apply`] (document operations), in the board engine (`add_shape`,
+//! `add_table`: shape geometry lives there) or in the web app (`snapshot`,
 //! `point_at` and the UI half of `set_board_theme`).
 //!
 //! Pages are 1-based; `page: None` means the page the board is showing.
@@ -377,6 +378,57 @@ pub enum Op {
         #[serde(default)]
         step_mode: Option<String>,
     },
+    /// Draw a shape (one of the Shapes picker's ids: `rect`, `circle`,
+    /// `arrow`, `venn2`, …) in the box `x, y, w, h`; segment shapes (line,
+    /// arrows) go from `(x, y)` to `(x + w, y + h)`. Run by the board app's
+    /// engine, which owns shape geometry.
+    AddShape {
+        #[serde(default)]
+        page: Option<u32>,
+        shape: String,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+        /// Line colour `#rrggbb`. Default: readable on the page.
+        #[serde(default)]
+        color: Option<String>,
+        /// Fill colour `#rrggbb` or `#rrggbbaa` (closed shapes). Default: none.
+        #[serde(default)]
+        fill: Option<String>,
+        /// Line width in slide pixels. Default 4.
+        #[serde(default)]
+        width: Option<f64>,
+        #[serde(default)]
+        dashed: Option<bool>,
+        /// Text centred inside the shape (e.g. a flowchart step).
+        #[serde(default)]
+        text: Option<String>,
+    },
+    /// Draw a table of `rows` × `cols` (1–10 each) at `x, y`, optionally with
+    /// cell text (`cells[row][col]`). Run by the board app's engine.
+    AddTable {
+        #[serde(default)]
+        page: Option<u32>,
+        x: f64,
+        y: f64,
+        rows: u32,
+        cols: u32,
+        #[serde(default)]
+        w: Option<f64>,
+        #[serde(default)]
+        h: Option<f64>,
+        #[serde(default)]
+        cells: Option<Vec<Vec<String>>>,
+        #[serde(default)]
+        color: Option<String>,
+        /// Fill of the header row `#rrggbb[aa]`. Default: none.
+        #[serde(default)]
+        header_fill: Option<String>,
+        /// Cell text size in slide pixels. Default: fits the rows (24–40).
+        #[serde(default)]
+        text_size: Option<f64>,
+    },
     /// Move a Smart Object's build step: absolute `step`, or `delta` (default +1).
     StepObject {
         #[serde(default)]
@@ -427,6 +479,8 @@ impl Op {
             Op::ReplaceItemsWithText { .. } => "replace_items_with_text",
             Op::StepObject { .. } => "step_object",
             Op::WriteHandwriting { .. } => "write_handwriting",
+            Op::AddShape { .. } => "add_shape",
+            Op::AddTable { .. } => "add_table",
         }
     }
 
@@ -472,6 +526,8 @@ impl Op {
             Op::ReplaceItemsWithText { .. } => "turned ink into text",
             Op::StepObject { .. } => "stepped a Smart Object",
             Op::WriteHandwriting { .. } => "wrote on the board",
+            Op::AddShape { .. } => "drew a shape",
+            Op::AddTable { .. } => "drew a table",
         }
     }
 }
@@ -506,5 +562,13 @@ mod tests {
         assert_eq!(t.access(), Access::Write);
         assert!(serde_json::from_str::<Op>(r#"{"op":"format_disk"}"#).is_err());
         assert_eq!(Op::GetSelection.name(), "get_selection");
+        let s: Op = serde_json::from_str(
+            r##"{"op":"add_shape","shape":"circle","x":1,"y":2,"w":30,"h":30,"fill":"#a7f3d0"}"##,
+        )
+        .unwrap();
+        assert_eq!((s.name(), s.access()), ("add_shape", Access::Write));
+        let t: Op =
+            serde_json::from_str(r#"{"op":"add_table","x":0,"y":0,"rows":3,"cols":4}"#).unwrap();
+        assert_eq!(t.name(), "add_table");
     }
 }

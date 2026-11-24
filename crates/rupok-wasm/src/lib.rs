@@ -6,6 +6,7 @@
 //! SolidJS UI (and the Tauri desktop shell, which loads the same UI) drives.
 
 mod b64;
+pub mod catalog;
 pub mod engine;
 pub mod export;
 pub mod live;
@@ -31,6 +32,9 @@ mod web {
     fn err(e: impl std::fmt::Display) -> JsValue {
         JsValue::from_str(&e.to_string())
     }
+
+    // The Shapes picker's API (`web/shapes_api.rs`).
+    mod shapes_api;
 
     #[wasm_bindgen(start)]
     pub fn start() {

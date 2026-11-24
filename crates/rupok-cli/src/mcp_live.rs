@@ -389,6 +389,86 @@ pub struct WriteHandwritingParams {
     pub page: Option<u32>,
 }
 
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddShapeParams {
+    /// Which shape: rect, rrect (rounded), square, ellipse, circle, triangle,
+    /// right-triangle, diamond, pentagon, hexagon, star, parallelogram,
+    /// trapezoid, line, arrow, double-arrow, dashed-line, curved-arrow,
+    /// connector, numberline, axes, venn2, venn3, terminator, process,
+    /// decision, data (flowchart input/output), callout (speech bubble),
+    /// brace, brace-down.
+    pub shape: String,
+    /// Left edge in slide pixels (the slide is 1920 × 1080). For lines and
+    /// arrows: the start point.
+    pub x: f64,
+    /// Top edge in slide pixels. For lines and arrows: the start point.
+    pub y: f64,
+    /// Width in slide pixels. For lines and arrows: the end is (x + w, y + h),
+    /// so w and h may be negative or zero.
+    pub w: f64,
+    /// Height in slide pixels.
+    pub h: f64,
+    /// Line colour `#rrggbb`. Default: readable on the page.
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Fill `#rrggbb` (solid) or `#rrggbbaa`, e.g. `#20c99733` for a soft
+    /// mint. Closed shapes only. Default: no fill.
+    #[serde(default)]
+    pub fill: Option<String>,
+    /// Line width in slide pixels, 0.5 to 60. Default 4.
+    #[serde(default)]
+    pub width: Option<f64>,
+    /// Dashed outline. Default false.
+    #[serde(default)]
+    pub dashed: Option<bool>,
+    /// Text centred inside the shape, e.g. a flowchart step ("x > 0?").
+    #[serde(default)]
+    pub text: Option<String>,
+    /// 1-based page number. Omit for the current page.
+    #[serde(default)]
+    #[schemars(range(min = 1))]
+    pub page: Option<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddTableParams {
+    /// Left edge in slide pixels.
+    pub x: f64,
+    /// Top edge in slide pixels.
+    pub y: f64,
+    /// Rows, 1 to 10.
+    #[schemars(range(min = 1, max = 10))]
+    pub rows: u32,
+    /// Columns, 1 to 10.
+    #[schemars(range(min = 1, max = 10))]
+    pub cols: u32,
+    /// Width in slide pixels. Default 220 per column.
+    #[serde(default)]
+    pub w: Option<f64>,
+    /// Height in slide pixels. Default 72 per row.
+    #[serde(default)]
+    pub h: Option<f64>,
+    /// Cell text, row by row: `[["Metal", "Symbol"], ["Sodium", "Na"]]`.
+    /// Shorter rows or fewer rows leave cells empty.
+    #[serde(default)]
+    pub cells: Option<Vec<Vec<String>>>,
+    /// Line and text colour `#rrggbb`. Default: readable on the page.
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Fill of the header (first) row `#rrggbb[aa]`, e.g. `#c3fae8`.
+    #[serde(default)]
+    pub header_fill: Option<String>,
+    /// Cell text size in slide pixels (8–200). Default: fits the rows.
+    #[serde(default)]
+    pub text_size: Option<f64>,
+    /// 1-based page number. Omit for the current page.
+    #[serde(default)]
+    #[schemars(range(min = 1))]
+    pub page: Option<u32>,
+}
+
 // ------------------------------------------------------------------- tools
 
 fn wrap(v: Value) -> Value {
@@ -677,6 +757,63 @@ do NOT call it again; explain the steps in chat instead.",
     }
 
     #[tool(
+        description = "Draw a clean shape on the board: basic shapes (rect, rrect, circle, triangle, star, …), \
+lines and arrows (arrow, double-arrow, dashed-line, curved-arrow, connector), and teaching diagrams (numberline, \
+axes, venn2, venn3, flowchart terminator / process / decision / data, callout speech bubble, brace). Give the box \
+in slide pixels; lines and arrows go from (x, y) to (x + w, y + h). Optional fill (`#rrggbbaa` for a soft tint), \
+dashed outline and centred text (a flowchart step). The teacher can then resize, recolour, fill or erase it like \
+their own shapes. One undo step; returns the new item ids.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn add_shape(&self, Parameters(p): Parameters<AddShapeParams>) -> CallToolResult {
+        self.live_call(Op::AddShape {
+            page: p.page,
+            shape: p.shape,
+            x: p.x,
+            y: p.y,
+            w: p.w,
+            h: p.h,
+            color: p.color,
+            fill: p.fill,
+            width: p.width,
+            dashed: p.dashed,
+            text: p.text,
+        })
+        .await
+    }
+
+    #[tool(
+        description = "Draw a table on the board (rows × cols, 1 to 10 each) with optional cell text and a \
+filled header row, e.g. a comparison table or a times table. The table and its text are one group the teacher \
+can move, resize and edit (add or remove rows and columns, type in cells). One undo step; returns the item ids.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn add_table(&self, Parameters(p): Parameters<AddTableParams>) -> CallToolResult {
+        self.live_call(Op::AddTable {
+            page: p.page,
+            x: p.x,
+            y: p.y,
+            rows: p.rows,
+            cols: p.cols,
+            w: p.w,
+            h: p.h,
+            cells: p.cells,
+            color: p.color,
+            header_fill: p.header_fill,
+            text_size: p.text_size,
+        })
+        .await
+    }
+
+    #[tool(
         description = "Change the look of the board: the current page's colour (white, paper, chalkboard, \
 blackboard or #rrggbb) and pattern, and/or the app interface (light, dark, system). Smart Objects follow the \
 page colour automatically; new text you add picks a readable colour for it. Use it when the teacher asks for \
@@ -742,5 +879,14 @@ mod tests {
         assert!(s["properties"]["item_ids"]["description"].is_string());
         let c = serde_json::to_value(schemars::schema_for!(ConnectBoardParams)).unwrap();
         assert_eq!(c["required"][0], "code");
+        let s = serde_json::to_value(schemars::schema_for!(AddShapeParams)).unwrap();
+        assert!(
+            s["properties"]["shape"]["description"]
+                .as_str()
+                .unwrap()
+                .contains("venn2")
+        );
+        let t = serde_json::to_value(schemars::schema_for!(AddTableParams)).unwrap();
+        assert_eq!(t["properties"]["rows"]["maximum"], 10);
     }
 }

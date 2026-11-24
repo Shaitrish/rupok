@@ -299,7 +299,7 @@ gets `z = (max z on the page) + 1`; "bring to front" assigns a new top `z`.
 | `opacity` | `f64` | yes | `1.0` | Extra opacity in `[0, 1]`, multiplied into the colour's alpha. |
 | `pts` | `Binary` | yes | empty stroke | Points in the [stroke point codec](#stroke-points). |
 | `ox`, `oy` | `f64` | no | `0` | Translation applied at render time. |
-| `shape` | `String` | no | absent | Set when a shape tool or Smart Ink made the stroke: `rect`, `ellipse`, `line`, `arrow`, and from Smart Ink also `circle`, `square`, `triangle`, `diamond`, `pentagon`, `hexagon` or `star`. Readers MUST accept other values. |
+| `shape` | `String` | no | absent | Set when a shape tool or Smart Ink made the stroke: `rect`, `ellipse`, `line`, `arrow`, and from Smart Ink also `circle`, `square`, `triangle`, `diamond`, `pentagon`, `hexagon` or `star`; the Shapes picker (proposed, pending RFC) adds the values in [Shapes picker kinds](#shapes-picker-kinds-proposed). Readers MUST accept other values. |
 | `geom` | `Map` | no | absent | Editable geometry of a shape stroke (see [Shape geometry](#shape-geometry)). |
 
 - Moving a stroke changes `ox`/`oy` and never rewrites `pts`. This keeps moves
@@ -325,6 +325,8 @@ readers that don't know it just draw `pts`.
 | `w`, `h` | `f64` | yes | none | See below. |
 | `rot` | `f64` | no | `0` | Rotation in radians about the box centre, clockwise on screen. |
 | `v` | `List<f64>` | for `poly` | empty | Vertices `[x0, y0, x1, y1, …]` normalised to the box (0..1). |
+| `fill` | `i64` (colour) | no | absent | *Proposed, pending RFC.* Fill colour of a closed shape (`rect`, `ellipse`, `poly`, `stadium`, `rrect`, `callout`, `table`), including alpha. Drawn inside the closed outline `pts` traces (a `table`: its box), even-odd, **under all ink** of the page, at the shape's place among non-ink items. Readers that don't know it draw no fill. |
+| `dash` | `bool` | no | `false` | *Proposed, pending RFC.* Draw the outline dashed: `pts` is cut by arc length into dashes `2.5 × width + 8` long with gaps `1.8 × width + 7` (world units). Readers that don't know it draw the outline solid. Writers omit it when false. |
 
 - `rect`, `ellipse`, `poly`: `x`, `y` is the top-left corner of the
   unrotated box and `w`, `h` (≥ 0) its size. An ellipse is inscribed in
@@ -372,6 +374,31 @@ Smart Ink also stores `shape` values `parallelogram` (a `poly`),
 `graph-line` (a `line` grouped with `axes`), `venn` (`ellipse` circles in a
 group) and `benzene` (a `poly` hexagon with an `ellipse` or `line` strokes
 in a group).
+
+###### Shapes picker kinds (proposed)
+
+> **Status: proposed, pending RFC.** Additive like the templates: `pts`
+> is always the drawing, so a reader that knows none of these still shows
+> the shape.
+
+The board's Shapes picker writes these box kinds (the box turned by `rot`
+like `rect`). `v` has an even length, like every `geom`.
+
+| `kind` | `shape` | `v` |
+|---|---|---|
+| `rrect` | `rounded-rect` | `[r, 0]`: corner radius as a fraction of `min(w, h)` (0..0.5). |
+| `callout` | `callout` | `[tx, ty]`: the tail's tip as fractions of `w` / `h` (`ty` ≥ 1, below the box); a rounded body with a tail from its bottom edge. |
+| `brace` | `brace` | `[side, 0]`: `0` `{` (cusp left), `1` `}`, `2` cusp at the top, `3` cusp at the bottom. |
+| `arrow2` | `double-arrow` | none. An arrow along the box's centre line with heads at both ends. |
+| `carrow` | `curved-arrow` | none. A quadratic curve from the box's bottom-left to its bottom-right corner bulging to the top edge, with a head at the end. |
+
+It also stores these `shape` values on existing kinds: `square`,
+`circle`, `right-triangle`, `trapezoid`, `parallelogram` (`poly`, `rect`,
+`ellipse`), the flowchart `process` (`rect`), `decision` (`poly`),
+`data` (`poly`, input/output) and `terminator` (`stadium`), `venn`
+(`ellipse` circles in a group), `table-header` (a filled `rect` under a
+table's first row, grouped with it), and `table`, `numberline` and `axes`
+with their labels as text items in a group.
 
 `from`, `to` (`String`, optional): on a `line` or `arrow`, the ids of the
 items its first and second end are attached to (a *connector*). An editor

@@ -1,0 +1,70 @@
+/* The Shapes picker (ShapesPicker.tsx), inside a dock popover: 44px targets,
+ * six to a row, flat like the rest of the dock. */
+:root .dock-pop.dock-pop-shapes { --tb: 44px; --tb-icon: 24px; --r-tb: 12px; width: min(calc(6 * 44px + 5 * 2px + 2 * var(--s2)), calc(100vw - 16px)); }
+.shapes-picker { display: flex; flex-direction: column; gap: 2px; }
+.shapes-label { padding: 6px var(--s2) 2px; font: 650 11px/14px var(--font); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-2); }
+.shapes-row { display: grid; grid-template-columns: repeat(auto-fill, var(--tb)); gap: 2px; }
+.shapes-tile { width: var(--tb); height: var(--tb); display: grid; place-items: center; }
+.shapes-tile .shape-glyph { color: var(--text); }
+.shapes-tile.on .shape-glyph { color: var(--accent-11); }
+.shapes-hint { margin: 2px var(--s2) 0; font: 500 12px/16px var(--font); color: var(--text-2); }
+
+/* Fill swatches: a soft tint on a checker so translucency reads; none is crossed out. */
+.shapes-fill { width: var(--tb); height: var(--tb); display: grid; place-items: center; }
+.fill-dot {
+  width: 24px; height: 24px; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(0, 0, 40, 0.16);
+  background-image: none;
+}
+:root[data-theme="dark"] .fill-dot { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24); }
+.fill-dot.none { background: linear-gradient(to top right, transparent calc(50% - 1px), var(--danger) calc(50% - 1px), var(--danger) calc(50% + 1px), transparent calc(50% + 1px)); }
+.shapes-fill.on, .sel-fill.on { background: transparent; }
+.shapes-fill.on .fill-dot, .sel-fill.on .fill-dot { box-shadow: 0 0 0 2px var(--surface-solid), 0 0 0 4px var(--accent-9); }
+
+/* The table size grid: ten by ten; a finger can slide across it. */
+.shapes-table { display: flex; flex-direction: column; gap: var(--s1); }
+.shapes-table-head { display: flex; align-items: center; gap: var(--s1); min-height: 44px; }
+.shapes-back { width: 44px; height: 44px; display: grid; place-items: center; }
+.shapes-table-size { padding: 0 var(--s2); font: 650 14px/20px var(--font); font-variant-numeric: tabular-nums; color: var(--text); }
+.shapes-grid10 {
+  display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; padding: 2px var(--s1) var(--s1);
+  touch-action: none; user-select: none;
+}
+.shapes-cell {
+  aspect-ratio: 1; min-width: 0; padding: 0; border: 0; border-radius: 4px; cursor: pointer;
+  background: var(--surface-solid); box-shadow: inset 0 0 0 1.5px var(--gray-6, var(--hairline));
+}
+.shapes-cell.on { background: var(--accent-4); box-shadow: inset 0 0 0 1.5px var(--accent-9); }
+.shapes-cell:focus-visible { outline: 2px solid var(--accent-9); outline-offset: 1px; }
+
+/* Selection toolbar: fill, dash and table controls (ShapeControls.tsx). */
+.sel-dash { width: 22px; height: 0; border-top: 3px dashed currentColor; }
+.sel-dash.solid { border-top-style: solid; }
+.sel-bar .btn.sel-table { width: auto; min-width: 44px; padding: 0 10px; gap: 4px; font: 650 13px/1 var(--font); }
+
+/* Cells to type in: tap targets over the selected table. */
+.table-cells { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.table-cell {
+  position: absolute; pointer-events: auto; border: 0; padding: 0; cursor: text; border-radius: 6px;
+  background: color-mix(in srgb, var(--accent-9) 10%, transparent); box-shadow: inset 0 0 0 1.5px var(--accent-9);
+  color: var(--accent-11); font: 650 13px/1 var(--font); display: grid; place-items: center;
+}
+.table-cell:hover, .table-cell:focus-visible { background: color-mix(in srgb, var(--accent-9) 22%, transparent); outline: none; }
+.table-cells-done {
+  position: absolute; pointer-events: auto; transform: translate(-50%, 0);
+}
+
+/* The fill chooser (toolbar and picker): swatches, then the opacity step. */
+.fill-chooser { display: flex; flex-direction: column; gap: 4px; }
+.fill-swatches { display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 2px; justify-content: start; }
+.sel-fills .fill-swatches { display: flex; flex-wrap: wrap; width: max-content; max-width: calc(100vw - 48px); }
+.fill-swatches .btn.icon { width: 44px; height: 44px; min-width: 44px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 12px; background: transparent; cursor: pointer; }
+.fill-swatches .btn.icon:hover { background: var(--hover); }
+.fill-swatches .sel-fill.on .fill-dot { box-shadow: 0 0 0 2px var(--surface-solid), 0 0 0 4px var(--accent-9); }
+.fill-alpha { display: flex; height: 40px; }
+.fill-alpha button { flex: 1; height: 40px; min-height: 40px; justify-content: center; font: 600 13px/1 var(--font); }
+.sel-fills { flex-direction: column; align-items: stretch; padding: 6px; }
+.sel-bar .btn.sel-fill-btn { width: auto; padding: 0 12px 0 10px; gap: 8px; font: 650 13px/1 var(--font); }
+.sel-bar .btn.sel-fill-btn .fill-dot { width: 22px; height: 22px; }
+.shapes-picker .fill-swatches { grid-template-columns: repeat(6, var(--tb)); }
+.sel-tablerow { flex-wrap: wrap; justify-content: center; width: max-content; max-width: calc(100vw - 32px); }
+.sel-bar .sel-tablerow .btn.sel-table { height: 44px; }

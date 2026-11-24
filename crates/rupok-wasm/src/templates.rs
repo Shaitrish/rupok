@@ -28,6 +28,7 @@ pub fn is_box_kind(kind: &str) -> bool {
             | "bulb"
             | "switch"
     ) || kind.starts_with("gate-")
+        || crate::catalog::is_kind(kind)
 }
 
 /// Open polylines through `v` normalised to the box (like `poly`).
@@ -329,6 +330,7 @@ fn box_points(g: &ShapeGeom, width: f32) -> Option<Vec<Q>> {
         k if k.starts_with("gate-") => {
             gate_points(k, w, h, v.get(1).copied().unwrap_or(0.0) >= 0.5)?
         }
+        k if crate::catalog::is_kind(k) => crate::catalog::local_points(g, width)?,
         _ => return None,
     };
     Some(pts)
@@ -542,6 +544,10 @@ pub fn anchors(g: &ShapeGeom) -> Vec<(&'static str, Q)> {
             out
         }
         "harpoon" => vec![("start", [g.x, g.y]), ("end", [g.x + g.w, g.y + g.h])],
+        k if crate::catalog::is_kind(k) => crate::catalog::local_anchors(g)
+            .into_iter()
+            .map(|(n, q)| (n, f.at(q[0], q[1])))
+            .collect(),
         _ => Vec::new(),
     }
 }

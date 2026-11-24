@@ -128,6 +128,11 @@ offline recogniser read (n-best LaTeX). Then:
 - **Translate this slide to Bangla**: read texts from `get_current_page`; put
   the translation on a new page with the same layout (`add_text` at the same
   coordinates), unless asked to replace in place.
+- **Diagram from shapes**: a flowchart is `add_shape` calls (`terminator`,
+  `process`, `decision`, `data`, each with `text`) joined by `arrow`s; a
+  sorting activity is a `venn2` / `venn3`; a comparison is `add_table` with
+  `cells` and a `header_fill`. Leave 40px or more between shapes, keep text
+  ≥ 24px, and use soft fills (`#rrggbb33`) so ink stays readable on top.
 - **Harder practice problems**: read the example, make 3 graded problems on a
   new page, answers revealed on Next.
 
@@ -180,6 +185,8 @@ House rules (projectors in bright rooms, chalk-dusted fingers):
 | `add_youtube`, `add_media`, `add_3d_model` with `path: "live"` | A YouTube video or trusted web embed by link, a video/audio file, or a `.glb` 3D model from the workspace (files are sent to the board). |
 | `replace_items_with_text(item_ids, text, …)` | Ink to text (confirm first). |
 | `step_object(item_id?, step?, delta?)` | Next / back inside a Smart Object. |
+| `add_shape(shape, x, y, w, h, color?, fill?, width?, dashed?, text?, page?)` | A clean shape: rect, rrect, square, ellipse, circle, triangle, right-triangle, diamond, pentagon, hexagon, star, parallelogram, trapezoid, line, arrow, double-arrow, dashed-line, curved-arrow, connector, numberline, axes, venn2, venn3, terminator, process, decision, data, callout, brace, brace-down. Lines go from (x, y) to (x + w, y + h). |
+| `add_table(x, y, rows, cols, w?, h?, cells?, color?, header_fill?, text_size?, page?)` | A table (1–10 × 1–10) with cell text, grouped. |
 | `point_at(x, y, w?, h?, label?, seconds?)` | Show the class where to look. |
 | `write_handwriting(lines, anchor?, style?, speed?, color?, size?, step_mode?)` | Write a solution in handwriting next to the problem (see Solve this). |
 | `set_board_theme(page_color?, pattern?, ui?)` | Chalkboard, grid, dark mode. |

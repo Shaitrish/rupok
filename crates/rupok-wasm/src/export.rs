@@ -324,6 +324,13 @@ enum ExportItem<'a> {
         /// Outline polygons, see [`stroke_outline`].
         outline: Vec<Vec<f32>>,
     },
+    /// A closed shape's fill, drawn under the ink like the board's DOM
+    /// layer: one polygon, flat `[x0, y0, …]`, in the stroke's place.
+    Fill {
+        /// 0xRRGGBBAA
+        color: u32,
+        poly: Vec<f32>,
+    },
     Text {
         rect: [f64; 4],
         text: &'a str,
@@ -392,8 +399,32 @@ pub fn page_export_json(lesson: &Lesson, pkg: &Package, index: usize, strokes: b
                 a[3].max(b[3]),
             ],
         });
+        if let ItemData::Stroke(s) = &it.data
+            && strokes
+            && let Some(g) = s.geom.as_ref()
+            && let Some(poly) = crate::catalog::fill_outline(g, &s.points, s.offset)
+        {
+            out.push(ExportItem::Fill {
+                color: g.fill.unwrap_or(0),
+                poly: poly
+                    .iter()
+                    .flat_map(|p| [round1(p[0] as f32), round1(p[1] as f32)])
+                    .collect(),
+            });
+        }
         out.push(match &it.data {
             ItemData::Stroke(_) if !strokes => continue,
+            ItemData::Stroke(s) if s.geom.as_ref().is_some_and(|g| g.dash) => ExportItem::Stroke {
+                color: s.color,
+                opacity: s.opacity,
+                tool: &s.tool,
+                shape: s.shape.as_deref(),
+                // A dashed outline: the union of its dashes.
+                outline: crate::catalog::dash_pieces(&s.points, s.width)
+                    .iter()
+                    .flat_map(|d| stroke_outline(d, s.width, s.offset, OUTLINE_TOLERANCE))
+                    .collect(),
+            },
             ItemData::Stroke(s) => ExportItem::Stroke {
                 color: s.color,
                 opacity: s.opacity,
@@ -744,6 +775,44 @@ mod tests {
         assert_eq!(
             page_export_json(&lesson, &Package::default(), 7, true),
             "null"
+        );
+    }
+
+    #[test]
+    fn filled_and_dashed_shapes_export_a_fill_and_dashes() {
+        let mut lesson = Lesson::new("Shapes", 1.0);
+        let page = lesson.page_id_at(0).unwrap();
+        let mut g =
+            crate::catalog::place(crate::catalog::Preset::Rect, [100.0, 100.0], [400.0, 300.0])
+                .parts
+                .remove(0)
+                .geom;
+        g.fill = Some(0xa7f3d0ff);
+        g.dash = true;
+        let points = crate::shapes::geom_points(&g, 4.0, 0.6).unwrap();
+        let stroke = rupok_core::StrokeData {
+            tool: "pen".into(),
+            color: 0x1c2024ff,
+            width: 4.0,
+            opacity: 1.0,
+            points,
+            offset: [0.0, 0.0],
+            shape: Some("rect".into()),
+            geom: Some(g),
+        };
+        lesson
+            .add_item(&page, &ItemData::Stroke(stroke), 2.0)
+            .unwrap();
+        let v: serde_json::Value =
+            serde_json::from_str(&page_export_json(&lesson, &Package::default(), 0, true)).unwrap();
+        let items = v["items"].as_array().unwrap();
+        assert_eq!(items[0]["kind"], "fill");
+        assert_eq!(items[0]["color"], 0xa7f3d0ffu32);
+        assert_eq!(items[0]["poly"].as_array().unwrap().len(), 10);
+        assert_eq!(items[1]["kind"], "stroke");
+        assert!(
+            items[1]["outline"].as_array().unwrap().len() > 10,
+            "one polygon per dash"
         );
     }
 }
