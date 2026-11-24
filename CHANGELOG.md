@@ -5,6 +5,87 @@ notes come after each list. Downloads are on
 [rupok.app/download](https://rupok.app/download/) and on
 [GitHub Releases](https://github.com/Shaitrish/rupok/releases).
 
+## v0.2.4 (24 November 2026)
+
+### For teachers
+
+- **Voice on the board:** a new Voice text tool on the dock (a microphone
+  with a T, in Prepare and Teach). Tap the page and speak: your words
+  appear on the slide while you talk, wrapped inside the box and never off
+  the page. Say "comma", "full stop" or "new line" (কমা, দাঁড়ি, নতুন লাইন),
+  or just pause for a new line. Tap the box or press Esc to finish, and the
+  words become a normal text box you can edit, move and recolour (one undo
+  step). In Teach, hold the dock button to talk and let go to place the
+  words, or use Space or a clicker's blank key. Switch the box to Bangla,
+  to hand-written (English), or to **Ask AI**, which sends what you said to
+  your AI as a question. Settings → General → Voice on the board.
+- **AI in action:** when your AI builds something, the class watches it
+  work. A **live working card** appears exactly where the result will go,
+  with what the AI is doing, its plan and a preview, and then the result
+  lands in that spot: Smart Objects fade into place, handwriting writes
+  itself and shapes are drawn on, with a small sparkle.
+- **AI text fits the page:** text from the AI wraps, moves in from the
+  edges and shrinks if needed, so it never runs off the slide or the
+  window. Very long text continues on a new page.
+- **Nicer AI handwriting:** smoother letters drawn in a hand's pen order,
+  natural spacing, a gently wandering baseline, pressure that swells and
+  tapers, a faster pace and a new joined style. Solve this can write the
+  solution line by line as the AI works it out.
+- **Class mode, fewer permission prompts:** on in Teach by default. Routine
+  board edits by your AI go straight through, each with a "Claude added …
+  · Undo" note so you can take it back with one tap. Deleting, clearing,
+  replacing your ink, and changing settings, the dock or the mode still
+  ask you first. Settings → AI & agents → AI in action.
+- **The AI button is always there in Teach**, labelled *Ask AI* until an AI
+  is connected, and tapping it always brings the chat back.
+- **Students can ask AI** (off until you allow it): in Student view a
+  student can ask the AI to show them something, with a limit per student;
+  the answer lands on the student's own layer, never in your lesson.
+- **Claude can control everything:** your AI can now do anything you can
+  on the board: add, reorder, duplicate, rename and delete pages; select,
+  move, align, restyle, resize, group and delete items; draw ink; edit
+  text; switch modes, zoom, replay and celebrate; export a PDF; organise
+  the Library; change allowed settings; and lay out your dock. AI keys,
+  your account, payments and permission switches stay yours alone.
+- **Custom stamps and Smart stamps:** make your own stamps (a picture, an
+  emoji or a label) with a sparkle, a burst of stars, a sound or a counter,
+  in the Stamps palette under **My stamps**, or ask your AI to make one.
+  **Smart stamps** are small interactive stamps, like a dice that rolls when
+  tapped. Stamps travel inside the lesson, so shared lessons show them, and
+  you can import and export stamp packs.
+- **Your own dock layout:** ⋯ → Customize dock (or hold the dock's grip).
+  Drag buttons in and out, make your own groups, split the dock to both
+  sides of the screen, change sizes and save named layouts such as
+  Left-handed, Minimal teaching or Maths class. Or ask your AI: "make my
+  dock like this".
+- **Make AI smoother:** Settings → AI & agents → *Make AI smoother:
+  pre-approve Rupok tools* has a ready-to-copy line for Claude Code, Codex
+  and OpenCode, so your AI stops asking before every board edit.
+
+### For developers
+
+- Agent-first is now a rule (AGENTS.md rule 8): every setting, dock button
+  and live op needs a row in `docs/agent-capabilities.md`, checked by
+  `crates/rupok-cli/tests/agent_capabilities.rs`. 44 new MCP tools
+  (`mcp_agent.rs`), new live ops in `rupok-live` (`items.rs`, `stamps.rs`)
+  and board ops in `apps/board/src/agentControl.ts`; settings an agent may
+  change are an allowlist (`agentSettings.ts`, 56 entries).
+- Voice on the board: live ops and MCP tools `start_voice_text` and
+  `stop_voice_text` (board only), engine call `add_text_box`; `add_text`
+  with `w` wraps on the board with the board's font (`voice/wrap.ts`).
+- AI in action: `show_progress` op and MCP tool (`rupok_live::progress`,
+  `mcp_progress.rs`), text fitting in `rupok_live::fit` (`add_text`,
+  `replace_items_with_text`, `update_text`, `write_handwriting`),
+  `write_handwriting` `anchor.group`, the handwriting synthesiser rework in
+  `rupok-ink/src/write`. Every MCP tool declares annotations
+  (`readOnlyHint`, `destructiveHint` only for real deletes and ink
+  replacement, `idempotentHint`, `openWorldHint: false`), checked by a test.
+- Format (proposed, pending RFC): a root `stamps` map for custom stamps
+  (`spec/rupok-format.md` § Custom stamps) and Smart stamps
+  (`spec/smart-object.md`). Additive: older lessons open unchanged.
+- The dock config (`modes.ts` `DockConfig`) gained ordered `groups`, a
+  `split` dock, sizes and named layouts, additively.
+
 ## v0.2.3 (24 November 2026)
 
 v0.2.2 was never published on its own, so this is the first update since

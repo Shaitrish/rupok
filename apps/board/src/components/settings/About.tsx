@@ -6,7 +6,7 @@ import { Mark } from "../Icon";
 import { controller } from "../../controller";
 import { graphicsAdapter } from "../../inkLatency";
 
-export const VERSION = "0.2.3";
+export const VERSION = "0.2.4";
 const REPO = "https://github.com/shaitrish/rupok";
 
 export function AboutSection(props: SettingProps) {
