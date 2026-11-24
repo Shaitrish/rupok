@@ -32,6 +32,8 @@ import { isPhone, pagesDrawer, pagesShown } from "./viewport";
 import { PageDesignHost } from "./components/PageDesign";
 import { drawCursor } from "./wetInk";
 import { Celebrate, QuickMenu } from "./components/Stamps";
+import { DockEditor } from "./components/DockEditor";
+import { StampEditorHost } from "./components/StampEditor";
 import { UpdateNotice } from "./updates/UpdateNotice";
 import { startUpdateChecks } from "./updates/updates";
 import { Tour } from "./tour/Tour";
@@ -174,6 +176,8 @@ export default function App() {
         <Dock onSettings={openSettings} />
         <QuickMenu />
         <Celebrate />
+        <DockEditor />
+        <StampEditorHost />
         <StatusChips />
         {/* Connect AI: the teacher's own agent edits the board live (live.ts). */}
         <LivePanel />

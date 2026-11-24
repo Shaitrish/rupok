@@ -210,3 +210,16 @@ html[data-overlay="ink"] .ov-dock > * { pointer-events: auto; }
 .pin-toggle.fixed { background: transparent; color: var(--text-3); cursor: default; }
 .dock-settings { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--s6); align-items: end; margin-top: var(--s2); }
 .dock-settings > .check { grid-column: 1 / -1; margin-bottom: var(--s2); }
+
+/* ------------------------------------------- Customize dock: sizes */
+/* A teacher's dock size and large icons (modes.ts → dock.size, dock.large). */
+:root .dock-shell.sz-s { --tb: 40px; --tb-icon: 20px; }
+:root .dock-shell.sz-l { --tb: 60px; --tb-icon: 30px; --r-tb: 14px; }
+:root .dock-shell.big-icons { --tb-icon: 30px; }
+:root .dock-shell.sz-l.big-icons { --tb: 68px; --tb-icon: 36px; }
+/* Per-button sizes: the cell does not box its button. */
+.dock-cell { display: contents; }
+.dock-cell.sz-l > .tool, .dock-cell.sz-l > .viewer-count { width: calc(var(--tb) * 1.3); height: calc(var(--tb) * 1.3); }
+.dock-cell.sz-l > .tool svg.icon { transform: scale(1.3); }
+.dock-cell.sz-s > .tool { width: calc(var(--tb) * 0.8); height: calc(var(--tb) * 0.8); }
+.dock-cell.sz-s > .tool svg.icon { transform: scale(0.85); }

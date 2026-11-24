@@ -331,3 +331,13 @@ export function summonDock(x: number, y: number): boolean {
   summonHandler(x, y);
   return true;
 }
+
+// ---------------------------------------------------------- the editor
+
+/** The "Customize dock" editor (components/DockEditor.tsx): the mode it
+ * edits, or null when closed. Opened from Settings → Teaching modes, the
+ * dock's ⋯ menu, or by holding the dock's grip. */
+export const [dockEditor, setDockEditor] = createSignal<Mode | null>(null);
+export function openDockEditor(m: Mode) {
+  setDockEditor(m === "view" ? "prepare" : m);
+}

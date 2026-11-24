@@ -115,7 +115,67 @@
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
+/* ------------------------------------------------ custom stamps */
+
+.stamp-art { width: 100%; height: 100%; }
+.item.stamp.anim-sparkle svg { animation: stamp-pop 420ms var(--ease) both; transform-origin: 50% 50%; }
+.item.stamp.anim-sparkle::after {
+  content: ""; position: absolute; inset: -35%; pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 2%, #fff 0 2.5%, transparent 3.5%),
+    radial-gradient(circle at 98% 50%, #ffe066 0 3%, transparent 4%),
+    radial-gradient(circle at 50% 98%, #fff 0 2.5%, transparent 3.5%),
+    radial-gradient(circle at 2% 50%, #ffe066 0 3%, transparent 4%),
+    radial-gradient(circle at 86% 14%, #fff 0 2%, transparent 3%),
+    radial-gradient(circle at 14% 86%, #ffe066 0 2%, transparent 3%),
+    radial-gradient(circle at 86% 86%, #fff 0 2%, transparent 3%),
+    radial-gradient(circle at 14% 14%, #ffe066 0 2%, transparent 3%);
+  animation: stamp-twinkle 900ms var(--ease) both;
+}
+@keyframes stamp-twinkle { 0% { transform: scale(0.5) rotate(0); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1.2) rotate(40deg); opacity: 0; } }
+.item.stamp.anim-bounce svg { animation: stamp-bounce 700ms cubic-bezier(0.28, 0.84, 0.42, 1) both; transform-origin: 50% 100%; }
+@keyframes stamp-bounce { 0% { transform: translateY(-60%) scale(0.8); opacity: 0; } 40% { transform: translateY(0) scale(1.1, 0.9); opacity: 1; } 60% { transform: translateY(-14%) scale(0.97, 1.03); } 80% { transform: translateY(0) scale(1.03, 0.97); } 100% { transform: none; } }
+.item.stamp.anim-spin svg { animation: stamp-spin 600ms var(--ease) both; transform-origin: 50% 50%; }
+@keyframes stamp-spin { 0% { transform: rotate(-200deg) scale(0.3); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.item.stamp.anim-fade-in svg { animation: stamp-fade 500ms var(--ease) both; }
+@keyframes stamp-fade { from { opacity: 0; } }
+.item.stamp.fading { transition: opacity 420ms var(--ease), transform 420ms var(--ease); opacity: 0; transform: scale(0.85); }
+
+/* Counter badge: this stamp's number on the page. */
+.stamp-count {
+  position: absolute; right: -6%; top: -6%; min-width: 34%; height: 34%; padding: 0 6%; border-radius: 999px;
+  display: grid; place-items: center; background: var(--accent-9, #20c997); color: var(--accent-contrast, #04241b);
+  font-family: var(--font); font-weight: 800; line-height: 1;
+  box-shadow: 0 0 0 3px var(--page-bg, #fff);
+}
+
+/* A short burst around a new stamp. */
+.stamp-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.stamp-burst i {
+  position: absolute; left: 0; top: 0; width: 12px; height: 12px; margin: -6px; border-radius: 3px; background: var(--c);
+  font-style: normal; font-size: 18px; line-height: 12px; text-align: center; color: var(--c);
+  animation: stamp-burst 760ms var(--ease) both; animation-delay: var(--d);
+}
+.stamp-burst.burst-stars i, .stamp-burst.burst-hearts i { background: transparent; }
+.stamp-burst.burst-sparkles i { width: 6px; height: 6px; margin: -3px; border-radius: 50%; box-shadow: 0 0 8px var(--c); }
+@keyframes stamp-burst {
+  0% { transform: rotate(var(--a)) translateY(0) scale(0.4); opacity: 1; }
+  100% { transform: rotate(var(--a)) translateY(-110px) scale(1) rotate(160deg); opacity: 0; }
+}
+
+/* My stamps in the palette. */
+.my-stamps { display: flex; flex-direction: column; gap: var(--s1); }
+.my-stamps-head { display: flex; align-items: center; justify-content: space-between; padding-right: var(--s1); }
+.my-stamps-head .btn.small, .my-stamps-pack .btn.small { min-height: 36px; padding: 0 var(--s3); }
+.my-stamp { position: relative; display: contents; }
+.my-stamp.editing .stamp-cell { outline: 2px dashed var(--accent-9); outline-offset: -4px; }
+.my-stamps-pack { display: flex; gap: var(--s2); padding: 0 var(--s1); }
+.smart-glyph { color: var(--accent-11); }
+img.stamp-icon { object-fit: contain; }
+
 @media (prefers-reduced-motion: reduce) {
+  .item.stamp[class*="anim-"] svg, .item.stamp.anim-sparkle::after, .stamp-burst { animation: none; display: none; }
+  .item.stamp[class*="anim-"] svg { display: block; }
   .item.stamp.pop svg, .item.stamp.pop::before, .item.stamp.pop::after, .quick-item { animation: none; }
   .item.stamp.pop::before, .item.stamp.pop::after { display: none; }
 }

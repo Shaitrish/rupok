@@ -7,8 +7,9 @@ import { controller } from "../controller";
 import {
   ALLOWED_CHROME, ALLOWED_TOOLS, CHROME_ITEMS, CORE_TOOLS, DEFAULT_MODES, DOCK_POSITIONS, MODES, SHAPE_TOOLS, TOOLBAR_ITEMS, UI_CONFIG_FORMAT,
   UI_CONFIG_VERSION, type ChromeKey, type DockConfig, type DockPin, type Mode, type ModeConfig, type ToolbarItem, type UiConfigFile,
-  resolveMode, sanitizeModes,
+  resolveMode, sanitizeDockPresets, sanitizeModes,
 } from "../modes";
+import { openDockEditor } from "../dock";
 import { ACCENTS, type Prefs, mode, modeConfig, prefs, setPrefs, showToast } from "../state";
 import { exportGestures, importGestures } from "../gesturePrefs";
 import { Icon } from "./Icon";
@@ -35,6 +36,7 @@ export function exportUiConfig(): UiConfigFile {
     modes: Object.fromEntries(MODES.map((m) => [m.id, resolveMode(p.modes, m.id)])) as UiConfigFile["modes"],
     appearance: { theme: p.theme, accent: p.accent, iconStyle: p.iconStyle, toolbar: p.toolbar, density: p.density, hand: p.hand },
     gestures: exportGestures(),
+    dockPresets: p.dockPresets ?? [],
   };
 }
 
@@ -52,6 +54,7 @@ export function importUiConfig(raw: unknown): string {
     if (typeof a[k] === "string" && allowed.includes(a[k] as string)) (next as any)[k] = a[k];
   }
   if (typeof a.accent === "string" && ACCENTS.some((x) => x.id === a.accent)) next.accent = a.accent as Prefs["accent"];
+  if (f.dockPresets !== undefined) next.dockPresets = sanitizeDockPresets(f.dockPresets);
   setPrefs(next);
   controller.applyPrefs();
   controller.updateInsets(true);
@@ -224,6 +227,11 @@ export function ModesSettings() {
           <span>Start minimised (a small round button)</span>
         </label>
       </div>
+      <Show when={editing() !== "view"}>
+        <button class="btn solid" onClick={() => openDockEditor(editing())}>
+          <Icon name="settings" /><span class="label">Customize dock…</span>
+        </button>
+      </Show>
       <p class="hint">Pen, highlighter, eraser, laser and undo are always on the dock in Prepare and Teach. Tools set to “⋯ menu” wait in the dock's ⋯ button. Drag the dock by its grip; it remembers where you leave it on each screen size.</p>
       <div class="actions">
         <button class="btn" onClick={upload}><Icon name="import" /><span class="label">Import UI config</span></button>

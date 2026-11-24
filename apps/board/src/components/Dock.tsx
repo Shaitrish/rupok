@@ -13,14 +13,16 @@
 
 import { type JSX, For, Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
 import { controller } from "../controller";
-import { CORE_TOOLS, TOOLBAR_ITEMS, type ModeConfig, type ToolbarItem } from "../modes";
+import {
+  CORE_TOOLS, TOOLBAR_ITEMS, type DockConfig, type DockGroup, type DockSize, type ModeConfig, type ToolbarItem, layoutPins,
+} from "../modes";
 import {
   type DomItem, HL_COLORS, PEN_COLORS, WIDTHS, type Tool, camera, canRedo, canUndo, color, editingText, hex, hlColor, isView, items,
   lessonOpened, mode, modeConfig, pageIndex, pages, prefs, replay, selectionIds, setColor, setHlColor, setPrefs, setSizes, setWidth,
   showToast, sizeKey, sizes, studentEntry, tool, width,
 } from "../state";
 import {
-  type DockEdge, type DockPlace, dockFrame, dockMinimized, dockPlace, inkForBoard, isVertical, lastShape, placeAround, recentColors,
+  type DockEdge, type DockPlace, dockFrame, dockMinimized, dockPlace, inkForBoard, isVertical, lastShape, openDockEditor, placeAround, presetPlace, recentColors,
   registerDockSummon, resetDock, screenBucket, setDockMinimized, setDockPlace, setDockSide, setLastShape, useColor,
   hlOpacity, setHlOpacityStored,
 } from "../dock";
@@ -37,6 +39,7 @@ import { MarkerOpacity, SizeControl, StylePicker } from "./InkOptions";
 import { StampIcon, StampsPanel } from "./Stamps";
 import { brushInfo, brushOf } from "../brushes";
 import { celebrate, currentStamp } from "../stamps";
+import { openAiPanel, setComposerDraft } from "../chat";
 
 const META = new Map(TOOLBAR_ITEMS.map((t) => [t.id, t]));
 const INK_TOOLS: Tool[] = ["pen", "highlighter", "rect", "ellipse", "line", "arrow", "shape"];
@@ -58,13 +61,37 @@ const FADE_NEAR = 120;
 const FADE_HOLD_MS = 800;
 const WAKE_NEAR = 56;
 
-type Group = "ink" | "colors" | "create" | "point" | "context" | "history" | "nav" | "exit" | "end";
-type Kind = "tool" | "colors" | "shapes" | "smartink" | "undo" | "redo" | "pager" | "replay" | "exit" | "context" | "more";
-interface Entry { key: string; kind: Kind; group: Group; id?: ToolbarItem }
+/** Built-in groups ("ink", "create", …), or a teacher's group (`g:<id>`). */
+type Group = string;
+type Kind =
+  | "tool" | "colors" | "shapes" | "smartink" | "undo" | "redo" | "pager" | "replay" | "exit" | "context" | "more"
+  | "celebrate" | "pages" | "solve" | "settings";
+interface Entry { key: string; kind: Kind; group: Group; id?: ToolbarItem; size?: DockSize }
 const GROUP: Partial<Record<ToolbarItem, Group>> = {
   pen: "ink", highlighter: "ink", eraser: "ink", smartink: "create", text: "create", stamp: "create",
   lasso: "point", laser: "point", hand: "point", interact: "point", undo: "history", redo: "history", pager: "nav", replay: "nav", exit: "exit",
+  celebrate: "create", pages: "nav", solve: "create", settings: "end",
 };
+const ACTION_KINDS: ToolbarItem[] = ["smartink", "undo", "redo", "pager", "replay", "exit", "celebrate", "pages", "solve", "settings"];
+const kindOf = (t: ToolbarItem): Kind => (ACTION_KINDS.includes(t) ? (t as Kind) : "tool");
+
+/** A teacher's groups as dock entries (main dock or the split dock). */
+function groupEntries(groups: DockGroup[], sizes: DockConfig["sizes"], prefix: string): Entry[] {
+  const out: Entry[] = [];
+  for (const g of groups) {
+    for (const pin of g.items) {
+      const size = sizes?.[pin];
+      if (pin === "shapes") out.push({ key: "shapes", kind: "shapes", group: `${prefix}${g.id}`, size });
+      else out.push({ key: pin, kind: kindOf(pin), id: pin, group: `${prefix}${g.id}`, size });
+    }
+  }
+  return out;
+}
+
+/** The split dock's entries (a teacher's second dock). */
+export function splitLayout(m: ModeConfig): Entry[] {
+  return m.dock.split ? groupEntries(m.dock.split.groups, m.dock.sizes, "s:") : [];
+}
 
 /** On a phone, what moves into ⋯ first when the dock is too long for the
  * screen ("colors:N" keeps N recent colours). Pen, eraser, the pager and ⋯
@@ -82,7 +109,17 @@ export function dockLayout(m: ModeConfig, core: boolean, allowMore: boolean, roo
   const bar: Entry[] = [];
   const overflow: ToolbarItem[] = [];
   let shapes = false;
-  for (const t of m.tools) {
+  const custom = core && !!(m.dock.groups?.length || m.dock.split);
+  if (custom) {
+    // The teacher's own groups, in their order; the rest waits in ⋯.
+    bar.push(...groupEntries(m.dock.groups ?? [], m.dock.sizes, "g:"));
+    const placed = new Set<string>(layoutPins(m.dock));
+    for (const t of m.tools) {
+      const folded = SHAPES.includes(t as Tool) ? placed.has("shapes") : t === "smartink" && placed.has("shapes") && !placed.has("smartink");
+      if (!placed.has(t) && !folded) overflow.push(t);
+    }
+  }
+  for (const t of custom ? [] : m.tools) {
     // Smart shapes folds into the Shapes button unless it is pinned on its own (Teach).
     if (SHAPES.includes(t as Tool) || (t === "smartink" && shapesOn && !pinned.has("smartink"))) {
       if (!shapesOn) overflow.push(t);
@@ -93,18 +130,26 @@ export function dockLayout(m: ModeConfig, core: boolean, allowMore: boolean, roo
       continue;
     }
     if ((core && CORE_TOOLS.includes(t)) || pinned.has(t)) {
-      const kind: Kind = ["smartink", "undo", "redo", "pager", "replay", "exit"].includes(t) ? (t as Kind) : "tool";
-      bar.push({ key: t, kind, id: t, group: GROUP[t] ?? "point" });
+      bar.push({ key: t, kind: kindOf(t), id: t, group: GROUP[t] ?? "point", size: m.dock.sizes?.[t] });
     } else overflow.push(t);
   }
-  // Recent colours right after the ink tools.
-  const lastInk = bar.map((e) => e.group).lastIndexOf("ink");
+  if (!custom) {
+    const sh = bar.find((e) => e.kind === "shapes");
+    if (sh) sh.size = m.dock.sizes?.shapes;
+  }
+  // Recent colours right after the ink tools (in their group when the teacher grouped them).
   if (m.chrome.colors && core && bar.some((e) => e.id === "pen" || e.id === "highlighter")) {
-    bar.splice(lastInk + 1, 0, { key: "colors", kind: "colors", group: "colors" });
+    if (custom) {
+      const last = bar.map((e) => e.id === "pen" || e.id === "highlighter").lastIndexOf(true);
+      bar.splice(last + 1, 0, { key: "colors", kind: "colors", group: bar[last].group });
+    } else {
+      const lastInk = bar.map((e) => e.group).lastIndexOf("ink");
+      bar.splice(lastInk + 1, 0, { key: "colors", kind: "colors", group: "colors" });
+    }
   }
   // The contextual section goes before history (else navigation, else the end).
-  let at = bar.findIndex((e) => e.group === "history");
-  if (at < 0) at = bar.findIndex((e) => e.group === "nav" || e.group === "exit");
+  let at = bar.findIndex((e) => (custom ? e.id === "undo" || e.id === "redo" : e.group === "history"));
+  if (at < 0) at = bar.findIndex((e) => (custom ? e.id === "pager" || e.id === "exit" : e.group === "nav" || e.group === "exit"));
   bar.splice(at < 0 ? bar.length : at, 0, { key: "context", kind: "context", group: "context" });
   if (overflow.length || allowMore) bar.push({ key: "more", kind: "more", group: "end" });
   let colors = 3;
@@ -491,7 +536,10 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   };
 
   // ------------------------------------------------------------ sizing
-  const iconSize = () => {
+  /** The teacher's dock size and large icons (Customize dock). */
+  const scale = () => (cfg().dock.size === "s" ? 0.85 : cfg().dock.size === "l" ? 1.2 : 1) * (cfg().dock.large ? 1.25 : 1);
+  const iconSize = () => Math.round(baseIconSize() * scale());
+  const baseIconSize = () => {
     const d = prefs().density;
     if (isPhone()) return d === "large" ? 26 : 22; // 44px cells (52 large) for thumbs
     // Teach is compact, except on a touch board, where fingers need the room (Dock.css).
@@ -772,6 +820,26 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
           <Icon name="exit" size={iconSize()} />
         </button>
       </Match>
+      <Match when={p.e.kind === "celebrate"}>
+        <button class="tool" title="Celebrate: a burst of stars" aria-label="Celebrate" onClick={() => celebrate()}>
+          <Icon name="celebrate" size={iconSize()} />
+        </button>
+      </Match>
+      <Match when={p.e.kind === "pages"}>
+        <button class="tool" classList={{ on: pagesDrawer() }} title="Pages  ·  G" aria-label="Pages" aria-pressed={pagesDrawer()} onClick={togglePagesDrawer}>
+          <Icon name="pages" size={iconSize()} active={pagesDrawer()} />
+        </button>
+      </Match>
+      <Match when={p.e.kind === "solve"}>
+        <button class="tool" title="Solve this: select a problem, the AI writes the solution" aria-label="Solve this" onClick={solveNow}>
+          <Icon name="totext" size={iconSize()} />
+        </button>
+      </Match>
+      <Match when={p.e.kind === "settings"}>
+        <button class="tool" title="Settings" aria-label="Settings" onClick={() => props.onSettings?.()}>
+          <Icon name="settings" size={iconSize()} />
+        </button>
+      </Match>
       <Match when={p.e.kind === "context"}>
         <Context />
       </Match>
@@ -791,6 +859,27 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
       </Match>
     </Switch>
   );
+
+  /** An entry in its size cell (Customize dock: per-button sizes). */
+  const Cell = (p: { e: Entry }) => (
+    <div class="dock-cell" classList={{ "sz-s": p.e.size === "s", "sz-l": p.e.size === "l" }}>
+      <Entry e={p.e} />
+    </div>
+  );
+  const solveNow = () => {
+    void import("../solve").then((m) => m.solve({ source: "dock" })).catch(() => showToast("Solve this needs the AI assistant"));
+  };
+
+  // The teacher's second dock (Customize dock → split), e.g. undo and the
+  // pager on the other edge of a big board.
+  const splitBar = createMemo(() => (core() ? splitLayout(cfg()) : []), undefined, {
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
+  const [splitDrag, setSplitDrag] = createSignal<DockPlace | null>(null);
+  createEffect(on(() => JSON.stringify(cfg().dock.split ?? null), () => setSplitDrag(null), { defer: true }));
+  const splitPlace = () => splitDrag() ?? presetPlace(cfg().dock.split?.position ?? "right", prefs().toolbar);
+  const splitVertical = () => isVertical(splitPlace(), cfg().dock.split?.orientation ?? "auto");
+  const splitSep = (i: number) => i > 0 && splitBar()[i - 1].group !== splitBar()[i].group;
 
   // Replay: its controls take the place of the tools.
   const [speed, setSpeed] = createSignal(2);
@@ -929,7 +1018,11 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
             idle: mode() === "teach" && idle() && !pop(),
             inking: inking(),
             lefty: prefs().hand === "left",
+            "sz-s": cfg().dock.size === "s",
+            "sz-l": cfg().dock.size === "l",
+            "big-icons": !!cfg().dock.large,
           }}
+          onGripHold={core() ? () => openDockEditor(mode()) : undefined}
           label={label()}
           iconSize={iconSize()}
           bubbleLabel={`Open the dock (${labelOf(bubbleTool())})`}
@@ -959,7 +1052,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                     <Show when={sepBefore(i())}>
                       <div class="dock-sep" />
                     </Show>
-                    <Entry e={e} />
+                    <Cell e={e} />
                   </>
                 )}
               </For>
@@ -972,6 +1065,49 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
               <TextControls />
             </Match>
           </Switch>
+        </DockShell>
+      </Show>
+
+      <Show when={splitBar().length > 0 && !replay() && !minimized()}>
+        <DockShell
+          place={splitPlace()}
+          vertical={splitVertical()}
+          orientation={cfg().dock.split?.orientation ?? "auto"}
+          frame={frame}
+          onPlace={(p) => setSplitDrag(p)}
+          minimized={false}
+          onMinimized={() => {}}
+          noMinimize
+          class="toolbar dock dock-split"
+          classList={{
+            teach: mode() === "teach",
+            idle: mode() === "teach" && idle() && !pop(),
+            inking: inking(),
+            "sz-s": cfg().dock.size === "s",
+            "sz-l": cfg().dock.size === "l",
+            "big-icons": !!cfg().dock.large,
+          }}
+          label="Second dock"
+          iconSize={iconSize()}
+          bubble={<></>}
+          bubbleLabel="Second dock"
+          onActivity={() => {
+            wake();
+            unfade();
+          }}
+          onDragStart={() => setPop(null)}
+          onGripHold={() => openDockEditor(mode())}
+        >
+          <For each={splitBar()}>
+            {(e, i) => (
+              <>
+                <Show when={splitSep(i())}>
+                  <div class="dock-sep" />
+                </Show>
+                <Cell e={e} />
+              </>
+            )}
+          </For>
         </DockShell>
       </Show>
 
@@ -1186,6 +1322,10 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                         else if (t === "exit") controller.exitMode();
                         else if (t === "interact") toggleUse();
                         else if (t === "shape") openShapesPicker();
+                        else if (t === "celebrate") celebrate();
+                        else if (t === "pages") togglePagesDrawer();
+                        else if (t === "solve") solveNow();
+                        else if (t === "settings") props.onSettings?.();
                         else if (t === "stamp") {
                           pick("stamp");
                           setPop({ kind: "stamp", anchor: moreBtn });
@@ -1265,16 +1405,27 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                 >
                   <Icon name="restart" size={20} /><span class="grow">Reset dock position</span>
                 </button>
-                <Show when={props.onSettings && cfg().chrome.settings}>
+                <Show when={!isView()}>
                   <button
                     class="dock-row"
                     role="menuitem"
                     onClick={() => {
                       setPop(null);
-                      props.onSettings?.("modes.editor");
+                      openDockEditor(mode());
                     }}
                   >
                     <Icon name="settings" size={20} /><span class="grow">Customize dock…</span>
+                  </button>
+                  <button
+                    class="dock-row"
+                    role="menuitem"
+                    onClick={() => {
+                      setPop(null);
+                      openAiPanel();
+                      setComposerDraft({ text: "/dock ", n: Date.now() });
+                    }}
+                  >
+                    <Icon name="smartink" size={20} /><span class="grow">Customize dock with AI…</span>
                   </button>
                 </Show>
               </div>
