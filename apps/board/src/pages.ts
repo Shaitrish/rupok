@@ -9,6 +9,7 @@ import "./site.css";
 import "./pages.css";
 import "./theme"; // the nav's light / dark toggle
 import "./download"; // platform-matched download buttons
+import "./pricing"; // the pricing page's taka/dollar and monthly/yearly switches
 import { stashPendingLesson } from "./pending";
 
 const LESSON_MIME = "application/vnd.rupok.lesson+zip";

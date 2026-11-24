@@ -320,37 +320,34 @@ CREATE TABLE audit_log (id INTEGER PRIMARY KEY, user_id TEXT, action TEXT, targe
 - Class spaces (later) add `classes`, `class_members` (pseudonymous student
   entries; see [Privacy](#privacy-students-and-minors)) and `class_lessons`.
 
-### Plans (proposal; prices are open questions)
+### Plans and billing (decided Nov 2026)
 
-| | Free | Pro | School |
-|---|---|---|---|
-| App, every feature | ✓ | ✓ | ✓ |
-| Cloud storage | 500 MB | 20 GB | 20 GB per teacher, pooled |
-| Share links | ✓ (100 active) | unlimited | unlimited |
-| Claude connector | ✓ | ✓ | ✓ |
-| Google Drive "Open with → Rupok" | ✓ | ✓ | ✓ |
-| Live class | none | ✓ (up to 60 students) | ✓ |
-| Rupok AI credits | none | monthly allowance | per seat |
-| Admin, classes, shared library | none | none | ✓ |
+The plans and prices are on the website, at [rupok.app/pricing](https://rupok.app/pricing/).
+Their numbers come from `apps/board/site/pages/pricing-data.mjs`.
+The reasoning and the billing code live in the private Rupok Cloud repository.
 
-**Billing notes.**
+| | Free | Pro | Coaching centre | School |
+|---|---|---|---|---|
+| App, every feature, bring-your-own AI | ✓ | ✓ | ✓ | ✓ |
+| Cloud storage | 500 MB | 20 GB | 30 GB / teacher | 50 GB / teacher |
+| Active student links | 10 (a folder link covers a course) | unlimited | unlimited | unlimited |
+| Version history shown | 30 days | full | full | full |
+| Rupok AI credits | 25 to try | 150 / month | 150 / teacher | 150 / teacher |
+| Price, Bangladesh (BDT, VAT incl.) | ৳0 | ৳299 / mo · ৳1,599 / 6 mo · ৳2,999 / yr | ৳1,199 / mo · ৳11,999 / yr (5 teachers) | ৳1,999 / teacher / yr (invoice) |
+| Price, elsewhere (USD) | $0 | $7 / mo · $60 / yr | – | $36 / teacher / yr |
 
-- Paddle charges **5% + $0.50 per transaction**, and products under $10 need
-  "bespoke pricing" ([Paddle pricing](https://www.paddle.com/pricing)). A
-  $3/month plan would lose about 22% to fees, so sell Pro **yearly**
-  (for example $24/year, fee about 7%), and School yearly per seat.
-- Paddle sells to Bangladesh in USD; BDT and bKash aren't supported
-  ([currencies](https://developer.paddle.com/concepts/sell/supported-currencies),
-  [payment methods](https://developer.paddle.com/concepts/payment-methods/overview)).
-- Payouts go by wire or Payoneer. Whether Paddle accepts a Bangladesh-based
-  seller isn't stated either way (open question).
-- bKash (later): Tokenized Checkout for one-off payments. Recurring billing
-  uses bKash's **Direct Charge** subscription API, which isn't public: you get
-  it through a bKash account manager ([developer docs](https://developer.bka.sh/)).
-  The merchant fee depends on the agreement; third-party figures put it around
-  1.5–1.85%, but get a written rate card.
-- Webhooks (`/api/billing/paddle`, signature-verified) set `users.plan` and
-  `subscriptions`. A missed webhook is reconciled daily by a Cron Trigger.
+**Billing:**
+- **Bangladesh:** SSLCommerz. It takes bKash, Nagad, Rocket, cards and
+  internet banking, sold as **prepaid periods** with in-app renewal
+  reminders. SSLCommerz has no dependable recurring billing.
+- **Everywhere else:** Paddle Billing, as monthly or yearly subscriptions.
+  Paddle is merchant of record and handles tax.
+- **Detection:** the region comes from Cloudflare's country, plus the
+  teacher's own choice.
+- **Classroom boards:** a classroom board licence (৳2,500 / $29 per board
+  per year) is invoiced with School.
+- **Trial:** 14 days of Pro, no card, once per account.
+- **Lapsed plans:** nothing is ever deleted when a plan lapses.
 
 ## Cost model
 

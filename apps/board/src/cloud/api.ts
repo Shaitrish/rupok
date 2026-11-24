@@ -88,7 +88,19 @@ export function explain(e: unknown): string {
   if (!(e instanceof CloudError)) return String((e as Error)?.message ?? e);
   switch (e.code) {
     case "quota_exceeded":
-      return "You're out of space in Rupok Cloud. Empty the cloud trash, delete lessons you no longer need, or keep this lesson on this device.";
+      return "You're out of space in Rupok Cloud. Empty the cloud trash, delete lessons you no longer need, keep this lesson on this device, or try Pro (20 GB) free for 14 days.";
+    case "plan_limit":
+      return e.message || "That needs a bigger plan. Try Pro free for 14 days.";
+    case "insufficient_credits":
+      return "You're out of Rupok AI credits. Top up, wait for next month's credits, or use your own Claude, Codex or OpenCode for free.";
+    case "billing_off":
+      return "Payments open soon. Nothing has been charged, and your free plan keeps working.";
+    case "billing_not_configured":
+      return "Payments aren't set up on this server yet. Nothing has been charged.";
+    case "trial_used":
+      return "You've already used your free trial.";
+    case "invalid_phone":
+      return "Enter your mobile number (for example 01XXXXXXXXX): SSLCommerz sends your receipt to it.";
     case "file_too_large":
       return "This lesson is too big for your Rupok Cloud plan. Remove large images or videos, or keep it on this device.";
     case "daily_upload_limit":

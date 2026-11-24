@@ -68,6 +68,8 @@ export async function refreshUsage(): Promise<void> {
   try {
     setCloudMe(await cloud.me());
   } catch { /* keep the last numbers */ }
+  // Plan, credits and links for the account screen (cloud/billing.ts).
+  void import("./billing").then((m) => m.refreshBilling());
 }
 
 /** "Sign in with Google". Web: a full-page redirect back to `returnTo`. */

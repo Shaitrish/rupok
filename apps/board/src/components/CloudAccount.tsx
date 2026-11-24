@@ -7,6 +7,8 @@ import { Icon } from "./Icon";
 import { showToast } from "../state";
 import { cloudMe, cloudOffline, cloudUser, devLogin, signIn, signInDev, signOut } from "../cloud/account";
 import { explain } from "../cloud/api";
+import { openUpgrade } from "../cloud/billing";
+import "./Billing.css";
 
 /** Usage against the quota, as a bar and a sentence. */
 export function CloudUsage() {
@@ -19,6 +21,9 @@ export function CloudUsage() {
           <i style={{ width: `${Math.max(1, pct())}%` }} />
         </div>
         <span class="lib-foot-note">{bytes(u()!.used_bytes)} of {bytes(u()!.quota_bytes)} used</span>
+        <Show when={pct() >= 80 && (cloudMe()?.plan?.id ?? "free") === "free"}>
+          <span class="bl-cloud-hint">Running out of space? <button onClick={() => openUpgrade("pro", "More room for your lessons: 20 GB with Pro.")}>Try Pro free for 14 days</button></span>
+        </Show>
       </div>
     </Show>
   );
