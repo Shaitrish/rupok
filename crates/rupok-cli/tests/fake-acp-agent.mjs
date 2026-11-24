@@ -13,6 +13,16 @@
 //                       selection, points at it, writes a step-by-step
 //                       solution with write_handwriting, then explains.
 //   "/review ..."       one of its slash commands: answers "Reviewing: …".
+//   "...caffeine..."    AI in action: a plan, show_progress cards with a live
+//                       preview, a Smart Object that first fails validation,
+//                       then the fixed one placed in the card's box.
+//   "...long text..."   adds a long paragraph at 96px near the bottom right
+//                       (the board must fit it inside the page).
+//   "...delete..."      asks to delete an item (destructive: still asks).
+//   Solve prompts with "```board": streams the solution lines in a fenced
+//                       block, one line at a time, instead of write_handwriting.
+//   "A student in my class asks..." (a student's ask): show_progress and a
+//                       Smart Object (lands on the student's own layer).
 // It also offers Claude-style modes, a model picker (session config option
 // with category "model", mirrored in the unstable `models` field), slash
 // commands, usage updates, and session list/load (replaying the chat).
@@ -204,6 +214,124 @@ async function solveThis(sid, text) {
   return "end_turn";
 }
 
+
+// ------------------------------------------------------------ AI in action
+
+const permission = async (sid, toolCallId, title, rawInput) => {
+  if (alwaysAllowed) return true;
+  const r = await request("session/request_permission", {
+    sessionId: sid,
+    toolCall: { toolCallId, title, kind: "edit", rawInput },
+    options: [
+      { optionId: "allow", name: "Allow", kind: "allow_once" },
+      { optionId: "always", name: "Always allow", kind: "allow_always" },
+      { optionId: "reject", name: "Reject", kind: "reject_once" },
+    ],
+  });
+  const o = r.result?.outcome;
+  if (o?.optionId === "always") alwaysAllowed = true;
+  return o?.outcome === "selected" && o.optionId !== "reject";
+};
+
+const MOLECULE = (atoms) => `<!doctype html><html><head><title>Caffeine</title><style>
+html,body{margin:0;height:100%;background:var(--rupok-color-bg,#fff);color:var(--rupok-color-fg,#1d2433);font-family:var(--rupok-font-body,system-ui)}
+svg{width:100%;height:100%}text{font:600 28px system-ui;fill:currentColor}
+</style></head><body><svg viewBox="0 0 1280 720">
+${atoms.map(([x, y, el, c], i) => `<g><circle cx="${x}" cy="${y}" r="38" fill="${c}"/><text x="${x - 10}" y="${y + 10}">${el}</text></g>`).join("")}
+<text x="40" y="680">Caffeine, C8H10N4O2</text></svg></body></html>`;
+const ATOMS = [[400, 260, "C", "#adb5bd"], [520, 200, "N", "#74c0fc"], [640, 260, "C", "#adb5bd"], [640, 400, "C", "#adb5bd"], [520, 460, "N", "#74c0fc"], [400, 400, "C", "#adb5bd"], [760, 200, "O", "#ff8787"], [760, 460, "N", "#74c0fc"], [880, 330, "C", "#adb5bd"], [280, 200, "O", "#ff8787"]];
+
+async function caffeine(sid) {
+  const box = { x: 320, y: 180, w: 1280, h: 720 };
+  const plan = (n) => ["Read the Smart Object spec", "Lay out the atoms", "Draw the bonds", "Test and place it"].map((content, i) => ({ content, priority: "high", status: i < n ? "completed" : i === n ? "in_progress" : "pending" }));
+  await say(sid, "Let me build a **caffeine** molecule for the class.\n\n");
+  update(sid, { sessionUpdate: "plan", entries: plan(0) });
+  update(sid, { sessionUpdate: "tool_call", toolCallId: "c0", title: "mcp__rupok__show_progress", kind: "other", status: "in_progress" });
+  const card = await tool("show_progress", { title: "Caffeine molecule", step: "Reading the spec…", kind: "object", ...box, plan: plan(0).map(({ content, status }) => ({ content, status })) });
+  update(sid, { sessionUpdate: "tool_call_update", toolCallId: "c0", status: "completed" });
+  await sleep(700);
+  update(sid, { sessionUpdate: "plan", entries: plan(1) });
+  for (let k = 3; k <= ATOMS.length; k += 3) {
+    await tool("show_progress", { id: card.id, step: `Placing the atoms (${Math.min(k, ATOMS.length)} of ${ATOMS.length})…`, percent: 20 + k * 4, preview_html: MOLECULE(ATOMS.slice(0, k)), plan: plan(1).map(({ content, status }) => ({ content, status })) });
+    await sleep(450);
+  }
+  update(sid, { sessionUpdate: "plan", entries: plan(3) });
+  update(sid, { sessionUpdate: "tool_call", toolCallId: "c1", title: "mcp__rupok__add_smart_object", kind: "edit", status: "pending", rawInput: { path: "live", title: "Caffeine", x: box.x, y: box.y, width: box.w, height: box.h } });
+  if (!(await permission(sid, "c1", "mcp__rupok__add_smart_object", { path: "live", title: "Caffeine" }))) {
+    update(sid, { sessionUpdate: "tool_call_update", toolCallId: "c1", status: "failed" });
+    await tool("show_progress", { id: card.id, state: "clear" });
+    await say(sid, "OK, I won't place it.");
+    return "end_turn";
+  }
+  // First try: loads a library from the network, which Rupok refuses.
+  try {
+    await tool("add_smart_object", { path: "live", title: "Caffeine", x: box.x, y: box.y, width: box.w, height: box.h, html: MOLECULE(ATOMS).replace("</head>", '<script src="https://cdn.example.com/three.min.js"></script></head>') });
+  } catch {
+    update(sid, { sessionUpdate: "tool_call_update", toolCallId: "c1", status: "failed" });
+    await sleep(900);
+  }
+  update(sid, { sessionUpdate: "tool_call", toolCallId: "c2", title: "mcp__rupok__add_smart_object", kind: "edit", status: "in_progress", rawInput: { path: "live", title: "Caffeine", x: box.x, y: box.y, width: box.w, height: box.h } });
+  const o = await tool("add_smart_object", { path: "live", title: "Caffeine", x: box.x, y: box.y, width: box.w, height: box.h, html: MOLECULE(ATOMS) });
+  update(sid, { sessionUpdate: "tool_call_update", toolCallId: "c2", status: "completed" });
+  update(sid, { sessionUpdate: "plan", entries: plan(4) });
+  await say(sid, `Done: caffeine is on page ${o.page}.`);
+  return "end_turn";
+}
+
+async function longText(sid) {
+  update(sid, { sessionUpdate: "tool_call", toolCallId: "l1", title: "mcp__rupok__add_text", kind: "edit", status: "pending" });
+  if (!(await permission(sid, "l1", "mcp__rupok__add_text", { path: "live" }))) return "end_turn";
+  const text = "Ohm's law says that the current through a conductor between two points is directly proportional to the voltage across the two points, as long as the temperature stays the same. We write it as V = IR, where V is the voltage in volts, I is the current in amperes and R is the resistance in ohms. If you double the voltage across a resistor, the current through it doubles too.";
+  const r = await tool("add_text", { path: "live", text, x: 1300, y: 700, size: 96 });
+  update(sid, { sessionUpdate: "tool_call_update", toolCallId: "l1", status: "completed" });
+  await say(sid, `Added the explanation (${r.size}px).`);
+  return "end_turn";
+}
+
+async function deleteSomething(sid) {
+  const pg = await tool("get_current_page", {});
+  const victim = (pg.items ?? [])[0];
+  if (!victim) { await say(sid, "There is nothing to delete."); return "end_turn"; }
+  update(sid, { sessionUpdate: "tool_call", toolCallId: "d1", title: "mcp__rupok__delete_item", kind: "delete", status: "pending" });
+  const r = await request("session/request_permission", {
+    sessionId: sid,
+    toolCall: { toolCallId: "d1", title: "mcp__rupok__delete_item", kind: "delete", rawInput: { path: "live", item_id: victim.id } },
+    options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }, { optionId: "reject", name: "Reject", kind: "reject_once" }],
+  });
+  const o = r.result?.outcome;
+  if (o?.outcome !== "selected" || o.optionId === "reject") { await say(sid, "OK, I left it."); return "end_turn"; }
+  await tool("delete_item", { path: "live", page: pg.page, item_id: victim.id });
+  update(sid, { sessionUpdate: "tool_call_update", toolCallId: "d1", status: "completed" });
+  await say(sid, "Deleted it.");
+  return "end_turn";
+}
+
+async function streamSolve(sid) {
+  await say(sid, "Let me work it out.\n\n");
+  update(sid, { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "2x+3=7, subtract 3, divide by 2." } });
+  await sleep(600);
+  await say(sid, "```board\n", 20, 10);
+  for (const l of ["Subtract 3 from both sides:", "$2x = 4$", "Divide both sides by 2:", "$x = \\frac{4}{2} = 2$"]) {
+    await say(sid, l, 4, 40);
+    await say(sid, "\n", 1, 10);
+    await sleep(700);
+  }
+  await say(sid, "```\n\nSubtract 3, then divide by 2: $x = 2$.");
+  return "end_turn";
+}
+
+async function studentAsk(sid) {
+  const box = { x: 320, y: 180, w: 1280, h: 720 };
+  const card = await tool("show_progress", { title: "Caffeine for you", step: "Building it…", kind: "object", ...box });
+  await sleep(800);
+  update(sid, { sessionUpdate: "tool_call", toolCallId: "u1", title: "mcp__rupok__add_smart_object", kind: "edit", status: "pending" });
+  if (!(await permission(sid, "u1", "mcp__rupok__add_smart_object", { path: "live", title: "Caffeine" }))) return "end_turn";
+  const r = await tool("add_smart_object", { path: "live", title: "Caffeine", ...{ x: box.x, y: box.y, width: box.w, height: box.h }, html: MOLECULE(ATOMS) });
+  void card;
+  await say(sid, r.status === "student_layer" ? "I made a caffeine model just for you." : "Placed it.");
+  return "end_turn";
+}
+
 async function prompt(params) {
   const sid = params.sessionId;
   cancelled = false;
@@ -217,7 +345,12 @@ async function prompt(params) {
   const res = (params.prompt || []).filter((b) => b.type === "resource");
   const imgs = (params.prompt || []).filter((b) => b.type === "image");
   try {
+    if (/^Solve this problem/i.test(text) && text.includes("```board")) return { stopReason: await streamSolve(sid) };
     if (/^Solve this problem/i.test(text)) return { stopReason: await solveThis(sid, text) };
+    if (/^A student in my class asks/i.test(text)) return { stopReason: await studentAsk(sid) };
+    if (/caffeine|molecule/i.test(text)) return { stopReason: await caffeine(sid) };
+    if (/long text/i.test(text)) return { stopReason: await longText(sid) };
+    if (/\bdelete\b/i.test(text)) return { stopReason: await deleteSomething(sid) };
     if (/context/i.test(text)) {
       const r = res[0]?.resource;
       let n = "no";
