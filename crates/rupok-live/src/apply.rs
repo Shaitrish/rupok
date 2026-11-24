@@ -1567,7 +1567,7 @@ ohms, I the current in amperes and V the voltage in volts. Doubling V doubles I.
         let f = Frame::SLIDE_16_9;
         assert!(g.x >= 0.0 && g.y >= 0.0, "{g:?}");
         assert!(g.x + g.w <= f.w && g.y + g.h <= f.h, "{g:?}");
-        assert!(size <= 48.0 && size >= MIN_PROJECTOR_TEXT, "{size}");
+        assert!((MIN_PROJECTOR_TEXT..=48.0).contains(&size), "{size}");
         // The board wraps at the box width: every line fits it.
         for l in crate::fit::wrap(para, size, g.w) {
             assert!(crate::fit::text_width(&l, size) <= g.w + 0.5);
