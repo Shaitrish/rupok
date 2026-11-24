@@ -649,6 +649,12 @@ pub struct Edits {
     pub add: Vec<NewItem>,
     /// Recolour text items (0xRRGGBBAA); other kinds are skipped.
     pub text_colors: Vec<(ItemId, u32)>,
+    /// Replace the text of text items; other kinds are skipped.
+    pub texts: Vec<(ItemId, String)>,
+    /// Set (`Some(json)`) or remove (`None`) custom stamp definitions in the
+    /// lesson's root `stamps` map (see [`crate::Lesson::stamp_defs`]), so a
+    /// stamp placed with a new definition is one change.
+    pub stamp_defs: Vec<(String, Option<String>)>,
 }
 
 impl Edits {
@@ -660,6 +666,8 @@ impl Edits {
             && self.remove.is_empty()
             && self.add.is_empty()
             && self.text_colors.is_empty()
+            && self.texts.is_empty()
+            && self.stamp_defs.is_empty()
     }
 }
 

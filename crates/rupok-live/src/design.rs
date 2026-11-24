@@ -478,6 +478,7 @@ pub(crate) fn run_page_design(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str) -> Res
         result: out,
         changed: true,
         show_page: Some(idx),
+        select: None,
     })
 }
 
@@ -578,6 +579,7 @@ pub(crate) fn run_branding(ctx: &mut BoardCtx<'_>, op: &Op, msg: &str) -> Result
             }),
             changed: true,
             show_page: Some(idx),
+            select: None,
         }
     };
     if *remove {

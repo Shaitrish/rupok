@@ -749,6 +749,13 @@ impl Lesson {
     /// is missing (the error is returned and the edit is rolled back by the
     /// caller's next undo-free commit; callers pass ids from the scene).
     pub fn apply_edits(&mut self, page_id: &str, e: &Edits) -> Result<Vec<ItemId>> {
+        if let Some((id, _)) = e.stamp_defs.iter().find(|(id, d)| {
+            !valid_name(id) || d.as_ref().is_some_and(|j| j.len() > MAX_STAMP_DEF_BYTES)
+        }) {
+            return Err(CoreError::Corrupt(format!(
+                "stamp `{id}`: bad id or definition too large"
+            )));
+        }
         let items = self.items_map(page_id)?;
         for (id, dx, dy) in &e.translate {
             Self::write_translate(&items, id, *dx, *dy)?;
@@ -774,6 +781,25 @@ impl Lesson {
                 m.insert("color", i64::from(*rgba))?;
             }
         }
+        for (id, text) in &e.texts {
+            let m = item_map(&items, id)?;
+            if str_of(&m, "kind").as_deref() == Some("text") {
+                m.insert("text", text.as_str())?;
+            }
+        }
+        if !e.stamp_defs.is_empty() {
+            let defs = self.doc.get_map("stamps");
+            for (id, def) in &e.stamp_defs {
+                match def {
+                    Some(json) => defs.insert(id, json.as_str())?,
+                    None => {
+                        if defs.get(id).is_some() {
+                            defs.delete(id)?;
+                        }
+                    }
+                }
+            }
+        }
         for id in &e.remove {
             if items.get(id).is_some() {
                 items.delete(id)?;
@@ -794,6 +820,35 @@ impl Lesson {
             self.doc.commit();
         }
         Ok(ids)
+    }
+
+    /// Custom stamp definitions stored in the lesson (the root `stamps` map,
+    /// spec: Custom stamps): `(id, JSON)` sorted by id. Entries that are not
+    /// strings, have a bad id or are too large are skipped (untrusted input).
+    pub fn stamp_defs(&self) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        self.doc.get_map("stamps").for_each(|k, v| {
+            if let ValueOrContainer::Value(LoroValue::String(s)) = v
+                && valid_name(k)
+                && s.len() <= MAX_STAMP_DEF_BYTES
+            {
+                out.push((k.to_string(), s.to_string()));
+            }
+        });
+        out.sort();
+        out
+    }
+
+    /// One custom stamp definition (JSON), if the lesson has it.
+    pub fn stamp_def(&self, id: &str) -> Option<String> {
+        match self.doc.get_map("stamps").get(id)? {
+            ValueOrContainer::Value(LoroValue::String(s))
+                if valid_name(id) && s.len() <= MAX_STAMP_DEF_BYTES =>
+            {
+                Some(s.to_string())
+            }
+            _ => None,
+        }
     }
 
     /// Set the geometry of a box item (text, image, object).
@@ -1303,6 +1358,9 @@ fn read_geom(m: &impl Fields) -> BoxGeom {
 
 /// A `brush` or `stamp` name: short, lowercase ASCII words (`a-z`, `0-9`,
 /// `-`). Anything else is treated as absent.
+/// Largest custom stamp definition (JSON, with its SVG) a lesson stores.
+pub const MAX_STAMP_DEF_BYTES: usize = 256 * 1024;
+
 fn valid_name(s: &str) -> bool {
     !s.is_empty()
         && s.len() <= 32
@@ -1867,6 +1925,7 @@ mod tests {
                         z: None,
                     }],
                     text_colors: vec![],
+                    ..Default::default()
                 },
             )
             .unwrap();
@@ -2712,5 +2771,101 @@ mod tests {
         assert!(l.set_media(&p, &a, &bad, None).is_err());
         let s = l.add_item(&p, &stroke(0.0), 3.0).unwrap();
         assert!(l.set_media(&p, &s, &youtube(), None).is_err());
+    }
+}
+
+#[cfg(test)]
+mod stamp_def_tests {
+    use super::*;
+
+    fn text(s: &str) -> ItemData {
+        ItemData::Text(TextData {
+            geom: BoxGeom {
+                x: 0.0,
+                y: 0.0,
+                w: 96.0,
+                h: 96.0,
+                rot: 0.0,
+            },
+            text: s.into(),
+            size: 60.0,
+            color: 0x000000ff,
+            latex: false,
+            stamp: Some("c-dice".into()),
+        })
+    }
+
+    #[test]
+    fn a_stamp_and_its_definition_are_one_change() {
+        let mut l = Lesson::new("S", 1.0);
+        let page = l.page_id_at(0).unwrap();
+        let ids = l
+            .apply_edits(
+                &page,
+                &Edits {
+                    add: vec![NewItem {
+                        data: text("🎲"),
+                        created: 2.0,
+                        group: None,
+                        z: None,
+                    }],
+                    stamp_defs: vec![("c-dice".into(), Some(r#"{"name":"Dice"}"#.into()))],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(ids.len(), 1);
+        assert_eq!(l.stamp_def("c-dice").as_deref(), Some(r#"{"name":"Dice"}"#));
+        assert_eq!(l.stamp_defs().len(), 1);
+        // text replaced in the same kind of change
+        l.apply_edits(
+            &page,
+            &Edits {
+                texts: vec![(ids[0].clone(), "🎯".into())],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        match &l.item(&page, &ids[0]).unwrap().data {
+            ItemData::Text(t) => assert_eq!(t.text, "🎯"),
+            _ => panic!(),
+        }
+        assert!(l.undo().unwrap());
+        assert!(l.undo().unwrap());
+        assert!(l.items(&page).unwrap().is_empty());
+        assert!(
+            l.stamp_defs().is_empty(),
+            "one undo removes stamp and definition"
+        );
+        // bad ids are refused, removal of a missing id is harmless
+        assert!(
+            l.apply_edits(
+                &page,
+                &Edits {
+                    stamp_defs: vec![("Bad Id".into(), Some("{}".into()))],
+                    ..Default::default()
+                }
+            )
+            .is_err()
+        );
+        l.apply_edits(
+            &page,
+            &Edits {
+                stamp_defs: vec![("c-gone".into(), None)],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        // survives save and load
+        l.apply_edits(
+            &page,
+            &Edits {
+                stamp_defs: vec![("c-star".into(), Some("{}".into()))],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let back = Lesson::load(&l.save()).unwrap();
+        assert_eq!(back.stamp_def("c-star").as_deref(), Some("{}"));
     }
 }

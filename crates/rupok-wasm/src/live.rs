@@ -143,6 +143,9 @@ pub fn apply<S: InkSink>(
     if let Some(i) = out.show_page {
         e.goto_page(i);
     }
+    if let Some(ids) = out.select.take() {
+        e.select(ids);
+    }
     if let Op::WriteHandwriting { .. } = &op {
         start_reveal(e, &mut out.result, now_ms);
     }
@@ -175,6 +178,32 @@ fn start_reveal<S: InkSink>(e: &mut Engine<S>, result: &mut serde_json::Value, n
         m.insert("strokes".into(), serde_json::json!(ids.len()));
         m.insert("first_item_id".into(), serde_json::json!(ids.first()));
     }
+}
+
+/// The lesson's custom stamp definitions, `{id: definition}` (for drawing
+/// them; see [`rupok_live::stamps`]).
+pub fn stamp_defs_json<S: InkSink>(e: &Engine<S>) -> String {
+    let mut m = serde_json::Map::new();
+    for (id, _) in e.lesson.stamp_defs() {
+        if let Some(d) = rupok_live::stamps::lesson_def(&e.lesson, &id) {
+            m.insert(id, serde_json::to_value(d).unwrap_or_default());
+        }
+    }
+    serde_json::Value::Object(m).to_string()
+}
+
+/// Check a custom stamp definition from the teacher's editor or an
+/// imported stamp pack (SVG sanitised, behaviour checked) without touching
+/// the lesson. Returns the clean definition (keeping `html` for a Smart
+/// stamp) or `{"error"}`.
+pub fn check_stamp_json(def_json: &str) -> Result<String, String> {
+    let d: rupok_live::StampDef =
+        serde_json::from_str(def_json).map_err(|err| error_json(format!("bad stamp: {err}")))?;
+    let (mut clean, html) =
+        rupok_live::stamps::check(&d, None).map_err(|err| err.to_json().to_string())?;
+    clean.id = d.id.filter(|i| rupok_live::stamps::valid_id(i));
+    clean.html = html;
+    Ok(serde_json::to_string(&clean).unwrap_or_default())
 }
 
 /// The lesson's encoded version vector.
@@ -272,6 +301,86 @@ mod tests {
             .is_err()
         );
         assert!(apply(&mut e, r#"{"op":"get_page"}"#, "A", 4.0).is_ok());
+    }
+
+    #[test]
+    fn item_ops_select_restyle_and_stamps_on_the_live_engine() {
+        let mut e = engine();
+        let r = apply(
+            &mut e,
+            r#"{"op":"draw_stroke","points":[[100,100],[300,200]]}"#,
+            "Claude Code",
+            2_000.0,
+        )
+        .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&r).unwrap();
+        let id = v["item_ids"][0].as_str().unwrap().to_string();
+        assert_eq!(e.stroke_count(), 1, "drawn in the scene");
+        apply(
+            &mut e,
+            &format!(r#"{{"op":"select_items","item_ids":["{id}"]}}"#),
+            "Claude Code",
+            2_100.0,
+        )
+        .unwrap();
+        assert_eq!(
+            e.selection(),
+            std::slice::from_ref(&id),
+            "the board shows the selection"
+        );
+        apply(
+            &mut e,
+            &format!(r##"{{"op":"restyle_items","item_ids":["{id}"],"color":"#e5484d"}}"##),
+            "Claude Code",
+            2_200.0,
+        )
+        .unwrap();
+        assert_eq!(
+            attribution_json(&e, 0),
+            format!(r#"{{"{id}":"Claude Code"}}"#)
+        );
+        assert!(e.undo(), "one undo per agent op");
+        assert!(e.undo());
+        assert_eq!(e.stroke_count(), 0);
+
+        // custom stamps: the agent makes one, the teacher places it (untagged)
+        let r = apply(
+            &mut e,
+            r#"{"op":"create_stamp","id":"owl","name":"Owl","art":"emoji","emoji":"🦉"}"#,
+            "Claude Code",
+            3_000.0,
+        )
+        .unwrap();
+        assert!(r.contains(r#""id":"owl""#));
+        assert!(stamp_defs_json(&e).contains("🦉"));
+        let r = apply(
+            &mut e,
+            r#"{"op":"add_stamp","stamp":"owl","x":10,"y":10}"#,
+            "",
+            3_100.0,
+        )
+        .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&r).unwrap();
+        let sid = v["item_id"].as_str().unwrap();
+        assert!(e.dom_items_json().contains(sid));
+        assert!(
+            !attribution_json(&e, 0).contains(sid),
+            "the teacher's own placement is not attributed to an agent"
+        );
+        // the editor's check: clean SVG, refused scripts
+        let ok = check_stamp_json(
+            r#"{"name":"S","art":"svg","svg":"<svg viewBox='0 0 10 10'><circle r='5'/></svg>"}"#,
+        )
+        .unwrap();
+        assert!(ok.contains("xmlns"));
+        assert!(
+            check_stamp_json(r#"{"name":"S","art":"svg","svg":"<svg onload='x()'/>"}"#).is_err()
+        );
+        let smart = check_stamp_json(r#"{"name":"D","art":"smart","html":"<p>hi</p>"}"#).unwrap();
+        assert!(
+            smart.contains("<p>hi</p>"),
+            "the editor keeps the HTML for the device library"
+        );
     }
 
     #[test]
