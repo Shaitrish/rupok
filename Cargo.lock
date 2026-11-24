@@ -4885,7 +4885,7 @@ dependencies = [
 
 [[package]]
 name = "rupok-bench"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "pollster",
  "rupok-core",
@@ -4898,7 +4898,7 @@ dependencies = [
 
 [[package]]
 name = "rupok-cli"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
@@ -4928,7 +4928,7 @@ dependencies = [
 
 [[package]]
 name = "rupok-core"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "loro",
  "rstar",
@@ -4940,7 +4940,7 @@ dependencies = [
 
 [[package]]
 name = "rupok-desktop"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "notify",
  "objc2",
@@ -4969,7 +4969,7 @@ dependencies = [
 
 [[package]]
 name = "rupok-format"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "blake3",
  "loro",
@@ -4983,14 +4983,14 @@ dependencies = [
 
 [[package]]
 name = "rupok-ink"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "rupok-live"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "base64 0.23.1",
  "loro",
@@ -5004,7 +5004,7 @@ dependencies = [
 
 [[package]]
 name = "rupok-render"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "bytemuck",
  "pollster",
@@ -5015,7 +5015,7 @@ dependencies = [
 
 [[package]]
 name = "rupok-wasm"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",

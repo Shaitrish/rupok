@@ -5,10 +5,36 @@ notes come after each list. Downloads are on
 [rupok.app/download](https://rupok.app/download/) and on
 [GitHub Releases](https://github.com/Shaitrish/rupok/releases).
 
-## Unreleased
+## v0.2.3 (24 November 2026)
+
+v0.2.2 was never published on its own, so this is the first update since
+v0.2.1 and everything below is new to you.
+
+**On v0.2.1 or older?** Download and install this version by hand once from
+[rupok.app/download](https://rupok.app/download/). From now on Rupok tells
+you when a new version is out.
 
 ### For teachers
 
+- **Shapes and tables, in Prepare and Teach:** one Shapes button on the
+  dock (or press S, or Insert ▾ → Shape… / Table…) opens a picker with
+  rectangles, circles, triangles, stars, arrows, a connector that sticks to
+  shapes, number lines, axes, Venn diagrams, flowchart boxes, speech bubbles
+  and braces. Drag to draw a shape or tap to place it. Tables use a
+  Word-style size grid; add or remove rows and columns later, and tap a cell
+  to type in it.
+- **Fill:** select a shape and tap Fill for a soft tint, a palette colour or
+  a solid fill, or switch its outline between solid and dashed. Your writing
+  stays on top of the fill.
+- **Pen styles:** the pen menu now offers ballpoint, fountain, marker,
+  pencil, chalk, brush, dashed, dotted, neon, rainbow and **magic ink**, which
+  fades away a few seconds after you lift the pen (good for pointing while
+  you explain). Each style shows a live sample; the highlighter and shapes
+  have their own styles, and a selection can be restyled.
+- **Stamps and celebrations:** a Stamps tool (K) with stars, ticks, crosses,
+  👍, 💯, "Excellent", "Good job", numbered badges and any emoji. Hold the
+  pen still for a moment to get your favourite stamps in a ring, and tap
+  Celebrate for a short burst of stars and confetti after a great answer.
 - **The web board works offline:** after the first visit, rupok.app/board
   starts without internet, opens lessons and draws, and the student viewer
   (`/open/`) works offline too. Install it as an app and every Smart Object
@@ -20,19 +46,14 @@ notes come after each list. Downloads are on
 - **Quick tour:** a short, skippable tour the first time the board opens:
   pen and colours, pages, Insert, Teach mode and saving. Restart it from ⋯ →
   Quick tour or Settings → About.
-
-### For developers
-
-- Offline web app: a hand-written service worker (`apps/board/pwa/sw.js`)
-  generated per build by `pwa/plugin.ts`, which also writes `/version.json`
-  and `<meta name="rupok-build">`. Update notices in `src/updates/`, the
-  shared release lookup in `src/release.ts`, the tour in `src/tour/`. See
-  docs/offline.md. The desktop CSP allows `https://api.github.com`.
-
-## v0.2.2 (24 November 2026)
-
-### For teachers
-
+- **Pricing page:** [rupok.app/pricing](https://rupok.app/pricing/) (and
+  in Bangla, in taka) shows the Free plan and the paid plans that are
+  coming. Paid plans are **coming soon**: nothing can be bought yet, and
+  Rupok itself stays free.
+- **Donate:** if Rupok helps your class, you can support it at
+  [rupok.app/donate](https://rupok.app/donate/) by bKash or US bank
+  transfer. The desktop app shows a small "Support Rupok" card at most
+  twice (never in Teach), and ⋯ → Support Rupok is always there.
 - **Zoom that stays on the slide:** a slide zooms from fit to 500 %, and
   you can only pan around the page, so the slide never gets lost in empty
   board. A pinch that goes smaller than fit springs back. The zoom chip
@@ -100,6 +121,29 @@ notes come after each list. Downloads are on
 
 ### For developers
 
+- Shapes picker (proposed, pending RFC; spec "Shape geometry → Shapes
+  picker kinds"): `fill` and `dash` inside a shape's `geom`, new box kinds
+  `rrect`, `callout`, `brace`, `arrow2`, `carrow` and new `shape` values, in
+  `crates/rupok-wasm/src/catalog.rs` and `engine/insert.rs`. Fills are DOM
+  items under the ink (`<id>#fill`); dashed outlines are drawn as dash
+  pieces. New live ops and MCP tools `add_shape` and `add_table`.
+- Brushes and stamps (proposed, pending RFC; spec "Brushes"): an optional
+  `brush` key on strokes (`rupok_ink::Brush`, drawn by `ink.wgsl` from the
+  stored points only, so wet and dry ink match) and an optional `stamp` key
+  on text items. PDF export paints brushes as vector layers. The ink vertex
+  grew from 20 to 28 bytes; the common brushes stay on the fast path.
+- Offline web app: a hand-written service worker (`apps/board/pwa/sw.js`)
+  generated per build by `pwa/plugin.ts`, which also writes `/version.json`
+  and `<meta name="rupok-build">`. Update notices in `src/updates/`, the
+  shared release lookup in `src/release.ts`, the tour in `src/tour/`. See
+  docs/offline.md. The desktop CSP allows `https://api.github.com`.
+- Pricing: `/pricing/` and `/bn/pricing/` built from
+  `site/pages/pricing-data.mjs` (`billingLive: false`, `cloudLive: false`),
+  and an in-app plan panel and upgrade dialog (`src/cloud/billing.ts`) for
+  the Rupok Cloud billing API, which stays off until it is launched.
+- Donations: `/donate/` and `/bn/donate/` (`site/pages/donate.mjs`), the
+  desktop donate card (`src/donate.ts`), the `open_donate_page` Tauri command
+  (a fixed URL) and `.github/FUNDING.yml`.
 - Slide camera bounds (`engine.rs`): fit to 5 × fit on framed pages, pan
   clamped to the page, pinch overshoot springs back; `set_camera` stays
   unbounded.
@@ -136,6 +180,7 @@ notes come after each list. Downloads are on
   `GLTFLoader`.
 - Fixed: saving while an item was undone dropped its Smart Object bundle or
   image from memory, so redo brought it back broken.
+
 
 ## v0.2.1 (23 November 2026)
 

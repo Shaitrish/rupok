@@ -37,7 +37,7 @@ const ld = (lang, path) => [
     applicationCategory: "EducationalApplication",
     operatingSystem: "Windows 10, Windows 11, macOS 11 or later (Apple silicon and Intel), Linux (Debian, Ubuntu and AppImage); any OS with Chrome, Edge or Safari",
     downloadUrl: RELEASES_URL,
-    softwareVersion: "0.2.2",
+    softwareVersion: "0.2.3",
     releaseNotes: RELEASES_URL,
     fileSize: "Varies by platform",
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
