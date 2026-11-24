@@ -50,6 +50,10 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://rupok.app/open/"/>
   </url>
   <url>
+    <loc>https://rupok.app/privacy/</loc>
+    <lastmod>2026-11-23</lastmod>
+  </url>
+  <url>
     <loc>https://rupok.app/rpk/</loc>
     <lastmod>2026-11-23</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://rupok.app/rpk/"/>
@@ -58,6 +62,10 @@
   </url>
   <url>
     <loc>https://rupok.app/smartboard-software/</loc>
+    <lastmod>2026-11-23</lastmod>
+  </url>
+  <url>
+    <loc>https://rupok.app/terms/</loc>
     <lastmod>2026-11-23</lastmod>
   </url>
   <url>

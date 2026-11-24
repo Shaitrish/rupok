@@ -5,6 +5,7 @@ import { FEATURES } from "./features.mjs";
 import { OPEN } from "./open.mjs";
 import { RPK } from "./rpk.mjs";
 import { DOWNLOAD } from "./download.mjs";
+import { LEGAL } from "./legal.mjs";
 
 /** The home page. Its HTML is hand-written in index.html; the builder only
  * injects the FAQ and JSON-LD below (between <!-- site:… --> markers) and
@@ -82,4 +83,5 @@ export const PAGES = [
   ...DOWNLOAD.map(tag("download.mjs")),
   ...FEATURES.map(tag("features.mjs")),
   ...COMPARE.map(tag("compare.mjs")),
+  ...LEGAL.map(tag("legal.mjs")),
 ];
