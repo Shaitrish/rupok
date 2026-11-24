@@ -184,6 +184,14 @@ export async function renderSnapshot(c: Controller, op: any, agent: string) {
         for (let i = 2; i < it.pts.length; i += 2) ctx.lineTo(it.pts[i], it.pts[i + 1]);
         ctx.stroke();
       }
+    } else if (it.kind === "fill" && Array.isArray(it.poly) && it.poly.length >= 6) {
+      // A shape's fill, in its stroke's place (export.rs `Fill`).
+      ctx.fillStyle = cssColor(it.color);
+      ctx.beginPath();
+      ctx.moveTo(it.poly[0], it.poly[1]);
+      for (let i = 2; i < it.poly.length; i += 2) ctx.lineTo(it.poly[i], it.poly[i + 1]);
+      ctx.closePath();
+      ctx.fill("evenodd");
     } else if (it.kind === "text") {
       const [x, y, w] = it.rect as Rect4;
       ctx.fillStyle = cssColor(it.color);

@@ -14,6 +14,7 @@
 // (LibraryButton.tsx), the AI panel (AiStatus.tsx / LivePanel.tsx).
 
 import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js";
+import { openShapesPicker } from "../shapes";
 import { controller } from "../controller";
 import {
   canRedo, canUndo, isView, lessonOpened, mode, modeConfig, prefs, revision, savedRevision, setPrefs, showToast, studentEntry, title,
@@ -172,6 +173,7 @@ export function Header(props: { onObject: () => void; onSettings: () => void }) 
   // ------------------------------------------------------------- the menus
   const toggleTheme = () => setPrefs({ theme: dark() ? "light" : "dark" });
   const insertEntries = (): MenuEntry[] => [
+    ...shapeInsertEntries(),
     { id: "insert-image", label: "Image…", icon: "image", run: () => void pickImage() },
     { id: "insert-pdf", label: "PDF…", icon: "pdf", run: () => void pickPdf() },
     { id: "insert-object", label: "Smart Object…", icon: "object", run: props.onObject },
@@ -312,7 +314,7 @@ export function Header(props: { onObject: () => void; onSettings: () => void }) 
             <MenuButton
               id="hdr-insert"
               label="Insert"
-              title="Insert an image, a PDF, a Smart Object or text"
+              title="Insert a shape, a table, an image, a PDF, a Smart Object or text"
               icon="insert"
               text="Insert"
               caret
@@ -390,4 +392,12 @@ export function FloatingAiStatus() {
       <AiStatus />
     </div>
   );
+}
+
+/** Insert ▾ → Shape… and Table… open the Shapes picker (shapes.ts). */
+function shapeInsertEntries(): MenuEntry[] {
+  return [
+    { id: "insert-shape", label: "Shape…", icon: "rect", key: "S", run: () => openShapesPicker() },
+    { id: "insert-table", label: "Table…", icon: "layers", run: () => openShapesPicker("table") },
+  ];
 }

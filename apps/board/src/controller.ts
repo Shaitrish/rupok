@@ -22,6 +22,7 @@ import { attachTrail, drawsInk, notePointerDown, notePointerUp, penBusy, predict
 import { APP_NAME, FILE_EXT, LESSON_MIME } from "./brand";
 import { forgetLessonPath, openLessonFiles, openLessonInto, saveLessonBytes } from "./platform";
 import { onPresentFullscreenLost, presentFullscreen, toggleFullscreen } from "./fullscreen";
+import { openShapesPicker, shapeToolName } from "./shapes";
 
 /** Clipboard JSON from `Board.export_items_json` starts with this. */
 const CLIP_RE = /^\s*\{"rupok":"clipboard\/v1"/;
@@ -282,7 +283,7 @@ export class Controller {
       this.board.set_tool("lasso");
       if (t === "text") this.board.select_json("[]");
     } else {
-      this.board.set_tool(t);
+      this.board.set_tool(t === "shape" ? shapeToolName() : t);
     }
   }
 
@@ -550,7 +551,7 @@ export class Controller {
     const [cx, cy, z] = this.board.camera();
     const wx = cx + (clientX - r.left) / z;
     const wy = cy + (clientY - r.top) / z;
-    return [...items].reverse().find((it) => wx >= it.x && wx <= it.x + it.w && wy >= it.y && wy <= it.y + it.h);
+    return [...items].reverse().find((it) => it.kind !== "fill" && wx >= it.x && wx <= it.x + it.w && wy >= it.y && wy <= it.y + it.h);
   }
 
   // -------------------------------------------------------------- keyboard
@@ -604,12 +605,14 @@ export class Controller {
       if (e.key === "Delete" || e.key === "Backspace") { if (this.selecting()) this.deleteSelection(); return; }
       if (e.key === "Escape") { this.board.select_json("[]"); if (this.board.replay_state().length) this.board.replay_stop(); return; }
       const map: Record<string, Tool> = {
-        p: "pen", h: "highlighter", e: "eraser", v: "lasso", s: "lasso", l: "laser", i: "interact",
+        p: "pen", h: "highlighter", e: "eraser", v: "lasso", l: "laser", i: "interact",
         t: "text", r: "rect", o: "ellipse", a: "arrow", n: "line",
       };
       // Tool keys work for the tools this mode's toolbar has (all in Prepare).
       if (map[k] && (mode() === "prepare" || modeConfig().tools.includes(map[k]))) { this.setTool(map[k]); return; }
       if (k === "m" && (mode() === "prepare" || modeConfig().tools.includes("smartink"))) { this.toggleSmartInk(); return; }
+      // S: the Shapes picker (shapes.ts), where the mode has the shape tool.
+      if (k === "s" && (mode() === "prepare" || modeConfig().tools.includes("shape"))) { openShapesPicker(); return; }
       if (k === "f") this.toggleFullscreen();
       if (k === "0") this.board.fit_page();
       if (k === "=" || k === "+") this.zoomBy(1.25);

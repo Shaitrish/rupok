@@ -37,7 +37,7 @@ export type DockPosition =
 export const DOCK_POSITIONS = ["auto", "bottom", "top", "left", "right", "bottom-left", "bottom-right", "top-left", "top-right"] as const;
 export type DockOrientation = "auto" | "horizontal" | "vertical";
 /** A dock pin: a toolbar entry, or "shapes" for the one Shapes button
- * (rectangle, ellipse, line, arrow and the Smart shapes toggle). */
+ * (the Shapes picker, components/ShapesPicker.tsx, and the Smart shapes toggle). */
 export type DockPin = ToolbarItem | "shapes";
 export interface DockConfig {
   position: DockPosition;
@@ -49,7 +49,7 @@ export interface DockConfig {
 }
 /** Always on the dock in Prepare and Teach; a config cannot remove them. */
 export const CORE_TOOLS: ToolbarItem[] = ["pen", "highlighter", "eraser", "laser", "undo"];
-export const SHAPE_TOOLS: ToolbarItem[] = ["rect", "ellipse", "line", "arrow"];
+export const SHAPE_TOOLS: ToolbarItem[] = ["shape", "rect", "ellipse", "line", "arrow"];
 const hasCore = (m: Mode) => m !== "view";
 
 export const MODES: { id: Mode; label: string; icon: IconName; key: string; hint: string }[] = [
@@ -66,6 +66,7 @@ export const TOOLBAR_ITEMS: { id: ToolbarItem; icon: IconName; label: string; ke
   { id: "lasso", icon: "select", label: "Select & move", key: "V", kind: "tool" },
   { id: "laser", icon: "laser", label: "Laser pointer", key: "L", kind: "tool" },
   { id: "text", icon: "text", label: "Text", key: "T", kind: "tool" },
+  { id: "shape", icon: "rect", label: "Shapes and tables", key: "S", kind: "tool" },
   { id: "rect", icon: "rect", label: "Rectangle", key: "R", kind: "tool" },
   { id: "ellipse", icon: "ellipse", label: "Ellipse", key: "O", kind: "tool" },
   { id: "line", icon: "line", label: "Line", key: "N", kind: "tool" },
@@ -86,7 +87,7 @@ export const CHROME_ITEMS: { id: ChromeKey; label: string }[] = [
   { id: "title", label: "Lesson title" },
   { id: "pagesToggle", label: "Pages button" },
   { id: "history", label: "Undo and redo" },
-  { id: "insert", label: "Insert menu (image, PDF, Smart Object, text)" },
+  { id: "insert", label: "Insert menu (shape, table, image, PDF, Smart Object, text)" },
   { id: "replay", label: "Replay button" },
   { id: "open", label: "Open" },
   { id: "theme", label: "Light / dark" },
@@ -121,13 +122,13 @@ const chrome = (on: ChromeKey[]): Record<ChromeKey, boolean> =>
 export const DEFAULT_MODES: ModesConfig = {
   prepare: {
     chrome: chrome(["switcher", "title", "pagesToggle", "history", "insert", "replay", "open", "theme", "fullscreen", "settings", "save", "ai", "overflow", "pages", "zoom", "stats", "colors", "sizes"]),
-    tools: ["pen", "highlighter", "eraser", "rect", "ellipse", "line", "arrow", "smartink", "text", "lasso", "laser", "hand", "interact", "undo", "redo"],
+    tools: ["pen", "highlighter", "eraser", "shape", "rect", "ellipse", "line", "arrow", "smartink", "text", "lasso", "laser", "hand", "interact", "undo", "redo"],
     dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["shapes", "text", "lasso"] },
   },
   teach: {
     chrome: chrome(["colors", "sizes"]),
-    tools: ["pen", "highlighter", "eraser", "lasso", "laser", "smartink", "undo", "pager", "exit"],
-    dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["lasso", "smartink", "pager", "exit"] },
+    tools: ["pen", "highlighter", "eraser", "shape", "text", "lasso", "laser", "smartink", "undo", "pager", "exit"],
+    dock: { position: "auto", orientation: "auto", minimized: false, pinned: ["shapes", "text", "lasso", "smartink", "pager", "exit"] },
   },
   view: {
     chrome: chrome(["switcher", "title", "pagesToggle", "open", "theme", "fullscreen", "overflow", "pages", "zoom"]),

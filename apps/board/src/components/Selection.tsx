@@ -26,6 +26,7 @@ import { Icon } from "./Icon";
 import { ToTextButton } from "./ToText";
 import { makeItLive } from "./MakeItLive";
 import { SolveButton } from "../solve/SolveUI";
+import { FillRow, ShapeControls, TableCells, setTableCellMode } from "./ShapeControls";
 
 /** Shapes that keep their proportions while resizing (Shift frees them). */
 const KEEP_ASPECT = [
@@ -127,9 +128,16 @@ export function SelectionOverlay() {
   const [scaleDrag, setScaleDrag] = createSignal<Geom | null>(null);
   /** The colour row of the toolbar is open. */
   const [palette, setPalette] = createSignal(false);
+  /** The fill row of the toolbar is open (shapes, ShapeControls.tsx). */
+  const [fills, setFills] = createSignal(false);
+  /** The table row (rows, columns, type in a cell) is open. */
+  const [tableRow, setTableRow] = createSignal(false);
   createEffect(() => {
     selectionIds();
     setPalette(false);
+    setFills(false);
+    setTableRow(false);
+    setTableCellMode(false);
   });
   /** Selected text items (they take a colour and scale their font). */
   const texts = () => {
@@ -439,10 +447,10 @@ export function SelectionOverlay() {
                   <button
                     class="btn icon sel-color"
                     classList={{ on: palette() }}
-                    title="Colour"
+                    title={selectionMeta().shapeStyle ? "Outline colour" : "Colour"}
                     aria-label="Colour"
                     aria-expanded={palette()}
-                    onClick={() => setPalette(!palette())}
+                    onClick={() => (setFills(false), setTableRow(false), setPalette(!palette()))}
                   >
                     <span
                       class="swatch-dot"
@@ -459,6 +467,13 @@ export function SelectionOverlay() {
                     <span class="sel-line thick" aria-hidden="true" />
                   </button>
                 </Show>
+                <ShapeControls
+                  fillsOpen={fills()}
+                  onFills={(o) => (setPalette(false), setTableRow(false), setFills(o))}
+                  tableOpen={tableRow()}
+                  onTable={(o) => (setPalette(false), setFills(false), setTableRow(o))}
+                  up={(barPos()?.top ?? 0) < (rect()?.y ?? 0)}
+                />
                 <button class="btn icon" title="Smaller" aria-label="Smaller" onClick={() => controller.board.scale_selection_by(1 / SIZE_STEP)}>
                   <Icon name="shrink" />
                 </button>
@@ -496,6 +511,9 @@ export function SelectionOverlay() {
                 <button class="btn icon sel-del" title="Delete  ·  Del" aria-label="Delete" onClick={() => controller.deleteSelection()}>
                   <Icon name="trash" />
                 </button>
+                <Show when={fills() && selectionMeta().shapeStyle?.fillable}>
+                  <FillRow up={(barPos()?.top ?? 0) < (rect()?.y ?? 0)} />
+                </Show>
                 <Show when={palette() && colorable()}>
                   <div class="sel-palette" classList={{ up: (barPos()?.top ?? 0) < (rect()?.y ?? 0) }} role="group" aria-label="Colours">
                     <For each={swatches()}>
@@ -515,6 +533,7 @@ export function SelectionOverlay() {
                 </Show>
               </div>
             </Show>
+            <TableCells />
           </>
         )}
       </Show>

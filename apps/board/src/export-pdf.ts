@@ -64,7 +64,9 @@ interface StrokeItem { kind: "stroke"; color: number; opacity: number; tool: str
 interface TextItem { kind: "text"; rect: Rect; text: string; size: number; color: number; latex?: boolean }
 interface ImageItem { kind: "image"; rect: Rect; asset: string }
 interface ObjectItem { kind: "object"; id: string; rect: Rect; title: string; bundle: string; step: number; steps: number; state: string | null }
-type Item = StrokeItem | TextItem | ImageItem | ObjectItem;
+/** A shape's fill (export.rs `Fill`), drawn under the ink like on the board. */
+interface FillItem { kind: "fill"; color: number; poly: number[] }
+type Item = StrokeItem | TextItem | ImageItem | ObjectItem | FillItem;
 interface PageData {
   title: string;
   frame: { w: number; h: number } | null;
@@ -467,6 +469,16 @@ class Exporter {
 
   // ------------------------------------------------------------- strokes
 
+  /** A shape's soft fill: one polygon, its own alpha, even-odd. */
+  private drawFill(ops: string[], res: Resources, it: FillItem) {
+    const a = Math.round(Math.max(0, Math.min(1, alphaOf(it.color))) * 100) / 100;
+    if (a <= 0 || it.poly.length < 6) return;
+    const p = it.poly;
+    const path = [`${p[0]} ${p[1]} m`];
+    for (let i = 2; i < p.length; i += 2) path.push(`${p[i]} ${p[i + 1]} l`);
+    ops.push("q", this.alpha(a, res), `${rgbOps(it.color)} rg`, path.join("\n"), "h f*", "Q");
+  }
+
   private drawStrokes(ops: string[], res: Resources, items: Item[], paper: boolean) {
     let lastColor = -1;
     let lastAlpha = -1;
@@ -529,6 +541,8 @@ class Exporter {
         await this.drawText(ops, res, it, paper);
       } else if (it.kind === "object") {
         await this.drawObject(ops, res, index, it, bg, paper);
+      } else if (it.kind === "fill") {
+        this.drawFill(ops, res, it);
       }
     }
     this.drawStrokes(ops, res, p.items, paper);

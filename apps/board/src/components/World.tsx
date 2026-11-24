@@ -160,6 +160,18 @@ export default function World(props: { ref: (el: HTMLDivElement) => void }) {
                 <ObjectItem item={item} />
               </div>
             </Match>
+            <Match when={item.kind === "fill"}>
+              {/* A shape's fill: under all ink, like images (engine/insert.rs). */}
+              <svg
+                class="item fill"
+                data-item={item.id}
+                style={{ left: `${item.x}px`, top: `${item.y}px`, width: `${Math.max(1, item.w)}px`, height: `${Math.max(1, item.h)}px` }}
+                viewBox={`0 0 ${Math.max(1, item.w)} ${Math.max(1, item.h)}`}
+                aria-hidden="true"
+              >
+                <path d={item.path} fill={item.color ?? "none"} fill-rule="evenodd" />
+              </svg>
+            </Match>
             <Match when={item.kind === "image"}>
               <div
                 class="item image"
