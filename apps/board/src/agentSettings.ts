@@ -31,8 +31,10 @@ export const AGENT_SETTINGS: readonly string[] = [
   "ai.solveStyle", "ai.solveSpeed", "ai.solveTeachStep", "ai.chatAttach", "ai.chatPosition",
   // AI in action: how results show (never Class mode or what students may do)
   "ai.progress", "ai.celebrate", "ai.sound", "ai.streamSolve",
-  // Statistics overlay
-  "about.stats",
+  // Statistics overlay, and how the ink is drawn (sharpness, the wet-ink
+  // layer, the OS ink trail, panel blur): all apply at once and undo cleanly.
+  // Not the renderer (a reload) or the native wet-ink prototype.
+  "about.stats", "about.renderScale", "about.wetLayer", "about.inkTrail", "about.flatPanels",
 ];
 
 type Simple = Extract<SettingDef, { type: "toggle" | "segmented" | "select" | "slider" | "colour" }>;

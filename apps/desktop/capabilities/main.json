@@ -37,6 +37,7 @@
     "allow-voice-model-cancel",
     "allow-voice-model-remove",
     "allow-voice-transcribe",
-    "allow-open-donate-page"
+    "allow-open-donate-page",
+    "allow-save-speed-report"
   ]
 }

@@ -9,7 +9,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, State, WindowEvent};
 use tauri_plugin_fs::FsExt;
 use tauri_plugin_window_state::StateFlags;
 
-use crate::{agent_cmd, cloud_cmd, files, library_cmd, overlay, voice_cmd};
+use crate::{agent_cmd, cloud_cmd, files, library_cmd, overlay, perf_cmd, voice_cmd};
 
 /// Label of the board window (`tauri.conf.json`).
 pub const MAIN: &str = "main";
@@ -109,6 +109,7 @@ pub fn run() {
             voice_cmd::voice_model_remove,
             voice_cmd::voice_transcribe,
             open_donate_page,
+            perf_cmd::save_speed_report,
         ])
         .setup(|app| {
             let args: Vec<String> = std::env::args().skip(1).collect();

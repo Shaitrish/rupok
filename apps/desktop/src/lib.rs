@@ -29,6 +29,8 @@ mod agent_cmd;
 #[cfg(feature = "app")]
 mod overlay;
 #[cfg(feature = "app")]
+mod perf_cmd;
+#[cfg(feature = "app")]
 mod voice_cmd;
 
 #[cfg(feature = "app")]

@@ -40,6 +40,7 @@ fn main() {
             "voice_model_remove",
             "voice_transcribe",
             "open_donate_page",
+            "save_speed_report",
         ]),
     ))
     .expect("tauri-build failed");

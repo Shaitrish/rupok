@@ -42,6 +42,18 @@ mod web {
         console_error_panic_hook::set_once();
     }
 
+    /// The wet tile: a small second canvas over the board that takes the ink
+    /// that is changing, so writing never presents the full-size canvas
+    /// (docs/performance.md, "The wet tile").
+    struct WetTile {
+        /// WebGL2 cannot share a context between canvases: the tile then has
+        /// its own device. With WebGPU it uses the board's.
+        gpu: Option<Gpu>,
+        surface: wgpu::Surface<'static>,
+        config: wgpu::SurfaceConfiguration,
+        renderer: InkRenderer,
+    }
+
     #[wasm_bindgen]
     pub struct Board {
         engine: Engine<InkRenderer>,
@@ -53,55 +65,122 @@ mod web {
         last_stats: rupok_render::RenderStats,
         frame_ms: f64,
         warned: bool,
+        tile: Option<WetTile>,
+        /// When ink last changed (ms): pending strokes go to the main canvas
+        /// once the pen has rested.
+        ink_ms: f64,
+        /// The last frame presented the main canvas / the tile.
+        drew_main: bool,
+        drew_tile: bool,
+        main_frames: u32,
+        tile_frames: u32,
+    }
+
+    /// The pen has rested this long: finished strokes still shown by the
+    /// tile are moved to the main canvas (one full-size frame).
+    const REST_MS: f64 = 220.0;
+
+    fn surface_config(
+        surface: &wgpu::Surface<'static>,
+        adapter: &wgpu::Adapter,
+        w: u32,
+        h: u32,
+    ) -> Result<wgpu::SurfaceConfiguration, JsValue> {
+        let caps = surface.get_capabilities(adapter);
+        let format = caps
+            .formats
+            .iter()
+            .copied()
+            .find(|f| !f.is_srgb())
+            .or(caps.formats.first().copied())
+            .ok_or_else(|| err("surface not supported by adapter"))?;
+        let alpha_mode = if caps
+            .alpha_modes
+            .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
+        {
+            wgpu::CompositeAlphaMode::PreMultiplied
+        } else {
+            caps.alpha_modes[0]
+        };
+        let mut config = surface
+            .get_default_config(adapter, w.max(1), h.max(1))
+            .ok_or_else(|| err("surface not supported by adapter"))?;
+        config.format = format;
+        config.alpha_mode = alpha_mode;
+        config.present_mode = wgpu::PresentMode::Fifo;
+        config.desired_maximum_frame_latency = 1;
+        Ok(config)
+    }
+
+    impl WetTile {
+        async fn new(
+            board: &Gpu,
+            webgl: bool,
+            canvas: web_sys::HtmlCanvasElement,
+        ) -> Result<WetTile, JsValue> {
+            let (gpu, surface) = if webgl {
+                let (gpu, surface) = Gpu::for_canvas(canvas, true).await.map_err(err)?;
+                (Some(gpu), surface)
+            } else {
+                let surface = board
+                    .instance
+                    .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
+                    .map_err(|e| err(format!("create_surface: {e}")))?;
+                (None, surface)
+            };
+            let g = gpu.as_ref().unwrap_or(board);
+            let config = surface_config(&surface, &g.adapter, 16, 16)?;
+            surface.configure(&g.device, &config);
+            let renderer = InkRenderer::new(&g.device, &g.queue, config.format);
+            Ok(WetTile {
+                gpu,
+                surface,
+                config,
+                renderer,
+            })
+        }
     }
 
     #[wasm_bindgen]
     impl Board {
         /// Create a board on `canvas`. Prefers WebGPU, falls back to WebGL2
         /// (or forces WebGL2 when `force_webgl` is true).
+        /// `wet_canvas`, when given, becomes the wet tile (see
+        /// `set_wet_tile`); if it cannot be set up the board works without.
         pub async fn create(
             canvas: web_sys::HtmlCanvasElement,
             force_webgl: bool,
+            wet_canvas: Option<web_sys::HtmlCanvasElement>,
         ) -> Result<Board, JsValue> {
             let css = [
                 canvas.client_width().max(1) as f32,
                 canvas.client_height().max(1) as f32,
             ];
             let (gpu, surface) = Gpu::for_canvas(canvas, force_webgl).await.map_err(err)?;
-            let caps = surface.get_capabilities(&gpu.adapter);
-            let format = caps
-                .formats
-                .iter()
-                .copied()
-                .find(|f| !f.is_srgb())
-                .unwrap_or(caps.formats[0]);
-            let alpha_mode = if caps
-                .alpha_modes
-                .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
-            {
-                wgpu::CompositeAlphaMode::PreMultiplied
-            } else {
-                caps.alpha_modes[0]
-            };
-            let mut config = surface
-                .get_default_config(&gpu.adapter, css[0] as u32, css[1] as u32)
-                .ok_or_else(|| err("surface not supported by adapter"))?;
-            config.format = format;
-            config.alpha_mode = alpha_mode;
-            config.present_mode = wgpu::PresentMode::Fifo;
-            config.desired_maximum_frame_latency = 1;
+            let config = surface_config(&surface, &gpu.adapter, css[0] as u32, css[1] as u32)?;
             surface.configure(&gpu.device, &config);
+            let webgl = gpu.adapter.get_info().backend == wgpu::Backend::Gl;
+            let tile = match wet_canvas {
+                Some(c) => match WetTile::new(&gpu, webgl, c).await {
+                    Ok(t) => Some(t),
+                    Err(e) => {
+                        web_sys::console::warn_2(&"rupok: no wet tile:".into(), &e);
+                        None
+                    }
+                },
+                None => None,
+            };
             web_sys::console::info_1(
                 &format!(
-                    "rupok: {} · format {:?} · alpha {:?} (supported {:?})",
+                    "rupok: {} · format {:?} · alpha {:?} · wet tile {}",
                     gpu.backend_name(),
-                    format,
-                    alpha_mode,
-                    caps.alpha_modes
+                    config.format,
+                    config.alpha_mode,
+                    if tile.is_some() { "ready" } else { "none" }
                 )
                 .into(),
             );
-            let renderer = InkRenderer::new(&gpu.device, &gpu.queue, format);
+            let renderer = InkRenderer::new(&gpu.device, &gpu.queue, config.format);
             let mut engine = Engine::new(renderer, "Untitled lesson", now());
             engine.set_view(css[0], css[1]);
             engine.fit_page();
@@ -115,7 +194,67 @@ mod web {
                 last_stats: Default::default(),
                 frame_ms: 0.0,
                 warned: false,
+                tile,
+                ink_ms: 0.0,
+                drew_main: false,
+                drew_tile: false,
+                main_frames: 0,
+                tile_frames: 0,
             })
+        }
+
+        /// Whether a wet tile canvas was set up at creation.
+        pub fn has_wet_tile(&self) -> bool {
+            self.tile.is_some()
+        }
+
+        /// Use the wet tile at this size (device px of its canvas), or draw
+        /// all ink in the main canvas with `on` false. Takes effect on the
+        /// next frame.
+        pub fn set_wet_tile(&mut self, on: bool, w: u32, h: u32) {
+            let Some(t) = self.tile.as_mut() else { return };
+            if !on {
+                self.engine.sink.set_tile_size(None);
+                return;
+            }
+            let g = t.gpu.as_ref().unwrap_or(&self.gpu);
+            let max = g.device.limits().max_texture_dimension_2d;
+            let (w, h) = (w.clamp(1, max), h.clamp(1, max));
+            if t.config.width != w || t.config.height != h {
+                t.config.width = w;
+                t.config.height = h;
+                t.surface.configure(&g.device, &t.config);
+                self.engine.sink.invalidate_tile();
+            }
+            self.engine.sink.set_tile_size(Some((w, h)));
+        }
+
+        /// Where the wet tile lies over the main canvas, in the main
+        /// canvas's own pixels: `[x, y, w, h]`. Empty without a tile.
+        pub fn wet_tile_rect(&self) -> Vec<f32> {
+            match (self.engine.sink.tile_size(), self.engine.sink.tile_rect()) {
+                (Some(_), Some(r)) => vec![r.x as f32, r.y as f32, r.w as f32, r.h as f32],
+                _ => Vec::new(),
+            }
+        }
+
+        /// Do not draw the wet ink (a native layer shows the stroke being
+        /// written); the engine still builds it. `false` draws it again.
+        pub fn set_wet_hidden(&mut self, hidden: bool) {
+            self.engine.sink.set_wet_hidden(hidden);
+        }
+
+        /// Which canvases the last drawn frame presented: 1 the main canvas,
+        /// 2 the wet tile, 3 both.
+        pub fn last_frame_kind(&self) -> u8 {
+            u8::from(self.drew_main) | (u8::from(self.drew_tile) << 1)
+        }
+
+        /// Present the main canvas on the next frame, with every finished
+        /// stroke in it (before reading the canvases back: a canvas keeps
+        /// its pixels only for the frame that drew it).
+        pub fn flush_ink(&mut self) {
+            self.engine.sink.request_main();
         }
 
         pub fn backend(&self) -> String {
@@ -134,50 +273,119 @@ mod web {
             self.engine.sink.invalidate();
         }
 
+        /// The main canvas's size in its own pixels.
+        pub fn canvas_size(&self) -> Vec<u32> {
+            vec![self.config.width, self.config.height]
+        }
+
         /// Draw a frame if anything changed. Returns true when a frame was drawn.
+        ///
+        /// With a wet tile, ink that is changing (the wet stroke, strokes
+        /// just finished) is drawn in the tile alone; the main canvas is
+        /// presented when dry ink or the view changed, when wet ink left the
+        /// tile, or once the pen has rested.
         pub fn frame(&mut self) -> bool {
             let t0 = now();
             self.engine.tick(t0);
             let cam = self.engine.camera;
             let (w, h) = (self.config.width, self.config.height);
-            let dirty = self.engine.take_dirty();
-            if !dirty && !self.engine.sink.needs_redraw(cam, self.dpr, w, h) {
+            self.engine.take_dirty();
+            let sink = &mut self.engine.sink;
+            if sink.has_wet() {
+                self.ink_ms = t0;
+            } else if sink.pending_strokes() == 0 {
+                self.ink_ms = self.ink_ms.max(t0 - REST_MS * 0.5);
+            }
+            let rested = t0 - self.ink_ms > REST_MS;
+            let plan = sink.plan(cam, self.dpr, w, h, rested);
+            if !plan.main && !plan.tile {
                 return false;
             }
-            let frame = match self.surface.get_current_texture() {
+            self.drew_main = false;
+            self.drew_tile = false;
+            if plan.main {
+                let frame = match self.surface.get_current_texture() {
+                    wgpu::CurrentSurfaceTexture::Success(f)
+                    | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
+                    wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+                        self.surface.configure(&self.gpu.device, &self.config);
+                        self.engine.sink.invalidate();
+                        return false;
+                    }
+                    other => {
+                        if !self.warned {
+                            self.warned = true;
+                            web_sys::console::warn_1(
+                                &format!(
+                                    "rupok: surface not ready: {:?}",
+                                    std::mem::discriminant(&other)
+                                )
+                                .into(),
+                            );
+                        }
+                        return false;
+                    }
+                };
+                let view = frame.texture.create_view(&Default::default());
+                self.last_stats = self.engine.sink.render_main(
+                    &self.gpu.device,
+                    &self.gpu.queue,
+                    &view,
+                    w,
+                    h,
+                    cam,
+                    self.dpr,
+                );
+                self.gpu.queue.present(frame);
+                self.drew_main = true;
+                self.main_frames = self.main_frames.wrapping_add(1);
+            }
+            if plan.tile {
+                self.drew_tile = self.tile_frame(cam);
+                if self.drew_tile {
+                    self.tile_frames = self.tile_frames.wrapping_add(1);
+                }
+            }
+            self.frame_ms = now() - t0;
+            self.drew_main || self.drew_tile
+        }
+
+        fn tile_frame(&mut self, cam: rupok_render::Camera) -> bool {
+            let Some(t) = self.tile.as_mut() else {
+                // No tile canvas: the plan cannot ask for one.
+                self.engine.sink.set_tile_size(None);
+                return false;
+            };
+            let g = t.gpu.as_ref().unwrap_or(&self.gpu);
+            let frame = match t.surface.get_current_texture() {
                 wgpu::CurrentSurfaceTexture::Success(f)
                 | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
                 wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
-                    self.surface.configure(&self.gpu.device, &self.config);
-                    self.engine.sink.invalidate();
+                    t.surface.configure(&g.device, &t.config);
+                    self.engine.sink.invalidate_tile();
                     return false;
                 }
-                other => {
-                    if !self.warned {
-                        self.warned = true;
-                        web_sys::console::warn_1(
-                            &format!(
-                                "rupok: surface not ready: {:?}",
-                                std::mem::discriminant(&other)
-                            )
-                            .into(),
-                        );
-                    }
+                _ => {
+                    // The tile cannot be drawn: everything back to the main canvas.
+                    web_sys::console::warn_1(&"rupok: wet tile lost; using the main canvas".into());
+                    self.engine.sink.set_tile_size(None);
                     return false;
                 }
             };
             let view = frame.texture.create_view(&Default::default());
-            self.last_stats = self.engine.sink.render(
-                &self.gpu.device,
-                &self.gpu.queue,
+            let sink = &self.engine.sink;
+            t.renderer.render_tile(
+                &g.device,
+                &g.queue,
                 &view,
-                w,
-                h,
-                cam,
+                t.config.width,
+                t.config.height,
+                sink.tile_camera(cam, self.dpr),
                 self.dpr,
+                sink.tile_vertices(),
             );
-            self.gpu.queue.present(frame);
-            self.frame_ms = now() - t0;
+            g.queue.present(frame);
+            self.engine.sink.tile_presented();
             true
         }
 
@@ -1165,6 +1373,10 @@ mod web {
                 "segments": s.segments_drawn,
                 "drawCalls": s.draw_calls,
                 "dryRedrawn": s.dry_redrawn,
+                "canvas": [self.config.width, self.config.height],
+                "tile": self.engine.sink.tile_size().map(|(w, h)| [w, h]),
+                "mainFrames": self.main_frames,
+                "tileFrames": self.tile_frames,
                 "frameMs": self.frame_ms,
                 "zoom": self.engine.camera.zoom,
             })

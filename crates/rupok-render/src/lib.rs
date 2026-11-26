@@ -13,7 +13,7 @@
 
 mod ink;
 
-pub use ink::{InkRenderer, RenderStats};
+pub use ink::{FramePlan, InkRenderer, InkVertex, RenderStats, TileRect};
 
 /// World → screen mapping. `screen_css = (world - (x, y)) * zoom`.
 #[derive(Clone, Copy, Debug, PartialEq)]

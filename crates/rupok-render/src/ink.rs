@@ -1,4 +1,11 @@
 //! Instanced SDF stroke renderer with chunk culling and a cached dry layer.
+//!
+//! While the pen writes, nothing here scales with the screen: the ink that is
+//! changing (the wet stroke, and strokes just finished) is drawn into a small
+//! *wet tile*, a second target the size of a handwriting area that the host
+//! lays over the main one. The main target is presented only when dry ink or
+//! the camera changes, or when wet ink leaves the tile. See
+//! docs/performance.md, "The wet tile".
 
 use std::collections::HashMap;
 
@@ -59,7 +66,48 @@ pub struct RenderStats {
     pub dead_vertices: usize,
     pub segments_drawn: u32,
     pub draw_calls: u32,
+    /// The whole dry layer was drawn again (pan, zoom, erase, resize).
     pub dry_redrawn: bool,
+    /// Only strokes added on top were drawn into the dry layer.
+    pub dry_appended: bool,
+}
+
+/// A rectangle of the main target, in device pixels.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TileRect {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+impl TileRect {
+    fn contains(&self, b: &[f32; 4]) -> bool {
+        b[0] >= self.x as f32
+            && b[1] >= self.y as f32
+            && b[2] <= (self.x + self.w) as f32
+            && b[3] <= (self.y + self.h) as f32
+    }
+}
+
+/// What the next frame has to draw ([`InkRenderer::plan`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FramePlan {
+    /// Present the main target ([`InkRenderer::render_main`]).
+    pub main: bool,
+    /// Present the wet tile ([`InkRenderer::render_tile`], then
+    /// [`InkRenderer::tile_presented`]).
+    pub tile: bool,
+    /// Where the tile lies over the main target after this frame.
+    pub rect: Option<TileRect>,
+}
+
+/// More pending vertices than this and the main target is presented instead.
+const MAX_PENDING_VERTS: usize = 24 * 1024;
+/// The depth the tile gives the `k`-th pending dry stroke: behind all wet ink
+/// (0.5 and nearer), later strokes nearer.
+fn pending_depth(k: usize) -> f32 {
+    0.9 - (k.min(30_000) as f32) * 1e-5
 }
 
 #[repr(C)]
@@ -103,12 +151,40 @@ pub struct InkRenderer {
     appended_since_sort: usize,
 
     wet: Vec<InkVertex>,
+    /// The wet ink is shown by something else (a native layer): not drawn.
+    wet_hidden: bool,
     wet_buf: wgpu::Buffer,
     wet_cap: usize,
 
     layer: Option<Layer>,
+    /// The dry layer must be drawn again from scratch.
     dry_dirty: bool,
+    /// Strokes added on top since the dry layer was drawn: `(start, len)`.
+    appended: Vec<(usize, usize)>,
     last_view: Option<(Camera, f32, u32, u32)>,
+
+    // ---- the wet tile (see the module docs)
+    mask_pipeline: wgpu::RenderPipeline,
+    /// Size of the tile target; `None` draws everything in the main target.
+    tile_size: Option<(u32, u32)>,
+    /// Where the tile lies, as of the last frame that used it.
+    tile_rect: Option<TileRect>,
+    /// The main target shows something the tile cannot stand in for.
+    main_dirty: bool,
+    /// The wet vertices as the main target last drew them (outside
+    /// `tile_rect`; everywhere without one).
+    baked: Vec<InkVertex>,
+    /// Dry strokes added since the main target was presented: `(start, len)`.
+    pending: Vec<(usize, usize)>,
+    pending_verts: usize,
+    planned: FramePlan,
+    /// What the tile has to show, and what it shows now.
+    tile_verts: Vec<InkVertex>,
+    tile_drawn: Vec<InkVertex>,
+    tile_drawn_rect: Option<TileRect>,
+    tile_stale: bool,
+    /// Depth for [`InkRenderer::render_tile`] (a renderer used as the tile's).
+    tile_depth: Option<(wgpu::TextureView, u32, u32)>,
 }
 
 fn empty_bounds() -> [f32; 4] {
@@ -194,6 +270,55 @@ fn morton_cell(x: f32, y: f32) -> u64 {
 
 fn intersects(a: &[f32; 4], b: &[f32; 4]) -> bool {
     a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1]
+}
+
+fn is_empty(b: &[f32; 4]) -> bool {
+    b[0] > b[2] || b[1] > b[3]
+}
+
+fn union(a: &mut [f32; 4], b: &[f32; 4]) {
+    a[0] = a[0].min(b[0]);
+    a[1] = a[1].min(b[1]);
+    a[2] = a[2].max(b[2]);
+    a[3] = a[3].max(b[3]);
+}
+
+/// World bounds of `verts` (separators skipped).
+fn bounds_of(verts: &[InkVertex]) -> [f32; 4] {
+    let mut b = empty_bounds();
+    for v in verts {
+        grow(&mut b, v);
+    }
+    b
+}
+
+/// The strokes of a wet vertex list (`SEP`-separated runs).
+fn strokes_of(verts: &[InkVertex]) -> impl Iterator<Item = &[InkVertex]> {
+    verts.split(|v| v.radius < 0.0).filter(|s| !s.is_empty())
+}
+
+/// World bounds of everything that differs between two wet vertex lists,
+/// stroke by stroke. A stroke that only grew differs in its tail: from two
+/// points before the first changed one, because a segment's shape also
+/// depends on its neighbours (`ink.wgsl`).
+fn changed_bounds(wet: &[InkVertex], baked: &[InkVertex]) -> [f32; 4] {
+    let mut out = empty_bounds();
+    let mut a = strokes_of(wet);
+    let mut b = strokes_of(baked);
+    loop {
+        let (x, y) = (a.next(), b.next());
+        if x.is_none() && y.is_none() {
+            return out;
+        }
+        let (x, y) = (x.unwrap_or(&[]), y.unwrap_or(&[]));
+        let same = x.iter().zip(y).take_while(|(p, q)| p == q).count();
+        if same == x.len() && same == y.len() {
+            continue;
+        }
+        let from = same.saturating_sub(2);
+        union(&mut out, &bounds_of(&x[from.min(x.len())..]));
+        union(&mut out, &bounds_of(&y[from.min(y.len())..]));
+    }
 }
 
 /// Convert stroke points into GPU vertices (single-point strokes become a
@@ -445,13 +570,8 @@ impl InkRenderer {
                 buffers: &[],
             },
             primitive: Default::default(),
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: Some(false),
-                depth_compare: Some(wgpu::CompareFunction::Always),
-                stencil: Default::default(),
-                bias: Default::default(),
-            }),
+            // Its pass has no depth attachment: nothing to clear at full size.
+            depth_stencil: None,
             multisample: Default::default(),
             fragment: Some(wgpu::FragmentState {
                 module: &blit_shader,
@@ -461,6 +581,44 @@ impl InkRenderer {
                     format,
                     blend: None,
                     write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            multiview_mask: None,
+            cache: None,
+        });
+
+        let mask_shader = device.create_shader_module(wgpu::include_wgsl!("mask.wgsl"));
+        let mask_pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("mask"),
+            bind_group_layouts: &[],
+            immediate_size: 0,
+        });
+        let mask_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("mask"),
+            layout: Some(&mask_pl),
+            vertex: wgpu::VertexState {
+                module: &mask_shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            primitive: Default::default(),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: DEPTH_FORMAT,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Always),
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            fragment: Some(wgpu::FragmentState {
+                module: &mask_shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::empty(),
                 })],
             }),
             multiview_mask: None,
@@ -492,11 +650,26 @@ impl InkRenderer {
             next_depth: 0,
             appended_since_sort: 0,
             wet: Vec::new(),
+            wet_hidden: false,
             wet_buf,
             wet_cap,
             layer: None,
             dry_dirty: true,
+            appended: Vec::new(),
             last_view: None,
+            mask_pipeline,
+            tile_size: None,
+            tile_rect: None,
+            main_dirty: true,
+            baked: Vec::new(),
+            pending: Vec::new(),
+            pending_verts: 0,
+            planned: FramePlan::default(),
+            tile_verts: Vec::new(),
+            tile_drawn: Vec::new(),
+            tile_drawn_rect: None,
+            tile_stale: false,
+            tile_depth: None,
         }
     }
 
@@ -548,7 +721,16 @@ impl InkRenderer {
         self.next_depth = 0;
         self.appended_since_sort = 0;
         self.upload_from = Some(0);
+        self.touch_all();
+    }
+
+    /// Everything dry must be drawn again, and the main target presented.
+    fn touch_all(&mut self) {
         self.dry_dirty = true;
+        self.main_dirty = true;
+        self.appended.clear();
+        self.pending.clear();
+        self.pending_verts = 0;
     }
 
     /// Append a stroke on top. Replaces an existing stroke with the same id.
@@ -593,7 +775,16 @@ impl InkRenderer {
         );
         self.appended_since_sort += 1;
         self.upload_from = Some(self.upload_from.map_or(start, |u| u.min(start)));
-        self.dry_dirty = true;
+        // A stroke on top of everything: the dry layer only needs this one
+        // drawn over it, and until the main target is next presented the
+        // wet tile can show it (`plan`).
+        if !self.dry_dirty {
+            self.appended.push((start, len));
+        }
+        if !self.main_dirty {
+            self.pending.push((start, len));
+            self.pending_verts += len;
+        }
     }
 
     /// Tombstone a stroke in place (no buffer rebuild).
@@ -606,7 +797,7 @@ impl InkRenderer {
         }
         self.tombstones.push((slot.start, slot.len));
         self.dead += slot.len + 1;
-        self.dry_dirty = true;
+        self.touch_all();
         true
     }
 
@@ -658,7 +849,7 @@ impl InkRenderer {
         self.appended_since_sort = 0;
         self.tombstones.clear();
         self.upload_from = Some(0);
-        self.dry_dirty = true;
+        self.touch_all();
     }
 
     /// Re-sort spatially if many strokes were appended since the last sort.
@@ -722,18 +913,288 @@ impl InkRenderer {
         self.wet.clear();
     }
 
+    /// Whether there is wet ink to draw.
     pub fn has_wet(&self) -> bool {
-        self.wet.len() > 3
+        !self.wet_hidden && self.wet.len() > 3
     }
 
-    /// Whether a frame must be drawn for this view.
+    /// Stop (or resume) drawing the wet ink while something else shows it:
+    /// the native wet-ink layer of the Windows app. The strokes are kept.
+    pub fn set_wet_hidden(&mut self, hidden: bool) {
+        self.wet_hidden = hidden;
+    }
+
+    /// Whether a frame must be drawn for this view (everything in one
+    /// target; with a wet tile, ask [`InkRenderer::plan`]).
     pub fn needs_redraw(&self, cam: Camera, dpr: f32, w: u32, h: u32) -> bool {
-        self.dry_dirty || self.last_view != Some((cam, dpr, w, h))
+        self.dry_dirty
+            || self.main_dirty
+            || !self.pending.is_empty()
+            || self.wet_shown() != self.baked.as_slice()
+            || self.last_view != Some((cam, dpr, w, h))
     }
 
     /// Force the dry layer to re-render on the next frame.
     pub fn invalidate(&mut self) {
-        self.dry_dirty = true;
+        self.touch_all();
+    }
+
+    /// Present the main target on the next frame, whatever changed (the
+    /// tile then shows only what is still wet).
+    pub fn request_main(&mut self) {
+        self.main_dirty = true;
+    }
+
+    /// The wet vertices, empty when there is no wet ink.
+    fn wet_shown(&self) -> &[InkVertex] {
+        if self.has_wet() { &self.wet } else { &[] }
+    }
+
+    // ------------------------------------------------------------ wet tile
+
+    /// Draw changing ink into a separate tile target of this size (device
+    /// px), or back into the main target with `None`.
+    pub fn set_tile_size(&mut self, size: Option<(u32, u32)>) {
+        let size = size.filter(|(w, h)| *w > 0 && *h > 0);
+        if self.tile_size != size {
+            self.tile_size = size;
+            self.tile_rect = None;
+            self.main_dirty = true;
+            self.tile_stale = true;
+        }
+    }
+
+    pub fn tile_size(&self) -> Option<(u32, u32)> {
+        self.tile_size
+    }
+
+    /// Where the tile lies over the main target (device px).
+    pub fn tile_rect(&self) -> Option<TileRect> {
+        self.tile_rect
+    }
+
+    /// The tile target lost its contents (resized, reconfigured).
+    pub fn invalidate_tile(&mut self) {
+        self.tile_stale = true;
+    }
+
+    /// Dry strokes the main target does not show yet.
+    pub fn pending_strokes(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Decide what this frame draws. The main target is needed when dry ink
+    /// other than strokes added on top changed, when the view changed, or
+    /// when the changing ink does not fit the tile; otherwise the tile alone
+    /// is redrawn (or nothing). `flush` asks for the pending strokes to go
+    /// to the main target now (the pen is resting).
+    ///
+    /// Nothing is committed here: [`InkRenderer::render_main`] and
+    /// [`InkRenderer::tile_presented`] do that, so a frame that could not
+    /// be drawn is planned again.
+    pub fn plan(&mut self, cam: Camera, dpr: f32, w: u32, h: u32, flush: bool) -> FramePlan {
+        if self.last_view != Some((cam, dpr, w, h)) {
+            self.dry_dirty = true;
+        }
+        if self.dry_dirty {
+            self.main_dirty = true;
+        }
+        self.tile_verts.clear();
+        let tile = self
+            .tile_size
+            .map(|(tw, th)| (tw.min(w), th.min(h)))
+            .filter(|(tw, th)| *tw > 0 && *th > 0);
+        let Some((tw, th)) = tile else {
+            let main = self.main_dirty
+                || !self.pending.is_empty()
+                || self.wet_shown() != self.baked.as_slice();
+            self.planned = FramePlan {
+                main,
+                tile: false,
+                rect: None,
+            };
+            return self.planned;
+        };
+
+        let scale = cam.zoom * dpr;
+        // World bounds → device px of the main target, with room for the
+        // antialiased edge; clipped to the target.
+        let to_px = |b: [f32; 4]| -> Option<[f32; 4]> {
+            if is_empty(&b) {
+                return None;
+            }
+            let p = [
+                ((b[0] - cam.x) * scale - 2.0).floor().max(0.0),
+                ((b[1] - cam.y) * scale - 2.0).floor().max(0.0),
+                ((b[2] - cam.x) * scale + 2.0).ceil().min(w as f32),
+                ((b[3] - cam.y) * scale + 2.0).ceil().min(h as f32),
+            ];
+            (!is_empty(&p)).then_some(p)
+        };
+        let fits = |p: &[f32; 4]| p[2] - p[0] <= tw as f32 && p[3] - p[1] <= th as f32;
+        // The pen's tip and where it is heading (device px), to put the tile
+        // ahead of the pen rather than around it.
+        let (tip, heading) = {
+            let wet = self.wet_shown();
+            let last = wet.iter().rposition(|v| v.radius >= 0.0);
+            match last {
+                Some(i) => {
+                    let back = wet[..i]
+                        .iter()
+                        .rev()
+                        .take(24)
+                        .take_while(|v| v.radius >= 0.0)
+                        .last()
+                        .unwrap_or(&wet[i]);
+                    let t = [
+                        (wet[i].pos[0] - cam.x) * scale,
+                        (wet[i].pos[1] - cam.y) * scale,
+                    ];
+                    let d = [
+                        (wet[i].pos[0] - back.pos[0]) * scale,
+                        (wet[i].pos[1] - back.pos[1]) * scale,
+                    ];
+                    let n = d[0].hypot(d[1]);
+                    let d = if n > 1.0 {
+                        [d[0] / n, d[1] / n]
+                    } else {
+                        [0.0, 0.0]
+                    };
+                    (Some(t), d)
+                }
+                None => (None, [0.0, 0.0]),
+            }
+        };
+        // A tile holding `p`: centred a quarter-tile ahead of the tip.
+        let place = |p: &[f32; 4]| -> TileRect {
+            let axis =
+                |lo: f32, hi: f32, size: u32, full: u32, tip: Option<f32>, dir: f32| -> u32 {
+                    let max = (full - size) as f32;
+                    let (min_x, max_x) = ((hi - size as f32).max(0.0), lo.min(max));
+                    let want = match tip {
+                        Some(t) => t - size as f32 * 0.5 + dir * size as f32 * 0.25,
+                        None => (lo + hi - size as f32) * 0.5,
+                    };
+                    want.round().clamp(min_x, max_x.max(min_x)) as u32
+                };
+            TileRect {
+                x: axis(p[0], p[2], tw, w, tip.map(|t| t[0]), heading[0]),
+                y: axis(p[1], p[3], th, h, tip.map(|t| t[1]), heading[1]),
+                w: tw,
+                h: th,
+            }
+        };
+
+        let mut rect = self
+            .tile_rect
+            .filter(|r| r.w == tw && r.h == th && r.x + tw <= w && r.y + th <= h);
+        let mut main = self.main_dirty
+            || (flush && !self.pending.is_empty())
+            || self.pending_verts > MAX_PENDING_VERTS;
+        if !main {
+            // Everything that differs from what the main target shows.
+            let mut c = changed_bounds(self.wet_shown(), &self.baked);
+            for &(start, len) in &self.pending {
+                union(&mut c, &bounds_of(&self.verts[start..start + len]));
+            }
+            match to_px(c) {
+                None => {}
+                Some(p) if rect.is_some_and(|r| r.contains(&p)) => {}
+                // Nothing wet is in the main target: the tile is free to move.
+                Some(p) if self.baked.is_empty() && fits(&p) => rect = Some(place(&p)),
+                Some(_) => main = true,
+            }
+        }
+        let mut pending_in_tile = !main;
+        if main {
+            // The main target takes all dry ink. Wet ink goes to the tile if
+            // it fits; of a long stroke, the part still changing (its tail).
+            pending_in_tile = false;
+            let wet = self.wet_shown();
+            if !wet.is_empty() {
+                let all = to_px(bounds_of(wet));
+                let tail = || {
+                    let c = to_px(changed_bounds(wet, &self.baked)).filter(|p| fits(p));
+                    c.or_else(|| {
+                        let last = wet.iter().rposition(|v| v.radius >= 0.0)?;
+                        let from = wet[..last]
+                            .iter()
+                            .rposition(|v| v.radius < 0.0)
+                            .map_or(0, |i| i + 1)
+                            .max(last.saturating_sub(8));
+                        to_px(bounds_of(&wet[from..=last]))
+                    })
+                };
+                rect = match all {
+                    Some(p) if fits(&p) => Some(place(&p)),
+                    Some(_) => tail().filter(|p| fits(p)).map(|p| place(&p)),
+                    None => rect,
+                };
+            }
+        }
+        if rect.is_some() {
+            let wet = if self.has_wet() { &self.wet[..] } else { &[] };
+            let pending: &[(usize, usize)] = if pending_in_tile { &self.pending } else { &[] };
+            if !wet.is_empty() || !pending.is_empty() {
+                self.tile_verts.push(SEP);
+                for (k, &(start, len)) in pending.iter().enumerate() {
+                    let depth = pending_depth(k);
+                    self.tile_verts.extend(
+                        self.verts[start..start + len]
+                            .iter()
+                            .map(|v| InkVertex { depth, ..*v }),
+                    );
+                    self.tile_verts.push(SEP);
+                }
+                if wet.is_empty() {
+                    self.tile_verts.push(SEP);
+                } else {
+                    // `[SEP, points, SEP, …, SEP]` without its leading SEP.
+                    self.tile_verts.extend_from_slice(&wet[1..]);
+                }
+            }
+        }
+        let tile = self.tile_stale
+            || self.tile_verts != self.tile_drawn
+            || (!self.tile_verts.is_empty() && rect != self.tile_drawn_rect);
+        self.planned = FramePlan { main, tile, rect };
+        self.planned
+    }
+
+    /// The tile's vertex list for this frame ([`InkRenderer::render_tile`]).
+    pub fn tile_vertices(&self) -> &[InkVertex] {
+        &self.tile_verts
+    }
+
+    /// The camera that draws the planned tile: the main camera, moved to the
+    /// tile's corner.
+    pub fn tile_camera(&self, cam: Camera, dpr: f32) -> Camera {
+        let r = self.planned.rect.unwrap_or(TileRect {
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 0,
+        });
+        let scale = cam.zoom * dpr;
+        Camera {
+            x: cam.x + r.x as f32 / scale,
+            y: cam.y + r.y as f32 / scale,
+            zoom: cam.zoom,
+        }
+    }
+
+    /// The planned tile frame is on screen.
+    pub fn tile_presented(&mut self) {
+        self.tile_drawn.clone_from(&self.tile_verts);
+        self.tile_drawn_rect = self.planned.rect;
+        self.tile_rect = self.planned.rect;
+        self.tile_stale = false;
+        // With the pen up, a frame the tile could carry alone means the
+        // main target shows none of the wet ink it once drew (it was all
+        // under the tile): nothing is baked any more.
+        if !self.planned.main && !self.has_wet() {
+            self.baked.clear();
+        }
     }
 
     fn sync_gpu(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
@@ -807,7 +1268,7 @@ impl InkRenderer {
             w,
             h,
         });
-        self.dry_dirty = true;
+        self.touch_all();
     }
 
     /// Visible instance ranges `[lo, hi)` over the dry vertex array.
@@ -857,11 +1318,35 @@ impl InkRenderer {
         queue.write_buffer(buf, 0, bytemuck::bytes_of(&g));
     }
 
-    /// Render one frame into `target` (`w`×`h` device px). `dpr` converts CSS
-    /// px to device px. The target is cleared to transparent so the ink layer
-    /// composites over the DOM (objects, images, page background).
+    /// Render one frame into `target` (`w`×`h` device px), all ink in this
+    /// one target. `dpr` converts CSS px to device px. The target is cleared
+    /// to transparent so the ink layer composites over the DOM (objects,
+    /// images, page background).
     #[allow(clippy::too_many_arguments)]
     pub fn render(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        target: &wgpu::TextureView,
+        w: u32,
+        h: u32,
+        cam: Camera,
+        dpr: f32,
+    ) -> RenderStats {
+        self.planned = FramePlan {
+            main: true,
+            tile: false,
+            rect: None,
+        };
+        self.render_main(device, queue, target, w, h, cam, dpr)
+    }
+
+    /// Present the main target as planned ([`InkRenderer::plan`]): the dry
+    /// layer (drawn again, or only the strokes added on top), then the wet
+    /// ink that is not the tile's. With a tile, its rectangle is cut out of
+    /// the wet ink so no pixel is drawn by both targets.
+    #[allow(clippy::too_many_arguments)]
+    pub fn render_main(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -887,10 +1372,19 @@ impl InkRenderer {
             label: Some("ink frame"),
         });
 
-        if self.dry_dirty {
-            Self::write_globals(queue, &self.dry_globals, cam, dpr, w, h);
+        let ranges: Vec<(usize, usize)> = if self.dry_dirty {
             let vis_css = cam.visible(w as f32 / dpr, h as f32 / dpr);
-            let ranges = self.visible_ranges(vis_css);
+            self.visible_ranges(vis_css)
+        } else {
+            // Instances `start..start + len - 1` are a stroke's segments.
+            self.appended
+                .iter()
+                .filter(|(_, len)| *len > 1)
+                .map(|&(start, len)| (start, start + len - 1))
+                .collect()
+        };
+        if self.dry_dirty || !ranges.is_empty() {
+            Self::write_globals(queue, &self.dry_globals, cam, dpr, w, h);
             let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("dry ink"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -898,7 +1392,12 @@ impl InkRenderer {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        // Strokes added on top are drawn over the layer as it is.
+                        load: if self.dry_dirty {
+                            wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT)
+                        } else {
+                            wgpu::LoadOp::Load
+                        },
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -922,13 +1421,13 @@ impl InkRenderer {
                 stats.draw_calls += 1;
             }
             drop(pass);
-            stats.dry_redrawn = true;
+            stats.dry_redrawn = self.dry_dirty;
+            stats.dry_appended = !self.dry_dirty;
         }
 
         {
-            if self.has_wet() {
-                Self::write_globals(queue, &self.wet_globals, cam, dpr, w, h);
-            }
+            // The layer onto the frame: no depth attachment, nothing else at
+            // full size.
             let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("frame"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -937,6 +1436,33 @@ impl InkRenderer {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.blit_pipeline);
+            pass.set_bind_group(0, &layer.bind_group, &[]);
+            pass.draw(0..3, 0..1);
+            stats.draw_calls += 1;
+        }
+        let mask = self
+            .planned
+            .rect
+            .filter(|r| r.x + r.w <= w && r.y + r.h <= h);
+        if self.has_wet() {
+            Self::write_globals(queue, &self.wet_globals, cam, dpr, w, h);
+            let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("wet ink"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -952,22 +1478,121 @@ impl InkRenderer {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            pass.set_pipeline(&self.blit_pipeline);
-            pass.set_bind_group(0, &layer.bind_group, &[]);
-            pass.draw(0..3, 0..1);
+            if let Some(r) = mask {
+                // The tile draws this rectangle: nearest depth, no colour.
+                pass.set_pipeline(&self.mask_pipeline);
+                pass.set_scissor_rect(r.x, r.y, r.w, r.h);
+                pass.draw(0..3, 0..1);
+                pass.set_scissor_rect(0, 0, w, h);
+                stats.draw_calls += 1;
+            }
+            pass.set_pipeline(&self.pipeline);
+            pass.set_bind_group(0, &self.wet_bg, &[]);
+            let hi = self.wet.len() - 2;
+            Self::bind_and_draw(&mut pass, &self.wet_buf, 1, hi);
+            stats.segments_drawn += (hi - 1) as u32;
             stats.draw_calls += 1;
-            if self.has_wet() {
+        }
+        queue.submit(Some(enc.finish()));
+        self.dry_dirty = false;
+        self.main_dirty = false;
+        self.appended.clear();
+        self.pending.clear();
+        self.pending_verts = 0;
+        self.baked.clear();
+        if self.has_wet() {
+            self.baked.extend_from_slice(&self.wet);
+        }
+        self.tile_rect = mask;
+        self.last_view = Some((cam, dpr, w, h));
+        stats
+    }
+
+    /// Draw a tile frame: `verts` ([`InkRenderer::tile_vertices`] of the main
+    /// renderer) through `cam` ([`InkRenderer::tile_camera`]) into `target`
+    /// (`w`×`h` device px), cleared to transparent. `self` is the tile's own
+    /// renderer: on WebGL2 the tile canvas has its own context and device.
+    #[allow(clippy::too_many_arguments)]
+    pub fn render_tile(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        target: &wgpu::TextureView,
+        w: u32,
+        h: u32,
+        cam: Camera,
+        dpr: f32,
+        verts: &[InkVertex],
+    ) -> RenderStats {
+        if !self
+            .tile_depth
+            .as_ref()
+            .is_some_and(|d| d.1 == w && d.2 == h)
+        {
+            let depth = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("tile depth"),
+                size: wgpu::Extent3d {
+                    width: w.max(1),
+                    height: h.max(1),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: DEPTH_FORMAT,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+            self.tile_depth = Some((depth.create_view(&Default::default()), w, h));
+        }
+        let draws = verts.len() > 3;
+        if draws {
+            if verts.len() > self.wet_cap {
+                self.wet_cap = verts.len().next_power_of_two();
+                self.wet_buf = Self::make_vbuf(device, self.wet_cap, "wet vertices");
+            }
+            queue.write_buffer(&self.wet_buf, 0, bytemuck::cast_slice(verts));
+            Self::write_globals(queue, &self.wet_globals, cam, dpr, w, h);
+        }
+        let mut stats = RenderStats::default();
+        let mut enc = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("wet tile"),
+        });
+        {
+            let depth = &self.tile_depth.as_ref().expect("tile depth").0;
+            let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("wet tile"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Discard,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            if draws {
                 pass.set_pipeline(&self.pipeline);
                 pass.set_bind_group(0, &self.wet_bg, &[]);
-                let hi = self.wet.len() - 2;
+                let hi = verts.len() - 2;
                 Self::bind_and_draw(&mut pass, &self.wet_buf, 1, hi);
                 stats.segments_drawn += (hi - 1) as u32;
                 stats.draw_calls += 1;
             }
         }
         queue.submit(Some(enc.finish()));
-        self.dry_dirty = false;
-        self.last_view = Some((cam, dpr, w, h));
         stats
     }
 }

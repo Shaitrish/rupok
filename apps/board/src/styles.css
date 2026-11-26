@@ -139,6 +139,10 @@ svg.icon { display: block; flex: none; }
 .pd-logo.editable { pointer-events: auto; cursor: grab; touch-action: none; }
 .pd-text { font-family: var(--font); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.01em; }
 .ink { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* The wet tile (controller.ts placeWetTile): sized and moved in the main canvas's pixels. */
+.ink-wet { position: absolute; left: 0; top: 0; width: 16px; height: 16px; transform-origin: 0 0; pointer-events: none; }
+/* Settings → About → Performance lab → Flat panels: no frosted glass to blur behind the chrome. */
+:root[data-flat-panels] .surface { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--surface-solid, var(--bg, #fff)); }
 .input-layer { position: absolute; inset: 0; touch-action: none; }
 .input-layer.interact { pointer-events: none; }
 
@@ -681,7 +685,7 @@ button, a, [role="button"] { touch-action: manipulation; }
 
 
 /* Performance and pen latency overlay (components/LatencyOverlay.tsx). */
-.latency { min-width: 236px; max-width: 300px; padding: 10px 12px; border-radius: 12px; display: grid; gap: 4px; font: 500 11.5px/16px var(--font); color: var(--text-2); font-variant-numeric: tabular-nums; pointer-events: none; }
+.latency { min-width: 236px; max-width: 360px; padding: 10px 12px; border-radius: 12px; display: grid; gap: 4px; font: 500 11.5px/16px var(--font); color: var(--text-2); font-variant-numeric: tabular-nums; pointer-events: none; }
 .latency b { font-weight: 650; color: var(--text); text-align: right; }
 .lat-big { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
 .lat-big b { font-size: 20px; line-height: 24px; }
@@ -690,3 +694,11 @@ button, a, [role="button"] { touch-action: manipulation; }
 .lat-row { display: flex; justify-content: space-between; gap: 12px; }
 .lat-gpu { display: block; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lat-gpu.bad { color: var(--danger, #e5484d); white-space: normal; }
+/* The board speed test (components/SpeedTest.tsx): a still card while it runs, then the report. */
+.speed-card { position: absolute; top: calc(var(--inset) + var(--bar) + 12px); left: 50%; transform: translateX(-50%); z-index: 40; max-width: min(560px, calc(100% - 32px)); padding: 10px 14px; border-radius: 12px; display: grid; gap: 4px; justify-items: start; background: var(--surface-solid); box-shadow: var(--shadow-1); font: 500 13px/18px var(--font); color: var(--text-2); pointer-events: none; }
+.speed-card b { color: var(--text); font-weight: 650; }
+.speed-card.hand { outline: 2px solid var(--accent-9); }
+.speed-card .btn { pointer-events: auto; margin-top: 4px; }
+.speed-report { width: min(1180px, 100%); }
+.speed-report pre { margin: 0 0 var(--s4); padding: 12px; max-height: 56dvh; overflow: auto; border-radius: 10px; background: var(--gray-2); font: 500 12px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; user-select: text; -webkit-user-select: text; }
+.speed-report .actions { display: flex; gap: var(--s2); }
