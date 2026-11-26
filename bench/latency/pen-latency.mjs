@@ -139,7 +139,7 @@ function probe() {
   const L = (window.__lat = {
     on: false, pending: [], samples: [], frames: [], moves: 0, received: 0, raw: null,
     captureNext: null, captures: {}, gaps: [], proc: [], longTasks: [], downs: [], firstFrameAfterDown: [], row: -1, loops: 0,
-    down: false, lastLoop: 0, intervals: [], kinds: [0, 0, 0, 0],
+    down: false, lastLoop: 0, intervals: [], kinds: [0, 0, 0, 0], prevFull: false, fullIntervals: [],
   });
   const ink = () => document.querySelector("canvas.ink");
   // The wet tile: a small canvas over the ink canvas with the stroke being
@@ -239,10 +239,15 @@ function probe() {
     // presented (1 the ink canvas, 2 the wet tile, 3 both; window.rupokPerf).
     const kind = L.pending.length ? (window.rupokPerf?.frameKind?.() ?? 1) : 0;
     if (L.down) {
-      if (L.lastLoop) L.intervals.push(t - L.lastLoop);
+      if (L.lastLoop) {
+        L.intervals.push(t - L.lastLoop);
+        // How long a frame that drew the whole ink canvas held up the next.
+        if (L.prevFull) L.fullIntervals.push(t - L.lastLoop);
+      }
       L.lastLoop = t;
       if (kind) L.kinds[kind & 3]++;
     }
+    L.prevFull = (kind & 1) === 1;
     const c = ink();
     const dpr = c ? c.width / c.getBoundingClientRect().width : 1;
     if (L.row < 0) {
@@ -660,7 +665,7 @@ const L = await page.evaluate((zig) => {
   return {
     shot,
     samples: l.samples, frames: l.frames, gaps: l.gaps, proc: l.proc, received: l.received, longTasks: l.longTasks,
-    firstFrameAfterDown: l.firstFrameAfterDown, diff, loops: l.loops, fidelity,
+    firstFrameAfterDown: l.firstFrameAfterDown, diff, loops: l.loops, fidelity, fullIntervals: l.fullIntervals,
   };
 }, zig);
 await browser.close();
@@ -687,10 +692,11 @@ const result = {
   loopMs: frameDur,
   firstFrameAfterDownMs: firstFrame,
   firstFrameList: ffd.map((x) => Math.round(x)),
-  // A typical frame: of the slower kind (one that draws the whole ink
-  // canvas, as the frame after a long stroke's pen-up does), when the board
-  // draws most frames in the wet tile.
-  nextStrokeExtraMs: Math.max(0, firstFrame.p95 - Math.max(stats(L.samples.map((s) => s.frame)).p95, stats(L.samples.filter((s) => s.full).map((s) => s.frame)).p95 || 0)),
+  // Against a typical frame, plus the one frame a pen-up may cost: after a
+  // long stroke the whole ink canvas is drawn once (every frame was that
+  // before the wet tile), and a stroke that starts during it waits for it.
+  // Anything beyond that is pen-up work in the next stroke's way.
+  nextStrokeExtraMs: Math.max(0, firstFrame.p95 - Math.max(stats(L.samples.map((s) => s.frame)).p95, stats(L.samples.filter((s) => s.full).map((s) => s.frame)).p95 || 0) - (stats(L.fullIntervals).p95 || 0)),
   penUpChangedPx: L.diff?.changed ?? NaN,
   penUpChangedPct: L.diff ? (100 * L.diff.changed) / Math.max(1, L.diff.inked) : NaN,
   sent,
