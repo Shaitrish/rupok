@@ -30,6 +30,13 @@ mod agent_cmd;
 mod overlay;
 #[cfg(feature = "app")]
 mod perf_cmd;
+
+// The native wet-ink layer: Windows only, experimental (Settings → About →
+// Performance lab). Its commands exist everywhere and say so elsewhere.
+#[cfg(all(feature = "app", windows))]
+mod native_ink;
+#[cfg(feature = "app")]
+mod native_ink_cmd;
 #[cfg(feature = "app")]
 mod voice_cmd;
 

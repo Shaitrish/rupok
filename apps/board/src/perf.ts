@@ -16,6 +16,7 @@
 
 import { createSignal } from "solid-js";
 import { prefs } from "./state";
+import { graphicsAdapter } from "./inkLatency";
 
 export type RenderScalePref = "auto" | "100" | "75" | "50";
 export type RendererPref = "auto" | "webgpu" | "webgl";
@@ -175,20 +176,28 @@ const TRY_KEY = "rupok.gpu.trying";
 export const webgpuTested = () => "gpu" in navigator && /Chrome\//.test(navigator.userAgent);
 
 /** Whether to start the board on WebGL2. "Auto" is WebGPU in Chromium where
- * it exists (it was about twice as fast as WebGL2 on the first 4K board we
- * measured: wgpu's WebGL2 path adds a full-canvas copy to every frame), and
- * WebGL2 otherwise, or when the last WebGPU start did not finish. */
-export function startOnWebgl(): boolean {
+ * it runs on a real GPU (it was about twice as fast as WebGL2 on the first
+ * 4K board we measured: wgpu's WebGL2 path adds a full-canvas copy to every
+ * frame), and WebGL2 otherwise: without a GPU (a software adapter), or when
+ * the last WebGPU start did not finish. */
+export async function startOnWebgl(): Promise<boolean> {
   const r = prefs().renderer;
   if (r === "webgl") return true;
   if (r === "webgpu") return false;
-  if (!webgpuTested()) return true;
+  if (!webgpuTested() || graphicsAdapter().software) return true;
   try {
     // The mark holds for a week, then WebGPU gets another try.
     const at = Number(localStorage.getItem(TRY_KEY) || 0);
-    return at > 0 && Date.now() - at < 7 * 86400_000;
+    if (at > 0 && Date.now() - at < 7 * 86400_000) return true;
+  } catch { /* storage unavailable */ }
+  try {
+    const a = await (navigator as any).gpu.requestAdapter();
+    if (!a) return true;
+    const i = a.info ?? {};
+    const name = `${i.vendor ?? ""} ${i.architecture ?? ""} ${i.device ?? ""} ${i.description ?? ""}`;
+    return !!(a.isFallbackAdapter || i.isFallbackAdapter) || /swiftshader|llvmpipe|softpipe|basic render|warp/i.test(name);
   } catch {
-    return false;
+    return true;
   }
 }
 

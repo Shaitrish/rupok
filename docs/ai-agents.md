@@ -512,7 +512,7 @@ edit a lesson file with the same code. Board tools need a paired board.
 | Modes and view | `set_mode(prepare \| teach \| student)`, `zoom_to(zoom?, x?, y?)`, `fit_page`, `start_replay(page?, speed?)`, `stop_replay`, `celebrate(kind?)`, `set_tool(tool, color?, width?, brush?)`, `undo_last_change` | – | ✅ |
 | Export | `export_pdf(pages?, layout?, ink?, print_friendly?, save_as?, download?)`: the board makes the PDF, the server saves it in the workspace | – | ✅ |
 | Library | `library_list(folder?, query?)`, `library_open(id)`, `library_create_lesson(title, folder?, template?, open?)`, `library_move(id, folder?)`, `library_rename(id, name)`, `library_trash(id)` | – | ✅ |
-| Settings | `get_settings`, `set_setting(key, value)`: an allowlist (theme, accent, density, pen style and defaults, gestures, PDF defaults, voice language…). Never AI keys, the cloud account, payments, storage or permissions. | – | ✅ |
+| Settings | `get_settings`, `set_setting(key, value)`: an allowlist (theme, accent, density, pen style and defaults, gestures, PDF defaults, voice language, ink sharpness and the wet-ink layer…). Never AI keys, the cloud account, payments, storage or permissions. | – | ✅ |
 | Smart Dock | `list_dock_items`, `get_dock_layout(mode?)`, `set_dock_layout(mode?, layout)`, `save_dock_preset(name, modes?)`, `apply_dock_preset(name)` (see [The Smart Dock](#the-smart-dock)) | – | ✅ |
 
 Examples, one per area:

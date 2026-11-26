@@ -18,7 +18,7 @@ import { type DesignDefault, setDesignDefault, setLessonBranding } from "./desig
 import { ObjectHost } from "./objects";
 import { attachTrackpadPinch } from "./pinch";
 import { autosaveLoad, autosaveStore, designDefaultLoad } from "./storage";
-import { noteFrame, noteSamples, notePen } from "./inkLatency";
+import { graphicsAdapter, noteFrame, noteSamples, notePen } from "./inkLatency";
 import { gov, markGpuStart, renderScale, resetAutoScale, startOnWebgl, tileSize } from "./perf";
 import { applyNativeInk, nativeInkDown, nativeInkRaw, nativeInkUp } from "./nativeInk";
 import { attachTrail, drawsInk, notePointerDown, notePointerUp, penBusy, predictedFor, setPointerKind, trailAfterMove } from "./wetInk";
@@ -91,7 +91,7 @@ export class Controller {
     await init({ module_or_path: wasmUrl });
     // Auto starts WebGPU where the browser has it; a start that fails, or
     // never finishes, falls back to WebGL2 (perf.ts).
-    const webgl = startOnWebgl();
+    const webgl = await startOnWebgl();
     const marked = !webgl && prefs().renderer === "auto";
     if (marked) markGpuStart(false);
     try {
@@ -102,6 +102,11 @@ export class Controller {
       this.board = await Board.create(canvas, true, wetCanvas);
     }
     if (marked) setTimeout(() => markGpuStart(true), 1500);
+    // No GPU: every frame is drawn by the processor and ink will lag. Say
+    // so once, where the teacher can do something about it.
+    if (!studentEntry && !navigator.webdriver && graphicsAdapter().software) {
+      setTimeout(() => showToast("This computer is drawing without its graphics card, so ink will lag. Update the graphics driver; see Settings → About → Graphics.", 9000), 4000);
+    }
     // For bench/latency and for support: what the renderer is doing.
     (window as any).rupokPerf = {
       stats: () => ({ ...JSON.parse(this.board.stats_json()), scale: this.scale }),

@@ -41,6 +41,8 @@ app = [
   "dep:rupok-cli",
   "dep:webkit2gtk",
   "dep:objc2",
+  "dep:windows",
+  "dep:windows-numerics",
 ]
 # Screen capture for the overlay's "Save to lesson" (no system libraries
 # needed: pure-Rust X11 on Linux, xcap on Windows and macOS). Builds without
@@ -82,6 +84,25 @@ webkit2gtk = { version = "2.0", optional = true, features = ["v2_8"] }
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 xcap = { version = "0.9", optional = true }
+
+# The native wet-ink layer (native_ink.rs): a DirectComposition surface drawn
+# with Direct2D. The same `windows` version Tauri already builds.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", optional = true, features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Direct2D",
+  "Win32_Graphics_Direct2D_Common",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_DirectComposition",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
+  "Win32_Graphics_Gdi",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
+windows-numerics = { version = "0.3", optional = true }
 
 # macOS overlay window levels and Spaces behaviour (already in Tauri's tree).
 [target.'cfg(target_os = "macos")'.dependencies]

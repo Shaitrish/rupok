@@ -41,6 +41,11 @@ fn main() {
             "voice_transcribe",
             "open_donate_page",
             "save_speed_report",
+            "native_ink_start",
+            "native_ink_begin",
+            "native_ink_points",
+            "native_ink_end",
+            "native_ink_stop",
         ]),
     ))
     .expect("tauri-build failed");

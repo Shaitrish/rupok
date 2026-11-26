@@ -39,13 +39,16 @@
 // it presented, how much of the screen the compositor had to redraw (from a
 // trace) and, on Linux, the GPU time Chrome used. Frame rates only mean
 // something with a real swap chain behind them: --wayland NAME runs the
-// browser full screen on that Wayland display, e.g. a headless GNOME with a
-// 4K virtual monitor:
-//   dbus-run-session -- gnome-shell --headless --no-x11 \
-//     --wayland-display wl-4k --virtual-monitor 3840x2160@60
-//   node bench/latency/pen-latency.mjs --4k --wayland wl-4k
-// The --check budgets of --4k are about the pipeline (frames that draw the
-// whole canvas, screen area redrawn), so they also hold under SwiftShader.
+// browser full screen on that Wayland display. virtual-display.sh starts a
+// headless GNOME with a 4K virtual monitor for a set time, with its own
+// home and runtime directories so nothing of it touches the desktop session:
+//   bench/latency/virtual-display.sh /tmp/v4k 120 &
+//   node bench/latency/pen-latency.mjs --4k --wayland wl-4k \
+//     --runtime-dir /tmp/v4k/rt --home /tmp/v4k/home
+// --writing is the same test at 1600×900. Its --check budgets are about the
+// pipeline (frames that draw the whole canvas, screen area redrawn), so
+// they hold under SwiftShader, where CI runs them (4K in software is a
+// frame or two per second: too few to count).
 
 import { chromium } from "playwright-core";
 import { createServer } from "node:http";
@@ -68,7 +71,9 @@ const STROKES = Number(opt("strokes", 12));
 const SMOOTHING = opt("smoothing", null);
 const LABEL = opt("label", "");
 const BRUSH = opt("brush", null);
-const FOURK = flag("4k");
+// --writing: the frame test at the usual 1600×900; --4k: the same at 3840×2160.
+const FOURK = flag("4k") || flag("writing");
+const BOARD = flag("4k") ? [3840, 2160] : [1600, 900];
 const DPR = Number(opt("dpr", 1));
 const SECONDS = Number(opt("seconds", 8));
 const WAYLAND = opt("wayland", null);
@@ -76,8 +81,11 @@ const WAYLAND = opt("wayland", null);
 // Budgets for --4k --check: while writing, the board must not draw or have
 // the compositor redraw the whole screen.
 const BUDGETS_4K = [
-  ["writing frames that drew the whole canvas (%)", (r) => r.fullFramePct, 25],
-  ["screen redrawn per frame while writing (%)", (r) => r.damagePct, 35],
+  // Before the wet tile these were 100 % and about 85 %. With it, a long
+  // stroke still redraws the canvas each time it leaves the tile, and slow
+  // (software) frames make those a larger share.
+  ["writing frames that drew the whole canvas (%)", (r) => r.fullFramePct, 40],
+  ["screen redrawn per frame while writing (%)", (r) => r.damagePct, 50],
   ["pointermove handler p95 (ms)", (r) => r.processMs.p95, 2.0],
 ];
 
@@ -281,8 +289,8 @@ const gpuArgs = flag("swiftshader")
 // --wayland NAME: a real window, full screen on that display (a clean
 // environment: a desktop session's GTK settings can crash a second Chrome).
 const wlEnv = WAYLAND && {
-  HOME: process.env.HOME, USER: process.env.USER, PATH: "/usr/bin:/bin", XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR,
-  LANG: "C.UTF-8", XDG_DATA_DIRS: "/usr/local/share/:/usr/share/", WAYLAND_DISPLAY: WAYLAND,
+  HOME: opt("home", process.env.HOME), USER: process.env.USER, PATH: "/usr/bin:/bin", XDG_RUNTIME_DIR: opt("runtime-dir", process.env.XDG_RUNTIME_DIR),
+  LANG: "C.UTF-8", XDG_DATA_DIRS: "/usr/local/share/:/usr/share/", GSETTINGS_BACKEND: "memory", WAYLAND_DISPLAY: WAYLAND,
 };
 const browser = await chromium.launch({
   executablePath: opt("chrome", process.env.CHROME_PATH || undefined),
@@ -293,7 +301,7 @@ const browser = await chromium.launch({
     ...(WAYLAND ? ["--ozone-platform=wayland", "--enable-unsafe-webgpu", `--force-device-scale-factor=${DPR}`] : []),
   ],
 });
-const size = FOURK ? { width: 3840 / DPR, height: 2160 / DPR } : { width: 1600, height: 900 };
+const size = { width: BOARD[0] / (FOURK ? DPR : 1), height: BOARD[1] / (FOURK ? DPR : 1) };
 const ctx = await browser.newContext(WAYLAND ? { viewport: null } : { viewport: size, deviceScaleFactor: FOURK ? DPR : 1 });
 const page = await ctx.newPage();
 if (WAYLAND) {
@@ -304,7 +312,9 @@ if (WAYLAND) {
 }
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-const prefs = { theme: "light", smartShapes: flag("smart") ? "auto" : "off", showPages: FOURK, ...JSON.parse(opt("prefs", "{}")) };
+// Ink sharpness is fixed at 100 %: "Auto" resizes the canvas when frames are
+// slow (they are, under SwiftShader), in the middle of the pixel comparisons.
+const prefs = { theme: "light", smartShapes: flag("smart") ? "auto" : "off", showPages: FOURK, renderScale: "100", ...JSON.parse(opt("prefs", "{}")) };
 if (SMOOTHING !== null) prefs.smoothing = Number(SMOOTHING);
 if (BRUSH !== null) prefs.penBrush = BRUSH;
 await page.addInitScript((v) => { if (window === window.top) localStorage.setItem("rupok.prefs", v); }, JSON.stringify(prefs));
@@ -415,7 +425,7 @@ function chromeGpuMs() {
   return seen.size ? [...seen.values()].reduce((a, b) => a + b, 0) : NaN;
 }
 
-/** --4k: handwriting and long strokes on a 4K board; what each frame costs. */
+/** --writing, --4k: handwriting and long strokes; what each frame costs. */
 async function run4k() {
   const S = Math.max(60, frame.height * 0.07);
   // Letters a line high, marching along lines; every sixth stroke a sweep
@@ -470,7 +480,7 @@ async function run4k() {
     errors,
   };
   const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : "—");
-  console.log(`\nRupok on a 4K board ${LABEL ? `— ${LABEL}` : ""}`);
+  console.log(`\nRupok writing frames, ${BOARD.join("×")} board ${LABEL ? `— ${LABEL}` : ""}`);
   console.log(`GPU: ${env.gpu}\nBrowser: ${env.ua}${WAYLAND ? ` on ${WAYLAND}` : " (headless: frame rates are not a display's)"}, renderer ${env.backend || "?"}`);
   console.log(`Screen ${env.screen.join("×")} px, dpr ${env.dpr}; ink canvas ${env.canvas?.join("×")}${env.wetTile ? `, wet tile ${env.wetTile.join("×")}` : ", no wet tile"}`);
   console.log(`Input: pen ${RATE} Hz, ${k} strokes in ${SECONDS} s\n`);

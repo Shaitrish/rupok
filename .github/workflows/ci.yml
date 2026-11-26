@@ -94,6 +94,9 @@ jobs:
           npm install --no-audit --no-fund
           node pen-latency.mjs --swiftshader --check --smoothing 0 --label "CI, smoothing 0"
           node pen-latency.mjs --swiftshader --check --label "CI, default smoothing"
+          # While the pen writes, the board draws its small wet tile, not the
+          # whole canvas, and the compositor redraws only around it.
+          node pen-latency.mjs --swiftshader --writing --check --label "CI, writing frames"
 
   sdk:
     name: Object SDK (node --test)
