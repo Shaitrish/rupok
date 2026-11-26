@@ -220,6 +220,8 @@ impl StrokeBuilder {
             out.extend_from_slice(ahead);
             return;
         }
+        // One allocation: the final curve and room for the provisional end.
+        out.reserve(self.curve.len() + 2 * crate::curve::MAX_PIECES + 4 * ahead.len() + 8);
         out.extend_from_slice(&self.curve);
         match tip {
             None => self.unsettled(ahead, out),

@@ -114,6 +114,34 @@ it adds none.
 - The laser pointer's trail uses the same curve. Shapes, the lasso outline
   and ink drawn by an agent are not pointer samples and are left as they are.
 
+What it costs (`rupok-bench`, "curve through the samples": the same
+13 600 px of loops, radius about 115 px, written three ways; straight joins,
+as before, in brackets):
+
+| | Samples | Wet points | Stored points | push + wet update, p99 | Pen-up |
+|---|---|---|---|---|---|
+| Mouse, 34 Hz, 40 px apart | 340 | 1985 [340] | 1129 [334] | 0.009 ms [0.003] | 0.55 ms [0.08] |
+| Touch, 60 Hz, 15 px apart | 906 | 2269 [906] | 1206 [852] | 0.002 ms [0.004] | 0.63 ms [0.22] |
+| Pen, 240 Hz, 1.5 px apart | 8991 | 8991 [8991] | 1208 [1208] | 0.006 ms [0.034] | 2.8 ms [2.9] |
+
+- While wet, a 40 px span is 5.9 pieces (the budget is 8, the hard cap 32):
+  about the vertices a pen makes over the same stretch.
+- Stored, the mouse's stroke is 3.4 times its old polygon and 93 % of what
+  the pen leaves for the same line: both are the same curve simplified by
+  0.2 px, so a sparse stroke cannot store more than a dense one. The pen's
+  stroke is unchanged.
+- The bench's 100 000 synthetic strokes (2.5 px between samples, turning up
+  to 26° at each, rougher than a hand): 16.3 → 16.9 stored points a stroke
+  (+4 %), and the input pipeline 0.2 → 0.4 µs a sample. Frame times, stroke
+  commit and the pen path's budgets did not move outside the noise of a busy
+  machine (runs interleaved, twice).
+- Budgets added to `rupok-bench --check`: pieces per 40 px span ≤ 8, extra
+  wet points for a 240 Hz pen ≤ 5 % (it is 0), a mouse stroke stored at no
+  more than 110 % of the pen's.
+
+Lessons saved before this keep their strokes as they were stored: a polygon
+drawn with a mouse in v0.2.4 stays a polygon.
+
 Why in the builder and not in the renderer: the format says how stored points
 are drawn (straight tapered pieces, spec "Stroke width and rendering"), and
 every reader does it that way: the GPU renderer, the PDF and SVG export,
