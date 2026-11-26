@@ -32,7 +32,9 @@ node pen-latency.mjs --headed --present           # adds the compositor estimate
 3. `controller.ts` hands the samples to the engine (`Board.pointer_move`). The
    `StrokeBuilder` (`crates/rupok-ink/src/builder.rs`) smooths them (One-Euro
    filter; Settings → Pen → Smoothing) and the engine rebuilds the wet stroke:
-   **smoothed points + the raw tip + at most 12 ms of the browser's prediction**.
+   **smoothed points + the raw tip + at most 12 ms of the browser's
+   prediction, joined by a smooth curve** (`StrokeBuilder::wet`; see
+   [Sparse samples](#sparse-samples-a-curve-through-the-points)).
 4. The frame loop (`requestAnimationFrame`) draws: the cached dry layer is
    blitted, the wet stroke drawn on top (`crates/rupok-render`), and the GPU
    commands are submitted.
@@ -40,15 +42,24 @@ node pen-latency.mjs --headed --present           # adds the compositor estimate
 6. **On Windows**, the OS draws the last stretch from our ink to the pen at the
    next refresh, ahead of steps 4 and 5: the *delegated ink trail*
    (`navigator.ink`, `apps/board/src/wetInk.ts`).
-7. Pen-up: the dry stroke is the same points, ending at the same raw tip, then
+7. Pen-up: the dry stroke is the same curve, ending at the same raw tip, then
    simplified by 0.2 screen px. It must look exactly like the last wet frame.
 
 ### The wet/dry contract (read this before changing how ink looks)
 
-- Wet ink = `builder.points()` + `builder.tip()` + prediction
-  (`Engine::update_wet`). Dry ink = `builder.finish()` = points + tip,
-  simplified. Anything that changes how a wet stroke looks (pen styles,
-  textures, widths) must change the dry stroke identically.
+- Wet ink = `builder.wet(prediction)`: the curve through `builder.points()`
+  + `builder.tip()` + prediction (`Engine::update_wet`). Dry ink =
+  `builder.finish()` = the same curve through points + tip, simplified.
+  Anything that changes how a wet stroke looks (pen styles, textures,
+  widths) must change the dry stroke identically.
+- The curve (`rupok_ink::curve`) is made in the builder and **stored as
+  points**: the renderer, the file format and every reader still join
+  stored points with straight pieces, so nothing downstream can disagree
+  with the wet ink. A span between two samples is final once the sample
+  after its end has arrived; only the stretch from the second-newest
+  sample to the pen is redrawn as the pen moves, and `finish()` is that
+  last wet curve. Ink already on screen never shifts, so dashes, dots and
+  the rainbow do not creep while writing or at pen-up.
 - The renderer draws both with the same shader. A segment's quad must not
   reach ahead of its end point (`ink.wgsl`), or dense wet strokes render
   thinner than their simplified dry copies.
@@ -64,9 +75,55 @@ node pen-latency.mjs --headed --present           # adds the compositor estimate
   rainbow follow the distance along the path, so those strokes are stored
   unsimplified (`Brush::keeps_every_point`). Magic ink is never saved: after
   pen-up its last wet frame stays on screen, then fades.
-- Guarded by `crates/rupok-render/tests/wet_dry.rs` (GPU, every brush), the
-  bench budgets "wet vs dry pixels differ" (plain pen and worst brush), and
-  the latency harness's "pen-up changed pixels" (`--brush NAME`).
+- Guarded by `crates/rupok-render/tests/wet_dry.rs` (GPU, every brush, from
+  dense pen samples and from sparse mouse samples; settled ink compared
+  pixel by pixel as the stroke grows), the bench budgets "wet vs dry pixels
+  differ" (plain pen and worst brush), and the latency harness's "pen-up
+  changed pixels" (`--brush NAME`).
+
+### Sparse samples: a curve through the points
+
+A mouse, a touch screen and a smartboard that reports itself as a mouse give
+one sample per frame or a little more: 30 to 125 a second. A fast hand moves
+30 px and more between two of them, and joined by straight lines a loop came
+out as a polygon (v0.2.4 on the Linux app: "Input 34 Hz · mouse", corners of
+20° to 40° at every sample). Smoothing does not help: the filter moves points,
+it adds none.
+
+`rupok_ink::curve` joins the samples with a curve instead:
+
+- It passes **through every sample** (so smoothing 0 is still raw, and the ink
+  still ends at the pen: no latency is added, at any smoothing setting). The
+  direction at a sample is the centripetal Catmull-Rom tangent, which does not
+  loop or overshoot; the handle lengths make evenly sampled circles exact.
+- **Corners stay corners.** The tangent fades out where the path turns by
+  more than 60° and is gone at 120°: a zig-zag or the bottom of a "v" keeps
+  its point.
+- It is cut into straight pieces by how far it bows from the chord, to 0.05
+  screen px (`FLATNESS_PX`, at the zoom the stroke is drawn at), at most 32
+  pieces a span. **Dense input passes through untouched:** 240 Hz pen samples
+  are half a pixel apart, no span bows that far, and the stored stroke is
+  byte for byte what v0.2.4 stored (tests `dense_pen_input_is_stored_as_before`,
+  `a_pen_at_240_hz_stores_what_it_stored_before`).
+- At pen-up the curve's points are simplified by the same 0.2 screen px as
+  any stroke, so a mouse stroke is stored about as densely as a pen would
+  have left the same line, not as the wet points.
+- The Smart Ink recognisers still read the samples (`StrokeBuilder::sampled`,
+  `Engine::finish_ink`): a corner between two sparse samples is a corner to
+  them, not a rounded bend.
+- The laser pointer's trail uses the same curve. Shapes, the lasso outline
+  and ink drawn by an agent are not pointer samples and are left as they are.
+
+Why in the builder and not in the renderer: the format says how stored points
+are drawn (straight tapered pieces, spec "Stroke width and rendering"), and
+every reader does it that way: the GPU renderer, the PDF and SVG export,
+thumbnails, replay, the eraser's hit-test and the partial eraser, older
+versions of Rupok and other implementations. A curve made at render time
+would have to be repeated exactly in each of them, would change how every
+existing lesson looks (it cannot tell a sparsely sampled curve from a
+polyline that is meant to have corners), and would be a normative change to
+the format, which needs an RFC. Stored as points, the curve is simply the
+stroke. What that gives up: the raw samples of a sparse stroke are not kept.
 
 ### Page design and the pen
 
@@ -247,6 +304,54 @@ Costs: Windows only; two renderers that must look identical (exactly what the
 pen-up bugs above were about); input routing over a webview (airspace,
 focus, gestures); a hand-off on every stroke. Weeks of work, and every pen
 style later doubles. Not justified until the smartboard numbers say so.
+
+## WebKitGTK notes (the Linux app)
+
+Measured on the Linux dev machine above (Ubuntu 24.04, GNOME on Wayland, two
+60 Hz displays) in a GTK 3 web view like the one Tauri makes, with real X
+pointer events (XTest) drawing loops on the board at 1600×1000. The AppImage
+bundles its own WebKitGTK and GTK from the CI runner (2.50.4 and 3.24.33 for
+v0.2.4); a `.deb` or a local build uses the system's (2.52.6 here). Both were
+measured and behave the same. The machine was busy with other work for most
+of the runs, which turned out to be the point.
+
+- **The GPU is used.** The web process and the UI process both load the
+  hardware Mesa driver (`radeonsi`); the hardware-acceleration policy
+  defaults to "always" in both WebKitGTK versions; the AppImage's launcher
+  sets no `WEBKIT_DISABLE_DMABUF_RENDERER` or `WEBKIT_DISABLE_COMPOSITING_MODE`
+  and bundles no Mesa. (The adapter reads "Apple GPU" because WebKit masks
+  it.) The app now asks for the policy outright (`apps/desktop/src/pen_input.rs`).
+- **Frames: 60 a second when the machine is free, fewer when it is not.**
+  `requestAnimationFrame` runs at 59 to 60 fps idle, with a full-window WebGL
+  canvas redrawn every frame, and while writing on the board (56 to 60). With
+  the load average above the core count the same test gave 32 to 52 fps: the
+  median frame is still 17 ms, but one in ten takes 30 to 110 ms. The board's
+  own work is 0.6 ms a frame and the page's main thread is not blocked; a
+  WebKitGTK frame crosses five processes (web process, its compositor thread,
+  the UI process, the X server, the shell), and any of them waiting for a
+  core drops the frame. There is no setting for that. The "34 fps" of the
+  first report is what the busy machine gives; it did not come back with
+  the load average under the core count.
+- **Under X11, not Wayland.** With `GDK_BACKEND=wayland` the same web view
+  runs at a flat 30 fps here (every frame takes two refreshes), blank page
+  included. The app already runs under XWayland on a Wayland session
+  (`prefer_x11_on_wayland`, for the overlay); that is also the faster path.
+  `RUPOK_WAYLAND=1` gives the 30 fps one.
+- **Input was tied to the frame rate by GTK, not by WebKit.** GTK merges
+  pointer motion that arrives while a window is being painted ("event
+  compression"), and the board repaints every frame while writing: a 125 Hz
+  pointer reached the page at 57 to 86 samples a second, a 445 Hz one at
+  about 100, and at one sample per frame when frames were late. With
+  compression off for the web view's window (GTK's advice for drawing apps;
+  `pen_input.rs`) every sample arrives, late ones in `getCoalescedEvents()`
+  (WebKitGTK 2.50 has it): 121 of 121 a second, at the same frame rate.
+- **What the overlay's numbers mean here.** "Input" and "Frames" are counted
+  over a whole second, moments when the pointer rests included, so a short
+  stroke reads low. Equal numbers ("34 Hz", "34 fps") mean one sample per
+  drawn frame, which is what event compression gave.
+
+What sparse input looked like is fixed where it is drawn: see
+[Sparse samples](#sparse-samples-a-curve-through-the-points).
 
 ## WebView2 notes
 
