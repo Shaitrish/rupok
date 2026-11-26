@@ -349,30 +349,37 @@ of the runs, which turned out to be the point.
   sets no `WEBKIT_DISABLE_DMABUF_RENDERER` or `WEBKIT_DISABLE_COMPOSITING_MODE`
   and bundles no Mesa. (The adapter reads "Apple GPU" because WebKit masks
   it.) The app now asks for the policy outright (`apps/desktop/src/pen_input.rs`).
-- **Frames: 60 a second when the machine is free, fewer when it is not.**
-  `requestAnimationFrame` runs at 59 to 60 fps idle, with a full-window WebGL
-  canvas redrawn every frame, and while writing on the board (56 to 60). With
-  the load average above the core count the same test gave 32 to 52 fps: the
-  median frame is still 17 ms, but one in ten takes 30 to 110 ms. The board's
-  own work is 0.6 ms a frame and the page's main thread is not blocked; a
-  WebKitGTK frame crosses five processes (web process, its compositor thread,
-  the UI process, the X server, the shell), and any of them waiting for a
-  core drops the frame. There is no setting for that. The "34 fps" of the
-  first report is what the busy machine gives; it did not come back with
-  the load average under the core count.
+- **Frames: 60 a second when the machine is free, half of that when a frame
+  is late.** `requestAnimationFrame` runs at 59 to 60 fps idle, with a
+  full-window WebGL canvas redrawn every frame, and while writing on the
+  board (56 to 60). With the load average above the core count the same test
+  gave 32 to 52 fps: the median frame is still 17 ms, but one in ten takes 30
+  to 110 ms. The board's own work is 0.6 ms a frame and the page's main
+  thread is not blocked. WebKitGTK starts the next frame only when the last
+  one has been shown, and a frame crosses five processes on the way (web
+  process, its compositor thread, the UI process, the X server, the shell):
+  when one of them waits for a core the frame misses its refresh and the
+  rate falls to exactly half, 30 fps, until it catches up. That is the
+  "34 fps" of the first report. We found no setting for it: in a headless
+  session, where every frame is late, turning the DMABUF renderer off or
+  changing the GDK backend left it at 30.
 - **Under X11, not Wayland.** With `GDK_BACKEND=wayland` the same web view
   runs at a flat 30 fps here (every frame takes two refreshes), blank page
-  included. The app already runs under XWayland on a Wayland session
-  (`prefer_x11_on_wayland`, for the overlay); that is also the faster path.
-  `RUPOK_WAYLAND=1` gives the 30 fps one.
+  included; so does an X11 window without the desktop's compositor behind
+  it (a nested or headless session). The app already runs under XWayland on
+  a Wayland session (`prefer_x11_on_wayland`, for the overlay); that is also
+  the faster path. `RUPOK_WAYLAND=1` gives the 30 fps one.
 - **Input was tied to the frame rate by GTK, not by WebKit.** GTK merges
   pointer motion that arrives while a window is being painted ("event
   compression"), and the board repaints every frame while writing: a 125 Hz
-  pointer reached the page at 57 to 86 samples a second, a 445 Hz one at
-  about 100, and at one sample per frame when frames were late. With
-  compression off for the web view's window (GTK's advice for drawing apps;
-  `pen_input.rs`) every sample arrives, late ones in `getCoalescedEvents()`
-  (WebKitGTK 2.50 has it): 121 of 121 a second, at the same frame rate.
+  pointer reached the page at 57 to 86 samples a second at 60 fps, and at
+  about one per frame when frames were late. With compression off for the
+  web view's window (GTK's advice for drawing apps; `pen_input.rs`) every
+  sample arrives, late ones in `getCoalescedEvents()` (WebKitGTK 2.50 has
+  it). In the app itself, read from its own overlay in a headless session
+  that paces frames at 30 fps, with a 125 Hz pointer: v0.2.4 "Input 51 Hz ·
+  Frames 30 fps", this build "Input 125 Hz · Frames 31 fps". The frame rate
+  is the same; the ink no longer loses samples to it.
 - **What the overlay's numbers mean here.** "Input" and "Frames" are counted
   over a whole second, moments when the pointer rests included, so a short
   stroke reads low. Equal numbers ("34 Hz", "34 fps") mean one sample per
