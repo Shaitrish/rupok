@@ -9,7 +9,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, State, WindowEvent};
 use tauri_plugin_fs::FsExt;
 use tauri_plugin_window_state::StateFlags;
 
-use crate::{agent_cmd, cloud_cmd, files, library_cmd, overlay, voice_cmd};
+use crate::{agent_cmd, cloud_cmd, files, library_cmd, overlay, pen_input, voice_cmd};
 
 /// Label of the board window (`tauri.conf.json`).
 pub const MAIN: &str = "main";
@@ -116,6 +116,10 @@ pub fn run() {
             queue_files(app.handle(), files::paths_from_args(&args, &cwd));
             overlay::register_shortcuts(app.handle());
             voice_cmd::init(app.handle()); // the board may use the microphone (voice input)
+            // Linux: every pointer sample reaches the board (pen_input.rs).
+            if let Some(w) = app.get_webview_window(MAIN) {
+                pen_input::tune(&w);
+            }
             // The lesson library (Documents/Rupok) and its folder watcher.
             if let Err(e) = library_cmd::init(app.handle()) {
                 eprintln!("library: {e}");

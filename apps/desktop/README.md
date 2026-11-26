@@ -28,6 +28,7 @@ Plans: [tauri-desktop](../../docs/roadmap/tauri-desktop.md) ·
 | `capabilities/` | Least-privilege permissions: `main.json` (board window), `overlay.json` (overlay windows) |
 | `src/app.rs` | Builder, plugins, `save_lesson`, files opened by the OS (argv, and `RunEvent::Opened` on macOS), the macOS menu bar |
 | `src/overlay.rs` | Overlay windows, click-through, global shortcut, capture, snapshot hand-off; macOS window level and Spaces |
+| `src/pen_input.rs` | Linux: every pointer sample reaches the board (GTK motion compression off for the web view), hardware-accelerated compositing asked for outright; see docs/performance.md, "WebKitGTK notes" |
 | `src/files.rs` | Atomic save and argv parsing (plain Rust, unit-tested) |
 | `src/capture.rs` | Screen capture: `xcap` on Windows and macOS (with the Screen Recording permission check), pure-Rust X11 on Linux |
 | `src/geometry.rs` | Toolbar placement, points/pixels, and the screenshot wire format (unit-tested) |
