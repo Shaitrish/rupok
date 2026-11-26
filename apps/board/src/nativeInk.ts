@@ -47,6 +47,8 @@ let strokeSeq = 0;
 export const nativeCounters = { strokes: 0, points: 0 };
 
 function fail(e: unknown) {
+  // A late answer after the layer was switched off is not a failure.
+  if (state() !== "ready" && state() !== "drawing") return;
   const msg = String((e as any)?.message ?? e);
   if (state() !== "failed") {
     console.warn("native wet ink switched off:", msg);
@@ -86,8 +88,13 @@ export async function applyNativeInk(setWetHidden: (hidden: boolean) => void) {
     // The native layer leads the pen itself: no OS trail on top of it.
     blockTrail(true);
   } catch (e) {
-    fail(e);
-    // Leave the switch off so the next start is clean.
+    // It did not start: say why (Settings shows it), and leave the switch
+    // off so the next start is clean.
+    const msg = String((e as any)?.message ?? e);
+    console.warn("native wet ink did not start:", msg);
+    showToast("Native wet ink could not start; the board draws ink as usual.", 5000);
+    setFailure(msg);
+    setState("failed");
     setPrefs({ nativeWetInk: false });
   }
 }
@@ -162,7 +169,7 @@ export function nativeInkUp(pointerId: number) {
   // little more for a slow compositor: opaque ink over the same ink shows
   // nothing in between.
   requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
-    void invoke?.("native_ink_end", { seq }).catch(fail);
+    if (state() === "ready" || state() === "drawing") void invoke?.("native_ink_end", { seq }).catch(fail);
   }, 40)));
 }
 

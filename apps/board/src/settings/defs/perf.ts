@@ -26,7 +26,7 @@ function live<K extends "renderScale" | "wetLayer" | "inkTrail" | "nativeWetInk"
 registerSettings([
   {
     id: "about.speedTest", category: "about", group: "Troubleshooting", order: 105, type: "action", label: "Board speed test",
-    description: "Draws on the board by itself for about a minute, once in each drawing mode, then asks you to write for 10 seconds in each. The report is shown, and saved to Documents/Rupok in the app. Your lesson is put back as it was.",
+    description: "Takes about five minutes. The board writes by itself in each drawing mode, asks you to write for 10 seconds a few times, and repeats with the other renderer (it reloads by itself). The report is shown at the end, and saved to Documents/Rupok in the app. Your lesson is put back as it was.",
     keywords: ["speed test", "benchmark", "slow", "lag", "fps", "report", "diagnostics", "smartboard", "4k", "গতি", "ধীর"],
     button: "Run board speed test", icon: "play",
     run: () => {

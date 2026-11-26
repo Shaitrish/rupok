@@ -566,12 +566,25 @@ pub fn begin(seq: u32, rgb: [u8; 3], clip: [f32; 4], point: [f32; 3]) -> Res<()>
     with(|l| l.begin(seq, rgb, clip, point))
 }
 
-/// More samples of stroke `seq`: flat `[x, y, radius, …]`.
+/// Whether the layer exists on this thread.
+fn running() -> bool {
+    LAYER.with(|l| l.try_borrow().is_ok_and(|l| l.is_some()))
+}
+
+/// More samples of stroke `seq`: flat `[x, y, radius, …]`. A batch that
+/// arrives after the layer was stopped has nothing to draw on.
 pub fn points(seq: u32, flat: &[f32]) -> Res<()> {
+    if !running() {
+        return Ok(());
+    }
     with(|l| l.points(seq, flat))
 }
 
-/// The board shows stroke `seq` itself now.
+/// The board shows stroke `seq` itself now. After a stop there is nothing
+/// left to remove.
 pub fn end(seq: u32) -> Res<()> {
+    if !running() {
+        return Ok(());
+    }
     with(|l| l.end(seq))
 }
