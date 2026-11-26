@@ -27,6 +27,8 @@ use crate::shapes::ShapeKind;
 #[cfg(test)]
 mod brush_tests;
 mod clip;
+#[cfg(test)]
+mod curve_tests;
 mod duster;
 pub mod insert;
 mod restyle;
@@ -342,6 +344,8 @@ pub struct Engine<S: InkSink> {
     /// The page rect of the gesture in progress, when ink is kept inside.
     ink_clip: Option<[f32; 4]>,
     smoothing: f32,
+    /// Join pointer samples with a smooth curve (`rupok_ink::curve`).
+    smooth_ink: bool,
     pressure_gamma: f32,
     pub touch_mode: TouchMode,
     pen_seen: bool,
@@ -720,6 +724,7 @@ impl<S: InkSink> Engine<S> {
             clip_ink: true,
             ink_clip: None,
             smoothing: 0.5,
+            smooth_ink: true,
             pressure_gamma: 0.8,
             touch_mode: TouchMode::Auto,
             pen_seen: false,
@@ -899,6 +904,17 @@ impl<S: InkSink> Engine<S> {
         } else {
             self.style_mut().width = w.clamp(0.5, 200.0);
         }
+    }
+
+    /// Join pointer samples with a smooth curve (on by default). Off draws
+    /// straight lines between samples, as before v0.2.5: for measuring and
+    /// for telling an input problem from a drawing one.
+    pub fn set_smooth_ink(&mut self, on: bool) {
+        self.smooth_ink = on;
+    }
+
+    pub fn smooth_ink(&self) -> bool {
+        self.smooth_ink
     }
 
     pub fn set_smoothing(&mut self, s: f32) {
@@ -1343,6 +1359,7 @@ impl<S: InkSink> Engine<S> {
             },
             filter: OneEuroParams::from_smoothing(self.smoothing),
             zoom: self.camera.zoom,
+            smooth: self.smooth_ink,
         }
     }
 
@@ -1745,6 +1762,9 @@ impl<S: InkSink> Engine<S> {
                 ..
             } => {
                 let style = builder.style;
+                // Smart Ink reads the stroke as sampled; the ink stored is
+                // the curve the wet stroke showed.
+                let sampled = builder.sampled();
                 let pts = builder.finish();
                 if style.brush == Brush::Magic {
                     // Disappearing ink: kept on screen as drawn, never saved.
@@ -1774,6 +1794,7 @@ impl<S: InkSink> Engine<S> {
                             geom: None,
                             brush: style.brush.key().map(Into::into),
                         },
+                        sampled,
                         started,
                         hold.snapped,
                         now_ms,
@@ -3232,12 +3253,11 @@ impl<S: InkSink> Engine<S> {
                 Gesture::Ink {
                     builder, predicted, ..
                 } => {
-                    // Smoothed body + raw tip + the browser's prediction:
-                    // the ink reaches the pen (rupok_ink::StrokeBuilder::tip).
-                    let mut pts = Vec::with_capacity(builder.points().len() + 1 + predicted.len());
-                    pts.extend_from_slice(builder.points());
-                    pts.extend(builder.tip());
-                    pts.extend_from_slice(predicted);
+                    // Smoothed body + raw tip + the browser's prediction,
+                    // joined by a smooth curve: the ink reaches the pen
+                    // (rupok_ink::StrokeBuilder::wet).
+                    let mut pts = Vec::new();
+                    builder.wet(predicted, &mut pts);
                     let st = builder.style;
                     clip::push_wet(
                         &mut wet,
@@ -3402,7 +3422,8 @@ fn laser_wet(points: &[(StrokePoint, f64)], now_ms: f64, zoom: f32) -> WetStroke
         })
         .collect();
     WetStroke {
-        points: pts,
+        // A pointer's samples, like ink: joined by the same curve.
+        points: rupok_ink::curve::smooth(&pts, rupok_ink::curve::FLATNESS_PX / zoom.max(1e-3)),
         width: 9.0 / zoom,
         color: 0xff2d55ff,
         opacity: 0.85,

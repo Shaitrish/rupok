@@ -345,9 +345,14 @@ impl<S: InkSink> Engine<S> {
     ///
     /// The stroke is always committed as drawn first; a snap or composite
     /// is a second change, so the first undo brings the ink back.
+    ///
+    /// `seen` is the stroke as the pointer sampled it: the recognisers read
+    /// that, not the curve stored in `stroke` (`rupok_ink::curve`), so a
+    /// corner between two sparse samples is still a corner to them.
     pub(super) fn finish_ink(
         &mut self,
         stroke: StrokeData,
+        seen: &[StrokePoint],
         started: f64,
         held: Option<Held>,
         now_ms: f64,
@@ -358,7 +363,7 @@ impl<S: InkSink> Engine<S> {
             return;
         }
         let opts = self.opts(false);
-        if held.is_none() && self.smart.scratch && recognize::is_scratch_out(&stroke.points, opts) {
+        if held.is_none() && self.smart.scratch && recognize::is_scratch_out(seen, opts) {
             let covered = self.scratch_covered(&stroke);
             if !covered.is_empty() {
                 self.scratch_erase(&stroke, covered, now_ms);
@@ -375,11 +380,11 @@ impl<S: InkSink> Engine<S> {
         };
         let prop = match held {
             Some(_) => None,
-            None => Registry::standard().recognize(&stroke.points, &ctx, standalone),
+            None => Registry::standard().recognize(seen, &ctx, standalone),
         };
         let bounds = stroke.aabb();
         let unsnap = if prop.is_none() {
-            self.unsnap_for_plus(&stroke, &ctx)
+            self.unsnap_for_plus(seen, &ctx)
         } else {
             None
         };
@@ -419,9 +424,9 @@ impl<S: InkSink> Engine<S> {
     /// The second stroke of a small "+" (`s`, not yet committed): the line
     /// its first stroke snapped to a moment ago goes back to ink, so the
     /// whole "+" stays writing.
-    fn unsnap_for_plus(&self, s: &StrokeData, ctx: &Context) -> Option<(ItemId, StrokeData)> {
+    fn unsnap_for_plus(&self, seen: &[StrokePoint], ctx: &Context) -> Option<(ItemId, StrokeData)> {
         let (rid, raw) = self.last_ink.as_ref()?.raw.clone()?;
-        let xy: Vec<[f32; 2]> = s.points.iter().map(|q| [q.x, q.y]).collect();
+        let xy: Vec<[f32; 2]> = seen.iter().map(|q| [q.x, q.y]).collect();
         let i = recognize::small_cross(&xy, ctx)?;
         (ctx.neighbours[i].id == rid && stroke_is_line(self.scene.get(&rid))).then_some((rid, raw))
     }

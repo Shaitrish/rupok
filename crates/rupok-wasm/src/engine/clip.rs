@@ -42,16 +42,18 @@ impl<S: InkSink> Engine<S> {
 
     /// Commit a finished stroke cut to the page: one piece goes through
     /// Smart Ink as usual; a stroke that left and re-entered the page is
-    /// stored as its pieces, in one undo step.
+    /// stored as its pieces, in one undo step. `sampled` is the stroke as
+    /// the pointer sampled it (`StrokeBuilder::sampled`), for Smart Ink.
     pub(super) fn finish_clipped(
         &mut self,
         stroke: StrokeData,
+        sampled: Vec<StrokePoint>,
         started: f64,
         held: Option<Held>,
         now_ms: f64,
     ) {
         let Some(r) = self.ink_clip else {
-            self.finish_ink(stroke, started, held, now_ms);
+            self.finish_ink(stroke, &sampled, started, held, now_ms);
             return;
         };
         let mut runs = clip_points(&stroke.points, r, edge_inset(stroke.width));
@@ -60,9 +62,17 @@ impl<S: InkSink> Engine<S> {
             1 => {
                 let points = runs.pop().unwrap_or_default();
                 let whole = points.len() == stroke.points.len();
-                // An uncut stroke keeps Smart Ink's hold-to-snap result.
+                // An uncut stroke keeps Smart Ink's hold-to-snap result,
+                // and is read as sampled; a cut one as what is left of it.
                 let held = if whole { held } else { None };
-                self.finish_ink(StrokeData { points, ..stroke }, started, held, now_ms);
+                let seen = if whole { sampled } else { points.clone() };
+                self.finish_ink(
+                    StrokeData { points, ..stroke },
+                    &seen,
+                    started,
+                    held,
+                    now_ms,
+                );
             }
             _ => {
                 if self.read_only {
