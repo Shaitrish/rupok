@@ -104,6 +104,9 @@ Rules that keep it correct:
 - The tile is always in the main canvas's own pixels (same render scale),
   placed on whole pixels; both are presented in the same animation frame,
   so the browser shows them together.
+  Below 100 % ink sharpness the browser stretches the two canvases
+  separately, and a stroke that crosses the tile's edge can show a one-pixel
+  nick there until the next full frame (pen-up at the latest).
 - A canvas keeps its pixels only for the frame that drew it. Anything that
   reads the ink canvases back (a test, a screenshot of the canvas) asks for
   a full frame first (`Board.flush_ink`), or reads both.
@@ -189,7 +192,7 @@ frames while a pointer is down.
 | **Strokes added on top are drawn over the dry layer**, and pen-up no longer redraws every stroke on the page. | The pen-up frame costs one copy, not a copy plus the page. |
 | **No full-size depth buffer in the frame pass**; depth is cleared only where wet ink is drawn. | One 4K clear less in every full frame. |
 | **Render scale** (Settings → About → Performance lab → Ink sharpness): Auto / 100 / 75 / 50 %. Auto starts at the sharpest step with at most 5 MP (a 4K board: 75 %, 2880×1620) and steps down when more than 30 % of 90 consecutive frames come late, between strokes; one step back up after a long clean run, once. | The frames that do need the whole canvas (pan, zoom, erase, pen-up, a stroke leaving the tile) fill 44 % fewer pixels at 75 %. |
-| **Renderer: Auto** is WebGPU in Chromium on a real GPU (the Windows app), WebGL2 otherwise (other engines, software adapters), with a fallback when WebGPU fails to start. | No extra full-canvas copy per frame where WebGPU works. |
+| **Renderer: Auto** is WebGPU in Chromium on Windows and Linux with a real GPU (the Windows app), WebGL2 otherwise (other engines and systems, software adapters), with a fallback when WebGPU fails to start. | No extra full-canvas copy per frame where WebGPU works. |
 | **The "Saving…" dot steps** twice a second instead of fading. | Nothing in the chrome changes on every refresh while writing. |
 | **Flat panels** (Performance lab, off by default): no backdrop blur behind the dock and bars. | Less to redraw when ink changes under them; small on the rig (4 points of GPU load with the old full-canvas path). |
 

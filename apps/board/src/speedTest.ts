@@ -32,7 +32,7 @@ import { desktopInvoke, isDesktop } from "./platform";
 const STORE = `${APP_SLUG}.speedtest`;
 const RESUME = `${APP_SLUG}.speedtest.resume`;
 /** Which test build wrote a report (bumped with each build sent to a board). */
-const BUILD = "4k-perf-3";
+const BUILD = "4k-perf-4";
 const RUN_MS = 10_000;
 const PEN_HZ = 240;
 /** Rows older than this are another visit's. */

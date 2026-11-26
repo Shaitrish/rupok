@@ -178,12 +178,16 @@ export const refreshHz = () => Math.round(1000 / gov.refreshMs);
 
 const TRY_KEY = "rupok.gpu.trying";
 
-/** Chromium with WebGPU (Chrome, Edge, the Windows app's WebView2): where
- * WebGPU is what we measured. Safari and Firefox stay on WebGL2 until tested. */
-export const webgpuTested = () => "gpu" in navigator && /Chrome\//.test(navigator.userAgent);
+/** Chromium with WebGPU on a Windows or Linux computer (Chrome, Edge, the
+ * Windows app's WebView2): where WebGPU is what we measured. Safari,
+ * Firefox, Macs, phones and Chromebooks stay on WebGL2 until tested. */
+export const webgpuTested = () => {
+  const ua = navigator.userAgent;
+  return "gpu" in navigator && /Chrome\//.test(ua) && /Windows NT|X11; Linux/.test(ua) && !/Android|CrOS|Mobile/.test(ua);
+};
 
-/** Whether to start the board on WebGL2. "Auto" is WebGPU in Chromium where
- * it runs on a real GPU (it was about twice as fast as WebGL2 on the first
+/** Whether to start the board on WebGL2. "Auto" is WebGPU in Chromium on
+ * Windows and Linux where it runs on a real GPU (it was about twice as fast as WebGL2 on the first
  * 4K board we measured: wgpu's WebGL2 path adds a full-canvas copy to every
  * frame), and WebGL2 otherwise: without a GPU (a software adapter), or when
  * the last WebGPU start did not finish. */

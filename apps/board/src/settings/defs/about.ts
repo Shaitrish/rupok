@@ -46,7 +46,7 @@ registerSettings([
   },
   {
     id: "about.renderer", category: "about", group: "Troubleshooting", order: 100, type: "segmented", label: "Renderer",
-    description: "Auto uses WebGPU where the device has it (faster on big screens) and WebGL2 otherwise. If the board stays blank, choose WebGL2. Switching reloads the page; your lesson is autosaved.",
+    description: "Auto uses WebGPU on Windows and Linux computers that have it (faster on big screens) and WebGL2 otherwise. If the board stays blank, choose WebGL2. Switching reloads the page; your lesson is autosaved.",
     keywords: ["webgl", "webgpu", "gpu", "graphics", "slow", "blank board"],
     options: [{ value: "auto", label: "Auto" }, { value: "webgpu", label: "WebGPU" }, { value: "webgl", label: "WebGL2" }],
     get: () => prefs().renderer,
