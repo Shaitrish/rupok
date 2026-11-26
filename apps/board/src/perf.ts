@@ -30,6 +30,8 @@ const AUTO_START_PIXELS = 5_000_000;
 const [autoStep, setAutoStep] = createSignal(-1);
 /** The sharpest step Auto may return to (lowered when a step up was slow). */
 let ceiling = 0;
+/** The board size (in screen pixels) Auto's step was chosen for. */
+let basis = 0;
 
 function startStep(cssW: number, cssH: number, dpr: number): number {
   const px = cssW * cssH * dpr * dpr;
@@ -43,9 +45,14 @@ export function renderScale(cssW: number, cssH: number, dpr: number): number {
   if (p === "100") return 1;
   if (p === "75") return 0.75;
   if (p === "50") return 0.5;
-  if (autoStep() < 0) {
+  // Start again when the board's size changed a lot (the window went full
+  // screen, or to another display): what was learned was about another size.
+  const px = cssW * cssH * dpr * dpr;
+  if (autoStep() < 0 || Math.abs(px - basis) > basis * 0.25) {
+    basis = px;
     ceiling = startStep(cssW, cssH, dpr);
     setAutoStep(ceiling);
+    gov.reset();
   }
   return AUTO_STEPS[autoStep()];
 }

@@ -30,7 +30,8 @@
 // --smart (Smart shapes "auto"), --brush NAME (pen style, e.g. fountain),
 // --json FILE, --check, --label TEXT,
 // --lesson FILE.rpk (write over its first page, e.g. one with a page design),
-// --prefs JSON (board settings, e.g. '{"wetLayer":"off","renderScale":"100"}').
+// --prefs JSON (board settings, e.g. '{"wetLayer":"off","renderScale":"100"}'),
+// --cpu N (throttle the page's main thread N times).
 //
 // --4k: the big-screen test (docs/performance.md, "Big screens and weak
 // GPUs"). A 3840×2160 board (--dpr 2: 1920×1080 at 2×), handwriting and
@@ -359,6 +360,8 @@ const env = await page.evaluate(() => {
 });
 
 const cdp = await ctx.newCDPSession(page);
+// --cpu N: the page's main thread N times slower (a weak processor).
+if (opt("cpu", null)) await cdp.send("Emulation.setCPUThrottlingRate", { rate: Number(opt("cpu")) });
 const frame = await page.locator(".page-frame").first().boundingBox();
 const mouse = (type, x, y, force = 0.5) =>
   cdp.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1, pointerType: "pen", force });

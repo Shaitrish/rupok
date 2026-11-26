@@ -170,7 +170,7 @@ trace (`viz`, `cc`, `gpu`) and the GPU time of Chrome's GPU process:
 | The board cleared a 4K target and a 4K depth buffer, and copied the 4K dry layer to it, to add a few pixels of wet ink. | `ink.rs` `render()`; 100 % of writing frames presented the full canvas. |
 | The compositor redrew the whole screen under it: a canvas that presents damages its whole area, and the ink canvas covered the board. | Trace: `root_damage_rect 0,0 3840x2160` in 288 of 352 frames; 86.5 % of the screen redrawn per frame on average. |
 | The "Saving…" dot in the top bar faded in and out for as long as the lesson was unsaved, which while writing is always. The compositor redraws one rectangle around everything that changed, so a small tile under the pen and a 6 px dot in the top bar became most of the screen. | Trace: the damage rectangle ran from the top bar to the tile in 60 of 242 frames, after the tile alone had fixed the rest. |
-| WebGL2 (the default until now) pays one more full-canvas copy per frame: wgpu draws into its own texture and copies it to the canvas at present. | `wgpu-hal` `gles/web.rs` `present`; 12 fps against 22–26 on the board. |
+| WebGL2 (the default until now) pays one more full-canvas copy per frame: wgpu draws into its own texture and copies it to the canvas at present. | `wgpu-hal` `gles/web.rs` `present`; the board's overlay read 12 fps with it against 22–26. |
 | The system compositor copies the window to the screen once more. | Rig: the virtual monitor's compositor used as much GPU time as Chrome. On Windows this is DWM; it is outside the app. |
 
 Chrome's GPU process used **558 ms of GPU time per second** of writing: on
@@ -227,8 +227,27 @@ GPU time follows the tile's area (same rig, 100 %): 2048×1152 332 ms/s,
 Without a GPU (SwiftShader, 1600×900, the CI configuration) a pen sample
 reached its frame in 30–75 ms p50, against 179 ms before.
 
-`rupok-bench` (one target, as on the page before the tile; the tile path is
-measured by the harness above): see the pull request for the two tables.
+`rupok-bench` on the same machine, before and after built and run back to
+back twice (run 1 / run 2). The laptop was under load and the runs were
+niced: the p99s (and the 1 s open-lesson budget) are the machine's on both
+sides; the medians are the renderer's and did not move.
+
+| | Before | After |
+|---|---|---|
+| Wet frame, one 1920×1080 target, p50 (ms) | 1.01 / 1.57 | 0.99 / 1.80 |
+| Wet frame p99 (budget 4 ms) | 9.61 / 3.07 | 1.25 / 3.27 |
+| Wet tile frame at 4K, p50 / p99 (budget 4 ms) | – | 1.76 / 5.30 and 0.72 / 1.95 |
+| 4K frames while writing in the tile (budget 0) | – | 0 of 240 |
+| Pan frame @100 %, p50 (ms) | 3.14 / 29.7 | 3.16 / 4.90 |
+| Pan frame p99 @100 % (budget 8.3 ms) | 9.01 / 84.7 | 30.4 / 54.4 |
+| Pen move → wet update p99 (budget 0.5 ms) | 0.12 / 0.25 | 0.18 / 0.14 |
+| Stroke commit p99 (budget 5 ms) | 0.04 | 0.04 |
+| Open lesson, 100k strokes (budget 1000 ms) | 1212 / 1361 | 1256 / 1364 |
+| Wet vs dry pixels differ (budget 0.5 %) | 0.00 % | 0.00 % |
+
+With the page's main thread throttled four times (`--4k --cpu 4`,
+headless), both builds are limited by the main thread, at the same 10 fps on
+this machine: the change adds no CPU work.
 
 **Not measured:** Intel UHD, Windows, DWM, WebView2. The model says the
 change removes about two thirds of the browser's GPU work per frame; whether

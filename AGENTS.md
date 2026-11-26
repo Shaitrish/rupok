@@ -87,7 +87,8 @@ The toolchain (1.100, edition 2024) is pinned in `rust-toolchain.toml`.
    `rupok-ink`, `rupok-core`, `rupok-render`, the pointer path in `rupok-wasm`, or
    package I/O: run `cargo run -p rupok-bench --release` before and after, and
    report both budget tables. Budgets: stroke commit p99 ≤ 5 ms, open lesson
-   ≤ 1000 ms, pan frame p99 ≤ 8.3 ms, wet frame p99 ≤ 4 ms, pen move → wet
+   ≤ 1000 ms, pan frame p99 ≤ 8.3 ms, wet frame p99 ≤ 4 ms (also in the wet
+   tile at 4K, with no 4K frame while writing in it), pen move → wet
    update p99 ≤ 0.5 ms, wet vs dry pixels ≤ 0.5 %. Changes to the pen path
    (`controller.ts` pointer handlers, `wetInk.ts`, the stroke builder, the
    ink shader) also run `bench/latency` before and after. Wet and dry ink

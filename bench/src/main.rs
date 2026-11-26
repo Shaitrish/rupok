@@ -391,6 +391,89 @@ fn main() {
         limit: 4.0,
         unit: "ms",
     });
+    // The same writing on a 4K board with the wet tile (docs/performance.md,
+    // "The wet tile"): the stroke is drawn into a 1024×768 target, and the
+    // 4K main target must not be presented at all while it stays in there.
+    {
+        let (mw, mh, tw, th) = (3840u32, 2160u32, 1024u32, 768u32);
+        let make = |w: u32, h: u32| {
+            gpu.device
+                .create_texture(&wgpu::TextureDescriptor {
+                    label: Some("bench 4K"),
+                    size: wgpu::Extent3d {
+                        width: w,
+                        height: h,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    view_formats: &[],
+                })
+                .create_view(&Default::default())
+        };
+        let (main_view, tile_view) = (make(mw, mh), make(tw, th));
+        let mut board = InkRenderer::new(&gpu.device, &gpu.queue, format);
+        board.set_tile_size(Some((tw, th)));
+        let mut tile = InkRenderer::new(&gpu.device, &gpu.queue, format);
+        for it in &items {
+            if let ItemData::Stroke(s) = &it.data {
+                board.add_stroke(&it.id, s);
+            }
+        }
+        board.compact();
+        let (warm, frames) = (5, 240);
+        let mut times = Vec::with_capacity(frames);
+        let mut full = 0u32;
+        for f in 0..warm + frames {
+            let pts: Vec<_> = (0..(50 + f))
+                .map(|i| rupok_ink::StrokePoint {
+                    x: 300.0 + i as f32 * 2.0,
+                    y: 300.0 + (i as f32 * 0.2).sin() * 30.0,
+                    p: 0.6,
+                    dt: i as u32,
+                })
+                .collect();
+            board.set_wet(&pts, 3.0, Brush::Pen, 0x2563ebff, 1.0);
+            let t = Instant::now();
+            let plan = board.plan(still, 1.0, mw, mh, false);
+            if plan.main {
+                board.render_main(&gpu.device, &gpu.queue, &main_view, mw, mh, still, 1.0);
+            }
+            if plan.tile {
+                let cam = board.tile_camera(still, 1.0);
+                let verts = board.tile_vertices();
+                tile.render_tile(&gpu.device, &gpu.queue, &tile_view, tw, th, cam, 1.0, verts);
+                board.tile_presented();
+            }
+            gpu.device
+                .poll(wgpu::PollType::wait_indefinitely())
+                .unwrap();
+            if f >= warm {
+                times.push(ms(t.elapsed()));
+                full += u32::from(plan.main);
+            }
+        }
+        let p50 = percentile(&mut times.clone(), 0.5);
+        let p99 = percentile(&mut times, 0.99);
+        println!(
+            "writing, wet tile @4K p50 {p50:>6.2} ms  p99 {p99:>6.2} ms   ({full} of {frames} frames presented the 4K target)"
+        );
+        budgets.push(Budget {
+            name: "wet tile frame p99 @4K",
+            value: p99,
+            limit: 4.0,
+            unit: "ms",
+        });
+        budgets.push(Budget {
+            name: "4K frames while writing in the tile",
+            value: f64::from(full),
+            limit: 0.0,
+            unit: "frames",
+        });
+    }
     // Every brush on the same path (pen styles, docs/performance.md).
     let mut worst = (0.0f64, Brush::Pen);
     for brush in Brush::ALL {

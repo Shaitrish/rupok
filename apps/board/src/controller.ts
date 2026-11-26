@@ -307,7 +307,12 @@ export class Controller {
    * follows with CSS. */
   applyWetTile() {
     const c = this.wetCanvas;
-    if (!c || !this.board.has_wet_tile()) return;
+    if (!c) return;
+    if (!this.board.has_wet_tile()) {
+      // The tile could not be set up: everything is drawn in the main canvas.
+      c.style.display = "none";
+      return;
+    }
     const size = prefs().wetLayer;
     const on = size !== "off";
     const [w, h] = this.board.canvas_size();
