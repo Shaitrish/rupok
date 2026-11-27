@@ -122,7 +122,7 @@ const LABELS: Record<string, string> = {
   library_create_lesson: "created a lesson", library_move: "moved a lesson", library_rename: "renamed a lesson",
   library_trash: "moved a lesson to the trash", get_settings: "is reading the settings", set_setting: "changed a setting",
   get_dock_layout: "is reading the dock", set_dock_layout: "changed the dock", list_dock_items: "is reading the dock",
-  save_dock_preset: "saved a dock layout", apply_dock_preset: "changed the dock",
+  save_dock_preset: "saved a dock layout", apply_dock_preset: "changed the dock", swap_islands: "swapped the islands",
   show_progress: "is working on something",
 };
 export const opLabel = (op: any) => LABELS[op?.op] ?? "is working";

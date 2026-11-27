@@ -39,7 +39,7 @@ changes alike (Auto-approve covers them the same way).
 | Undo | ✗ | ✅ the agent's own last change; teacher's history 🔒 |
 | Modes, view, replay | ◐ go to page, point | ✅ Prepare/Teach/Student, zoom, fit, replay, tool |
 | Library, export, save | ◐ workspace files | ✅ list, open, create, move, rename, trash, export PDF |
-| Settings | ◐ theme | ✅ allowlisted settings (57), dock layout; secrets 🔒 |
+| Settings | ◐ theme | ✅ allowlisted settings (58), dock layout; secrets 🔒 |
 | Smart Dock | ✗ | ✅ position, groups, split dock, sizes, named layouts |
 | Layout (Modern, Classic islands) | ✗ | ✅ switch layouts, rearrange and resize the islands |
 | Solve this, To text, maths, voice | ◐ | ✅ write handwriting, ink to text, Voice on the board (start, stop); recognition and dictation 🔒 (local input) |
@@ -140,6 +140,7 @@ changes alike (Auto-approve covers them the same way).
 | Pages drawer | ✗ | ✅ | `set_setting` `appearance.pagesPanel`, `appearance.pagesPinned` | – | ✅ |
 | Layout: Modern or Classic | ✗ | ✅ | `set_setting` `appearance.layout`, or `apply_dock_preset` `Classic` / `Default` | – | ✅ |
 | Rearrange, resize, move the Classic islands | ✗ | ✅ | `set_dock_layout` with `style: "islands"` (each group is an island), `get_dock_layout` | – | ✅ |
+| Swap the side islands (menu island left or right) | ✗ | ✅ | `swap_islands` (`swapped`: true, false, or toggle), `set_setting` `appearance.islandSwap` | – | ✅ |
 
 ## Library, export, save, sharing
 
@@ -196,7 +197,7 @@ board and on files; **board** operations run in the board app
 | `undo` | board | write |
 | `start_voice_text`, `stop_voice_text` | board (`voice/board.ts`, the microphone) | write |
 | `library_list`, `get_settings`, `get_dock_layout`, `list_dock_items` | board | read |
-| `library_create_lesson`, `library_move`, `library_rename`, `library_trash`, `set_setting`, `set_dock_layout`, `save_dock_preset`, `apply_dock_preset` | board | write |
+| `library_create_lesson`, `library_move`, `library_rename`, `library_trash`, `set_setting`, `set_dock_layout`, `save_dock_preset`, `apply_dock_preset`, `swap_islands` | board | write |
 
 ## Settings
 
@@ -208,6 +209,7 @@ the AI chip's Undo puts it back.
 | Setting | Who | How, or why teacher only |
 |---|---|---|
 | `appearance.layout` | agent | `set_setting` |
+| `appearance.islandSwap` | agent | `set_setting`, or `swap_islands` |
 | `appearance.theme` | agent | `set_setting` |
 | `appearance.accent` | agent | `set_setting` |
 | `appearance.density` | agent | `set_setting` |
@@ -358,6 +360,7 @@ What each button does is in the tables above.
 | `zoom` | `zoom_to`, `fit_page` |
 | `addpage` | `add_page_after_current` |
 | `recognize` | `set_setting` `pen.smartShapes`, `replace_items_with_text`, `write_handwriting` |
+| `ai` | teacher only: Connect AI and the chat are the teacher's (the agent is already in them) |
 
 ## Adding a feature
 

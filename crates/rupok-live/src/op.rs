@@ -844,6 +844,12 @@ pub enum Op {
     ApplyDockPreset {
         name: String,
     },
+    /// The Classic layout: the first and last islands trade sides (the menu
+    /// island on the right). `swapped` sets it; omitted, it toggles.
+    SwapIslands {
+        #[serde(default)]
+        swapped: Option<bool>,
+    },
 
     // ------------------------------------------------- voice (live only)
     /// Start "Voice text" on the board: the teacher's speech appears as text
@@ -958,6 +964,7 @@ impl Op {
             Op::ListDockItems => "list_dock_items",
             Op::SaveDockPreset { .. } => "save_dock_preset",
             Op::ApplyDockPreset { .. } => "apply_dock_preset",
+            Op::SwapIslands { .. } => "swap_islands",
             Op::ShowProgress(_) => "show_progress",
         }
     }
@@ -1031,6 +1038,7 @@ impl Op {
                 | Op::ListDockItems
                 | Op::SaveDockPreset { .. }
                 | Op::ApplyDockPreset { .. }
+                | Op::SwapIslands { .. }
                 | Op::StartVoiceText { .. }
                 | Op::StopVoiceText { .. }
                 | Op::ShowProgress(_)
@@ -1105,6 +1113,7 @@ impl Op {
             Op::ListDockItems => "read the dock",
             Op::SaveDockPreset { .. } => "saved a dock layout",
             Op::ApplyDockPreset { .. } => "changed the dock",
+            Op::SwapIslands { .. } => "swapped the islands",
             Op::ShowProgress(_) => "showed its progress",
         }
     }

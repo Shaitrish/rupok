@@ -98,15 +98,20 @@
 .cl-main { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; }
 .cl-list .cl-body, .cl-tools .cl-body, .cl-zoom .cl-body, .cl-recog .cl-body { flex-direction: column; gap: var(--s1); }
 
-/* Thickness: a slider and the live dot. */
-.cl-thick { display: flex; align-items: center; gap: var(--s4); }
-.cl-slider { flex: 1; min-width: 200px; height: 44px; }
-.cl-dot-well {
-  width: 56px; height: 56px; flex: none; border-radius: 14px; display: grid; place-items: center;
-  background: var(--page-bg, #fff); box-shadow: inset 0 0 0 1px var(--hairline);
+/* One system for every Classic panel: 52px tiles (swatches, shapes),
+ * 4px gaps, 12px radii, the same section labels and the same mint ring. */
+.dock-pop.classic { --cl-tile: 52px; --cl-gap: 4px; --cl-r: 12px; }
+.cl-label, .cl-shapes .shapes-label {
+  font: 650 12px/16px var(--font); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-2); padding: 0;
 }
-:root[data-theme="dark"] .cl-dot-well { background: #fff; }
-.cl-dot { border-radius: 50%; display: block; box-shadow: inset 0 0 0 1px rgba(0, 0, 40, 0.14); }
+.cl-value { font: 650 15px/20px var(--font); font-variant-numeric: tabular-nums; color: var(--text); }
+
+/* Size: label and value, the slider, a sample of the line. */
+.cl-thick { display: flex; flex-direction: column; gap: var(--s1); }
+.cl-thick-head { display: flex; align-items: baseline; justify-content: space-between; }
+.cl-thick-row { display: flex; align-items: center; gap: var(--s3); }
+.cl-slider { flex: 1; min-width: 200px; height: 44px; }
+.cl-sample { flex: none; border-radius: var(--cl-r); background: #fff; box-shadow: inset 0 0 0 1px var(--hairline); }
 
 /* Pen tiles: our drawings, big enough to read across the room. */
 .cl-tray {
@@ -127,11 +132,12 @@
 .cl-seg button { height: 40px; padding: 0 var(--s3); }
 
 /* Colours: 3 × 5 and the eyedropper. */
-.cl-colours { display: grid; grid-template-columns: repeat(3, 48px); grid-auto-rows: 48px; gap: var(--s1); padding: var(--s2); border-radius: 16px; background: var(--gray-2); align-content: start; flex: none; }
+.cl-colours { display: grid; grid-template-columns: repeat(3, var(--cl-tile)); grid-auto-rows: var(--cl-tile); gap: var(--cl-gap); padding: var(--s2); border-radius: 16px; background: var(--gray-2); align-content: start; flex: none; }
 :root[data-theme="dark"] .cl-colours { background: var(--gray-1); }
-.cl-swatch { width: 48px; height: 48px; border: 0; border-radius: 12px; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 40, 0.16); }
+.cl-swatch { width: var(--cl-tile); height: var(--cl-tile); border: 0; border-radius: var(--cl-r); cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 40, 0.16); }
 .cl-swatch.light { box-shadow: inset 0 0 0 1px var(--gray-7); }
 .cl-swatch.on { box-shadow: inset 0 0 0 1px rgba(0, 0, 40, 0.16), 0 0 0 3px var(--surface-solid), 0 0 0 5px var(--accent-11); }
+.cl-brush.on { box-shadow: 0 0 0 3px var(--surface-solid), 0 0 0 5px var(--accent-11); }
 .cl-swatch.on::after { content: ""; display: block; width: 12px; height: 12px; margin: auto; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35); }
 .cl-drop { grid-column: 1 / -1; width: auto; background: var(--surface-solid); color: var(--text); display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--hairline); }
 .cl-drop:hover { background: var(--hover); }
@@ -139,9 +145,33 @@
 
 /* The Shapes picker inside the Classic frame: bigger tiles. */
 :root .dock-pop.dock-pop-shapes.classic { width: max-content; }
-.cl-shapes .cl-main { width: calc(9 * 52px + 8 * 2px + 8px); }
-.cl-shapes .shapes-picker { --tb: 52px; --tb-icon: 28px; max-height: min(52dvh, 560px); overflow-y: auto; padding-right: 4px; }
-.cl-shapes .shapes-tile { border-radius: 12px; }
+/* Shapes: tiles the size of the colour swatches, in an 8-column grid. */
+.cl-shapes .cl-main { width: calc(8 * var(--cl-tile) + 7 * var(--cl-gap) + 8px); }
+.cl-shapes .shapes-picker {
+  --tb: var(--cl-tile); --tb-icon: 28px; --r-tb: var(--cl-r);
+  gap: 0; max-height: min(52dvh, 560px); overflow-y: auto; padding: 0 4px 4px 0;
+}
+.cl-shapes .shapes-label { padding: var(--s4) 0 var(--s2); }
+.cl-shapes .shapes-label:first-child { padding-top: var(--s1); }
+.cl-shapes .shapes-row { grid-template-columns: repeat(8, var(--cl-tile)); gap: var(--cl-gap); }
+.cl-shapes .shapes-tile {
+  width: var(--cl-tile); height: var(--cl-tile); border-radius: var(--cl-r); background: var(--gray-a3); color: var(--text);
+}
+.cl-shapes .shapes-tile:hover, .cl-shapes .sel-fill:hover { background: var(--gray-a4); }
+.cl-shapes .shapes-tile .shape-glyph { width: 30px; height: 30px; stroke-width: 2; }
+.cl-shapes .shapes-tile.on { background: var(--accent-3); box-shadow: 0 0 0 3px var(--surface-solid), 0 0 0 5px var(--accent-11); }
+.cl-shapes .shapes-tile.on .shape-glyph { color: var(--accent-11); }
+.cl-shapes .fill-swatches { display: grid; grid-template-columns: repeat(8, var(--cl-tile)); gap: var(--cl-gap); }
+.cl-shapes .sel-fill { width: var(--cl-tile); height: var(--cl-tile); min-width: var(--cl-tile); border-radius: var(--cl-r); background: var(--gray-a3); }
+.cl-shapes .sel-fill.on { background: var(--accent-3); box-shadow: 0 0 0 3px var(--surface-solid), 0 0 0 5px var(--accent-11); }
+.cl-shapes .sel-fill.on .fill-dot { box-shadow: inset 0 0 0 1px rgba(0, 0, 40, 0.16); }
+.cl-shapes .fill-alpha { margin-top: var(--s2); }
+.cl-shapes .fill-dot { width: 30px; height: 30px; border-radius: 8px; }
+.cl-shapes .dock-hr { margin: var(--s3) 0 0; }
+.cl-shapes .dock-row { height: 48px; font-size: 15px; }
+.cl-shapes .shapes-hint { margin: var(--s2) 0 0; font-size: 13px; }
+/* The pen tray uses the same rhythm. */
+.cl-tray { gap: var(--cl-gap); }
 
 /* Rows and tiles (☰ menu, mode, tools, zoom). */
 .cl-row {
@@ -299,3 +329,29 @@
 }
 /* Icons follow the island size (it changes with the screen, above). */
 .island .tool > svg { width: var(--tb-icon); height: var(--tb-icon); }
+
+/* Our Classic icons (icons/drawn/ci-*.svg): 2.2 strokes and a soft fill
+ * that reads as a silhouette; the active tool fills a little more. */
+.icon.ci .f { fill: currentColor; fill-opacity: 0.16; }
+.icon.ci.on .f { fill-opacity: 0.34; }
+
+/* The arrow tab at a side island's outer edge: swaps the side islands. */
+.isl-swap {
+  position: relative; flex: none; width: 24px; height: var(--isl); border: 0; padding: 0; border-radius: 10px; cursor: pointer;
+  display: grid; place-items: center; background: var(--gray-a3); color: var(--text-2); touch-action: none;
+  transition: background-color 120ms var(--ease), color 120ms var(--ease);
+}
+.isl-swap::before { content: ""; position: absolute; inset: 0 -10px; } /* a 44px hit area */
+.isl-swap.left { margin-right: 4px; }
+.isl-swap.right { margin-left: 4px; }
+.isl-swap:hover { background: var(--accent-3); color: var(--accent-11); }
+
+/* Ask AI on an island: a live dot while an agent is connected. */
+.island .dock-ai { position: relative; }
+.dock-ai-dot { position: absolute; top: 8px; right: 8px; width: 10px; height: 10px; border-radius: 5px; background: var(--accent-9); box-shadow: 0 0 0 2px var(--surface-solid); }
+.dock-ai.busy .dock-ai-dot { animation: ai-pulse 1s var(--ease) infinite alternate; }
+@keyframes ai-pulse { to { opacity: 0.35; } }
+.cl-colours { align-self: flex-start; }
+.dock-pop.classic .cl-shapes .fill-swatches .sel-fill { background: var(--gray-a3); }
+.dock-pop.classic .cl-shapes .fill-swatches .sel-fill.on { background: var(--accent-3); }
+.cl-shapes .shapes-picker { max-height: min(48dvh, 520px); }

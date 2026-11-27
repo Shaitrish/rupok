@@ -17,6 +17,13 @@ registerSettings([
     default: "modern",
   },
   {
+    id: "appearance.islandSwap", category: "appearance", order: 6, type: "toggle", label: "Menu island on the right",
+    description: "Classic layout: the menu island and the page island trade sides. The arrow tab at each side island's edge does the same.",
+    keywords: ["swap", "islands", "left", "right", "mirror", "classic", "ক্লাসিক"],
+    when: () => layout() === "classic",
+    ...pref("islandSwap"),
+  },
+  {
     id: "appearance.theme", category: "appearance", order: 10, type: "segmented", label: "Theme",
     description: "Light, dark, or follow this device.",
     keywords: ["dark mode", "light mode", "night", "থিম", "অন্ধকার", "ডার্ক", "আলো"],

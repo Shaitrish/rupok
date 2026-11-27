@@ -87,24 +87,31 @@ export function Panel(props: { title: string; onClose: () => void; class?: strin
   );
 }
 
-/** Thickness: a slider and a live dot the size of the line. */
+/** Size: a labelled slider with its value, and a live sample of the line. */
 function Thickness(props: { value: number; min: number; max: number; color: number; onChange: (w: number) => void; alpha?: number }) {
-  const d = () => Math.max(2, Math.min(44, props.value));
+  const w = () => Math.max(1, Math.min(36, props.value));
   return (
     <div class="cl-thick">
-      <input
-        class="slider cl-slider"
-        type="range"
-        min={props.min}
-        max={props.max}
-        step="1"
-        value={props.value}
-        aria-label={`Thickness ${Math.round(props.value)}`}
-        style={{ "--p": `${((props.value - props.min) / (props.max - props.min)) * 100}%` }}
-        onInput={(e) => props.onChange(Number(e.currentTarget.value))}
-      />
-      <div class="cl-dot-well" title={`Thickness ${Math.round(props.value)}`}>
-        <span class="cl-dot" style={{ width: `${d()}px`, height: `${d()}px`, background: hex(props.color), opacity: props.alpha ?? 1 }} />
+      <div class="cl-thick-head">
+        <span class="cl-label">Size</span>
+        <output class="cl-value">{Math.round(props.value)} px</output>
+      </div>
+      <div class="cl-thick-row">
+        <input
+          class="slider cl-slider"
+          type="range"
+          min={props.min}
+          max={props.max}
+          step="1"
+          value={props.value}
+          aria-label="Size"
+          aria-valuetext={`${Math.round(props.value)} pixels`}
+          style={{ "--p": `${((props.value - props.min) / (props.max - props.min)) * 100}%` }}
+          onInput={(e) => props.onChange(Number(e.currentTarget.value))}
+        />
+        <svg class="cl-sample" viewBox="0 0 104 52" width="104" height="52" aria-hidden="true">
+          <line x1={w() / 2 + 14} y1="26" x2={90 - w() / 2} y2="26" stroke={hex(props.color)} stroke-opacity={props.alpha ?? 1} stroke-width={w()} stroke-linecap="round" />
+        </svg>
       </div>
     </div>
   );

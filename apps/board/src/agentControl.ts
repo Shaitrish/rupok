@@ -46,6 +46,7 @@ export const BOARD_OPS = new Set([
   "set_mode", "zoom_to", "fit_page", "start_replay", "stop_replay", "celebrate", "set_tool", "undo", "export_pdf",
   "library_list", "library_open", "library_create_lesson", "library_move", "library_rename", "library_trash",
   "get_settings", "set_setting", "get_dock_layout", "set_dock_layout", "list_dock_items", "save_dock_preset", "apply_dock_preset",
+  "swap_islands",
 ]);
 
 const fail = (m: string): never => {
@@ -239,6 +240,17 @@ export async function runBoardOp(c: Controller, op: any, agent: string, lastAgen
       const undo = prefsUndo(c, ["dockPresets"]);
       const p = savePreset(name, modes);
       return { result: { saved: p.name, modes: Object.keys(p.modes) }, undo };
+    }
+    case "swap_islands": {
+      if (op.swapped !== undefined && typeof op.swapped !== "boolean") fail("swapped must be true, false or left out (to swap)");
+      const undo = prefsUndo(c, ["islandSwap"]);
+      const to = op.swapped ?? !prefs().islandSwap;
+      setPrefs({ islandSwap: to });
+      return {
+        result: { swapped: to, menu_island: to ? "right" : "left", layout: layout(), note: layout() === "classic" ? undefined : "Applies to the Classic layout (set_setting appearance.layout classic)" },
+        undo,
+        changed: true,
+      };
     }
     case "apply_dock_preset": {
       const name = String(op.name ?? "").trim().toLowerCase();

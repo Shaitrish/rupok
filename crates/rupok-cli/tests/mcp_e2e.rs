@@ -267,6 +267,7 @@ fn mcp_server_over_stdio() {
         "set_dock_layout",
         "list_dock_items",
         "apply_dock_preset",
+        "swap_islands",
     ] {
         assert!(names.contains(&expected), "missing tool {expected}");
     }

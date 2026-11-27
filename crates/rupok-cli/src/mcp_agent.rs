@@ -574,6 +574,15 @@ pub struct DockPresetParams {
     pub name: String,
 }
 
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SwapIslandsParams {
+    /// true: the menu island on the right and the page island on the left;
+    /// false: the other way round. Omitted: swap them.
+    #[serde(default)]
+    pub swapped: Option<bool>,
+}
+
 // ------------------------------------------------------------------- tools
 
 fn live_or(path: &Option<String>) -> Option<String> {
@@ -1538,6 +1547,21 @@ Modern dock.",
         Parameters(p): Parameters<DockPresetParams>,
     ) -> CallToolResult {
         self.live_call(Op::ApplyDockPreset { name: p.name }).await
+    }
+
+    #[tool(
+        description = "Classic layout: swap the side islands, so the menu island moves to the right and the \
+page island to the left (or back). The teacher does the same with the arrow tab at an island's edge. The \
+teacher is asked like for an edit and can undo it from the AI chip.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn swap_islands(&self, Parameters(p): Parameters<SwapIslandsParams>) -> CallToolResult {
+        self.live_call(Op::SwapIslands { swapped: p.swapped }).await
     }
 }
 

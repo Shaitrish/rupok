@@ -18,7 +18,9 @@ export type ToolbarItem =
   /** The Classic layout's buttons (components/classic/), placeable on any dock:
    * ☰ main menu, mode, the tools box, share, zoom, a new page, and
    * recognise ink (Smart shapes, To text, Solve this). */
-  | "menu" | "mode" | "toolbox" | "share" | "zoom" | "addpage" | "recognize";
+  | "menu" | "mode" | "toolbox" | "share" | "zoom" | "addpage" | "recognize"
+  /** Ask AI: Connect AI, or the chat with the teacher's agent (one tap). */
+  | "ai";
 
 /** Chrome elements a mode can show or hide. */
 export type ChromeKey =
@@ -89,7 +91,7 @@ export interface DockConfig {
 /** Always on the dock in Prepare and Teach; a config cannot remove them. */
 export const CORE_TOOLS: ToolbarItem[] = ["pen", "highlighter", "eraser", "laser", "undo"];
 /** The Classic layout's own buttons (they also fit on a Modern dock). */
-export const CLASSIC_ITEMS: ToolbarItem[] = ["menu", "mode", "toolbox", "share", "zoom", "addpage", "recognize"];
+export const CLASSIC_ITEMS: ToolbarItem[] = ["menu", "mode", "toolbox", "share", "zoom", "addpage", "recognize", "ai"];
 /** Islands keep fewer: highlighter and laser live in the pen panel and the tools box. */
 export const ISLAND_CORE: ToolbarItem[] = ["pen", "eraser", "undo"];
 export const SHAPE_TOOLS: ToolbarItem[] = ["shape", "rect", "ellipse", "line", "arrow"];
@@ -135,6 +137,7 @@ export const TOOLBAR_ITEMS: { id: ToolbarItem; icon: IconName; label: string; ke
   { id: "zoom", icon: "search", label: "Zoom", key: "+ −", kind: "action" },
   { id: "addpage", icon: "plus", label: "New page", kind: "action" },
   { id: "recognize", icon: "recognize", label: "Recognise ink", key: "M", kind: "action" },
+  { id: "ai", icon: "ai", label: "Ask AI", kind: "action" },
 ];
 /** "shapes" is a dock pin, not a toolbar entry: the Shapes button. */
 export const SHAPES_PIN = { id: "shapes" as const, icon: "rect" as IconName, label: "Shapes and tables" };
@@ -203,7 +206,7 @@ export const CLASSIC_DOCK: Partial<DockConfig> = {
   position: "bottom",
   size: "l",
   groups: [
-    { id: "left", label: "Menu", items: ["menu", "mode", "toolbox", "share", "zoom"] },
+    { id: "left", label: "Menu", items: ["menu", "mode", "toolbox", "share", "zoom", "ai"] },
     { id: "centre", label: "Tools", items: ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] },
     { id: "right", label: "Pages", items: ["addpage", "pager"] },
   ],
@@ -501,7 +504,7 @@ export interface UiConfigFile {
   format: typeof UI_CONFIG_FORMAT;
   version: number;
   modes?: Partial<ModesConfig>;
-  appearance?: { theme?: string; accent?: string; iconStyle?: string; toolbar?: string; density?: string; hand?: string; layout?: string };
+  appearance?: { theme?: string; accent?: string; iconStyle?: string; toolbar?: string; density?: string; hand?: string; layout?: string; islandSwap?: boolean };
   /** Classroom touch gestures (gestures.ts → GestureConfig). */
   gestures?: Record<string, unknown>;
   /** The teacher's saved dock layouts ("My layouts"), by name. */

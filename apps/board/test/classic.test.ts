@@ -19,10 +19,10 @@ test("the Classic preset makes three islands in Prepare and Teach", () => {
     assert.equal(d.style, "islands");
     assert.equal(d.size, "l");
     assert.deepEqual(d.groups!.map((g) => g.id), ["left", "centre", "right"]);
-    assert.deepEqual(d.groups![0].items, ["menu", "mode", "toolbox", "share", "zoom"]);
+    assert.deepEqual(d.groups![0].items, ["menu", "mode", "toolbox", "share", "zoom", "ai"]);
     assert.deepEqual(d.groups![2].items, ["addpage", "pager"]);
     // The island buttons are the mode's tools too.
-    for (const t of ["menu", "toolbox", "recognize", "addpage"] as const) assert.ok(modes[m]!.tools.includes(t), `${m} offers ${t}`);
+    for (const t of ["menu", "toolbox", "recognize", "addpage", "ai"] as const) assert.ok(modes[m]!.tools.includes(t), `${m} offers ${t}`);
   }
 });
 
@@ -70,7 +70,7 @@ test("untrusted island configs are cleaned, never fatal", () => {
 });
 
 test("Student view allows the menu and zoom islands but no editing", () => {
-  const v = sanitizeMode("view", { tools: ["menu", "zoom", "pen", "addpage", "pager"] });
+  const v = sanitizeMode("view", { tools: ["menu", "zoom", "pen", "addpage", "ai", "pager"] });
   assert.deepEqual(v.tools, ["menu", "zoom", "pager"]);
 });
 

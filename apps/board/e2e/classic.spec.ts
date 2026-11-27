@@ -39,7 +39,9 @@ test.describe("Classic layout", () => {
     const errors = trackErrors(page);
     await openClassic(page);
     await expect(page.locator(".topbar")).toHaveCount(0);
-    for (const name of ["Main menu", "Mode", "Tools", "Share", "Zoom"]) await expect(island(page, "left").getByRole("button", { name })).toBeVisible();
+    for (const name of ["Main menu", "Mode", "Tools", "Share", "Zoom", "Ask AI"]) await expect(island(page, "left").getByRole("button", { name })).toBeVisible();
+    // The AI is on the island, not floating over the slide.
+    await expect(page.locator(".ai-float")).toHaveCount(0);
     for (const name of ["Select & move", "Pen", "Eraser", "Shapes", "Pan", "Recognise ink", "Stamps", "Undo", "Redo"]) {
       await expect(island(page, "centre").getByRole("button", { name, exact: true })).toBeVisible();
     }
@@ -47,6 +49,21 @@ test.describe("Classic layout", () => {
     // 56 px targets (44 px or more everywhere).
     const pen = await island(page, "centre").getByRole("button", { name: "Pen", exact: true }).boundingBox();
     expect(pen!.width).toBeGreaterThanOrEqual(52);
+    expect(errors).toEqual([]);
+  });
+
+  test("the arrow tab swaps the side islands, and the agent can too", async ({ page }) => {
+    const errors = trackErrors(page);
+    await openClassic(page);
+    const leftOf = async (id: string) => (await island(page, id).boundingBox())!.x;
+    expect(await leftOf("left")).toBeLessThan(await leftOf("right"));
+    await island(page, "left").getByRole("button", { name: "Swap the side islands" }).click();
+    await expect.poll(async () => (await leftOf("left")) > (await leftOf("right"))).toBe(true);
+    // The menu island now has its tab on the far right.
+    await expect(island(page, "left").locator(".isl-swap.right")).toHaveCount(1);
+    const r = await page.evaluate(() => (window as any).rupokBoardOp({ op: "swap_islands", swapped: false }));
+    expect(r.menu_island).toBe("left");
+    await expect.poll(async () => (await leftOf("left")) < (await leftOf("right"))).toBe(true);
     expect(errors).toEqual([]);
   });
 

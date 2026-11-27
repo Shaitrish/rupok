@@ -36,7 +36,7 @@ export function exportUiConfig(): UiConfigFile {
     format: UI_CONFIG_FORMAT,
     version: UI_CONFIG_VERSION,
     modes: Object.fromEntries(MODES.map((m) => [m.id, resolveMode(p.modes, m.id)])) as UiConfigFile["modes"],
-    appearance: { theme: p.theme, accent: p.accent, iconStyle: p.iconStyle, toolbar: p.toolbar, density: p.density, hand: p.hand, layout: layout() },
+    appearance: { theme: p.theme, accent: p.accent, iconStyle: p.iconStyle, toolbar: p.toolbar, density: p.density, hand: p.hand, layout: layout(), islandSwap: p.islandSwap },
     gestures: exportGestures(),
     dockPresets: p.dockPresets ?? [],
   };
@@ -59,6 +59,7 @@ export function importUiConfig(raw: unknown): string {
   if (f.dockPresets !== undefined) next.dockPresets = sanitizeDockPresets(f.dockPresets);
   setPrefs(next);
   // A layout without its own modes: Classic applies the Classic preset (a file's modes win).
+  if (typeof a.islandSwap === "boolean") next.islandSwap = a.islandSwap;
   if ((a.layout === "classic" || a.layout === "modern") && !f.modes?.prepare && !f.modes?.teach) setLayout(a.layout);
   controller.applyPrefs();
   controller.updateInsets(true);

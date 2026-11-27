@@ -183,6 +183,8 @@ export interface Prefs {
   /** The Modern docks kept while the Classic layout is on, so switching
    * back restores the teacher's own dock (layout.ts). */
   modernDocks?: Partial<Record<"prepare" | "teach", import("./modes").DockConfig>>;
+  /** Classic: the first and last islands trade sides (the menu island on the right). */
+  islandSwap: boolean;
   /** The first-run "Which layout do you prefer?" was answered. */
   layoutChosen?: boolean;
 }
@@ -193,7 +195,7 @@ const defaults: Prefs = {
   smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right", eraserMode: "partial", keepInkOnPage: true, pagesPinned: false,
   smartGraphs: true, smartFlowchart: true, smartGates: true, smartNumberLine: true,
   smartGeometry: true, smartTables: true, smartScience: false, smartMath: true,
-  penBrush: "pen", hlBrush: "pen", shapeBrush: "pen", markerOpacity: 0.8,
+  islandSwap: false, penBrush: "pen", hlBrush: "pen", shapeBrush: "pen", markerOpacity: 0.8,
   stampFavorites: ["star", "tick", "cross", "thumbs-up", "hundred", "excellent"], stampQuickMenu: true, stampSounds: true,
 };
 
@@ -243,6 +245,7 @@ function loadPrefs(): Prefs {
       saved.modernDocks = md;
     } else delete saved.modernDocks;
     saved.layoutChosen = saved.layoutChosen === true;
+    saved.islandSwap = saved.islandSwap === true;
     return saved;
   } catch {
     return defaults;

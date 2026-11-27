@@ -111,6 +111,9 @@ rearrange it like any dock.
 
 - Each group of `groups` is one island. The first sits at the left, the
   last at the right, the others in the middle (one group: in the middle).
+  `appearance.islandSwap` (the arrow tab at a side island's outer edge,
+  Settings → Appearance, or the agent's `swap_islands`) trades the first
+  and last islands' sides; they slide across.
   On narrow screens the middle island moves above the other two.
 - `position`: `"bottom"` (default) or `"top"`; other positions are treated
   as the bottom edge. `orientation`, `minimized` and `split` are ignored.
@@ -144,7 +147,7 @@ Modern and Classic and brings back the teacher's own Modern dock.
   "dock": {
     "style": "islands", "size": "l",
     "groups": [
-      { "id": "left", "label": "Menu", "items": ["menu", "mode", "toolbox", "share", "zoom"] },
+      { "id": "left", "label": "Menu", "items": ["menu", "mode", "toolbox", "share", "zoom", "ai"] },
       { "id": "centre", "label": "Tools", "items": ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] },
       { "id": "right", "label": "Pages", "items": ["addpage", "pager"] }
     ]
@@ -188,6 +191,7 @@ Settings → Teaching modes) resets that memory, so the config takes effect.
 | `zoom` | Zoom: in, out, fit, fullscreen. In `teach` it turns the fit lock off, like the zoom chip | all |
 | `addpage` | A new page after this one (same look) | prepare, teach |
 | `recognize` | Recognise ink: Smart shapes on/off and when they snap, To text, Solve this | prepare, teach |
+| `ai` | Ask AI: Connect AI, or the chat with the teacher's agent (a dot while one is connected). In Classic it replaces the floating AI button | prepare, teach |
 
 ### Chrome keys
 
@@ -257,6 +261,7 @@ All optional; invalid values are ignored.
 | `density` | `compact`, `comfortable`, `large` |
 | `hand` | `right`, `left`: the writing hand. Dock popovers open away from it, so the arm never covers them |
 | `layout` | `modern`, `classic`: on import, `classic` applies the Classic preset (a file's own `modes` win) |
+| `islandSwap` | `true`, `false`: Classic, the first and last islands trade sides (the menu island on the right) |
 
 ### Gestures
 
@@ -354,7 +359,8 @@ student view gets no pages panel.
         "toolbar": { "enum": ["bottom", "left", "right"] },
         "density": { "enum": ["compact", "comfortable", "large"] },
         "hand": { "enum": ["right", "left"] },
-        "layout": { "enum": ["modern", "classic"] }
+        "layout": { "enum": ["modern", "classic"] },
+        "islandSwap": { "type": "boolean" }
       }
     },
     "gestures": {
@@ -397,7 +403,7 @@ student view gets no pages panel.
           "items": {
             "enum": ["pen", "highlighter", "eraser", "lasso", "laser", "text", "voice", "stamp", "rect", "ellipse", "line", "arrow",
                      "hand", "interact", "smartink", "undo", "redo", "replay", "pager", "exit",
-                     "menu", "mode", "toolbox", "share", "zoom", "addpage", "recognize"]
+                     "menu", "mode", "toolbox", "share", "zoom", "addpage", "recognize", "ai"]
           }
         },
         "dock": {

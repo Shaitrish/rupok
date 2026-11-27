@@ -5,7 +5,7 @@ import {
 } from "../state";
 import { brandVars, brandingFor, lessonBranding, styleOf, usesPlaceholders } from "../design";
 import { openPageDesign } from "./PageDesign";
-import { hasTopBar } from "../modes";
+import { hasTopBar, layoutPins } from "../modes";
 import LatencyOverlay from "./LatencyOverlay";
 import { Icon } from "./Icon";
 import { SelectionOverlay } from "./Selection";
@@ -38,7 +38,8 @@ export function TopBar(props: { onObject: () => void; onSettings: () => void }) 
       </Show>
       {/* Teach has no top bar: the AI button floats top right, always, so the
           AI is one tap away (labelled until an AI is connected). */}
-      <Show when={(!hasTopBar(modeConfig()) || isClassic()) && !isView()}>
+      {/* Classic: the AI is a button on an island ("ai"); the floating one only when no island has it. */}
+      <Show when={(!hasTopBar(modeConfig()) || isClassic()) && !isView() && !(isClassic() && layoutPins(modeConfig().dock).includes("ai"))}>
         <FloatingAiStatus label={!aiAround() || livePhase() === "unreachable"} />
       </Show>
       {/* Mounted here because the top bar component is always rendered; the

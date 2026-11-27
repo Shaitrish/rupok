@@ -29,7 +29,7 @@ import {
 import { DockPopover, DockShell, longPress } from "./DockShell";
 import { isPhone, keyboard, pagesDrawer, setPagesDrawer, togglePagesDrawer } from "../viewport";
 import { addPageLike } from "./Chrome";
-import { Icon } from "./Icon";
+import { Icon, IconSet } from "./Icon";
 import type { IconName } from "../icons.generated";
 import { APP_SLUG, FILE_EXT } from "../brand";
 import { ShapesPicker } from "./ShapesPicker";
@@ -44,6 +44,8 @@ import { openAiPanel, setComposerDraft } from "../chat";
 import { islandsOf } from "../layout";
 import { InkPanel, MainMenu, ModeMenu, PageGrid, RecognizePanel, ShapesPanel, ToolsBox, ZoomPanel } from "./classic/ClassicPanels";
 import { shareLesson } from "./Header";
+import { aiConnected, aiStatusText, toggleAi } from "./AiStatus";
+import { liveEditing } from "../live";
 import "./classic/classic.css";
 
 const META = new Map(TOOLBAR_ITEMS.map((t) => [t.id, t]));
@@ -75,17 +77,17 @@ type Group = string;
 type Kind =
   | "tool" | "colors" | "shapes" | "smartink" | "undo" | "redo" | "pager" | "replay" | "exit" | "context" | "more"
   | "celebrate" | "pages" | "solve" | "settings"
-  | "menu" | "mode" | "toolbox" | "share" | "zoom" | "addpage" | "recognize";
+  | "menu" | "mode" | "toolbox" | "share" | "zoom" | "addpage" | "recognize" | "ai";
 interface Entry { key: string; kind: Kind; group: Group; id?: ToolbarItem; size?: DockSize }
 const GROUP: Partial<Record<ToolbarItem, Group>> = {
   pen: "ink", highlighter: "ink", eraser: "ink", smartink: "create", text: "create", voice: "create", stamp: "create",
   lasso: "point", laser: "point", hand: "point", interact: "point", undo: "history", redo: "history", pager: "nav", replay: "nav", exit: "exit",
   celebrate: "create", pages: "nav", solve: "create", settings: "end",
-  menu: "end", mode: "end", toolbox: "create", share: "end", zoom: "point", addpage: "nav", recognize: "create",
+  menu: "end", mode: "end", toolbox: "create", share: "end", zoom: "point", addpage: "nav", recognize: "create", ai: "end",
 };
 const ACTION_KINDS: ToolbarItem[] = [
   "smartink", "undo", "redo", "pager", "replay", "exit", "celebrate", "pages", "solve", "settings",
-  "menu", "mode", "toolbox", "share", "zoom", "addpage", "recognize",
+  "menu", "mode", "toolbox", "share", "zoom", "addpage", "recognize", "ai",
 ];
 /** Islands (the Classic layout): icon per size (the cells are in classic.css). */
 const ISLAND_ICON = { s: 24, m: 28, l: 32 } as const;
@@ -698,7 +700,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
         aria-haspopup="dialog"
         onClick={() => toggle("shapes", btn)}
       >
-        <Show when={legacy()} fallback={<ShapeGlyph id={currentShape()} size={iconSize()} />}>
+        <Show when={legacy()} fallback={islands() ? <Icon name="rect" size={iconSize()} active={on()} /> : <ShapeGlyph id={currentShape()} size={iconSize()} />}>
           <Icon name={iconOf(legacy()!)} size={iconSize()} active />
         </Show>
         <span class="dock-caret" />
@@ -840,6 +842,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
     else if (t === "settings") props.onSettings?.();
     else if (t === "share") void shareLesson();
     else if (t === "addpage") addPageLike(false);
+    else if (t === "ai") toggleAi();
     else if (t === "pager") togglePagesDrawer();
     else if (t === "menu" || t === "mode" || t === "toolbox" || t === "zoom" || t === "recognize") {
       if (anchor) setPop({ kind: t, anchor });
@@ -936,6 +939,18 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
       <Match when={p.e.kind === "share"}>
         <button class="tool" title="Share the lesson: a link, or the file" aria-label="Share" onClick={() => void shareLesson()}>
           <Icon name="share" size={iconSize()} />
+        </button>
+      </Match>
+      <Match when={p.e.kind === "ai"}>
+        <button
+          class="tool dock-ai"
+          classList={{ on: aiConnected(), busy: !!liveEditing() }}
+          title={aiConnected() ? aiStatusText() : "Ask AI: connect your AI assistant, or open the chat"}
+          aria-label="Ask AI"
+          onClick={toggleAi}
+        >
+          <Icon name="ai" size={iconSize()} active={aiConnected()} />
+          <Show when={aiConnected()}><span class="dock-ai-dot" aria-hidden="true" /></Show>
         </button>
       </Match>
       <Match when={p.e.kind === "addpage"}>
@@ -1099,11 +1114,46 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   // The Classic layout (layout.ts): each group is its own island along the
   // bottom (or top) edge, the first at the left, the last at the right.
   // Replay and text editing take the place of the middle island.
-  const slotOf = (i: number, n: number) => (n === 1 ? "centre" : i === 0 ? "left" : i === n - 1 ? "right" : "centre");
+  // Settings → Appearance → "Menu island on the right" (or the arrow tabs,
+  // or the agent's swap_islands) trades the first and last islands' sides.
+  const slotOf = (i: number, n: number) => {
+    if (n === 1) return "centre";
+    const swap = prefs().islandSwap;
+    return i === 0 ? (swap ? "right" : "left") : i === n - 1 ? (swap ? "left" : "right") : "centre";
+  };
   const Islands = () => {
     const list = () => isles()?.islands ?? [];
     const inSlot = (slot: string) => list().map((g, i) => ({ g, i })).filter(({ i }) => slotOf(i, list().length) === slot);
-    const Island = (p: { g: { id: string; label?: string; entries: Entry[] } }) => (
+    // The side islands slide to their new side (from the mirror of where they are now).
+    createEffect(on(() => prefs().islandSwap, () => {
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      requestAnimationFrame(() => {
+        for (const n of Array.from(el?.querySelectorAll<HTMLElement>(".island-slot.left .island, .island-slot.right .island") ?? [])) {
+          const r = n.getBoundingClientRect();
+          const dx = window.innerWidth - 2 * r.left - r.width;
+          n.animate?.([{ transform: `translateX(${dx}px)` }, { transform: "none" }], { duration: 280, easing: "cubic-bezier(0.2, 0, 0, 1)" });
+        }
+      });
+    }, { defer: true }));
+    /** The arrow tab at a side island's outer edge: tap it (or swipe it inward) to swap sides. */
+    const SwapTab = (p: { side: "left" | "right" }) => {
+      // Captured, so a swipe that slides off the tab still ends in its click.
+      return (
+        <button
+          class={`isl-swap ${p.side}`}
+          title={`Move this island to the ${p.side === "left" ? "right" : "left"} (the islands swap sides)`}
+          aria-label="Swap the side islands"
+          aria-pressed={prefs().islandSwap}
+          onPointerDown={(e) => e.currentTarget.setPointerCapture?.(e.pointerId)}
+          onClick={() => setPrefs({ islandSwap: !prefs().islandSwap })}
+        >
+          <svg viewBox="0 0 12 24" width="12" height="24" aria-hidden="true">
+            <path d={p.side === "left" ? "M4 6l5 6-5 6" : "M8 6l-5 6 5 6"} fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      );
+    };
+    const Island = (p: { g: { id: string; label?: string; entries: Entry[] }; slot: string }) => (
       <div
         class="island"
         data-island={p.g.id}
@@ -1115,7 +1165,9 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
           openDockEditor(mode());
         }}
       >
+        <Show when={p.slot === "left" && list().length > 1}><SwapTab side="left" /></Show>
         <For each={p.g.entries}>{(e) => <Cell e={e} />}</For>
+        <Show when={p.slot === "right" && list().length > 1}><SwapTab side="right" /></Show>
       </div>
     );
     const busy = () => !!replay() || !!(editingText() && editItem());
@@ -1133,12 +1185,13 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
         }}
         onPointerDown={() => unfade()}
       >
+        <IconSet.Provider value="classic">
         <For each={["left", "centre", "right"] as const}>
           {(slot) => (
             <div class={`island-slot ${slot}`}>
               <Show
                 when={slot === "centre" && busy()}
-                fallback={<For each={inSlot(slot)}>{({ g }) => <Island g={g} />}</For>}
+                fallback={<For each={inSlot(slot)}>{({ g }) => <Island g={g} slot={slot} />}</For>}
               >
                 <div class="island" role="toolbar" aria-label={replay() ? "Replay" : "Text"}>
                   <Switch>
@@ -1150,6 +1203,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
             </div>
           )}
         </For>
+        </IconSet.Provider>
       </div>
     );
   };

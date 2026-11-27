@@ -291,7 +291,9 @@ teachers coming from classroom whiteboard software.
   button size (`l` = 56 px buttons, 32 px icons), `large` makes icons
   bigger still. Pen, eraser and undo always stay on an island.
 - Its own buttons: `menu`, `mode`, `toolbox`, `share`, `zoom`, `addpage`,
-  `recognize` (they also fit on a Modern dock).
+  `recognize`, `ai` (Ask AI) (they also fit on a Modern dock).
+- "Put the menu on the right": `swap_islands(swapped: true)` (left out, it
+  toggles; `false` puts it back on the left).
 
 ```text
 set_dock_layout(mode: "teach", layout: {style: "islands", size: "l", groups: [

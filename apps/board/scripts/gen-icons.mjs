@@ -97,6 +97,7 @@ const MAP = {
   organise: ["sort-vertical"],
   pipette: ["pipette"],
   library: ["library"],
+  ai: ["stars-minimalistic", "stars"],
 };
 
 function body(name) {

@@ -513,7 +513,7 @@ edit a lesson file with the same code. Board tools need a paired board.
 | Export | `export_pdf(pages?, layout?, ink?, print_friendly?, save_as?, download?)`: the board makes the PDF, the server saves it in the workspace | – | ✅ |
 | Library | `library_list(folder?, query?)`, `library_open(id)`, `library_create_lesson(title, folder?, template?, open?)`, `library_move(id, folder?)`, `library_rename(id, name)`, `library_trash(id)` | – | ✅ |
 | Settings | `get_settings`, `set_setting(key, value)`: an allowlist (theme, accent, density, pen style and defaults, gestures, PDF defaults, voice language, ink sharpness and the wet-ink layer…). Never AI keys, the cloud account, payments, storage or permissions. | – | ✅ |
-| Smart Dock | `list_dock_items`, `get_dock_layout(mode?)`, `set_dock_layout(mode?, layout)`, `save_dock_preset(name, modes?)`, `apply_dock_preset(name)` (see [The Smart Dock](#the-smart-dock)) | – | ✅ |
+| Smart Dock | `list_dock_items`, `get_dock_layout(mode?)`, `set_dock_layout(mode?, layout)`, `save_dock_preset(name, modes?)`, `apply_dock_preset(name)`, `swap_islands(swapped?)` (see [The Smart Dock](#the-smart-dock)) | – | ✅ |
 
 Examples, one per area:
 
@@ -603,8 +603,11 @@ holds files, import, export, print, settings, help and modes. Switch with
 `set_setting(key: "appearance.layout", value: "classic" | "modern")` (Modern
 brings back the teacher's own dock) or `apply_dock_preset(name: "Classic")`;
 rearrange it with `set_dock_layout` like any dock. Its buttons: `menu`,
-`mode`, `toolbox`, `share`, `zoom`, `addpage`, `recognize`. Pen, eraser and
-undo always stay on an island.
+`mode`, `toolbox`, `share`, `zoom`, `addpage`, `recognize`, `ai` (Ask AI).
+Pen, eraser and undo always stay on an island. `swap_islands(swapped?)`
+puts the menu island on the right and the page island on the left (or back;
+left out, it toggles), as the arrow tab at a side island's edge does; it is
+the setting `appearance.islandSwap`.
 
 ```text
 list_dock_items()                          # ids: pen, highlighter, eraser, lasso, laser, text, shapes, stamp,
