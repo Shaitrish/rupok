@@ -30,6 +30,7 @@ import { makeItLive } from "./MakeItLive";
 import { SolveButton } from "../solve/SolveUI";
 import { FillRow, ShapeControls, TableCells, setTableCellMode } from "./ShapeControls";
 import { StyleRow } from "./InkOptions";
+import { isClassic } from "../layout";
 
 /** Shapes that keep their proportions while resizing (Shift frees them). */
 const KEEP_ASPECT = [
@@ -220,15 +221,30 @@ export function SelectionOverlay() {
     });
   });
 
+  /** Classic: the toolbar stands upright beside the selection (right, else left). */
+  const vertical = () => isClassic();
+  /** The toolbar's measured size (it changes with what the selection holds). */
+  const [barSize, setBarSize] = createSignal({ w: 0, h: 0 });
+  const ro = new ResizeObserver(() => bar && setBarSize({ w: bar.offsetWidth, h: bar.offsetHeight }));
+  onCleanup(() => ro.disconnect());
   /** Floating toolbar: centred above the frame, else below it, else inside
    * its top edge; always on screen and clear of the top bar. */
   const barPos = createMemo(() => {
     const r = rect();
     if (!r) return null;
     const { w: vw, h: vh } = viewport();
-    const bw = bar?.offsetWidth || 148;
-    const bh = bar?.offsetHeight || 48;
+    const bw = barSize().w || bar?.offsetWidth || 148;
+    const bh = barSize().h || bar?.offsetHeight || 48;
     const [topInset, rightInset, bottomInset, leftInset] = controller.insets;
+    if (vertical()) {
+      const gap = BAR_GAP + 14; // clear of the corner brackets
+      let left = r.x + r.w + gap;
+      const onLeft = left + bw > vw - rightInset && r.x - gap - bw >= leftInset;
+      if (onLeft) left = r.x - gap - bw;
+      left = Math.min(Math.max(left, leftInset), vw - rightInset - bw);
+      const top = Math.min(Math.max(r.y + r.h / 2 - bh / 2, topInset), vh - bottomInset - bh);
+      return { left: Math.round(left), top: Math.round(Math.max(top, topInset)), side: onLeft ? "left" : "right" };
+    }
     const minTop = topInset;
     const maxTop = vh - bottomInset - bh;
     let top = r.y - BAR_GAP - bh;
@@ -470,7 +486,7 @@ export function SelectionOverlay() {
   const n = () => selectionIds().length;
 
   return (
-    <div class="sel-layer">
+    <div class="sel-layer" classList={{ classic: vertical() }}>
       <Show when={show() && rect()}>
         {(r) => (
           <>
@@ -498,9 +514,14 @@ export function SelectionOverlay() {
             </div>
             <Show when={!resizing()}>
               <div
-                ref={bar}
+                ref={(el) => {
+                  bar = el;
+                  ro.observe(el);
+                }}
                 class="cluster surface sel-bar"
+                classList={{ vertical: vertical(), "pop-left": (barPos() as { side?: string } | null)?.side === "left" }}
                 role="toolbar"
+                aria-orientation={vertical() ? "vertical" : "horizontal"}
                 aria-label={`${n()} selected`}
                 style={{ left: `${barPos()?.left ?? 0}px`, top: `${barPos()?.top ?? 0}px` }}
               >

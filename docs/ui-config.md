@@ -98,6 +98,59 @@ text size while editing text. Everything else in `tools` waits in the ⋯ menu.
   big board. A button sits on one dock only.
 - `size` (`"s"`, `"m"`, `"l"`), `sizes` (per button, `{ "pen": "l" }`) and
   `large` (large icons, for low vision) (all optional).
+- `style` (optional): `"dock"` (the Smart Dock, the default) or
+  `"islands"`, the **Classic layout** (below).
+
+### The Classic layout (`style: "islands"`)
+
+The Classic layout is familiar to teachers who come from classroom
+whiteboard software: no top bar, and big buttons in separate islands along
+the bottom edge. It is a dock style, not a separate mode, so everything
+above applies: the teacher (Customize dock) and their AI (`set_dock_layout`)
+rearrange it like any dock.
+
+- Each group of `groups` is one island. The first sits at the left, the
+  last at the right, the others in the middle (one group: in the middle).
+  On narrow screens the middle island moves above the other two.
+- `position`: `"bottom"` (default) or `"top"`; other positions are treated
+  as the bottom edge. `orientation`, `minimized` and `split` are ignored.
+- `size`: `"l"` (56 px buttons, 32 px icons; the Classic default), `"m"`
+  (48 / 28) or `"s"` (44 / 24, never smaller: a 44 px hit area). `large`
+  adds 4 px to every icon.
+- Pen, eraser and undo always stay (a layout that leaves one out gets it
+  back in the island with the pen). Highlighter and laser are in the pen
+  panel and the Tools box; anything the mode offers that is on no island is
+  in the Tools box.
+- The top bar is not drawn. The ☰ menu (`menu`) holds File (new, open,
+  save, save as, Library), Import, Export (PDF, the lesson file, share),
+  Print, Settings, Help, Mode (modes, fullscreen, theme, the Modern layout)
+  and Exit. The lesson title shows for a moment when the page changes.
+- Pen, highlighter and shapes open titled panels: thickness with a live
+  dot, illustrated pen types, 15 colours and an eyedropper.
+- The page button (`pager`'s counter) opens a grid of thumbnails above it.
+  A swipe from the left or right screen edge (finger or pen, starting
+  within 20 px of the edge, at least 56 px inward within 0.6 s) slides in
+  the slide panel: numbered thumbnails with add, duplicate and star, and
+  organise, starred-only and delete at the top.
+- The Student view follows Prepare: when Prepare uses islands, the student
+  view shows ☰ and zoom, pan, objects and replay, and the pager.
+
+The **Classic** dock preset sets it for Prepare and Teach;
+**Settings → Appearance → Layout** (`appearance.layout`) switches between
+Modern and Classic and brings back the teacher's own Modern dock.
+
+```json
+"teach": {
+  "dock": {
+    "style": "islands", "size": "l",
+    "groups": [
+      { "id": "left", "label": "Menu", "items": ["menu", "mode", "toolbox", "share", "zoom"] },
+      { "id": "centre", "label": "Tools", "items": ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] },
+      { "id": "right", "label": "Pages", "items": ["addpage", "pager"] }
+    ]
+  }
+}
+```
 
 The editor for all of this is **Customize dock** (the dock's ⋯ menu, a long
 press on its grip, or Settings → Teaching modes). Named layouts the teacher
@@ -128,6 +181,13 @@ Settings → Teaching modes) resets that memory, so the config takes effect.
 | `replay` | Replay this page (a labelled button in `view`) | all |
 | `pager` | Back / next with a page indicator (steps through Smart Object builds in `teach`) | all |
 | `exit` | Leave the mode (back to where Teach was entered from) | teach |
+| `menu` | ☰ main menu: File, Import, Export, Print, Settings, Help, Mode, Exit (Classic) | all |
+| `mode` | Mode: Prepare, Teach, Student (and Draw over apps in the desktop app) | all |
+| `toolbox` | Tools: text, highlighter, laser, table, image, Smart Object, video, replay, celebrate, page design, and what is on no island | prepare, teach |
+| `share` | Share the lesson (a Rupok Cloud link, or the file) | prepare, teach |
+| `zoom` | Zoom: in, out, fit, fullscreen. In `teach` it turns the fit lock off, like the zoom chip | all |
+| `addpage` | A new page after this one (same look) | prepare, teach |
+| `recognize` | Recognise ink: Smart shapes on/off and when they snap, To text, Solve this | prepare, teach |
 
 ### Chrome keys
 
@@ -196,6 +256,7 @@ All optional; invalid values are ignored.
 | `toolbar` | `bottom`, `left`, `right`: where the dock starts in modes whose `dock.position` is `"auto"` |
 | `density` | `compact`, `comfortable`, `large` |
 | `hand` | `right`, `left`: the writing hand. Dock popovers open away from it, so the arm never covers them |
+| `layout` | `modern`, `classic`: on import, `classic` applies the Classic preset (a file's own `modes` win) |
 
 ### Gestures
 
@@ -292,7 +353,8 @@ student view gets no pages panel.
         "iconStyle": { "enum": ["linear", "line-duotone", "broken", "bold"] },
         "toolbar": { "enum": ["bottom", "left", "right"] },
         "density": { "enum": ["compact", "comfortable", "large"] },
-        "hand": { "enum": ["right", "left"] }
+        "hand": { "enum": ["right", "left"] },
+        "layout": { "enum": ["modern", "classic"] }
       }
     },
     "gestures": {
@@ -334,7 +396,8 @@ student view gets no pages panel.
           "uniqueItems": true,
           "items": {
             "enum": ["pen", "highlighter", "eraser", "lasso", "laser", "text", "voice", "stamp", "rect", "ellipse", "line", "arrow",
-                     "hand", "interact", "smartink", "undo", "redo", "replay", "pager", "exit"]
+                     "hand", "interact", "smartink", "undo", "redo", "replay", "pager", "exit",
+                     "menu", "mode", "toolbox", "share", "zoom", "addpage", "recognize"]
           }
         },
         "dock": {
@@ -351,6 +414,7 @@ student view gets no pages panel.
               ]
             },
             "orientation": { "enum": ["auto", "horizontal", "vertical"] },
+            "style": { "enum": ["dock", "islands"] },
             "minimized": { "type": "boolean" },
             "pinned": {
               "type": "array",

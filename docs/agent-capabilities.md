@@ -39,8 +39,9 @@ changes alike (Auto-approve covers them the same way).
 | Undo | ✗ | ✅ the agent's own last change; teacher's history 🔒 |
 | Modes, view, replay | ◐ go to page, point | ✅ Prepare/Teach/Student, zoom, fit, replay, tool |
 | Library, export, save | ◐ workspace files | ✅ list, open, create, move, rename, trash, export PDF |
-| Settings | ◐ theme | ✅ allowlisted settings (56), dock layout; secrets 🔒 |
+| Settings | ◐ theme | ✅ allowlisted settings (57), dock layout; secrets 🔒 |
 | Smart Dock | ✗ | ✅ position, groups, split dock, sizes, named layouts |
+| Layout (Modern, Classic islands) | ✗ | ✅ switch layouts, rearrange and resize the islands |
 | Solve this, To text, maths, voice | ◐ | ✅ write handwriting, ink to text, Voice on the board (start, stop); recognition and dictation 🔒 (local input) |
 | Cloud and payments | ✗ | 🔒 account, sharing links, payments |
 
@@ -59,6 +60,7 @@ changes alike (Auto-approve covers them the same way).
 | Page design, branding | ✅ | ✅ | `set_page_design`, `set_branding` | ✅ | ✅ |
 | Clear a page | ✗ | ✅ | `delete_items` with every id from `get_current_page` | ✅ | ✅ |
 | Save my design as the default for new lessons | ✗ | 🔒 | Teacher only: it changes every future lesson on this device. | | |
+| Star a page (Classic slide panel) | ✗ | 🔒 | Teacher only: a personal bookmark on this device, not part of the lesson. | | |
 
 ## Ink, pens and erasing
 
@@ -136,6 +138,8 @@ changes alike (Auto-approve covers them the same way).
 | Theme (light, dark) | ✅ | ✅ | `set_board_theme` (ui), `set_setting` | – | ✅ |
 | Fullscreen, the overlay over other apps | ✗ | 🔒 | Teacher only: the browser and the OS allow it only from a user gesture. | | |
 | Pages drawer | ✗ | ✅ | `set_setting` `appearance.pagesPanel`, `appearance.pagesPinned` | – | ✅ |
+| Layout: Modern or Classic | ✗ | ✅ | `set_setting` `appearance.layout`, or `apply_dock_preset` `Classic` / `Default` | – | ✅ |
+| Rearrange, resize, move the Classic islands | ✗ | ✅ | `set_dock_layout` with `style: "islands"` (each group is an island), `get_dock_layout` | – | ✅ |
 
 ## Library, export, save, sharing
 
@@ -203,6 +207,7 @@ the AI chip's Undo puts it back.
 
 | Setting | Who | How, or why teacher only |
 |---|---|---|
+| `appearance.layout` | agent | `set_setting` |
 | `appearance.theme` | agent | `set_setting` |
 | `appearance.accent` | agent | `set_setting` |
 | `appearance.density` | agent | `set_setting` |
@@ -346,6 +351,13 @@ What each button does is in the tables above.
 | `solve` | `write_handwriting` |
 | `settings` | `get_settings`, `set_setting` |
 | `shapes` | `add_shape`, `add_table` |
+| `menu` | the ☰ menu's entries each have their own path: `library_create_lesson`, `library_open`, `export_pdf`, `get_settings`, `set_mode` |
+| `mode` | `set_mode` |
+| `toolbox` | `set_tool`, `add_text`, `add_smart_object`, `add_media`, `start_replay`, `celebrate` |
+| `share` | teacher only: sharing links are the teacher's cloud account |
+| `zoom` | `zoom_to`, `fit_page` |
+| `addpage` | `add_page_after_current` |
+| `recognize` | `set_setting` `pen.smartShapes`, `replace_items_with_text`, `write_handwriting` |
 
 ## Adding a feature
 

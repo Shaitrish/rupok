@@ -41,8 +41,16 @@ import { brushInfo, brushOf } from "../brushes";
 import { celebrate, currentStamp } from "../stamps";
 import { dockClickConsumed, dockPress, dockRelease, pickVoiceTool, voiceListening } from "../voice/board";
 import { openAiPanel, setComposerDraft } from "../chat";
+import { islandsOf } from "../layout";
+import { InkPanel, MainMenu, ModeMenu, PageGrid, RecognizePanel, ShapesPanel, ToolsBox, ZoomPanel } from "./classic/ClassicPanels";
+import { shareLesson } from "./Header";
+import "./classic/classic.css";
 
 const META = new Map(TOOLBAR_ITEMS.map((t) => [t.id, t]));
+const POP_LABEL: Partial<Record<string, string>> = {
+  more: "More tools", shapes: "Shapes", stamp: "Stamps", menu: "Main menu", mode: "Mode", toolbox: "Tools", zoom: "Zoom",
+  recognize: "Recognise ink", pagegrid: "Pages",
+};
 const INK_TOOLS: Tool[] = ["pen", "highlighter", "rect", "ellipse", "line", "arrow", "shape"];
 const SHAPES: Tool[] = ["shape", "rect", "ellipse", "line", "arrow"];
 /** Tools whose strokes the dock gets out of the way of. */
@@ -66,14 +74,30 @@ const WAKE_NEAR = 56;
 type Group = string;
 type Kind =
   | "tool" | "colors" | "shapes" | "smartink" | "undo" | "redo" | "pager" | "replay" | "exit" | "context" | "more"
-  | "celebrate" | "pages" | "solve" | "settings";
+  | "celebrate" | "pages" | "solve" | "settings"
+  | "menu" | "mode" | "toolbox" | "share" | "zoom" | "addpage" | "recognize";
 interface Entry { key: string; kind: Kind; group: Group; id?: ToolbarItem; size?: DockSize }
 const GROUP: Partial<Record<ToolbarItem, Group>> = {
   pen: "ink", highlighter: "ink", eraser: "ink", smartink: "create", text: "create", voice: "create", stamp: "create",
   lasso: "point", laser: "point", hand: "point", interact: "point", undo: "history", redo: "history", pager: "nav", replay: "nav", exit: "exit",
   celebrate: "create", pages: "nav", solve: "create", settings: "end",
+  menu: "end", mode: "end", toolbox: "create", share: "end", zoom: "point", addpage: "nav", recognize: "create",
 };
-const ACTION_KINDS: ToolbarItem[] = ["smartink", "undo", "redo", "pager", "replay", "exit", "celebrate", "pages", "solve", "settings"];
+const ACTION_KINDS: ToolbarItem[] = [
+  "smartink", "undo", "redo", "pager", "replay", "exit", "celebrate", "pages", "solve", "settings",
+  "menu", "mode", "toolbox", "share", "zoom", "addpage", "recognize",
+];
+/** Islands (the Classic layout): icon per size (the cells are in classic.css). */
+const ISLAND_ICON = { s: 24, m: 28, l: 32 } as const;
+
+/** The Classic layout's islands: one list of entries per island, and what
+ * the mode offers that is on none of them (the tools box shows it). */
+export function islandLayout(m: ModeConfig, d: DockConfig): { islands: { id: string; label?: string; entries: Entry[] }[]; overflow: ToolbarItem[] } {
+  const islands = (d.groups ?? []).map((g) => ({ id: g.id, label: g.label, entries: groupEntries([g], d.sizes, "g:") }));
+  const placed = new Set<string>(layoutPins(d));
+  const overflow = m.tools.filter((t) => !placed.has(t) && !(SHAPES.includes(t as Tool) && placed.has("shapes")) && !(t === "smartink" && placed.has("recognize")));
+  return { islands, overflow };
+}
 const kindOf = (t: ToolbarItem): Kind => (ACTION_KINDS.includes(t) ? (t as Kind) : "tool");
 
 /** A teacher's groups as dock entries (main dock or the split dock). */
@@ -272,11 +296,21 @@ function pickFile(accept: string): Promise<File | undefined> {
   });
 }
 
-type Pop = { kind: "pen" | "highlighter" | "eraser" | "shapes" | "stamp" | "more"; anchor: HTMLElement; focus?: "table" };
+type Pop = {
+  kind: "pen" | "highlighter" | "eraser" | "shapes" | "stamp" | "more" | "menu" | "mode" | "toolbox" | "zoom" | "recognize" | "pagegrid";
+  anchor: HTMLElement;
+  focus?: "table";
+};
 
 export default function Dock(props: { onSettings?: (section?: string) => void }) {
   const cfg = () => modeConfig();
   const core = () => mode() !== "view";
+  /** The Classic layout's islands (layout.ts), or null for the Smart Dock. */
+  const islands = () => islandsOf(mode());
+  const islandSize = () => islands()?.size ?? "l";
+  const isles = createMemo(() => (islands() ? islandLayout(cfg(), islands()!) : null), undefined, {
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
   // ------------------------------------------------------------ geometry
   const [viewport, setViewport] = createSignal({ w: window.innerWidth, h: window.innerHeight });
   /** The room along the dock (px) and its cell sizes, so tools that do not
@@ -323,7 +357,8 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   // The board keeps the docked edge clear ("fit page" centres in the rest).
   createEffect(
     on(
-      (): "bottom" | "top" | "left" | "right" | "none" => (minimized() || place().edge === "float" ? "none" : place().edge as "bottom" | "top" | "left" | "right"),
+      (): "bottom" | "top" | "left" | "right" | "none" =>
+        islands() ? (islands()!.position === "top" ? "top" : "bottom") : minimized() || place().edge === "float" ? "none" : place().edge as "bottom" | "top" | "left" | "right",
       (side) => {
         setDockSide(side);
         // CSS keeps the zoom chip clear of a bottom dock on phones (styles.css).
@@ -379,6 +414,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
 
   // -------------------------------------------------------------- summon
   const summon = (x: number, y: number) => {
+    if (islands()) return; // the islands stay on their edge
     setPop(null);
     if (minimized()) setDockMinimized(mode(), cfg(), false);
     unfade();
@@ -539,7 +575,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   // ------------------------------------------------------------ sizing
   /** The teacher's dock size and large icons (Customize dock). */
   const scale = () => (cfg().dock.size === "s" ? 0.85 : cfg().dock.size === "l" ? 1.2 : 1) * (cfg().dock.large ? 1.25 : 1);
-  const iconSize = () => Math.round(baseIconSize() * scale());
+  const iconSize = () => (islands() ? ISLAND_ICON[islandSize()] + (islands()!.large ? 4 : 0) : Math.round(baseIconSize() * scale()));
   const baseIconSize = () => {
     const d = prefs().density;
     if (isPhone()) return d === "large" ? 26 : 22; // 44px cells (52 large) for thumbs
@@ -709,8 +745,8 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
         aria-live="polite"
         title="Show all pages  ·  G"
         aria-label={`Page ${pageIndex() + 1} of ${pages().length}. Show all pages`}
-        aria-expanded={pagesDrawer()}
-        onClick={togglePagesDrawer}
+        aria-expanded={islands() ? pop()?.kind === "pagegrid" : pagesDrawer()}
+        onClick={(e) => (islands() ? toggle("pagegrid", e.currentTarget) : togglePagesDrawer())}
       >
         {pageIndex() + 1} / {pages().length}
       </button>
@@ -724,7 +760,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
         <Icon name="next" size={iconSize()} />
       </button>
       {/* Teach: a new page (same look) without leaving the slide. */}
-      <Show when={mode() === "teach" && !isPhone()}>
+      <Show when={mode() === "teach" && !isPhone() && !islands()}>
         <button class="tool" title="New page after this one (same look)" aria-label="New page" onClick={() => addPageLike(false)}>
           <Icon name="plus" size={iconSize()} />
         </button>
@@ -766,6 +802,52 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
       </Show>
     </Reveal>
   );
+
+  /** A button that opens one of the Classic panels. */
+  const PopButton = (p: { kind: "menu" | "mode" | "toolbox" | "zoom" | "recognize" }) => {
+    let btn!: HTMLButtonElement;
+    const on = () => pop()?.kind === p.kind || (p.kind === "recognize" && prefs().smartShapes !== "off");
+    const icon = (): IconName => iconOf(p.kind);
+    return (
+      <button
+        ref={btn}
+        class="tool"
+        classList={{ on: on() }}
+        data-tour={p.kind === "menu" ? "menu" : undefined}
+        title={p.kind === "mode" ? `Mode: ${mode() === "view" ? "Student" : mode() === "teach" ? "Teach" : "Prepare"}  ·  F5 teaches` : tipOf(p.kind)}
+        aria-label={labelOf(p.kind)}
+        aria-haspopup={p.kind === "menu" ? "menu" : "dialog"}
+        aria-expanded={pop()?.kind === p.kind}
+        onClick={() => toggle(p.kind, btn)}
+      >
+        <Icon name={icon()} size={iconSize()} active={on()} />
+      </button>
+    );
+  };
+  /** A tool or action from the tools box (or ⋯): what tapping it on the dock does. */
+  const runItem = (t: ToolbarItem, anchor?: HTMLElement) => {
+    setPop(null);
+    if (t === "smartink") controller.toggleSmartInk();
+    else if (t === "undo") controller.board.undo();
+    else if (t === "redo") controller.board.redo();
+    else if (t === "replay") controller.board.replay_start();
+    else if (t === "exit") controller.exitMode();
+    else if (t === "interact") toggleUse();
+    else if (t === "shape") openShapesPicker();
+    else if (t === "celebrate") celebrate();
+    else if (t === "pages") togglePagesDrawer();
+    else if (t === "solve") solveNow();
+    else if (t === "settings") props.onSettings?.();
+    else if (t === "share") void shareLesson();
+    else if (t === "addpage") addPageLike(false);
+    else if (t === "pager") togglePagesDrawer();
+    else if (t === "menu" || t === "mode" || t === "toolbox" || t === "zoom" || t === "recognize") {
+      if (anchor) setPop({ kind: t, anchor });
+    } else if (t === "stamp") {
+      pick("stamp");
+      if (anchor) setPop({ kind: "stamp", anchor });
+    } else pick(t as Tool);
+  };
 
   let moreBtn!: HTMLButtonElement;
   const Entry = (p: { e: Entry }) => (
@@ -847,6 +929,19 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
       </Match>
       <Match when={p.e.kind === "context"}>
         <Context />
+      </Match>
+      <Match when={p.e.kind === "menu" || p.e.kind === "mode" || p.e.kind === "toolbox" || p.e.kind === "zoom" || p.e.kind === "recognize"}>
+        <PopButton kind={p.e.kind as "menu"} />
+      </Match>
+      <Match when={p.e.kind === "share"}>
+        <button class="tool" title="Share the lesson: a link, or the file" aria-label="Share" onClick={() => void shareLesson()}>
+          <Icon name="share" size={iconSize()} />
+        </button>
+      </Match>
+      <Match when={p.e.kind === "addpage"}>
+        <button class="tool" title="New page after this one (same look)" aria-label="New page" onClick={() => addPageLike(false)}>
+          <Icon name="plus" size={iconSize()} />
+        </button>
       </Match>
       <Match when={p.e.kind === "more"}>
         <button
@@ -1000,9 +1095,78 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   const [clearArmed, setClearArmed] = createSignal(0);
   const armedNow = () => clearArmed() > 0;
 
+  // ------------------------------------------------------------ islands
+  // The Classic layout (layout.ts): each group is its own island along the
+  // bottom (or top) edge, the first at the left, the last at the right.
+  // Replay and text editing take the place of the middle island.
+  const slotOf = (i: number, n: number) => (n === 1 ? "centre" : i === 0 ? "left" : i === n - 1 ? "right" : "centre");
+  const Islands = () => {
+    const list = () => isles()?.islands ?? [];
+    const inSlot = (slot: string) => list().map((g, i) => ({ g, i })).filter(({ i }) => slotOf(i, list().length) === slot);
+    const Island = (p: { g: { id: string; label?: string; entries: Entry[] } }) => (
+      <div
+        class="island"
+        data-island={p.g.id}
+        role="toolbar"
+        aria-label={p.g.label ?? `${p.g.id[0].toUpperCase()}${p.g.id.slice(1)} buttons`}
+        onContextMenu={(e) => {
+          if (isView() || (e.target as HTMLElement).closest("button")) return;
+          e.preventDefault();
+          openDockEditor(mode());
+        }}
+      >
+        <For each={p.g.entries}>{(e) => <Cell e={e} />}</For>
+      </div>
+    );
+    const busy = () => !!replay() || !!(editingText() && editItem());
+    // The page fits above the islands once they have their real height.
+    onMount(() => requestAnimationFrame(() => controller.board && controller.updateInsets(true)));
+    return (
+      <div
+        ref={(d) => (el = d)}
+        class="islands"
+        classList={{
+          top: islands()?.position === "top",
+          inking: inking(),
+          [`isz-${islandSize()}`]: true,
+          "big-icons": !!islands()?.large,
+        }}
+        onPointerDown={() => unfade()}
+      >
+        <For each={["left", "centre", "right"] as const}>
+          {(slot) => (
+            <div class={`island-slot ${slot}`}>
+              <Show
+                when={slot === "centre" && busy()}
+                fallback={<For each={inSlot(slot)}>{({ g }) => <Island g={g} />}</For>}
+              >
+                <div class="island" role="toolbar" aria-label={replay() ? "Replay" : "Text"}>
+                  <Switch>
+                    <Match when={replay()}><ReplayControls /></Match>
+                    <Match when={editingText() && editItem()}><TextControls /></Match>
+                  </Switch>
+                </div>
+              </Show>
+            </div>
+          )}
+        </For>
+      </div>
+    );
+  };
+  const islandOf = (a: HTMLElement) => (a.closest(".island") as HTMLElement | null) ?? el;
+  const popSize = () => sizes()[sizeKey(popTool() === "highlighter" ? "highlighter" : "pen")] ?? width();
+  const setInkSize = (k: "pen" | "highlighter", w: number) => {
+    if (k === "pen") setWidth(w);
+    setSizes({ ...sizes(), [k]: w });
+    if (tool() === k || (k === "pen" && SHAPES.includes(tool()))) controller.board.set_width(w);
+  };
+
   return (
     <>
-      <Show when={cfg().tools.length > 0}>
+      <Show when={islands() && cfg().tools.length > 0}>
+        <Islands />
+      </Show>
+      <Show when={!islands() && cfg().tools.length > 0}>
         <DockShell
           place={place()}
           vertical={vertical()}
@@ -1073,7 +1237,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
         </DockShell>
       </Show>
 
-      <Show when={splitBar().length > 0 && !replay() && !minimized()}>
+      <Show when={!islands() && splitBar().length > 0 && !replay() && !minimized()}>
         <DockShell
           place={splitPlace()}
           vertical={splitVertical()}
@@ -1122,14 +1286,64 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
           return (
           <DockPopover
             anchor={p().anchor}
-            dock={() => el}
-            vertical={vertical()}
+            dock={() => (islands() ? islandOf(p().anchor) : el)}
+            vertical={islands() ? false : vertical()}
             hand={prefs().hand}
-            label={p().kind === "more" ? "More tools" : p().kind === "shapes" ? "Shapes" : p().kind === "stamp" ? "Stamps" : `${labelOf(p().kind as Tool)} options`}
+            align={islands() ? "center" : undefined}
+            label={POP_LABEL[p().kind] ?? `${labelOf(p().kind as Tool)} options`}
             onClose={() => setPop(null)}
-            class={`dock-pop-${p().kind}`}
+            class={`dock-pop-${p().kind}${islands() ? " classic" : ""}`}
           >
             <Switch>
+              <Match when={islands() && (p().kind === "pen" || p().kind === "highlighter")}>
+                <InkPanel
+                  kind={p().kind as "pen" | "highlighter"}
+                  color={p().kind === "pen" ? color() : hlColor()}
+                  size={popSize()}
+                  onSize={(w) => setInkSize(p().kind as "pen", w)}
+                  onColor={(c) => {
+                    if (tool() !== p().kind) pick(p().kind as Tool);
+                    pickColor(c);
+                  }}
+                  onTool={(t) => {
+                    pick(t);
+                    setPop({ kind: t, anchor: p().anchor });
+                  }}
+                  onClose={() => setPop(null)}
+                />
+              </Match>
+              <Match when={islands() && p().kind === "shapes"}>
+                <ShapesPanel
+                  color={color()}
+                  size={sizes().pen ?? width()}
+                  onSize={(w) => setInkSize("pen", w)}
+                  onColor={(c) => {
+                    setColor(c);
+                    controller.board.set_color(c);
+                    useColor("pen", c);
+                  }}
+                  onClose={() => setPop(null)}
+                  focus={p().focus}
+                />
+              </Match>
+              <Match when={p().kind === "menu"}>
+                <MainMenu onClose={() => setPop(null)} />
+              </Match>
+              <Match when={p().kind === "mode"}>
+                <ModeMenu onClose={() => setPop(null)} />
+              </Match>
+              <Match when={p().kind === "toolbox"}>
+                <ToolsBox overflow={isles()?.overflow ?? layout().overflow} run={(t) => runItem(t, p().anchor)} onClose={() => setPop(null)} />
+              </Match>
+              <Match when={p().kind === "zoom"}>
+                <ZoomPanel onClose={() => setPop(null)} />
+              </Match>
+              <Match when={p().kind === "recognize"}>
+                <RecognizePanel onClose={() => setPop(null)} />
+              </Match>
+              <Match when={p().kind === "pagegrid"}>
+                <PageGrid onClose={() => setPop(null)} />
+              </Match>
               <Match when={p().kind === "pen" || p().kind === "highlighter"}>
                 <div class="dock-pop-title">{p().kind === "pen" ? "Pen" : "Highlighter"}</div>
                 <div class="ink-label">Style</div>
@@ -1180,7 +1394,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                 </div>
               </Match>
             </Switch>
-            <Show when={(p().kind === "pen" || p().kind === "highlighter" || p().kind === "eraser") && cfg().chrome.sizes}>
+            <Show when={(p().kind === "eraser" || (!islands() && (p().kind === "pen" || p().kind === "highlighter"))) && cfg().chrome.sizes}>
               <Show when={p().kind !== "eraser"} fallback={
                 <div class="dock-sizes" role="group" aria-label="Sizes">
                   <For each={sizeOptions()}>
@@ -1208,10 +1422,10 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                 />
               </Show>
             </Show>
-            <Show when={p().kind === "pen"}>
+            <Show when={p().kind === "pen" && !islands()}>
               <MarkerOpacity />
             </Show>
-            <Show when={p().kind === "pen" && !["ballpoint", "marker", "magic"].includes(brushOf("pen"))}>
+            <Show when={p().kind === "pen" && !islands() && !["ballpoint", "marker", "magic"].includes(brushOf("pen"))}>
               <label class="dock-slider">
                 <span>Pressure · {prefs().pressure < 0.8 ? "soft" : prefs().pressure > 1.2 ? "firm" : "normal"}</span>
                 <input
@@ -1228,7 +1442,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                 />
               </label>
             </Show>
-            <Show when={p().kind === "highlighter"}>
+            <Show when={p().kind === "highlighter" && !islands()}>
               <label class="dock-slider">
                 <span>Opacity · {Math.round(hlOpacity() * 100)}%</span>
                 <input
@@ -1264,7 +1478,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                 <span class="grow">{armedNow() ? "Tap again to clear the page" : "Clear page"}</span>
               </button>
             </Show>
-            <Show when={p().kind === "shapes"}>
+            <Show when={p().kind === "shapes" && !islands()}>
               <ShapesPicker onDone={() => setPop(null)} focus={p().focus} />
               {/* Folded, so the picker still fits above the dock in Teach. */}
               <button
@@ -1318,24 +1532,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                       role="menuitem"
                       classList={{ on: tool() === t || (t === "smartink" && prefs().smartShapes !== "off") }}
                       disabled={(t === "undo" && !canUndo()) || (t === "redo" && !canRedo())}
-                      onClick={() => {
-                        setPop(null);
-                        if (t === "smartink") controller.toggleSmartInk();
-                        else if (t === "undo") controller.board.undo();
-                        else if (t === "redo") controller.board.redo();
-                        else if (t === "replay") controller.board.replay_start();
-                        else if (t === "exit") controller.exitMode();
-                        else if (t === "interact") toggleUse();
-                        else if (t === "shape") openShapesPicker();
-                        else if (t === "celebrate") celebrate();
-                        else if (t === "pages") togglePagesDrawer();
-                        else if (t === "solve") solveNow();
-                        else if (t === "settings") props.onSettings?.();
-                        else if (t === "stamp") {
-                          pick("stamp");
-                          setPop({ kind: "stamp", anchor: moreBtn });
-                        } else pick(t as Tool);
-                      }}
+                      onClick={() => runItem(t, moreBtn)}
                     >
                       <Icon name={iconOf(t)} size={20} active={tool() === t} />
                       <span class="grow">{labelOf(t)}</span>

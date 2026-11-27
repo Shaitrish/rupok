@@ -549,8 +549,9 @@ pub struct SetDockParams {
     /// `prepare` or `teach`. Default: the mode on screen.
     #[serde(default)]
     pub mode: Option<String>,
-    /// The dock: `{position, orientation, size, large, groups: [{label?,
-    /// items: [ids]}], split: {position, groups}}`; ids from list_dock_items.
+    /// The dock: `{style, position, orientation, size, large, groups:
+    /// [{label?, items: [ids]}], split: {position, groups}}`; ids from
+    /// list_dock_items. `style: "islands"` is the Classic layout.
     /// Only the given keys change. Pen, eraser and undo always stay.
     pub layout: Value,
 }
@@ -1472,8 +1473,10 @@ size, large icons, the groups of buttons in order, and the optional second (spli
         description = "Customise the Smart Dock for the teacher (\"pen, highlighter and eraser on the left, undo \
 and next page on the right, bigger buttons\"): position (left, right, top, bottom, corners), orientation, \
 groups of buttons (ids from list_dock_items, each group separated), a split second dock on another edge, button \
-size (small, medium, large) and large icons. Pen, eraser and undo always stay. Validated; the teacher is asked \
-like for an edit and can undo it from the AI chip.",
+size (small, medium, large) and large icons. `style: "islands"` is the Classic layout: each group is a big \
+island along the bottom edge (first left, last right, the rest in the middle; menu, mode, toolbox, share, zoom, \
+addpage, recognize are its buttons). Pen, eraser and undo always stay. Validated; the teacher is asked like for \
+an edit and can undo it from the AI chip.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -1519,8 +1522,10 @@ whether they must stay), and the named layouts (built-in and the teacher's).",
     }
 
     #[tool(
-        description = "Switch to a named dock layout: \"Left-handed\", \"Minimal teaching\", \"Maths class\", \
-\"Default\" or one the teacher saved.",
+        description = "Switch to a named dock layout: \"Classic\" (three big islands along the bottom, no top \
+bar), \"Default\" (the Modern Smart Dock), \"Left-handed\", \"Minimal teaching\", \"Maths class\" or one the \
+teacher saved. set_setting appearance.layout also switches Modern and Classic, keeping the teacher's own \
+Modern dock.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,

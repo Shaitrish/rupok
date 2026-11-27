@@ -1,0 +1,301 @@
+/* The Classic layout (layout.ts): islands along the bottom edge, big
+ * buttons, titled panels. Tokens only (DESIGN.md); the island sizes are the
+ * Large board cells (56px targets, 32px icons) unless the teacher picks
+ * smaller ones. Light and dark come from the same tokens. */
+
+:root {
+  /* Our drawings (icons/drawn/): flat colours that read on the panel. */
+  --art-line: #2b3036; --art-body: #e4e7ec; --art-dark: #59606a; --art-metal: #b7bdc6; --art-wood: #ecc896; --art-eraser: #f2a7a0;
+  /* The Classic focus ring: the darker accent with a halo, readable on every board colour. */
+  --cl-ring: var(--accent-11);
+}
+:root[data-theme="dark"] {
+  --art-line: #e6e8eb; --art-body: #3b4148; --art-dark: #9ba3ad; --art-metal: #737b86; --art-wood: #b48f5c; --art-eraser: #c97b74;
+}
+
+/* ------------------------------------------------------------- islands */
+.islands {
+  --isl: 56px; --isl-pad: 6px; --tb: var(--isl); --tb-icon: 32px; --r-tb: 14px;
+  position: absolute; z-index: 10; left: calc(var(--inset) + env(safe-area-inset-left, 0px)); right: calc(var(--inset) + env(safe-area-inset-right, 0px));
+  bottom: calc(var(--inset) + env(safe-area-inset-bottom, 0px));
+  display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: "l c r"; align-items: end; gap: var(--s2);
+  pointer-events: none; transition: opacity 240ms var(--ease);
+}
+.islands.top { bottom: auto; top: calc(var(--inset) + env(safe-area-inset-top, 0px)); align-items: start; }
+.islands.isz-m { --isl: 48px; --tb-icon: 28px; --r-tb: 12px; }
+.islands.isz-s { --isl: 44px; --tb-icon: 24px; --r-tb: 12px; --isl-pad: 4px; }
+.islands.inking { opacity: 0.35; }
+.islands.inking .island { pointer-events: none; }
+.island-slot { display: flex; gap: var(--s2); min-width: 0; }
+.island-slot.left { grid-area: l; justify-self: start; }
+.island-slot.centre { grid-area: c; justify-self: center; }
+.island-slot.right { grid-area: r; justify-self: end; }
+.island {
+  pointer-events: auto; display: flex; align-items: center; gap: 2px; padding: var(--isl-pad);
+  border-radius: calc(var(--r-tb) + var(--isl-pad)); background: var(--surface-solid);
+  box-shadow: var(--shadow-1); max-width: calc(100vw - 2 * var(--inset)); overflow-x: auto; scrollbar-width: none;
+  animation: dock-fade 160ms var(--ease);
+}
+.island::-webkit-scrollbar { display: none; }
+.island .dock-cell { display: flex; flex: none; }
+.island .tool { width: var(--isl); height: var(--isl); color: var(--text); }
+.island .tool:disabled { color: var(--text-3); background: transparent; cursor: default; }
+/* The active tool is raised: a soft accent tile and the bold icon (colour is never the only cue). */
+.island .tool.on { background: var(--accent-3); color: var(--accent-11); box-shadow: inset 0 0 0 1.5px var(--accent-9); }
+.island .tool.on:hover { background: var(--accent-4); }
+.island .viewer-count {
+  height: var(--isl); min-width: calc(var(--isl) + 16px); padding: 0 var(--s3); border: 0; border-radius: var(--r-tb); cursor: pointer;
+  background: var(--gray-a3); font: 650 18px/1 var(--font); font-variant-numeric: tabular-nums; color: var(--text);
+}
+.island .viewer-count:hover, .island .viewer-count[aria-expanded="true"] { background: var(--accent-3); color: var(--accent-11); }
+.island .dock-dot { right: 8px; bottom: 8px; }
+.island .dock-sep { height: 32px; }
+.island .dock-steps { font: 650 16px/1 var(--font); padding: 0 var(--s2); font-variant-numeric: tabular-nums; }
+.island .dock-replay, .island .dock-text { display: flex; align-items: center; gap: var(--s1); }
+.island .dock-range { width: 240px; }
+.island .dock-time { font: 600 15px/1 var(--font); font-variant-numeric: tabular-nums; padding: 0 var(--s2); }
+.island .dock-context { display: flex; align-items: center; }
+.islands.big-icons { --tb-icon: 36px; }
+
+/* Accessible focus: 3px of the darker accent with a surface halo. */
+.island :focus-visible, .dock-pop.classic :focus-visible, .lc-dialog :focus-visible, .sel-layer.classic :focus-visible {
+  outline: 3px solid var(--cl-ring); outline-offset: 2px; box-shadow: 0 0 0 5px var(--surface-solid);
+}
+
+/* Narrower screens: the middle island goes on its own row above the others. */
+@media (max-width: 1240px) {
+  .islands { grid-template-columns: auto 1fr auto; grid-template-areas: "c c c" "l . r"; }
+}
+@media (max-width: 1240px) and (min-width: 601px) {
+  .islands.isz-l { --isl: 52px; --tb-icon: 28px; }
+}
+@media (max-width: 600px) {
+  .islands { --isl: 44px; --tb-icon: 24px; --isl-pad: 4px; }
+}
+
+/* ------------------------------------------------------------ popovers */
+.dock-pop.classic {
+  --tb: 48px; --tb-icon: 24px; --r-tb: 12px;
+  padding: 0; border-radius: 20px; box-shadow: var(--shadow-2); overflow: visible; max-height: calc(100dvh - 120px);
+}
+/* A pointer to the button the panel belongs to. */
+.dock-pop.classic.centered::after {
+  content: ""; position: absolute; left: var(--tail, 50%); bottom: -9px; width: 18px; height: 18px; margin-left: -9px;
+  background: var(--surface-solid); transform: rotate(45deg); border-radius: 0 0 4px 0;
+  box-shadow: 1px 1px 0 var(--hairline); pointer-events: none;
+}
+.islands.top ~ .dock-pop.classic.centered::after { bottom: auto; top: -9px; border-radius: 4px 0 0 0; box-shadow: -1px -1px 0 var(--hairline); }
+
+.cl-panel { display: flex; flex-direction: column; min-width: 280px; max-height: inherit; }
+.cl-title {
+  display: flex; align-items: center; gap: var(--s2); height: 52px; padding: 0 var(--s2) 0 var(--s5);
+  border-bottom: 1px solid var(--hairline); font: 650 17px/24px var(--font); color: var(--text); flex: none;
+}
+.cl-title span { flex: 1; }
+.cl-x { width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; color: var(--text-2); cursor: pointer; display: grid; place-items: center; }
+.cl-x:hover { background: var(--hover); color: var(--text); }
+.cl-body { display: flex; gap: var(--s4); padding: var(--s4); min-height: 0; overflow-y: auto; }
+.cl-main { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; }
+.cl-list .cl-body, .cl-tools .cl-body, .cl-zoom .cl-body, .cl-recog .cl-body { flex-direction: column; gap: var(--s1); }
+
+/* Thickness: a slider and the live dot. */
+.cl-thick { display: flex; align-items: center; gap: var(--s4); }
+.cl-slider { flex: 1; min-width: 200px; height: 44px; }
+.cl-dot-well {
+  width: 56px; height: 56px; flex: none; border-radius: 14px; display: grid; place-items: center;
+  background: var(--page-bg, #fff); box-shadow: inset 0 0 0 1px var(--hairline);
+}
+:root[data-theme="dark"] .cl-dot-well { background: #fff; }
+.cl-dot { border-radius: 50%; display: block; box-shadow: inset 0 0 0 1px rgba(0, 0, 40, 0.14); }
+
+/* Pen tiles: our drawings, big enough to read across the room. */
+.cl-tray {
+  display: grid; grid-template-columns: repeat(7, 76px); gap: var(--s1); padding: var(--s2);
+  border-radius: 16px; background: var(--gray-2);
+}
+:root[data-theme="dark"] .cl-tray { background: var(--gray-1); }
+.cl-brush {
+  height: 104px; border: 0; border-radius: 12px; background: transparent; cursor: pointer; color: var(--text-2);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; padding: 6px 2px;
+  font: 550 12px/14px var(--font); transition: background-color 120ms var(--ease), transform 120ms var(--ease);
+}
+.cl-brush:hover { background: var(--hover); color: var(--text); }
+.cl-brush .cl-art { transition: transform 120ms var(--ease); }
+.cl-brush.on { background: var(--accent-3); color: var(--accent-11); box-shadow: inset 0 0 0 2px var(--accent-9); }
+.cl-brush.on .cl-art { transform: translateY(-4px); }
+.cl-seg { align-self: flex-start; }
+.cl-seg button { height: 40px; padding: 0 var(--s3); }
+
+/* Colours: 3 × 5 and the eyedropper. */
+.cl-colours { display: grid; grid-template-columns: repeat(3, 48px); grid-auto-rows: 48px; gap: var(--s1); padding: var(--s2); border-radius: 16px; background: var(--gray-2); align-content: start; flex: none; }
+:root[data-theme="dark"] .cl-colours { background: var(--gray-1); }
+.cl-swatch { width: 48px; height: 48px; border: 0; border-radius: 12px; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 40, 0.16); }
+.cl-swatch.light { box-shadow: inset 0 0 0 1px var(--gray-7); }
+.cl-swatch.on { box-shadow: inset 0 0 0 1px rgba(0, 0, 40, 0.16), 0 0 0 3px var(--surface-solid), 0 0 0 5px var(--accent-11); }
+.cl-swatch.on::after { content: ""; display: block; width: 12px; height: 12px; margin: auto; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35); }
+.cl-drop { grid-column: 1 / -1; width: auto; background: var(--surface-solid); color: var(--text); display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--hairline); }
+.cl-drop:hover { background: var(--hover); }
+.cl-hidden-color { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* The Shapes picker inside the Classic frame: bigger tiles. */
+:root .dock-pop.dock-pop-shapes.classic { width: max-content; }
+.cl-shapes .cl-main { width: calc(9 * 52px + 8 * 2px + 8px); }
+.cl-shapes .shapes-picker { --tb: 52px; --tb-icon: 28px; max-height: min(52dvh, 560px); overflow-y: auto; padding-right: 4px; }
+.cl-shapes .shapes-tile { border-radius: 12px; }
+
+/* Rows and tiles (☰ menu, mode, tools, zoom). */
+.cl-row {
+  display: flex; align-items: center; gap: var(--s4); width: 100%; min-height: 56px; padding: var(--s2) var(--s4); border: 0; border-radius: 14px;
+  background: transparent; color: var(--text); cursor: pointer; text-align: left; font: 600 16px/20px var(--font);
+}
+.cl-row:hover { background: var(--hover); }
+.cl-row.on { background: var(--accent-3); color: var(--accent-11); }
+.cl-row .icon { flex: none; color: var(--text-2); }
+.cl-row.on .icon { color: var(--accent-11); }
+.cl-row .grow { flex: 1; display: flex; flex-direction: column; }
+.cl-row small { font: 450 13px/18px var(--font); color: var(--text-2); }
+.cl-row kbd, .cl-tile kbd { font: 600 12px/1 var(--font); color: var(--text-3); padding: 4px 6px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--hairline); }
+.cl-row .dock-check { flex: none; }
+.cl-tile {
+  width: 112px; min-height: 104px; border: 0; border-radius: 16px; background: transparent; color: var(--text); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s2); padding: var(--s3) var(--s2);
+  font: 600 14px/18px var(--font); text-align: center;
+}
+.cl-tile:hover { background: var(--hover); }
+.cl-tile.on { background: var(--accent-3); color: var(--accent-11); }
+.cl-tile:disabled { color: var(--text-3); background: transparent; cursor: default; }
+.cl-tile .icon { color: var(--text-2); }
+.cl-tile.on .icon { color: var(--accent-11); }
+.cl-tiles { display: grid; grid-template-columns: repeat(4, 112px); gap: var(--s1); }
+
+.cl-menu { display: flex; min-height: 420px; }
+.cl-menu-rows { display: flex; flex-direction: column; gap: 2px; padding: var(--s3); width: 248px; border-right: 1px solid var(--hairline); }
+.cl-menu-sub { display: grid; grid-template-columns: repeat(2, 112px); grid-auto-rows: min-content; gap: var(--s1); padding: var(--s3); align-content: start; min-width: 256px; }
+
+.cl-zoom-row { display: flex; align-items: center; gap: var(--s2); padding-bottom: var(--s2); }
+.cl-big { width: 64px; height: 64px; border: 0; border-radius: 16px; background: var(--gray-a3); color: var(--text); cursor: pointer; display: grid; place-items: center; }
+.cl-big:hover { background: var(--gray-a4); }
+.cl-pct { flex: 1; text-align: center; font: 650 22px/1 var(--font); font-variant-numeric: tabular-nums; min-width: 96px; }
+
+.cl-recog { max-width: 420px; }
+.cl-recog-actions { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.cl-recog-actions .btn { height: 48px; font-size: 15px; }
+
+/* The page grid above the page button. */
+.cl-grid .cl-body { flex-direction: column; }
+.cl-grid-list { display: grid; grid-template-columns: repeat(4, 168px); gap: var(--s3); max-height: min(60dvh, 520px); overflow-y: auto; padding: 4px; margin: -4px; }
+.cl-thumb {
+  position: relative; aspect-ratio: 16 / 9; border: 0; padding: 0; border-radius: 10px; cursor: pointer; overflow: hidden;
+  box-shadow: 0 0 0 1px var(--hairline); display: block;
+}
+.cl-thumb canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cl-thumb.on { box-shadow: 0 0 0 3px var(--accent-9); }
+.cl-thumb .num {
+  position: absolute; left: 6px; bottom: 6px; height: 24px; min-width: 24px; padding: 0 8px; border-radius: 8px; display: grid; place-items: center;
+  font: 650 13px/1 var(--font); font-variant-numeric: tabular-nums; background: rgba(28, 32, 36, 0.78); color: #fff;
+}
+.cl-thumb-add { background: var(--gray-a3) !important; color: var(--text-2); display: grid; place-items: center; box-shadow: inset 0 0 0 2px var(--gray-a5); }
+.cl-thumb-add:hover { color: var(--accent-11); background: var(--accent-3) !important; }
+.cl-grid-foot { display: flex; justify-content: flex-end; padding-top: var(--s3); }
+.cl-grid-foot .btn { height: 44px; }
+.cl-grid-foot .btn span { display: inline; }
+@media (max-width: 900px) { .cl-grid-list { grid-template-columns: repeat(2, 150px); } .cl-tray { grid-template-columns: repeat(4, 76px); } .cl-tiles { grid-template-columns: repeat(3, 100px); } .cl-tile { width: 100px; } }
+
+/* ------------------------------------------------------- title strip */
+.cl-titlebar {
+  position: absolute; z-index: 9; top: calc(var(--s2) + env(safe-area-inset-top, 0px)); left: 50%; transform: translate(-50%, -8px);
+  display: flex; align-items: center; gap: var(--s3); height: 36px; padding: 0 var(--s4); border-radius: 18px; max-width: 60vw;
+  background: var(--surface-solid); box-shadow: var(--shadow-1); font: 600 14px/20px var(--font); color: var(--text);
+  opacity: 0; pointer-events: none; transition: opacity 240ms var(--ease), transform 240ms var(--ease);
+}
+.cl-titlebar.shown { opacity: 1; transform: translate(-50%, 0); }
+.cl-titletext { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-titlepage { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.cl-unsaved { color: var(--text-2); font-weight: 500; }
+
+/* ----------------------------------------------------- the slide panel */
+.pages.drawer.edge {
+  top: calc(var(--inset) + env(safe-area-inset-top, 0px)); bottom: calc(var(--inset) + env(safe-area-inset-bottom, 0px) + 92px);
+  width: min(320px, calc(100vw - 2 * var(--inset)));
+}
+.pages.drawer.edge-left { left: calc(var(--inset) + env(safe-area-inset-left, 0px)); right: auto; animation: edge-in-left 200ms var(--ease); }
+.pages.drawer.edge-right { right: calc(var(--inset) + env(safe-area-inset-right, 0px)); left: auto; animation: edge-in-right 200ms var(--ease); }
+.pages.drawer.edge .pages-list { grid-template-columns: 1fr; }
+.pages.drawer.edge .page-thumb .num { left: auto; height: 28px; min-width: 28px; font-size: 15px; }
+.pages.drawer.edge .thumb-actions .btn { width: 44px; min-width: 44px; height: 44px; }
+.pages.drawer.edge .page-style-wrap { display: none; }
+.thumb-star.on { color: var(--accent-11); }
+.thumb-starred { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-solid); color: var(--accent-11); box-shadow: var(--shadow-1); pointer-events: none; }
+.page-thumb:hover .thumb-starred, .page-thumb:focus-within .thumb-starred { display: none; }
+@keyframes edge-in-left { from { opacity: 0; transform: translateX(-32px); } }
+@keyframes edge-in-right { from { opacity: 0; transform: translateX(32px); } }
+
+/* ------------------------------------------------- selection (Classic) */
+/* Corner brackets around the selection, and the toolbar upright beside it. */
+.sel-layer.classic .sel-frame { box-shadow: none; outline: 1.5px dashed var(--select); outline-offset: 0; }
+.sel-layer.classic .sel-frame::before {
+  content: ""; position: absolute; inset: -12px; pointer-events: none;
+  --c: var(--select); --l: 20px; --t: 3px;
+  background:
+    linear-gradient(var(--c), var(--c)) left top / var(--l) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) left top / var(--t) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) right top / var(--l) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) right top / var(--t) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) left bottom / var(--l) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) left bottom / var(--t) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) right bottom / var(--l) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) right bottom / var(--t) var(--l) no-repeat;
+}
+.sel-bar.vertical { flex-direction: column; flex-wrap: nowrap; width: auto; min-height: 0; padding: var(--s1); border-radius: 18px; gap: 2px; }
+.sel-bar.vertical .btn, .sel-bar.vertical .btn.icon { width: 52px; min-width: 52px; height: 52px; justify-content: center; }
+.sel-bar.vertical .btn .icon { width: 26px; height: 26px; }
+.sel-bar.vertical .vsep { width: 28px; height: 1px; margin: 2px auto; }
+.sel-bar.vertical .btn.totext span, .sel-bar.vertical .btn.totext .label { display: none; }
+.sel-bar.vertical .sel-palette, .sel-bar.vertical .sel-palette.up { top: 0; bottom: auto; left: calc(100% + var(--s2)); right: auto; }
+.sel-bar.vertical.pop-left .sel-palette, .sel-bar.vertical.pop-left .sel-palette.up { left: auto; right: calc(100% + var(--s2)); }
+
+/* ----------------------------------------------------- first-run choice */
+.lc-dialog { width: min(760px, 100%); text-align: center; }
+.lc-dialog .badge { width: 48px; height: 48px; margin: 0 auto var(--s3); border-radius: 14px; display: grid; place-items: center; background: var(--accent-3); color: var(--accent-11); }
+.lc-dialog h2 { font-size: 24px; line-height: 32px; }
+.lc-sub { margin: var(--s2) 0 var(--s5); color: var(--text-2); font-size: 15px; }
+.lc-options { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); }
+.lc-option {
+  display: flex; flex-direction: column; gap: var(--s2); align-items: stretch; text-align: left; padding: var(--s3); border: 0; border-radius: 18px;
+  background: var(--gray-2); cursor: pointer; color: var(--text); box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.lc-option:hover { background: var(--gray-3); }
+.lc-option.on { background: var(--accent-3); box-shadow: inset 0 0 0 3px var(--accent-9); }
+.lc-name { font: 700 18px/24px var(--font); }
+.lc-text { font: 450 14px/20px var(--font); color: var(--text-2); }
+.lc-art { width: 100%; height: auto; border-radius: 10px; }
+.lc-art .lc-canvas { fill: var(--canvas); }
+.lc-art .lc-page { fill: #fff; stroke: var(--hairline); }
+.lc-art .lc-ink { fill: none; stroke: #3e63dd; stroke-width: 3; stroke-linecap: round; }
+.lc-art .lc-chrome { fill: var(--surface-solid); stroke: var(--gray-6); }
+.lc-art .lc-dot { fill: var(--gray-8); }
+.lc-art .lc-dot.on { fill: var(--accent-9); }
+.lc-actions { display: flex; justify-content: center; margin-top: var(--s5); }
+.lc-go { height: 48px; padding: 0 var(--s6); font-size: 16px; }
+@media (max-width: 600px) { .lc-options { grid-template-columns: 1fr; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .islands, .island, .cl-titlebar, .pages.drawer.edge, .cl-brush, .cl-brush .cl-art { animation: none; transition: none; }
+}
+
+/* Heavier strokes on the islands: thin 1.5px line icons fade at the back of a classroom. */
+.island .icon [stroke-width="1.5"], .cl-panel .icon [stroke-width="1.5"], .cl-menu .icon [stroke-width="1.5"] { stroke-width: 1.85; }
+.pages.drawer.edge { width: min(360px, calc(100vw - 2 * var(--inset))); }
+.pages.drawer.edge .pages-head > span:first-child { white-space: nowrap; }
+.pages.drawer.edge .pages-head { gap: 2px; }
+
+/* Very large screens at 100% scaling (a 4K panel): the islands grow, so a
+ * 56px button is not a fingertip-sized speck at the back of the room. */
+@media (min-width: 2400px) {
+  .islands.isz-l { --isl: 80px; --tb-icon: 44px; --r-tb: 18px; --isl-pad: 8px; }
+  .islands.isz-m { --isl: 64px; --tb-icon: 36px; }
+  .island .viewer-count { font-size: 24px; }
+  .cl-titlebar { zoom: 1.4; }
+}
+/* Icons follow the island size (it changes with the screen, above). */
+.island .tool > svg { width: var(--tb-icon); height: var(--tb-icon); }

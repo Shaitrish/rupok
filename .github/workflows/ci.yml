@@ -110,6 +110,19 @@ jobs:
       - name: Test
         run: node --test "packages/object-sdk/test/*.test.mjs"
 
+  board-unit:
+    name: Board unit tests (node --test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # Node 23.6+ strips TypeScript types: the tests import src/*.ts directly
+      # (gestures, voice, the Classic layout's config and edge swipe).
+      - name: Test
+        run: node --test "apps/board/test/*.test.ts"
+
   rupoklib:
     name: Offline libraries (vendor rupoklib)
     runs-on: ubuntu-latest

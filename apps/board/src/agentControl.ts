@@ -16,6 +16,7 @@ import { celebrate, type CelebrateKind, freshStamps } from "./stamps";
 import { agentSettings, setAgentSetting } from "./agentSettings";
 import { applyPreset, placeable, savePreset, savedPresets } from "./components/DockEditor";
 import { resetDock } from "./dock";
+import { layout } from "./layout";
 import { isBrush, setBrushOf } from "./brushes";
 import { myStamps, resolveStamp } from "./stampLib";
 import { deleteStamp as deleteLibStamp, saveStamp } from "./customStamps";
@@ -198,6 +199,12 @@ export async function runBoardOp(c: Controller, op: any, agent: string, lastAgen
           sizes: ["s", "m", "l"],
           presets: [...DOCK_PRESETS.map((p) => ({ name: p.name, hint: p.hint, builtin: true })), ...savedPresets().map((p) => ({ name: p.name, builtin: false }))],
           example: { position: "left", size: "l", groups: [{ label: "Ink", items: ["pen", "highlighter", "eraser"] }], split: { position: "right", groups: [{ items: ["undo", "redo"] }, { items: ["pager"] }] } },
+          layout: layout(),
+          styles: {
+            dock: "The Smart Dock (Modern layout): one bar, groups separated.",
+            islands: "The Classic layout: each group is an island along the bottom (or top) edge; the first at the left, the last at the right, the others in the middle. No top bar; the ☰ menu (menu) holds files, export, settings and help.",
+          },
+          classic_example: { style: "islands", position: "bottom", size: "l", groups: [{ label: "Menu", items: ["menu", "mode", "toolbox", "share", "zoom"] }, { label: "Tools", items: ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] }, { label: "Pages", items: ["addpage", "pager"] }] },
         },
       };
     }
@@ -205,7 +212,8 @@ export async function runBoardOp(c: Controller, op: any, agent: string, lastAgen
       const m = dockMode(op.mode);
       const layout = op.layout;
       if (!layout || typeof layout !== "object" || Array.isArray(layout)) fail("layout must be an object, e.g. {\"position\": \"left\", \"groups\": [{\"items\": [\"pen\", \"eraser\"]}]}");
-      const known = new Set(["position", "orientation", "minimized", "pinned", "groups", "split", "size", "sizes", "large"]);
+      const known = new Set(["position", "orientation", "minimized", "pinned", "groups", "split", "size", "sizes", "large", "style"]);
+      if ("style" in layout && layout.style !== "islands" && layout.style !== "dock") fail("style must be \"islands\" (the Classic layout: each group is an island) or \"dock\" (the Smart Dock)");
       const unknown = Object.keys(layout).filter((k) => !known.has(k));
       if (unknown.length) fail(`unknown layout keys: ${unknown.join(", ")} (allowed: ${[...known].join(", ")})`);
       const placeableIds = new Set<string>([...placeable(m), "rect", "ellipse", "line", "arrow", "shape"]);
@@ -368,3 +376,12 @@ export async function finishStampOp(op: any, result: any): Promise<any> {
 }
 
 export const isStampOp = (name: string) => ["list_stamps", "create_stamp", "update_stamp", "delete_stamp", "add_stamp"].includes(name);
+
+// Automated browsers only (the e2e suites): run a board op as an agent
+// would, without a paired agent. Never exposed to a teacher's browser.
+if (typeof navigator !== "undefined" && navigator.webdriver) {
+  (window as any).rupokBoardOp = async (op: unknown) => {
+    const { controller } = await import("./controller");
+    return (await runBoardOp(controller, op, "e2e", () => false)).result;
+  };
+}

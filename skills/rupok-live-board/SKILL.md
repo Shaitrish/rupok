@@ -271,7 +271,34 @@ page on the right, bigger buttons." (`/dock` in Rupok's chat):
    is large icons for low vision.
 3. Pen, highlighter, eraser, laser and undo always stay. Relay any
    `warnings`. Offer `save_dock_preset(name)`; `apply_dock_preset` switches
-   to Left-handed, Minimal teaching, Maths class, Default or a saved one.
+   to Classic, Left-handed, Minimal teaching, Maths class, Default or a saved one.
+
+## Layouts: Modern and Classic
+
+Rupok has two layouts. **Modern**: a top bar and the Smart Dock. **Classic**:
+no top bar, big buttons in three islands along the bottom (☰ menu, mode,
+tools, share, zoom · select, pen, eraser, shapes, pan, recognise ink,
+stamps, undo, redo · new page, back, page button, next), familiar to
+teachers coming from classroom whiteboard software.
+
+- Switch: `set_setting(key: "appearance.layout", value: "classic")` (or
+  `"modern"`, which brings back the teacher's own Modern dock), or
+  `apply_dock_preset(name: "Classic")`.
+- Classic is a dock style, so the dock tools arrange it: in
+  `set_dock_layout`, `style: "islands"` makes each group an island (the
+  first at the left, the last at the right, the others in the middle),
+  `position: "top"` moves them to the top edge, `size` and `sizes` set the
+  button size (`l` = 56 px buttons, 32 px icons), `large` makes icons
+  bigger still. Pen, eraser and undo always stay on an island.
+- Its own buttons: `menu`, `mode`, `toolbox`, `share`, `zoom`, `addpage`,
+  `recognize` (they also fit on a Modern dock).
+
+```text
+set_dock_layout(mode: "teach", layout: {style: "islands", size: "l", groups: [
+  {label: "Menu", items: ["menu", "zoom"]},
+  {label: "Tools", items: ["pen", "eraser", "shapes", "recognize", "undo"]},
+  {label: "Pages", items: ["addpage", "pager"]}]})
+```
 
 ## Tools
 

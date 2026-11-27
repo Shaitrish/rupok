@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { APP_SLUG } from "./brand";
-import { type Mode, type ModeConfig, type ModesConfig, resolveMode, sanitizeDockPresets, sanitizeModes } from "./modes";
+import { type Mode, type ModeConfig, type ModesConfig, resolveMode, sanitizeDockPresets, sanitizeMode, sanitizeModes } from "./modes";
 
 export type Tool =
   | "pen" | "highlighter" | "eraser" | "lasso" | "hand" | "laser" | "interact" | "text"
@@ -180,6 +180,11 @@ export interface Prefs {
   stampSounds: boolean;
   /** The teacher's saved dock layouts (Customize dock → Save layout). */
   dockPresets?: import("./modes").DockPreset[];
+  /** The Modern docks kept while the Classic layout is on, so switching
+   * back restores the teacher's own dock (layout.ts). */
+  modernDocks?: Partial<Record<"prepare" | "teach", import("./modes").DockConfig>>;
+  /** The first-run "Which layout do you prefer?" was answered. */
+  layoutChosen?: boolean;
 }
 const defaults: Prefs = {
   theme: "system", accent: "mint", iconStyle: "linear", toolbar: "bottom", density: "comfortable",
@@ -229,6 +234,15 @@ function loadPrefs(): Prefs {
     saved.flatPanels = saved.flatPanels === true;
     saved.dockPresets = sanitizeDockPresets(saved.dockPresets);
     saved.modes = sanitizeModes(saved.modes);
+    if (saved.modernDocks && typeof saved.modernDocks === "object") {
+      const md: Prefs["modernDocks"] = {};
+      for (const m of ["prepare", "teach"] as const) {
+        const d = saved.modernDocks[m];
+        if (d && typeof d === "object") md[m] = sanitizeMode(m, { dock: d }).dock;
+      }
+      saved.modernDocks = md;
+    } else delete saved.modernDocks;
+    saved.layoutChosen = saved.layoutChosen === true;
     return saved;
   } catch {
     return defaults;

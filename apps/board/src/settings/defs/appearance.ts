@@ -1,10 +1,21 @@
 // Settings → Appearance.
 
 import { ACCENTS } from "../../state";
+import { layout } from "../../layout";
+import { setLayout } from "../../components/DockEditor";
 import { pref } from "../bind";
 import { registerSettings } from "../registry";
 
 registerSettings([
+  {
+    id: "appearance.layout", category: "appearance", order: 5, type: "segmented", label: "Layout",
+    description: "Modern: a top bar and one dock. Classic: big buttons in three islands along the bottom and a ☰ menu.",
+    keywords: ["classic", "modern", "islands", "big icons", "toolbar", "note3", "familiar", "লেআউট", "ক্লাসিক"],
+    options: [{ value: "modern", label: "Modern" }, { value: "classic", label: "Classic" }],
+    get: layout,
+    set: (v: string) => setLayout(v === "classic" ? "classic" : "modern"),
+    default: "modern",
+  },
   {
     id: "appearance.theme", category: "appearance", order: 10, type: "segmented", label: "Theme",
     description: "Light, dark, or follow this device.",

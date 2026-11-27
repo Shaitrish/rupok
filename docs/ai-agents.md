@@ -527,6 +527,7 @@ set_mode(mode: "teach") · zoom_to(zoom: 2, x: 600, y: 400) · fit_page()
 export_pdf(pages: "2-5", layout: "handout-2", save_as: "handouts/forces.pdf")
 library_create_lesson(title: "Week 3: Forces", template: "slides", open: true)
 set_setting(key: "appearance.theme", value: "dark")
+set_setting(key: "appearance.layout", value: "classic")      # three big islands, no top bar
 set_dock_layout(mode: "teach", layout: {groups: [{items: ["pen", "highlighter", "eraser"]}], split: {position: "right", groups: [{items: ["undo"]}, {items: ["pager"]}]}, size: "l"})
 ```
 
@@ -592,8 +593,18 @@ page on the right, bigger buttons". The dock is customisable per mode
 (Prepare, Teach): its position, ordered **groups** of buttons (separated on
 the dock), an optional **split** second dock on another edge, a button
 `size` (`s`, `m`, `l`), per-button `sizes`, and `large` icons for low
-vision. Named layouts: *Left-handed*, *Minimal teaching*, *Maths class*,
+vision. Named layouts: *Classic*, *Left-handed*, *Minimal teaching*, *Maths class*,
 *Default*, and the teacher's own (`save_dock_preset`).
+
+**The Classic layout** is a dock style: `style: "islands"` turns each group
+into a big island along the bottom edge (the first at the left, the last at
+the right, the others in the middle) and hides the top bar; the ☰ `menu`
+holds files, import, export, print, settings, help and modes. Switch with
+`set_setting(key: "appearance.layout", value: "classic" | "modern")` (Modern
+brings back the teacher's own dock) or `apply_dock_preset(name: "Classic")`;
+rearrange it with `set_dock_layout` like any dock. Its buttons: `menu`,
+`mode`, `toolbox`, `share`, `zoom`, `addpage`, `recognize`. Pen, eraser and
+undo always stay on an island.
 
 ```text
 list_dock_items()                          # ids: pen, highlighter, eraser, lasso, laser, text, shapes, stamp,

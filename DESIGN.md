@@ -189,6 +189,8 @@ Attribution lives in `NOTICE` and in Settings → About.
 | **Page design sheet** | 400px side sheet (bottom sheet on phones) with a live preview (drag the logo), looks, background, branding and "Save as my default". The slide moves aside to stay in view in Prepare. Every change is one undo step; sliders and drags preview live and commit on release. |
 | **Step badge** | A 28px pill at the bottom-right of a Smart Object showing `step / steps`, in tabular numbers. |
 | **Smart Dock** | The drawing toolbar (`components/Dock.tsx`, shell in `DockShell.tsx`). Grip, core tools (pen, highlighter, eraser, laser, undo), three recent colours, pinned tools, ⋯, minimise chevron, all in `--tb` cells. Surface: `--surface-solid` at 94%, hairline ring, small shadow; a 12px backdrop blur only on hardware GPUs and never while ink is drawn next to it. The pen and highlighter carry a colour dot sized by width. Contextual sections open by animating their width. Minimised: a 48px round bubble (56 on Large board) with the current tool and colour. Popovers: radius 14, `--surface-solid`, on the side facing the screen centre, opening away from the writing hand. |
+| **Classic islands** | The Classic layout (`layout.ts`, `components/classic/`): the dock's groups as separate islands along the bottom edge, first left, last right, the rest centred. `--surface-solid`, `--shadow-1`, radius = cell radius + 6px padding. Large by default: 56px cells and 32px icons (48/28 and 44/24 when the teacher picks smaller; never under 44px); line icons drawn at 1.85 stroke so they read across a room. The active tool: `--accent-3` tile, a 1.5px `--accent-9` inner ring and the bold-duotone icon. No top bar; the lesson title shows in a 36px pill for 2.6s when the page changes. |
+| **Classic panels** | What opens from an island: radius 20, `--shadow-2`, a 52px title row with a 44px close button, 16px padding, a pointer to its button. Pen panel: thickness slider with a live dot, 13 illustrated pen tiles (76×104, our drawings in `icons/drawn/`, coloured by `--art-*` tokens and the current ink), a 3×5 colour grid of 48px swatches and an eyedropper. Focus: a 3px `--accent-11` ring with a surface halo. |
 
 ---
 
@@ -224,6 +226,7 @@ Attribution lives in `NOTICE` and in Settings → About.
 
 | Setting | Options |
 |---|---|
+| Layout | Modern (top bar and the Smart Dock) · Classic (three big islands, ☰ menu) |
 | Theme | System · Light · Dark |
 | Accent | Iris · Teal · Blue · Violet · Grass · Ruby · Amber |
 | Icons | Linear · Duotone · Broken · Bold |
