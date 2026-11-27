@@ -158,7 +158,7 @@ student view, share links and the overlay keep their own chrome.
   "dock": {
     "style": "islands", "size": "l",
     "groups": [
-      { "id": "left", "label": "Menu", "items": ["menu", "mode", "toolbox", "share", "zoom", "ai"] },
+      { "id": "left", "label": "Menu", "items": ["menu", "mode", "toolbox", "ai"] },
       { "id": "centre", "label": "Tools", "items": ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] },
       { "id": "right", "label": "Pages", "items": ["addpage", "pager"] }
     ]

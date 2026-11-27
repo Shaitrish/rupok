@@ -40,7 +40,7 @@ test.describe("Classic layout", () => {
     const errors = trackErrors(page);
     await openClassic(page);
     await expect(page.locator(".topbar")).toHaveCount(0);
-    for (const name of ["Main menu", "Mode", "Tools", "Zoom", "Ask AI"]) await expect(island(page, "left").getByRole("button", { name })).toBeVisible();
+    for (const name of ["Main menu", "Mode", "Tools", "Ask AI"]) await expect(island(page, "left").getByRole("button", { name })).toBeVisible();
     // The AI is on the island, not floating over the slide.
     await expect(page.locator(".ai-float")).toHaveCount(0);
     for (const name of ["Select & move", "Pen", "Eraser", "Shapes", "Hand", "Recognise ink", "Stamps", "Undo", "Redo"]) {

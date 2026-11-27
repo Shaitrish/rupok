@@ -246,6 +246,17 @@ function loadPrefs(): Prefs {
     } else delete saved.modernDocks;
     saved.layoutChosen = saved.layoutChosen === true;
     saved.islandSwap = saved.islandSwap === true;
+    // Classic previews before v0.2.6 had Share and Zoom on the left island:
+    // they moved into the ☰ menu (an island the teacher arranged is kept).
+    for (const m of ["prepare", "teach"] as const) {
+      const g = saved.modes?.[m]?.dock?.style === "islands" ? saved.modes[m].dock.groups?.[0] : undefined;
+      const was = g?.items.join(",");
+      if (g && (was === "menu,mode,toolbox,share,zoom" || was === "menu,mode,toolbox,share,zoom,ai" || was === "menu,mode,toolbox,zoom,ai")) {
+        g.items = ["menu", "mode", "toolbox", "ai"];
+        saved.modes[m].dock.pinned = saved.modes[m].dock.pinned.filter((p: string) => p !== "share" && p !== "zoom");
+        saved.modes[m].tools = saved.modes[m].tools.filter((t: string) => t !== "share" && t !== "zoom");
+      }
+    }
     return saved;
   } catch {
     return defaults;

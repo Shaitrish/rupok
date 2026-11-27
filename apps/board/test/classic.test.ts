@@ -20,7 +20,7 @@ test("the Classic preset makes three islands in Prepare and Teach", () => {
     assert.equal(d.style, "islands");
     assert.equal(d.size, "l");
     assert.deepEqual(d.groups!.map((g) => g.id), ["left", "centre", "right"]);
-    assert.deepEqual(d.groups![0].items, ["menu", "mode", "toolbox", "zoom", "ai"]);
+    assert.deepEqual(d.groups![0].items, ["menu", "mode", "toolbox", "ai"]);
     assert.deepEqual(d.groups![2].items, ["addpage", "pager"]);
     // The island buttons are the mode's tools too.
     for (const t of ["menu", "toolbox", "recognize", "addpage", "ai"] as const) assert.ok(modes[m]!.tools.includes(t), `${m} offers ${t}`);

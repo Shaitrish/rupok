@@ -213,7 +213,7 @@ export const CLASSIC_DOCK: Partial<DockConfig> = {
   position: "bottom",
   size: "l",
   groups: [
-    { id: "left", label: "Menu", items: ["menu", "mode", "toolbox", "zoom", "ai"] },
+    { id: "left", label: "Menu", items: ["menu", "mode", "toolbox", "ai"] },
     { id: "centre", label: "Tools", items: ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] },
     { id: "right", label: "Pages", items: ["addpage", "pager"] },
   ],

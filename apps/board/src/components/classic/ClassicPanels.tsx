@@ -305,6 +305,14 @@ export function MainMenu(props: { onClose: () => void }) {
     },
     { id: "print", label: "Print", icon: "print", run: go(openExport) },
     {
+      id: "zoom", label: "Zoom", icon: "search", sub: [
+        { id: "zoom-in", label: "Zoom in", icon: "zoomIn", key: "+", run: () => controller.zoomBy(1.25) },
+        { id: "zoom-out", label: "Zoom out", icon: "zoomOut", key: "−", run: () => controller.zoomBy(0.8) },
+        { id: "fit", label: "Fit page", icon: "grow", key: "0", run: go(() => controller.board.fit_page()) },
+        { id: "fullscreen-z", label: "Fullscreen", icon: "fullscreen", key: "F", run: go(() => controller.toggleFullscreen()) },
+      ],
+    },
+    {
       id: "toolbar", label: atTop() ? "Toolbar at bottom" : "Toolbar at top", icon: atTop() ? "down" : "up",
       run: go(flipIslandsNow), hidden: view(),
     },

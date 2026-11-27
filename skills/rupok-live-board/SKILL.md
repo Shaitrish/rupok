@@ -277,7 +277,7 @@ page on the right, bigger buttons." (`/dock` in Rupok's chat):
 
 Rupok has two layouts. **Modern**: a top bar and the Smart Dock. **Classic**:
 no top bar, big buttons in three islands along the bottom (☰ menu, mode,
-tools, share, zoom · select, pen, eraser, shapes, pan, recognise ink,
+tools, Ask AI · select, pen, eraser, shapes, hand, recognise ink,
 stamps, undo, redo · new page, back, page button, next), familiar to
 teachers coming from classroom whiteboard software.
 

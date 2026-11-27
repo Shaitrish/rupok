@@ -206,7 +206,7 @@ export async function runBoardOp(c: Controller, op: any, agent: string, lastAgen
             dock: "The Smart Dock (Modern layout): one bar, groups separated.",
             islands: "The Classic layout: each group is an island along the bottom (or top) edge; the first at the left, the last at the right, the others in the middle. No top bar; the ☰ menu (menu) holds files, export, settings and help.",
           },
-          classic_example: { style: "islands", position: "bottom", size: "l", groups: [{ label: "Menu", items: ["menu", "mode", "toolbox", "share", "zoom"] }, { label: "Tools", items: ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] }, { label: "Pages", items: ["addpage", "pager"] }] },
+          classic_example: { style: "islands", position: "bottom", size: "l", groups: [{ label: "Menu", items: ["menu", "mode", "toolbox", "ai"] }, { label: "Tools", items: ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] }, { label: "Pages", items: ["addpage", "pager"] }] },
         },
       };
     }

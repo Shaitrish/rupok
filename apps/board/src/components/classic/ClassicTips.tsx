@@ -31,6 +31,19 @@ export function ClassicTips() {
     setTip(null);
   };
   onMount(() => {
+    // Island buttons show only this tooltip: their `title` moves to
+    // data-title as they appear (the aria-label stays for screen readers).
+    const strip = () => {
+      for (const b of Array.from(document.querySelectorAll<HTMLElement>(".islands [title]"))) {
+        b.dataset.title = b.title;
+        b.removeAttribute("title");
+      }
+    };
+    strip();
+    const islandsEl = document.querySelector(".islands");
+    const mo = new MutationObserver(strip);
+    if (islandsEl) mo.observe(islandsEl, { subtree: true, childList: true, attributes: true, attributeFilter: ["title"] });
+    onCleanup(() => mo.disconnect());
     const over = (e: PointerEvent) => {
       const btn = (e.target as Element | null)?.closest?.(SCOPE) as HTMLElement | null;
       clearTimeout(timer);
