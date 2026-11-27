@@ -53,6 +53,9 @@ capture = ["dep:x11rb", "dep:xcap"]
 # downloaded on demand from Settings, never bundled (voice.rs, voice_cmd.rs).
 # Needs cmake and a C++ compiler. `tauri dev --features whisper`.
 whisper = ["dep:whisper-rs", "dep:ureq", "dep:sha2"]
+# Offline voice with Apple's Metal GPU (the macOS installer). whisper.cpp
+# already uses Accelerate on the CPU; Metal makes the larger models usable.
+metal = ["whisper", "whisper-rs/metal"]
 
 [dependencies]
 rupok-format.workspace = true

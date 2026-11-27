@@ -96,6 +96,7 @@
       "signingIdentity": "-"
     },
     "linux": {
+      "appimage": { "bundleMediaFramework": true },
       "deb": {
         "desktopTemplate": "linux/rupok.desktop",
         "files": {

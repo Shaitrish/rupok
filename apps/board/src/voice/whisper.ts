@@ -1,7 +1,8 @@
 // Offline Whisper provider (desktop app, feature `whisper`). The webview
-// captures the microphone with getUserMedia (WebView2 and WKWebView ask the
-// user; on Linux the shell answers WebKitGTK's permission request for audio
-// only), downsamples to 16 kHz mono and sends 16-bit PCM to the Rust command
+// captures the microphone with getUserMedia (the shell grants its own board
+// the microphone in every engine, apps/desktop/src/voice_cmd.rs
+// `on_permission`; macOS still asks once), downsamples to 16 kHz mono and
+// sends 16-bit PCM to the Rust command
 // `voice_transcribe` (apps/desktop/src/voice_cmd.rs), which runs whisper.cpp
 // on this computer. Audio stays in memory and is dropped after each pass.
 //
@@ -10,6 +11,7 @@
 // Long dictation is cut into ~20 s pieces so each pass stays fast.
 
 import { desktopInvoke, desktopListen } from "../platform";
+import { mediaErrorCode } from "./diagnose";
 import type { DictationSession, SessionHandlers, SessionOptions, VoiceProvider } from "./types";
 
 export const TARGET_RATE = 16000;
@@ -23,6 +25,10 @@ export interface ModelStatus {
 }
 export interface WhisperStatus {
   built: boolean;
+  /** This processor can run whisper.cpp (absent from older shells: true). */
+  cpu_ok?: boolean;
+  /** Why not, in words. */
+  cpu_note?: string | null;
   downloading: boolean;
   models: ModelStatus[];
 }
@@ -87,7 +93,7 @@ export function makeWhisperProvider(model: () => string | null): VoiceProvider {
       };
       const fail = (e: any) => {
         const msg = String(e?.message ?? e);
-        h.onError({ code: e?.code === "no-model" || /not downloaded/.test(msg) ? "no-model" : "other", message: msg });
+        h.onError({ code: e?.code === "no-model" || /not downloaded/.test(msg) ? "no-model" : "other", message: `Offline voice: ${msg}` });
       };
       const release = () => {
         clearInterval(timer);
@@ -122,23 +128,37 @@ export function makeWhisperProvider(model: () => string | null): VoiceProvider {
         }
       };
 
+      // The audio context is made here, inside the tap, so no engine's
+      // autoplay rule leaves it suspended (WebKit would, after the await).
+      const AC: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
+      ctx = AC ? new AC() : null;
+      void ctx?.resume().catch(() => {});
+
       (async () => {
         try {
+          if (!navigator.mediaDevices?.getUserMedia || !ctx) throw Object.assign(new Error("getUserMedia is missing"), { name: "NoApi" });
           stream = await navigator.mediaDevices.getUserMedia({
             audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           });
         } catch (e: any) {
-          const denied = e?.name === "NotAllowedError" || e?.name === "SecurityError";
+          const code = e?.name === "NoApi" ? "no-api" : mediaErrorCode(e);
           h.onError({
-            code: denied ? "not-allowed" : "no-mic",
-            message: denied ? "Microphone access was refused. Allow it in your system's privacy settings." : "No microphone was found.",
+            code: code === "other" ? "busy" : code,
+            message:
+              code === "not-allowed" ? "The system refused the microphone."
+              : code === "no-mic" ? "No microphone was found."
+              : code === "no-api" ? "This app's web engine cannot use the microphone."
+              : "The microphone could not be opened.",
+            detail: [e?.name, e?.message].filter(Boolean).join(": "),
           });
           end();
           return;
         }
-        if (cancelled || stopped) { end(); return; }
-        const AC: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
-        ctx = new AC();
+        // Stopped while the microphone was opening: close it again (end()
+        // may already have run, before the stream existed).
+        if (cancelled || stopped || !ctx) { release(); end(); return; }
+        if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+        if (cancelled || stopped || !ctx || !stream) { release(); end(); return; }
         const src = ctx.createMediaStreamSource(stream);
         // ScriptProcessor is deprecated but works in every webview Tauri uses
         // (an AudioWorklet module would need a blob: URL in the CSP).

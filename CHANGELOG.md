@@ -5,6 +5,33 @@ notes come after each list. Downloads are on
 [rupok.app/download](https://rupok.app/download/) and on
 [GitHub Releases](https://github.com/Shaitrish/rupok/releases).
 
+## Unreleased
+
+### For teachers
+
+- **Voice typing works in the desktop app** on Windows, Linux and macOS. The
+  first time you tap the mic, Rupok offers "Download offline voice (base,
+  ~148 MB)". After that, speech becomes text on your computer, in English
+  and বাংলা, even without internet. Audio never leaves the computer.
+- **When the microphone does not work, Rupok says why and how to fix it:**
+  blocked for the site (with the steps in Chrome or Edge), blocked by
+  Windows, macOS or Linux privacy settings, no microphone, or the microphone
+  busy in another app. "Try again" is right there.
+- **Test microphone:** Settings → General → Voice input. Speak for 3
+  seconds; it shows which speech recognition is used, the microphone
+  permission, the input level and what was heard.
+
+### For developers
+
+- The installers are built with `--features whisper` (`metal` on macOS) and
+  `GGML_NATIVE=OFF`; `voice_status` reports `cpu_ok` / `cpu_note`.
+- `voice_cmd::on_permission` grants the board window the microphone in
+  WebView2, WKWebView and WebKitGTK. The AppImage bundles GStreamer.
+- `apps/board/src/voice/diagnose.ts`: `micAdvice` (pure, tested) turns a
+  failure plus the permission state and devices into steps.
+- Brave, Chromium, Opera and Vivaldi no longer try Web Speech (the API
+  without a service); new provider choice `"setup"` offers the model.
+
 ## v0.2.5 (27 November 2026)
 
 ### For teachers

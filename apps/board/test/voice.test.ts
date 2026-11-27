@@ -8,8 +8,9 @@ import {
   applySpokenPunctuation, capitalizeSentences, joinDictation, normalizeBangla,
 } from "../src/voice/punctuation.ts";
 import {
-  type VoiceEnv, audioPath, chooseProvider, detectPlatform, osDictationHint, webSpeechUsable,
+  type VoiceEnv, audioPath, chooseProvider, detectPlatform, lacksSpeechService, osDictationHint, webSpeechUsable,
 } from "../src/voice/select.ts";
+import { type MicFacts, micAdvice } from "../src/voice/diagnose.ts";
 
 const UA = {
   chromeWin: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -52,13 +53,46 @@ test("desktop: WebView2 and WebKitGTK never use Web Speech; WKWebView does", () 
 
 test("desktop: Whisper wins once a model is downloaded", () => {
   const linux = env(UA.webkitGtk, { desktop: true, speechApi: false, whisperBuilt: true });
-  assert.equal(chooseProvider(linux), "hint", "built but no model yet");
+  assert.equal(chooseProvider(linux), "setup", "built but no model yet: offer the download");
   assert.equal(chooseProvider({ ...linux, whisperModel: "base" }), "whisper");
   const mac = env(UA.safariMac, { desktop: true, whisperBuilt: true, whisperModel: "tiny" });
   assert.equal(chooseProvider(mac), "whisper");
   assert.equal(chooseProvider(mac, "webspeech"), "webspeech", "a forced provider is honoured");
   // A model on disk but a build without whisper: not usable.
   assert.equal(chooseProvider(env(UA.webkitGtk, { desktop: true, speechApi: false, whisperModel: "base" })), "hint");
+});
+
+test("desktop: Windows (WebView2) offers the offline voice download, never Web Speech", () => {
+  const win = env(UA.edgeWin, { desktop: true, whisperBuilt: true });
+  assert.equal(chooseProvider(win), "setup");
+  assert.equal(chooseProvider({ ...win, whisperModel: "base" }), "whisper");
+  assert.equal(chooseProvider(win, "whisper"), "setup", "forced offline voice without a model: the download");
+  assert.equal(chooseProvider(win, "os"), "hint");
+  assert.equal(audioPath("setup", win), "device");
+});
+
+test("desktop: a processor without AVX2 gets the system hint, not a download that cannot run", () => {
+  const old = env(UA.edgeWin, { desktop: true, whisperBuilt: true, whisperCpuOk: false });
+  assert.equal(chooseProvider(old), "hint");
+  assert.equal(chooseProvider({ ...old, whisperModel: "base" }), "hint");
+});
+
+test("desktop: macOS keeps Web Speech first, offers the download when it breaks", () => {
+  const mac = env(UA.safariMac, { desktop: true, whisperBuilt: true });
+  assert.equal(chooseProvider(mac), "webspeech");
+  assert.equal(chooseProvider({ ...mac, speechBroken: true }), "setup");
+});
+
+test("Chromium browsers without Google's speech service are not trusted", () => {
+  const chromium = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+  assert.equal(lacksSpeechService(chromium, ["Chromium", "Not_A Brand"], "linux"), true);
+  assert.equal(lacksSpeechService(chromium, ["Google Chrome", "Chromium", "Not_A Brand"], "linux"), false);
+  assert.equal(lacksSpeechService(UA.edgeWin, ["Microsoft Edge", "Chromium"], "windows"), false);
+  assert.equal(lacksSpeechService(UA.chromeWin, null, "windows"), false, "no brands: trust Chrome's UA");
+  assert.equal(lacksSpeechService(`${UA.chromeWin} OPR/115.0.0.0`, null, "windows"), true);
+  assert.equal(lacksSpeechService(UA.android, ["Chromium"], "android"), false, "Android uses the system recogniser");
+  assert.equal(lacksSpeechService(UA.firefoxLinux, null, "linux"), false);
+  assert.equal(chooseProvider(env(UA.chromeWin, { noSpeechService: true })), "hint");
 });
 
 test("forced providers fall back when unavailable", () => {
@@ -83,6 +117,51 @@ test("OS dictation hints", () => {
   assert.deepEqual(osDictationHint("windows").keys, ["Win", "H"]);
   assert.match(osDictationHint("mac").text, /Dictation/);
   assert.match(osDictationHint("linux").text, /offline/);
+  assert.doesNotMatch(osDictationHint("linux", true).text, /desktop app/, "the desktop app does not send you to itself");
+});
+
+// ----------------------------------------------------- microphone advice
+
+const facts = (o: Partial<MicFacts>): MicFacts => ({
+  os: "linux", engine: "chromium", edge: false, desktop: false, permission: "prompt", inputs: 2,
+  secure: true, framed: false, error: "not-allowed", ...o,
+});
+
+test("mic advice: a site blocked in Chrome points at the padlock, and Linux's switch", () => {
+  const a = micAdvice(facts({ permission: "denied" }));
+  assert.match(a.title, /blocked for this site/);
+  assert.ok(a.steps.some((s) => /address bar/.test(s)));
+  assert.ok(a.steps.some((s) => /Privacy & Security › Microphone/.test(s)), "Linux privacy toggle");
+  assert.equal(a.retry, false);
+});
+
+test("mic advice: an unanswered question means try again", () => {
+  const a = micAdvice(facts({ permission: "prompt" }));
+  assert.match(a.title, /did not get permission/);
+  assert.equal(a.retry, true);
+});
+
+test("mic advice: allowed for the site but refused means the OS", () => {
+  const w = micAdvice(facts({ os: "windows", permission: "granted" }));
+  assert.match(w.title, /Windows is blocking/);
+  assert.ok(w.steps.some((s) => /Let desktop apps access your microphone/.test(s)));
+  const sys = micAdvice(facts({ os: "mac", permission: "prompt", detail: "NotAllowedError: Permission denied by system" }));
+  assert.match(sys.title, /macOS is blocking/);
+});
+
+test("mic advice: the desktop app's refusals are the OS's", () => {
+  const a = micAdvice(facts({ os: "windows", desktop: true, permission: "unknown" }));
+  assert.match(a.title, /Windows is blocking/);
+  assert.ok(a.steps.some((s) => /Restart|reopen/i.test(s)));
+});
+
+test("mic advice: no device, busy, insecure, framed", () => {
+  assert.match(micAdvice(facts({ inputs: 0 })).title, /No microphone/);
+  assert.match(micAdvice(facts({ error: "no-mic", inputs: null })).title, /No microphone/);
+  assert.match(micAdvice(facts({ error: "busy" })).title, /busy/);
+  assert.match(micAdvice(facts({ secure: false })).title, /secure/);
+  assert.match(micAdvice(facts({ framed: true })).title, /page around Rupok/);
+  assert.match(micAdvice(facts({ error: "service" })).title, /no speech service/);
 });
 
 // ----------------------------------------------------------- punctuation

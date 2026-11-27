@@ -8,11 +8,12 @@
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { MicButton } from "../components/MicButton";
 import { openSettings } from "../settings/open";
-import { editingText } from "../state";
+import { editingText, showToast } from "../state";
 import {
-  activeAnchor, activeLang, bubbleOn, cancelDictation, hint, interim, privacyShort, privacyText, setDictationLang, setHint,
-  startDictation, stopDictation, voiceEnv, voicePrefs, voiceStatus,
+  activeAnchor, activeLang, bubbleOn, cancelDictation, closeHint, hint, interim, privacyShort, privacyText, retryDictation,
+  setDictationLang, startDictation, stopDictation, voiceChoice, voiceEnv, voicePrefs, voiceProblem, voiceStatus, whisper,
 } from "./dictation";
+import { FIRST_MODEL, downloadVoiceModel, mb, modelBytes, modelError, modelProgress, stopVoiceModelDownload } from "./model";
 import { osDictationHint } from "./select";
 import { VOICE_LANGS, type VoiceLang } from "./types";
 import "./voice.css";
@@ -90,37 +91,127 @@ function Bubble() {
   );
 }
 
+/** The popover by the mic when it cannot simply listen: why the microphone
+ * failed and how to fix it; the offline voice download on first use
+ * (desktop); or how to use the system's own dictation. */
 function Hint() {
   const rect = useRect(() => hint());
-  const info = () => osDictationHint(voiceEnv().os);
-  const canWhisper = () => voiceEnv().desktop && voiceEnv().whisperBuilt && !voiceEnv().whisperModel;
+  const info = () => osDictationHint(voiceEnv().os, voiceEnv().desktop);
+  const setup = () => !voiceProblem() && voiceChoice() === "setup";
+  const cpuNote = () => (voiceEnv().desktop && whisper()?.built && whisper()?.cpu_ok === false ? whisper()?.cpu_note ?? null : null);
+  const [ready, setReady] = createSignal(false);
   let box!: HTMLDivElement;
   onMount(() => {
     const away = (e: PointerEvent) => {
-      if (hint() && box && !box.contains(e.target as Node) && !(e.target as HTMLElement)?.closest?.("[data-mic]")) setHint(null);
+      if (hint() && box && !box.contains(e.target as Node) && !(e.target as HTMLElement)?.closest?.("[data-mic],[data-voice-mic]")) {
+        setReady(false);
+        closeHint();
+      }
     };
     window.addEventListener("pointerdown", away, true);
     onCleanup(() => window.removeEventListener("pointerdown", away, true));
   });
+  const download = async () => {
+    setReady(false);
+    const ok = await downloadVoiceModel(FIRST_MODEL);
+    if (!ok) return;
+    if (hint()) setReady(true);
+    else showToast("Offline voice is ready. Tap the mic to talk.", 4000);
+  };
+  const size = () => mb(modelBytes(FIRST_MODEL) || 147_951_465);
+  const pct = () => {
+    const p = modelProgress();
+    return p && p.total ? Math.round((100 * p.done) / p.total) : 0;
+  };
   return (
     <Show when={hint() && rect()}>
       {(r) => (
-        <div ref={box} class="voice-hint surface" role="dialog" aria-label="Voice typing" style={place(r(), 340, 170)} onMouseDown={(e) => e.preventDefault()}>
-          <div class="voice-hint-title">Speak instead of typing</div>
-          <p>{info().text}</p>
-          <Show when={info().keys.length}>
-            <div class="voice-hint-keys">
-              <For each={info().keys}>{(k, i) => <>{i() > 0 && <span>+</span>}<kbd>{k}</kbd></>}</For>
-            </div>
+        <div ref={box} class="voice-hint surface" role="dialog" aria-label="Voice typing" style={place(r(), 360, setup() ? 210 : 230)} onMouseDown={(e) => e.preventDefault()}>
+          <Show
+            when={voiceProblem()}
+            fallback={
+              <Show
+                when={setup() || ready()}
+                fallback={
+                  <>
+                    <div class="voice-hint-title">Speak instead of typing</div>
+                    <Show when={cpuNote()}><p>{cpuNote()}</p></Show>
+                    <p>{info().text}</p>
+                    <Show when={info().keys.length}>
+                      <div class="voice-hint-keys">
+                        <For each={info().keys}>{(k, i) => <>{i() > 0 && <span>+</span>}<kbd>{k}</kbd></>}</For>
+                      </div>
+                    </Show>
+                    <div class="voice-hint-actions">
+                      <button type="button" class="btn" onClick={() => { closeHint(); openSettings("general.voiceInput"); }}>Voice settings</button>
+                      <span class="grow" />
+                      <button type="button" class="btn solid" onClick={() => closeHint()}>OK</button>
+                    </div>
+                  </>
+                }
+              >
+                <Show
+                  when={!ready()}
+                  fallback={
+                    <>
+                      <div class="voice-hint-title">Offline voice is ready</div>
+                      <p>Speech becomes text on this computer, in English and বাংলা. Audio never leaves it.</p>
+                      <div class="voice-hint-actions">
+                        <span class="grow" />
+                        <button type="button" class="btn solid" data-voice-start onClick={() => { setReady(false); retryDictation(); }}>Start talking</button>
+                      </div>
+                    </>
+                  }
+                >
+                  <div class="voice-hint-title">Turn on voice typing</div>
+                  <p>Rupok turns speech into text on this computer, in English and বাংলা, even without internet. It needs a one-time download.</p>
+                  <Show
+                    when={modelProgress()}
+                    fallback={
+                      <div class="voice-hint-actions">
+                        <button type="button" class="btn solid" data-voice-download onClick={() => void download()}>
+                          Download offline voice ({FIRST_MODEL}, ~{size()})
+                        </button>
+                        <span class="grow" />
+                        <button type="button" class="btn" onClick={() => closeHint()}>Not now</button>
+                      </div>
+                    }
+                  >
+                    {(p) => (
+                      <div class="voice-hint-progress">
+                        <progress max={p().total || 1} value={p().done} aria-label="Downloading offline voice" />
+                        <span>{mb(p().done)} / {mb(p().total)} · {pct()}%</span>
+                        <button type="button" class="btn" onClick={() => stopVoiceModelDownload()}>Stop</button>
+                      </div>
+                    )}
+                  </Show>
+                  <Show when={modelError()}><p class="voice-hint-error" role="alert">{modelError()}</p></Show>
+                  <Show when={info().keys.length && !modelProgress()}>
+                    <p class="voice-hint-alt">Or now, without the download: <For each={info().keys}>{(k, i) => <>{i() > 0 && " + "}<kbd>{k}</kbd></>}</For></p>
+                  </Show>
+                </Show>
+              </Show>
+            }
+          >
+            {(pb) => (
+              <>
+                <div class="voice-hint-title">{pb().title}</div>
+                <p>{pb().text}</p>
+                <Show when={pb().steps.length}>
+                  <ol class="voice-hint-steps">
+                    <For each={pb().steps}>{(st) => <li>{st}</li>}</For>
+                  </ol>
+                </Show>
+                <div class="voice-hint-actions">
+                  <button type="button" class="btn" onClick={() => { closeHint(); openSettings("general.voiceTest"); }}>Test microphone</button>
+                  <span class="grow" />
+                  <Show when={pb().retry} fallback={<button type="button" class="btn solid" onClick={() => closeHint()}>OK</button>}>
+                    <button type="button" class="btn solid" data-voice-retry onClick={() => retryDictation()}>Try again</button>
+                  </Show>
+                </div>
+              </>
+            )}
           </Show>
-          <div class="voice-hint-actions">
-            <Show when={canWhisper()}>
-              <button type="button" class="btn soft" onClick={() => { setHint(null); openSettings("general.voiceModel"); }}>Set up offline voice</button>
-            </Show>
-            <button type="button" class="btn" onClick={() => { setHint(null); openSettings("general.voiceInput"); }}>Voice settings</button>
-            <span class="grow" />
-            <button type="button" class="btn solid" onClick={() => setHint(null)}>OK</button>
-          </div>
         </div>
       )}
     </Show>
@@ -171,7 +262,7 @@ export default function VoiceLayer() {
         } else if (hint()) {
           e.preventDefault();
           e.stopImmediatePropagation();
-          setHint(null);
+          closeHint();
         }
         return;
       }

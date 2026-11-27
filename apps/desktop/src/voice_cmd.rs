@@ -43,6 +43,10 @@ pub struct ModelOut {
 pub struct StatusOut {
     /// This build has whisper.cpp (feature `whisper`).
     built: bool,
+    /// This processor can run it (see `voice::cpu_problem`).
+    cpu_ok: bool,
+    /// Why not, in words, when `cpu_ok` is false.
+    cpu_note: Option<String>,
     downloading: bool,
     models: Vec<ModelOut>,
 }
@@ -53,8 +57,11 @@ pub fn voice_status<R: Runtime>(
     voice: State<'_, VoiceState>,
 ) -> Result<StatusOut, String> {
     let store = store(&app)?;
+    let cpu_note = voice::cpu_problem();
     Ok(StatusOut {
         built: voice::BUILT,
+        cpu_ok: cpu_note.is_none(),
+        cpu_note,
         downloading: voice.downloading.load(Ordering::Relaxed),
         models: voice::MODELS
             .iter()
@@ -91,6 +98,9 @@ pub async fn voice_model_download<R: Runtime>(
     #[cfg(feature = "whisper")]
     {
         use tauri::Emitter;
+        if let Some(why) = voice::cpu_problem() {
+            return Err(why);
+        }
         if voice.downloading.swap(true, Ordering::SeqCst) {
             return Err("a voice model is already downloading".into());
         }
@@ -184,32 +194,43 @@ pub async fn voice_transcribe<R: Runtime>(
     }
 }
 
-/// Let the board window use the microphone. WebKitGTK (Linux) denies
-/// getUserMedia unless the app enables media streams and answers the
-/// permission request; only audio-only requests from the board are allowed.
-/// WebView2 (Windows) and WKWebView (macOS) ask the user themselves.
+/// The board window may use the microphone (voice input); nothing else may.
+/// Registered on the app builder (`app.rs`), so it answers before any page
+/// asks:
+/// - WebView2 (Windows) would otherwise show its own "tauri.localhost wants
+///   to use your microphone" prompt every session, which a "Block" answer
+///   turns into a silent `NotAllowedError` from then on.
+/// - WebKitGTK (Linux) denies getUserMedia when nobody answers.
+/// - WKWebView (macOS) grants by default; macOS itself still asks once
+///   (Info.plist `NSMicrophoneUsageDescription`).
+///
+/// The camera and every other permission keep the engine's default. Smart
+/// Objects run in sandboxed iframes without `allow="microphone"`, so the
+/// engines refuse them before this is asked.
+pub fn on_permission<R: Runtime>(
+    webview: tauri::Webview<R>,
+    kind: tauri::webview::PermissionKind,
+) -> tauri::webview::PermissionResponse {
+    use tauri::webview::{PermissionKind, PermissionResponse};
+    if kind == PermissionKind::Microphone && webview.label() == crate::app::MAIN {
+        PermissionResponse::Allow
+    } else {
+        PermissionResponse::Default
+    }
+}
+
+/// Linux: WebKitGTK hides `navigator.mediaDevices` unless media streams are
+/// enabled in the web view's settings (the permission itself is answered by
+/// [`on_permission`]). WebView2 and WKWebView need nothing here.
 pub fn init<R: Runtime>(app: &AppHandle<R>) {
     #[cfg(target_os = "linux")]
     if let Some(w) = app.get_webview_window(crate::app::MAIN) {
         let _ = w.with_webview(|wv| {
-            use webkit2gtk::glib::object::Cast;
-            use webkit2gtk::{
-                PermissionRequestExt, SettingsExt, UserMediaPermissionRequest,
-                UserMediaPermissionRequestExt, WebViewExt,
-            };
+            use webkit2gtk::{SettingsExt, WebViewExt};
             let view = wv.inner();
             if let Some(s) = WebViewExt::settings(&view) {
                 s.set_enable_media_stream(true);
             }
-            view.connect_permission_request(|_, req| {
-                match req.downcast_ref::<UserMediaPermissionRequest>() {
-                    Some(um) if um.is_for_audio_device() && !um.is_for_video_device() => {
-                        req.allow();
-                        true
-                    }
-                    _ => false,
-                }
-            });
         });
     }
     #[cfg(not(target_os = "linux"))]

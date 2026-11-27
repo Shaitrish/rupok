@@ -4,7 +4,7 @@
 import { isDesktop } from "../../platform";
 import { setDefaultLang, voicePrefs } from "../../voice/dictation";
 import { VOICE_LANGS, type VoiceLang } from "../../voice/types";
-import { VoiceModel, VoicePrivacy } from "../../voice/VoiceSettings";
+import { VoiceModel, VoicePrivacy, VoiceTest } from "../../voice/VoiceSettings";
 import "../../voice/voice.css";
 import { registerSettings } from "../registry";
 
@@ -56,10 +56,17 @@ registerSettings([
   {
     id: "general.voiceModel", category: "general", group: GROUP, order: 304, type: "custom", layout: "block",
     label: "Offline voice model",
-    description: "Download once to dictate without internet, in English and Bangla. Needed on Linux, where the system has no speech recognition.",
+    description: "Download once to dictate without internet, in English and Bangla. Needed in the desktop app on Windows and Linux, whose web engines have no speech recognition.",
     keywords: ["Whisper", "offline", "download", "model", "on-device", "remove", "অফলাইন"],
     component: VoiceModel,
     when: () => isDesktop,
+  },
+  {
+    id: "general.voiceTest", category: "general", group: GROUP, order: 304.5, type: "custom", layout: "block",
+    label: "Test microphone",
+    description: "Speak for 3 seconds: shows the speech recognition in use, the microphone permission, the input level and what was heard. When something is wrong it says how to fix it.",
+    keywords: ["test", "microphone", "mic", "check", "level", "permission", "not working", "blocked", "diagnose", "troubleshoot", "মাইক পরীক্ষা"],
+    component: VoiceTest,
   },
   {
     id: "general.voicePunctuation", category: "general", group: GROUP, order: 305, type: "toggle", label: "Spoken punctuation",

@@ -266,6 +266,7 @@ the AI chip's Undo puts it back.
 | `general.voiceProvider` | teacher only | Privacy: where the teacher's voice is sent. |
 | `general.voicePrivacy` | teacher only | Privacy: what happens to recordings. |
 | `general.voiceModel` | teacher only | Downloads a large speech model to this device. |
+| `general.voiceTest` | teacher only | The microphone: a local check only the teacher runs (it listens for 3 seconds). |
 | `general.voicePunctuation` | agent | `set_setting` |
 | `general.voiceMode` | agent | `set_setting` |
 | `general.voiceBoardMode` | agent | `set_setting` |
