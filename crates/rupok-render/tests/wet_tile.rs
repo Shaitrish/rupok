@@ -235,16 +235,16 @@ impl Rig {
             .zip(&got)
             .filter(|(a, b)| (0..4).any(|c| a[c].abs_diff(b[c]) > 2))
             .count();
-        if off > 0 {
-            if let Ok(dir) = std::env::var("RUPOK_WETDRY_DUMP") {
-                for (name, img) in [("want", &want), ("got", &got)] {
-                    let mut f = format!("P6 {W} {H} 255\n").into_bytes();
-                    f.extend(
-                        img.iter()
-                            .flat_map(|p| [255 - p[3], 255 - p[3], 255 - p[3]]),
-                    );
-                    std::fs::write(format!("{dir}/tile-{name}.ppm"), f).expect("dump");
-                }
+        if off > 0
+            && let Ok(dir) = std::env::var("RUPOK_WETDRY_DUMP")
+        {
+            for (name, img) in [("want", &want), ("got", &got)] {
+                let mut f = format!("P6 {W} {H} 255\n").into_bytes();
+                f.extend(
+                    img.iter()
+                        .flat_map(|p| [255 - p[3], 255 - p[3], 255 - p[3]]),
+                );
+                std::fs::write(format!("{dir}/tile-{name}.ppm"), f).expect("dump");
             }
         }
         assert_eq!(

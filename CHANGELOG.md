@@ -5,6 +5,40 @@ notes come after each list. Downloads are on
 [rupok.app/download](https://rupok.app/download/) and on
 [GitHub Releases](https://github.com/Shaitrish/rupok/releases).
 
+## v0.2.5 (27 November 2026)
+
+### For teachers
+
+- **Faster ink on big 4K boards:** while you write, Rupok now redraws only
+  a small area under the pen instead of the whole screen. On a 4K test
+  screen this cut full-screen redraws from every frame to about 3 % of
+  frames and kept writing near 60 frames per second. Not yet measured on a
+  real classroom board.
+- **Ink sharpness (Auto / 100 / 75 / 50 %):** big boards draw ink at 75 %
+  by default, which is much lighter on built-in graphics chips. Change it in
+  Settings → About → Performance lab.
+- **Performance lab:** switches for ink sharpness, the wet-ink layer, the
+  Windows ink trail, a native Windows wet-ink layer (an experimental
+  prototype, off by default) and flat panels. Every switch applies at once.
+- **Board speed test:** Settings → About → Troubleshooting → Run board speed
+  test. It writes by itself in several modes, asks you to write a few
+  times, and saves a report to `Documents/Rupok/speed-test-<date>.txt`.
+- **Smooth curves:** fast strokes no longer look like straight segments
+  with corners. Rupok draws a smooth curve through the pen's points as you
+  write, so a mouse or a slow touch screen gives round loops too. Lessons
+  saved before keep their strokes as they were.
+- **Linux app:** every pointer movement now reaches the board (up to the
+  pointer's full rate, not one per frame).
+- **Settings → About** shows which build you are running.
+
+### For developers
+
+- Wet tile in `rupok-render`; render-scale governor; Renderer Auto picks
+  WebGPU in Chromium with a real GPU. See `docs/performance.md`.
+- `crates/rupok-ink/src/curve.rs`: the curve is applied in the
+  `StrokeBuilder` and stored as the stroke's points (no format change).
+- Board test script: `docs/board-test.md`.
+
 ## v0.2.4 (24 November 2026)
 
 ### For teachers
