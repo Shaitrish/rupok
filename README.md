@@ -187,6 +187,30 @@ bun run wasm      # builds rupok-wasm and generates src/wasm/
 bun run dev
 ```
 
+### Performance
+
+Pen latency is the feature we care about most, so it has its own budgets in
+CI (`bench/latency`, `cargo run -p rupok-bench --release -- --check`). The
+method, the full numbers and the per-frame design are in
+[docs/performance.md](docs/performance.md).
+
+Measured for v0.2.5 on a **development laptop, not a classroom board**
+(Ryzen 5 5625U with integrated Radeon graphics, Chrome, a 3840×2160 screen,
+a simulated 240 Hz pen, 8 s of handwriting), against v0.2.4:
+
+| While writing | v0.2.4 | v0.2.5 |
+|---|---|---|
+| Frames per second, median / slowest 5 % | 56.8 / 20.0 | 59.9 / 41.8 |
+| Pen to frame submitted, p50 / p95 | 14.1 / 57.6 ms | 10.1 / 20.9 ms |
+| Frames that redrew the whole 4K canvas | 100 % | 3.2 % |
+| Screen area the compositor redrew per frame | 86.5 % | 14.1 % |
+| Ink pixels that change when the pen lifts | 0.00 % | 0.00 % |
+
+Not measured yet: Windows, WebView2 and Intel graphics on a real classroom
+panel. If you have a board, Settings → About → Troubleshooting → **Run board
+speed test** writes a report you can attach to an issue; see
+[docs/board-test.md](docs/board-test.md).
+
 ### Good first issues
 
 - Issues labelled
