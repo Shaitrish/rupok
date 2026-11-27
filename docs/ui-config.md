@@ -98,6 +98,73 @@ text size while editing text. Everything else in `tools` waits in the ⋯ menu.
   big board. A button sits on one dock only.
 - `size` (`"s"`, `"m"`, `"l"`), `sizes` (per button, `{ "pen": "l" }`) and
   `large` (large icons, for low vision) (all optional).
+- `style` (optional): `"dock"` (the Smart Dock, the default) or
+  `"islands"`, the **Classic layout** (below).
+
+### The Classic layout (`style: "islands"`)
+
+The Classic layout is familiar to teachers who come from classroom
+whiteboard software: no top bar, and big buttons in separate islands along
+the bottom edge. It is a dock style, not a separate mode, so everything
+above applies: the teacher (Customize dock) and their AI (`set_dock_layout`)
+rearrange it like any dock.
+
+- Each group of `groups` is one island. The first sits at the left, the
+  last at the right, the others in the middle (one group: in the middle).
+  An island's own `place` (`bottom-left`, `bottom-centre`, `bottom-right`,
+  `top-left`, `top-centre`, `top-right`) puts it there instead, and
+  `collapsed: true` folds it to a small pill (tap it to show it again). The
+  teacher moves an island by pressing and holding its background, then
+  dragging it to one of the six spots; a double tap on the background moves
+  every island to the other edge; ☰ → Toolbar at top / bottom and Hide
+  toolbar do the same for all of them.
+  `appearance.islandSwap` (the arrow tab at a side island's outer edge,
+  Settings → Appearance, or the agent's `swap_islands`) trades the first
+  and last islands' sides; they slide across.
+  On narrow screens the middle island moves above the other two.
+- `position`: `"bottom"` (default) or `"top"`; other positions are treated
+  as the bottom edge. `orientation`, `minimized` and `split` are ignored.
+- `size`: `"l"` (56 px buttons, 32 px icons; the Classic default), `"m"`
+  (48 / 28) or `"s"` (44 / 24, never smaller: a 44 px hit area). `large`
+  adds 4 px to every icon.
+- Pen, eraser and undo always stay (a layout that leaves one out gets it
+  back in the island with the pen). Highlighter and laser are in the pen
+  panel and the Tools box; anything the mode offers that is on no island is
+  in the Tools box.
+- The top bar is not drawn. The ☰ menu (`menu`) holds File (new, open,
+  save, save as, Library), Import, Export (PDF, the lesson file, share),
+  Print, Settings, Help, Mode (modes, fullscreen, theme, the Modern layout)
+  and Exit. The lesson title shows for a moment when the page changes.
+- Pen, highlighter and shapes open titled panels: thickness with a live
+  dot, illustrated pen types, 15 colours and an eyedropper.
+- The page button (`pager`'s counter) opens a grid of thumbnails above it.
+  A swipe from the left or right screen edge (finger or pen, starting
+  within 20 px of the edge, at least 56 px inward within 0.6 s) slides in
+  the slide panel: numbered thumbnails with add, duplicate and star, and
+  organise, starred-only and delete at the top.
+- The Student view follows Prepare: when Prepare uses islands, the student
+  view shows ☰ and zoom, pan, objects and replay, and the pager.
+
+The **Classic** dock preset sets it for Prepare and Teach;
+**Settings → Appearance → Layout** (`appearance.layout`) switches between
+Modern and Classic and brings back the teacher's own Modern dock.
+Classic is the default on the teacher board: a new board starts in it, and
+the first-run "Which layout do you prefer?" has Classic preselected
+(dismissing it keeps Classic). A teacher who picked Modern keeps Modern. The
+student view, share links and the overlay keep their own chrome.
+
+```json
+"teach": {
+  "dock": {
+    "style": "islands", "size": "l",
+    "groups": [
+      { "id": "left", "label": "Menu", "items": ["menu", "mode", "toolbox", "ai"] },
+      { "id": "centre", "label": "Tools", "items": ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] },
+      { "id": "right", "label": "Pages", "items": ["addpage", "pager"] }
+    ]
+  }
+}
+```
 
 The editor for all of this is **Customize dock** (the dock's ⋯ menu, a long
 press on its grip, or Settings → Teaching modes). Named layouts the teacher
@@ -121,13 +188,21 @@ Settings → Teaching modes) resets that memory, so the config takes effect.
 | `voice` | Voice text: speak and the words go on the board; hold for push-to-talk ([Voice on the board](ai-agents.md#voice-on-the-board)) | prepare, teach; view only with Settings → Voice on the board → "Students may ask the AI by voice" (Ask AI only) |
 | `shape` | The Shapes picker's tool: every shape and table (key `S` opens the picker) | prepare, teach |
 | `rect`, `ellipse`, `line`, `arrow` | Single shape tools (keys `R`, `O`, `N`, `A`) | prepare, teach |
-| `hand` | Pan | all |
+| `hand` | Hand: move the board (hold Space) | all |
 | `interact` | Use Smart Objects | all |
 | `smartink` | Smart shapes on/off: switches between Off and the last on-mode (Auto by default; set in Settings → Pen & ink → Smart shapes). Key `M` | prepare, teach |
 | `undo`, `redo` | Undo / redo buttons | prepare, teach |
 | `replay` | Replay this page (a labelled button in `view`) | all |
 | `pager` | Back / next with a page indicator (steps through Smart Object builds in `teach`) | all |
 | `exit` | Leave the mode (back to where Teach was entered from) | teach |
+| `menu` | ☰ main menu: File, Import, Export, Print, Settings, Help, Mode, Exit (Classic) | all |
+| `mode` | Mode: Prepare, Teach, Student (and Draw over apps in the desktop app) | all |
+| `toolbox` | Tools: text, highlighter, laser, table, image, Smart Object, video, replay, celebrate, page design, and what is on no island | prepare, teach |
+| `share` | Share the lesson (a Rupok Cloud link, or the file) | prepare, teach |
+| `zoom` | Zoom: in, out, fit, fullscreen. In `teach` it turns the fit lock off, like the zoom chip | all |
+| `addpage` | A new page after this one (same look) | prepare, teach |
+| `recognize` | Recognise ink: Smart shapes on/off and when they snap, To text, Solve this | prepare, teach |
+| `ai` | Ask AI: Connect AI, or the chat with the teacher's agent (a dot while one is connected). In Classic it replaces the floating AI button | prepare, teach |
 
 ### Chrome keys
 
@@ -196,6 +271,8 @@ All optional; invalid values are ignored.
 | `toolbar` | `bottom`, `left`, `right`: where the dock starts in modes whose `dock.position` is `"auto"` |
 | `density` | `compact`, `comfortable`, `large` |
 | `hand` | `right`, `left`: the writing hand. Dock popovers open away from it, so the arm never covers them |
+| `layout` | `modern`, `classic`: on import, `classic` applies the Classic preset (a file's own `modes` win) |
+| `islandSwap` | `true`, `false`: Classic, the first and last islands trade sides (the menu island on the right) |
 
 ### Gestures
 
@@ -292,7 +369,9 @@ student view gets no pages panel.
         "iconStyle": { "enum": ["linear", "line-duotone", "broken", "bold"] },
         "toolbar": { "enum": ["bottom", "left", "right"] },
         "density": { "enum": ["compact", "comfortable", "large"] },
-        "hand": { "enum": ["right", "left"] }
+        "hand": { "enum": ["right", "left"] },
+        "layout": { "enum": ["modern", "classic"] },
+        "islandSwap": { "type": "boolean" }
       }
     },
     "gestures": {
@@ -334,7 +413,8 @@ student view gets no pages panel.
           "uniqueItems": true,
           "items": {
             "enum": ["pen", "highlighter", "eraser", "lasso", "laser", "text", "voice", "stamp", "rect", "ellipse", "line", "arrow",
-                     "hand", "interact", "smartink", "undo", "redo", "replay", "pager", "exit"]
+                     "hand", "interact", "smartink", "undo", "redo", "replay", "pager", "exit",
+                     "menu", "mode", "toolbox", "share", "zoom", "addpage", "recognize", "ai"]
           }
         },
         "dock": {
@@ -351,6 +431,18 @@ student view gets no pages panel.
               ]
             },
             "orientation": { "enum": ["auto", "horizontal", "vertical"] },
+            "style": { "enum": ["dock", "islands"] },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" }, "label": { "type": "string" }, "items": { "type": "array" },
+                  "place": { "enum": ["bottom-left", "bottom-centre", "bottom-right", "top-left", "top-centre", "top-right"] },
+                  "collapsed": { "type": "boolean" }
+                }
+              }
+            },
             "minimized": { "type": "boolean" },
             "pinned": {
               "type": "array",

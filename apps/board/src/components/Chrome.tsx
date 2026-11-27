@@ -5,7 +5,7 @@ import {
 } from "../state";
 import { brandVars, brandingFor, lessonBranding, styleOf, usesPlaceholders } from "../design";
 import { openPageDesign } from "./PageDesign";
-import { hasTopBar } from "../modes";
+import { hasTopBar, layoutPins } from "../modes";
 import LatencyOverlay from "./LatencyOverlay";
 import { Icon } from "./Icon";
 import { SelectionOverlay } from "./Selection";
@@ -17,6 +17,10 @@ import { ExportHost } from "./ExportDialog";
 import { FloatingAiStatus, Header } from "./Header";
 import { livePhase } from "../live";
 import { isPhone, pagesDrawer, setPagesDrawer } from "../viewport";
+import { isClassic } from "../layout";
+import { pagesSide, setPagesSide } from "./classic/edge";
+import { isStarred, toggleStar } from "./classic/stars";
+import { ClassicTitle } from "./classic/ClassicTitle";
 
 // The top bar itself lives in Header.tsx (with HeaderMenu.tsx for Insert ▾
 // and ⋯, and AiStatus.tsx for the AI). Add top-bar actions there: an item on
@@ -25,12 +29,17 @@ export function TopBar(props: { onObject: () => void; onSettings: () => void }) 
   const aiAround = () => livePhase() !== "idle";
   return (
     <>
-      <Show when={hasTopBar(modeConfig())}>
+      <Show when={hasTopBar(modeConfig()) && !isClassic()}>
         <Header onObject={props.onObject} onSettings={props.onSettings} />
+      </Show>
+      {/* Classic: no top bar, only the lesson title for a moment (☰ has the rest). */}
+      <Show when={isClassic()}>
+        <ClassicTitle />
       </Show>
       {/* Teach has no top bar: the AI button floats top right, always, so the
           AI is one tap away (labelled until an AI is connected). */}
-      <Show when={!hasTopBar(modeConfig()) && !isView()}>
+      {/* Classic: the AI is a button on an island ("ai"); the floating one only when no island has it. */}
+      <Show when={(!hasTopBar(modeConfig()) || isClassic()) && !isView() && !(isClassic() && layoutPins(modeConfig().dock).includes("ai"))}>
         <FloatingAiStatus label={!aiAround() || livePhase() === "unreachable"} />
       </Show>
       {/* Mounted here because the top bar component is always rendered; the
@@ -69,6 +78,9 @@ export function useLookForAllPages() {
  */
 export function PagesPanel() {
   const drawer = () => pagesDrawer() || isPhone();
+  /** Classic: the slide panel, slid in from a screen edge (classic/edge.ts). */
+  const edge = () => (isClassic() && drawer() ? pagesSide() ?? "right" : null);
+  createEffect(on(pagesDrawer, (o) => !o && setPagesSide(null), { defer: true }));
   const editable = () => !isView();
   const current = () => pages()[pageIndex()];
   const thumbBg = (c: number) => "#" + (c >>> 8).toString(16).padStart(6, "0");
@@ -269,16 +281,20 @@ export function PagesPanel() {
   createEffect(on(pageIndex, () => reveal("nearest"), { defer: true }));
 
   const [goTo, setGoTo] = createSignal("");
+  const [starsOnly, setStarsOnly] = createSignal(false);
 
   return (
-    <Show when={drawer() || modeConfig().chrome.pages}>
+    <Show when={drawer() || (modeConfig().chrome.pages && !isClassic())}>
     {/* The drawer floats over the board; tapping outside closes it (unless pinned). */}
     <Show when={drawer() && !pinned()}>
       <div class="pages-scrim" onClick={close} />
     </Show>
     <aside
       class="pages surface"
-      classList={{ viewing: isView(), top: !hasTopBar(modeConfig()), drawer: drawer(), pinned: pinned() }}
+      classList={{
+        viewing: isView(), top: !hasTopBar(modeConfig()) || isClassic(), drawer: drawer(), pinned: pinned(),
+        edge: !!edge(), "edge-left": edge() === "left", "edge-right": edge() === "right",
+      }}
       aria-label="Pages"
       role={drawer() ? "dialog" : undefined}
     >
@@ -327,6 +343,30 @@ export function PagesPanel() {
           </form>
         </Show>
         <span class="grow" />
+        <Show when={edge() && editable()}>
+          <button class="btn icon" title="Organise: pick pages to move, duplicate or delete together" aria-label="Organise pages" onClick={() => { setSelectMode(true); }}>
+            <Icon name="organise" size={20} />
+          </button>
+          <button
+            class="btn icon"
+            classList={{ on: starsOnly() }}
+            title={starsOnly() ? "Show every page" : "Show starred pages only"}
+            aria-label="Starred pages only"
+            aria-pressed={starsOnly()}
+            onClick={() => setStarsOnly(!starsOnly())}
+          >
+            <Icon name="star" size={20} active={starsOnly()} />
+          </button>
+          <button
+            class="btn icon thumb-del"
+            title="Delete this page (tap twice)"
+            aria-label="Delete this page"
+            disabled={pages().length < 2}
+            onClick={() => { if (confirmTwice()) controller.board.delete_page(); }}
+          >
+            <Icon name="trash" size={20} />
+          </button>
+        </Show>
         <Show when={editable()}>
           <button class="btn icon" data-tour="pages-add" title="Add page after this one (same look)" aria-label="Add page" onClick={() => addPageLike(false)}>
             <Icon name="plus" size={20} />
@@ -361,9 +401,10 @@ export function PagesPanel() {
               return JSON.stringify([p()?.background, b, usesPlaceholders(b) ? [pages().length, brandVars()] : 0]);
             };
             return (
+              <Show when={!starsOnly() || isStarred(id)}>
               <div
                 class="page-thumb"
-                classList={{ on: i() === pageIndex(), lifted: lifted(), marked: isSel(id), selecting: selectMode() }}
+                classList={{ on: i() === pageIndex(), lifted: lifted(), marked: isSel(id), selecting: selectMode(), starred: isStarred(id) }}
                 data-page={id}
                 role="button"
                 tabindex="0"
@@ -442,6 +483,21 @@ export function PagesPanel() {
                         <Icon name="trash" size={16} />
                       </button>
                     </Show>
+                    <Show when={edge()}>
+                      <button
+                        class="btn icon thumb-star"
+                        classList={{ on: isStarred(id) }}
+                        title={isStarred(id) ? "Unstar this page" : "Star this page: find it again with the star filter"}
+                        aria-label={isStarred(id) ? "Unstar page" : "Star page"}
+                        aria-pressed={isStarred(id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleStar(id);
+                        }}
+                      >
+                        <Icon name="star" size={16} active={isStarred(id)} />
+                      </button>
+                    </Show>
                     <button
                       class="btn icon"
                       title="More page actions (or right-click, or press and hold)"
@@ -457,7 +513,11 @@ export function PagesPanel() {
                     </button>
                   </div>
                 </Show>
+                <Show when={isStarred(id) && !selectMode()}>
+                  <span class="thumb-starred" aria-hidden="true"><Icon name="star" size={16} active /></span>
+                </Show>
               </div>
+              </Show>
             );
           }}
         </For>
@@ -643,7 +703,7 @@ export function ReplayBar() {
 }
 
 export function StatusChips() {
-  const c = () => modeConfig().chrome;
+  const c = () => ({ ...modeConfig().chrome, zoom: modeConfig().chrome.zoom && !isClassic() });
   return (
     <div class="statusbar">
       <Show when={c().zoom}>

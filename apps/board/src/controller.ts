@@ -11,7 +11,8 @@ import {
   editingText, selectionIds, setSelectionIds, setSelectionMeta, studentEntry, isView, setLessonOpened, mode, setModeSignal, modeConfig,
   smartFamilies,
 } from "./state";
-import { type Mode, type ToolbarItem, hasTopBar } from "./modes";
+import { type Mode, type ToolbarItem, hasTopBar, layoutPins } from "./modes";
+import { isClassic } from "./layout";
 import { dockSide } from "./dock";
 import { cssPx, isPhone, pagesDrawer, safeArea, setPagesDrawer, togglePagesDrawer } from "./viewport";
 import { type DesignDefault, setDesignDefault, setLessonBranding } from "./design";
@@ -278,7 +279,8 @@ export class Controller {
   private lastNav = 0;
   private fitCam = "";
   private snapBack(now: number) {
-    if (mode() !== "teach" || modeConfig().chrome.zoom || this.pointersDown > 0 || now - this.lastNav < 700) return;
+    // Classic: a Zoom button on the islands is the zoom chip.
+    if (mode() !== "teach" || modeConfig().chrome.zoom || layoutPins(modeConfig().dock).includes("zoom") || this.pointersDown > 0 || now - this.lastNav < 700) return;
     const cam = this.board.camera().join(",");
     if (this.fitCam && cam !== this.fitCam) {
       this.board.fit_page();
@@ -905,17 +907,27 @@ export class Controller {
     const safe = safeArea();
     const inset = phone ? 8 : 12, gap = phone ? 8 : 12;
     const cfg = modeConfig();
-    let top = safe.top + inset + (hasTopBar(cfg) ? bar + gap : 0), bottom = safe.bottom + inset + gap, left = safe.left + inset, right = safe.right + inset;
+    const classic = isClassic();
+    let top = safe.top + inset + (hasTopBar(cfg) && !classic ? bar + gap : 0), bottom = safe.bottom + inset + gap, left = safe.left + inset, right = safe.right + inset;
     // The edge the Smart Dock is docked to (dock.ts); "none" when it floats or is minimised.
     const side = dockSide();
     const dock = cfg.tools.length > 0;
     if (!dock || side === "none") bottom = safe.bottom + inset;
-    else if (side === "bottom") bottom += tb;
+    else if (classic) {
+      // The islands' real height on each edge (they grow on very large screens,
+      // a folded island is a small pill, and islands may sit on both edges).
+      const rowH = (edge: string) =>
+        Math.max(0, ...Array.from(document.querySelectorAll<HTMLElement>(`.islands-row.${edge} .island, .islands-row.${edge} .isl-pill`), (n) => n.offsetHeight));
+      const hb = document.querySelector(".islands") ? rowH("bottom") : tb, ht = rowH("top");
+      if (hb) bottom += hb;
+      else bottom = safe.bottom + inset;
+      if (ht) top += ht + gap;
+    } else if (side === "bottom") bottom += tb;
     else if (side === "top") top += tb + gap;
     else if (side === "left") left += tb + gap;
     else if (side === "right") right += tb + gap;
     // On a phone the pages panel is a drawer over the board: no room kept for it.
-    if (p.showPages && cfg.chrome.pages && !phone) left = Math.max(left, inset + 176 + gap) + (dock && side === "left" ? tb + gap : 0);
+    if (p.showPages && cfg.chrome.pages && !phone && !classic) left = Math.max(left, inset + 176 + gap) + (dock && side === "left" ? tb + gap : 0);
     // The docked chat panel (Prepare only; it is an overlay in Teach).
     if (this.chatInset > 0 && this.chatSide === "right") right = Math.max(right, inset + this.chatInset);
     if (this.chatInset > 0 && this.chatSide === "left") left += this.chatInset;

@@ -48,15 +48,15 @@ function pickFiles(accept: string, multiple = false): Promise<File[]> {
   });
 }
 
-const pickPdf = async () => controller.importFiles(await pickFiles(".pdf,application/pdf"));
-const pickImage = async () => {
+export const pickPdf = async () => controller.importFiles(await pickFiles(".pdf,application/pdf"));
+export const pickImage = async () => {
   const [f] = await pickFiles("image/*");
   if (f) controller.insertImage(f);
 };
 
 /** Signed in to Rupok Cloud: a share-link dialog (ShareDialog.tsx). Otherwise,
  * the file through the system share sheet, or saved to send by hand. */
-async function shareLesson() {
+export async function shareLesson() {
   if (await openShareDialog(() => void shareLessonFile())) return;
   await shareLessonFile();
 }

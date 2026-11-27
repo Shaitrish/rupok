@@ -4,6 +4,8 @@
 
 import { For, Show, createSignal } from "solid-js";
 import { controller } from "../controller";
+import { layout } from "../layout";
+import { setLayout } from "./DockEditor";
 import {
   ALLOWED_CHROME, ALLOWED_TOOLS, CHROME_ITEMS, CORE_TOOLS, DEFAULT_MODES, DOCK_POSITIONS, MODES, SHAPE_TOOLS, TOOLBAR_ITEMS, UI_CONFIG_FORMAT,
   UI_CONFIG_VERSION, type ChromeKey, type DockConfig, type DockPin, type Mode, type ModeConfig, type ToolbarItem, type UiConfigFile,
@@ -34,7 +36,7 @@ export function exportUiConfig(): UiConfigFile {
     format: UI_CONFIG_FORMAT,
     version: UI_CONFIG_VERSION,
     modes: Object.fromEntries(MODES.map((m) => [m.id, resolveMode(p.modes, m.id)])) as UiConfigFile["modes"],
-    appearance: { theme: p.theme, accent: p.accent, iconStyle: p.iconStyle, toolbar: p.toolbar, density: p.density, hand: p.hand },
+    appearance: { theme: p.theme, accent: p.accent, iconStyle: p.iconStyle, toolbar: p.toolbar, density: p.density, hand: p.hand, layout: layout(), islandSwap: p.islandSwap },
     gestures: exportGestures(),
     dockPresets: p.dockPresets ?? [],
   };
@@ -56,6 +58,9 @@ export function importUiConfig(raw: unknown): string {
   if (typeof a.accent === "string" && ACCENTS.some((x) => x.id === a.accent)) next.accent = a.accent as Prefs["accent"];
   if (f.dockPresets !== undefined) next.dockPresets = sanitizeDockPresets(f.dockPresets);
   setPrefs(next);
+  // A layout without its own modes: Classic applies the Classic preset (a file's modes win).
+  if (typeof a.islandSwap === "boolean") next.islandSwap = a.islandSwap;
+  if ((a.layout === "classic" || a.layout === "modern") && !f.modes?.prepare && !f.modes?.teach) setLayout(a.layout);
   controller.applyPrefs();
   controller.updateInsets(true);
   const parts = [...Object.keys(modes).map((m) => MODES.find((x) => x.id === m)!.label)];

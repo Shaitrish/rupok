@@ -254,6 +254,8 @@ export interface DockPopoverProps {
   onClose: () => void;
   /** Desktop overlay window: laid out inline (the window grows to fit). */
   inline?: boolean;
+  /** Centred over its button, with a pointer (the Classic islands). */
+  align?: "center";
   class?: string;
   children: JSX.Element;
 }
@@ -278,7 +280,8 @@ export function DockPopover(props: DockPopoverProps) {
     if (!props.vertical) {
       const above = dr.top + dr.height / 2 > H / 2;
       top = above ? dr.top - GAP - ph : dr.bottom + GAP;
-      left = props.hand === "right" ? ar.right - pw : ar.left;
+      el.dataset.side = above ? "above" : "below";
+      left = props.align === "center" ? ar.left + ar.width / 2 - pw / 2 : props.hand === "right" ? ar.right - pw : ar.left;
       left = clamp(left, M, W - pw - M);
       top = clamp(top, M, H - ph - M);
     } else {
@@ -289,6 +292,8 @@ export function DockPopover(props: DockPopoverProps) {
       left = clamp(left, M, W - pw - M);
     }
     setPos({ left: Math.round(left), top: Math.round(top) });
+    // Where the pointer meets the button (the Classic popovers draw it in CSS).
+    if (props.align === "center" && !props.vertical) el.style.setProperty("--tail", `${Math.round(Math.max(24, Math.min(pw - 24, ar.left + ar.width / 2 - left)))}px`);
   };
   onMount(() => {
     place();
@@ -321,7 +326,7 @@ export function DockPopover(props: DockPopoverProps) {
     <div
       ref={el}
       class={`dock-pop ${props.class ?? ""}`}
-      classList={{ inline: !!props.inline, placed: !!pos() || !!props.inline }}
+      classList={{ inline: !!props.inline, placed: !!pos() || !!props.inline, centered: props.align === "center" }}
       style={pos() && !props.inline ? { left: `${pos()!.left}px`, top: `${pos()!.top}px` } : undefined}
       role="dialog"
       aria-label={props.label}

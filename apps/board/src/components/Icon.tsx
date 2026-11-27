@@ -1,9 +1,36 @@
-import { ICONS, type IconName, type IconVariant } from "../icons.generated";
+import { createContext, useContext } from "solid-js";
+import { DRAWN, type DrawnName, ICONS, type IconName, type IconVariant } from "../icons.generated";
 import { prefs } from "../state";
 import { APP_NAME } from "../brand";
 
+/** "classic": icons inside the Classic islands use our own bolder set
+ * (icons/drawn/ci-*.svg), drawn to read from the back of a classroom. */
+export const IconSet = createContext<"solar" | "classic">("solar");
+
+/** Solar names → our Classic drawings. */
+const CLASSIC: Partial<Record<IconName, DrawnName>> = {
+  menu: "ci-menu", monitor: "ci-screen", toolbox: "ci-toolbox", share: "ci-share", search: "ci-search", select: "ci-select",
+  pen: "ci-pen", eraser: "ci-eraser", rect: "ci-shapes", hand: "ci-hand", recognize: "ci-recognize", stamp: "ci-stamp",
+  ai: "ci-ai", undo: "ci-undo", redo: "ci-redo", plus: "ci-addpage", prev: "ci-prev", next: "ci-next",
+};
+
 /** Solar icon. Active tools render the bold-duotone weight for a clear "on" state. */
 export function Icon(props: { name: IconName; size?: number; active?: boolean; variant?: IconVariant }) {
+  const set = useContext(IconSet);
+  const drawn = () => (set === "classic" ? CLASSIC[props.name] : undefined);
+  if (drawn()) {
+    return (
+      <svg
+        class="icon ci"
+        classList={{ on: !!props.active }}
+        viewBox="0 0 24 24"
+        width={props.size ?? 20}
+        height={props.size ?? 20}
+        aria-hidden="true"
+        innerHTML={DRAWN[drawn()!].body}
+      />
+    );
+  }
   const variant = (): IconVariant => {
     if (props.variant) return props.variant;
     const base = prefs().iconStyle;

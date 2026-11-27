@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { APP_SLUG } from "./brand";
-import { type Mode, type ModeConfig, type ModesConfig, resolveMode, sanitizeDockPresets, sanitizeModes } from "./modes";
+import { type Mode, type ModeConfig, type ModesConfig, resolveMode, sanitizeDockPresets, sanitizeMode, sanitizeModes } from "./modes";
 
 export type Tool =
   | "pen" | "highlighter" | "eraser" | "lasso" | "hand" | "laser" | "interact" | "text"
@@ -180,6 +180,13 @@ export interface Prefs {
   stampSounds: boolean;
   /** The teacher's saved dock layouts (Customize dock → Save layout). */
   dockPresets?: import("./modes").DockPreset[];
+  /** The Modern docks kept while the Classic layout is on, so switching
+   * back restores the teacher's own dock (layout.ts). */
+  modernDocks?: Partial<Record<"prepare" | "teach", import("./modes").DockConfig>>;
+  /** Classic: the first and last islands trade sides (the menu island on the right). */
+  islandSwap: boolean;
+  /** The first-run "Which layout do you prefer?" was answered. */
+  layoutChosen?: boolean;
 }
 const defaults: Prefs = {
   theme: "system", accent: "mint", iconStyle: "linear", toolbar: "bottom", density: "comfortable",
@@ -188,7 +195,7 @@ const defaults: Prefs = {
   smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right", eraserMode: "partial", keepInkOnPage: true, pagesPinned: false,
   smartGraphs: true, smartFlowchart: true, smartGates: true, smartNumberLine: true,
   smartGeometry: true, smartTables: true, smartScience: false, smartMath: true,
-  penBrush: "pen", hlBrush: "pen", shapeBrush: "pen", markerOpacity: 0.8,
+  islandSwap: false, penBrush: "pen", hlBrush: "pen", shapeBrush: "pen", markerOpacity: 0.8,
   stampFavorites: ["star", "tick", "cross", "thumbs-up", "hundred", "excellent"], stampQuickMenu: true, stampSounds: true,
 };
 
@@ -229,6 +236,27 @@ function loadPrefs(): Prefs {
     saved.flatPanels = saved.flatPanels === true;
     saved.dockPresets = sanitizeDockPresets(saved.dockPresets);
     saved.modes = sanitizeModes(saved.modes);
+    if (saved.modernDocks && typeof saved.modernDocks === "object") {
+      const md: Prefs["modernDocks"] = {};
+      for (const m of ["prepare", "teach"] as const) {
+        const d = saved.modernDocks[m];
+        if (d && typeof d === "object") md[m] = sanitizeMode(m, { dock: d }).dock;
+      }
+      saved.modernDocks = md;
+    } else delete saved.modernDocks;
+    saved.layoutChosen = saved.layoutChosen === true;
+    saved.islandSwap = saved.islandSwap === true;
+    // Classic previews before v0.2.6 had Share and Zoom on the left island:
+    // they moved into the ☰ menu (an island the teacher arranged is kept).
+    for (const m of ["prepare", "teach"] as const) {
+      const g = saved.modes?.[m]?.dock?.style === "islands" ? saved.modes[m].dock.groups?.[0] : undefined;
+      const was = g?.items.join(",");
+      if (g && (was === "menu,mode,toolbox,share,zoom" || was === "menu,mode,toolbox,share,zoom,ai" || was === "menu,mode,toolbox,zoom,ai")) {
+        g.items = ["menu", "mode", "toolbox", "ai"];
+        saved.modes[m].dock.pinned = saved.modes[m].dock.pinned.filter((p: string) => p !== "share" && p !== "zoom");
+        saved.modes[m].tools = saved.modes[m].tools.filter((t: string) => t !== "share" && t !== "zoom");
+      }
+    }
     return saved;
   } catch {
     return defaults;

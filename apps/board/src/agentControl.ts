@@ -10,12 +10,14 @@
 // Settings and dock changes return an `undo`, which the AI chip's Undo runs.
 
 import type { Controller } from "./controller";
-import { type Mode, type ToolbarItem, DEFAULT_MODES, DOCK_PRESETS, TOOLBAR_ITEMS, CORE_TOOLS, SHAPES_PIN, dockWarnings, sanitizeMode, type DockConfig } from "./modes";
+import { type DockGroup, ISLAND_PLACES, type Mode, type ToolbarItem, DEFAULT_MODES, DOCK_PRESETS, TOOLBAR_ITEMS, CORE_TOOLS, SHAPES_PIN, dockWarnings, sanitizeMode, type DockConfig } from "./modes";
 import { type Prefs, isView, mode, modeConfig, pages, prefs, setColor, setHlColor, setPrefs, setSizes, sizes, title, type Tool } from "./state";
 import { celebrate, type CelebrateKind, freshStamps } from "./stamps";
 import { agentSettings, setAgentSetting } from "./agentSettings";
-import { applyPreset, placeable, savePreset, savedPresets } from "./components/DockEditor";
+import { applyPreset, placeable, resetIslands, saveDock, savePreset, savedPresets } from "./components/DockEditor";
+import { bakePlaces, islandPlaces, moveIsland, placeOf, splitPlace } from "./islands";
 import { resetDock } from "./dock";
+import { layout } from "./layout";
 import { isBrush, setBrushOf } from "./brushes";
 import { myStamps, resolveStamp } from "./stampLib";
 import { deleteStamp as deleteLibStamp, saveStamp } from "./customStamps";
@@ -45,6 +47,7 @@ export const BOARD_OPS = new Set([
   "set_mode", "zoom_to", "fit_page", "start_replay", "stop_replay", "celebrate", "set_tool", "undo", "export_pdf",
   "library_list", "library_open", "library_create_lesson", "library_move", "library_rename", "library_trash",
   "get_settings", "set_setting", "get_dock_layout", "set_dock_layout", "list_dock_items", "save_dock_preset", "apply_dock_preset",
+  "swap_islands", "move_island",
 ]);
 
 const fail = (m: string): never => {
@@ -185,7 +188,7 @@ export async function runBoardOp(c: Controller, op: any, agent: string, lastAgen
     case "get_dock_layout": {
       const m = dockMode(op.mode);
       const cfg = modeConfig(m);
-      return { result: { mode: m, dock: cfg.dock, tools: cfg.tools, warnings: dockWarnings(m, cfg) } };
+      return { result: { mode: m, dock: cfg.dock, tools: cfg.tools, warnings: dockWarnings(m, cfg), ...(cfg.dock.style === "islands" ? { islands: islandReport(m) } : {}) } };
     }
     case "list_dock_items": {
       const items = [...TOOLBAR_ITEMS.map((t) => ({ id: t.id, label: t.label, key: t.key })), { id: SHAPES_PIN.id, label: SHAPES_PIN.label }]
@@ -198,6 +201,12 @@ export async function runBoardOp(c: Controller, op: any, agent: string, lastAgen
           sizes: ["s", "m", "l"],
           presets: [...DOCK_PRESETS.map((p) => ({ name: p.name, hint: p.hint, builtin: true })), ...savedPresets().map((p) => ({ name: p.name, builtin: false }))],
           example: { position: "left", size: "l", groups: [{ label: "Ink", items: ["pen", "highlighter", "eraser"] }], split: { position: "right", groups: [{ items: ["undo", "redo"] }, { items: ["pager"] }] } },
+          layout: layout(),
+          styles: {
+            dock: "The Smart Dock (Modern layout): one bar, groups separated.",
+            islands: "The Classic layout: each group is an island along the bottom (or top) edge; the first at the left, the last at the right, the others in the middle. No top bar; the ☰ menu (menu) holds files, export, settings and help.",
+          },
+          classic_example: { style: "islands", position: "bottom", size: "l", groups: [{ label: "Menu", items: ["menu", "mode", "toolbox", "ai"] }, { label: "Tools", items: ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] }, { label: "Pages", items: ["addpage", "pager"] }] },
         },
       };
     }
@@ -205,7 +214,8 @@ export async function runBoardOp(c: Controller, op: any, agent: string, lastAgen
       const m = dockMode(op.mode);
       const layout = op.layout;
       if (!layout || typeof layout !== "object" || Array.isArray(layout)) fail("layout must be an object, e.g. {\"position\": \"left\", \"groups\": [{\"items\": [\"pen\", \"eraser\"]}]}");
-      const known = new Set(["position", "orientation", "minimized", "pinned", "groups", "split", "size", "sizes", "large"]);
+      const known = new Set(["position", "orientation", "minimized", "pinned", "groups", "split", "size", "sizes", "large", "style"]);
+      if ("style" in layout && layout.style !== "islands" && layout.style !== "dock") fail("style must be \"islands\" (the Classic layout: each group is an island) or \"dock\" (the Smart Dock)");
       const unknown = Object.keys(layout).filter((k) => !known.has(k));
       if (unknown.length) fail(`unknown layout keys: ${unknown.join(", ")} (allowed: ${[...known].join(", ")})`);
       const placeableIds = new Set<string>([...placeable(m), "rect", "ellipse", "line", "arrow", "shape"]);
@@ -232,6 +242,47 @@ export async function runBoardOp(c: Controller, op: any, agent: string, lastAgen
       const p = savePreset(name, modes);
       return { result: { saved: p.name, modes: Object.keys(p.modes) }, undo };
     }
+    case "swap_islands": {
+      if (op.swapped !== undefined && typeof op.swapped !== "boolean") fail("swapped must be true, false or left out (to swap)");
+      const undo = prefsUndo(c, ["islandSwap"]);
+      const to = op.swapped ?? !prefs().islandSwap;
+      setPrefs({ islandSwap: to });
+      return {
+        result: { swapped: to, menu_island: to ? "right" : "left", layout: layout(), note: layout() === "classic" ? undefined : "Applies to the Classic layout (set_setting appearance.layout classic)" },
+        undo,
+        changed: true,
+      };
+    }
+    case "move_island": {
+      const m = dockMode(op.mode);
+      const d = modeConfig(m).dock;
+      if (d.style !== "islands") fail(`${m === "teach" ? "Teach" : "Prepare"} does not use the Classic islands (set_setting appearance.layout classic first)`);
+      const undo = prefsUndo(c, ["modes", "islandSwap"]);
+      if (op.reset === true) {
+        resetIslands([m]);
+        return { result: { mode: m, reset: true, islands: islandReport(m) }, undo, changed: true };
+      }
+      const gs = d.groups ?? [];
+      const which = op.island ?? "all";
+      let groups: DockGroup[];
+      if (which === "all") {
+        if (op.edge !== "top" && op.edge !== "bottom" && op.collapsed === undefined) fail("for all islands give edge (top or bottom) or collapsed");
+        groups = bakePlaces(d, prefs().islandSwap).map((g) => {
+          const [, slot] = splitPlace(g.place!);
+          const place = op.edge === "top" || op.edge === "bottom" ? placeOf(op.edge, slot) : g.place;
+          return { ...g, place, ...(typeof op.collapsed === "boolean" ? { collapsed: op.collapsed || undefined } : {}) };
+        });
+      } else {
+        const i = typeof which === "number" ? which - 1 : gs.findIndex((g) => g.id === which || g.label?.toLowerCase() === String(which).toLowerCase());
+        if (i < 0 || i >= gs.length) fail(`no island “${which}”; islands: ${gs.map((g, k) => `${k + 1} ${g.id}`).join(", ")}`);
+        if (op.place !== undefined && !(ISLAND_PLACES as unknown[]).includes(op.place)) fail(`place must be one of ${ISLAND_PLACES.join(", ")}`);
+        groups = op.place ? moveIsland(d, prefs().islandSwap, i, op.place) : bakePlaces(d, prefs().islandSwap);
+        if (typeof op.collapsed === "boolean") groups[i] = { ...groups[i], collapsed: op.collapsed || undefined };
+      }
+      setPrefs({ islandSwap: false });
+      saveDock(m, { groups });
+      return { result: { mode: m, islands: islandReport(m) }, undo, changed: true };
+    }
     case "apply_dock_preset": {
       const name = String(op.name ?? "").trim().toLowerCase();
       const p = [...DOCK_PRESETS, ...savedPresets()].find((x) => x.name.toLowerCase() === name)
@@ -242,6 +293,13 @@ export async function runBoardOp(c: Controller, op: any, agent: string, lastAgen
     }
   }
   throw new AgentOpError(`the board does not know \`${op.op}\``);
+}
+
+/** Where each island is now (for agents). */
+function islandReport(m: "prepare" | "teach") {
+  const d = modeConfig(m).dock;
+  const places = islandPlaces(d, prefs().islandSwap);
+  return (d.groups ?? []).map((g, i) => ({ island: g.id, label: g.label, place: places[i], collapsed: !!g.collapsed, items: g.items }));
 }
 
 function dockMode(m: unknown): "prepare" | "teach" {
@@ -368,3 +426,12 @@ export async function finishStampOp(op: any, result: any): Promise<any> {
 }
 
 export const isStampOp = (name: string) => ["list_stamps", "create_stamp", "update_stamp", "delete_stamp", "add_stamp"].includes(name);
+
+// Automated browsers only (the e2e suites): run a board op as an agent
+// would, without a paired agent. Never exposed to a teacher's browser.
+if (typeof navigator !== "undefined" && navigator.webdriver) {
+  (window as any).rupokBoardOp = async (op: unknown) => {
+    const { controller } = await import("./controller");
+    return (await runBoardOp(controller, op, "e2e", () => false)).result;
+  };
+}

@@ -549,8 +549,9 @@ pub struct SetDockParams {
     /// `prepare` or `teach`. Default: the mode on screen.
     #[serde(default)]
     pub mode: Option<String>,
-    /// The dock: `{position, orientation, size, large, groups: [{label?,
-    /// items: [ids]}], split: {position, groups}}`; ids from list_dock_items.
+    /// The dock: `{style, position, orientation, size, large, groups:
+    /// [{label?, items: [ids]}], split: {position, groups}}`; ids from
+    /// list_dock_items. `style: "islands"` is the Classic layout.
     /// Only the given keys change. Pen, eraser and undo always stay.
     pub layout: Value,
 }
@@ -571,6 +572,40 @@ pub struct DockPresetParams {
     /// "Left-handed", "Minimal teaching", "Maths class", "Default" or a
     /// layout the teacher saved.
     pub name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SwapIslandsParams {
+    /// true: the menu island on the right and the page island on the left;
+    /// false: the other way round. Omitted: swap them.
+    #[serde(default)]
+    pub swapped: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MoveIslandParams {
+    /// `prepare` or `teach`. Default: the mode on screen.
+    #[serde(default)]
+    pub mode: Option<String>,
+    /// The island: its id (`left`, `centre`, `right` in the Classic
+    /// layout), its label, its 1-based number, or "all". Default: all.
+    #[serde(default)]
+    pub island: Option<Value>,
+    /// Where it goes: bottom-left, bottom-centre, bottom-right, top-left,
+    /// top-centre or top-right (another island alone there takes its place).
+    #[serde(default)]
+    pub place: Option<String>,
+    /// With "all": every island to the `top` or `bottom` edge.
+    #[serde(default)]
+    pub edge: Option<String>,
+    /// Fold the island to a small pill (true) or show it again (false).
+    #[serde(default)]
+    pub collapsed: Option<bool>,
+    /// Every island back along the bottom, unfolded.
+    #[serde(default)]
+    pub reset: Option<bool>,
 }
 
 // ------------------------------------------------------------------- tools
@@ -1472,8 +1507,10 @@ size, large icons, the groups of buttons in order, and the optional second (spli
         description = "Customise the Smart Dock for the teacher (\"pen, highlighter and eraser on the left, undo \
 and next page on the right, bigger buttons\"): position (left, right, top, bottom, corners), orientation, \
 groups of buttons (ids from list_dock_items, each group separated), a split second dock on another edge, button \
-size (small, medium, large) and large icons. Pen, eraser and undo always stay. Validated; the teacher is asked \
-like for an edit and can undo it from the AI chip.",
+size (small, medium, large) and large icons. `style: \"islands\"` is the Classic layout: each group is a big \
+island along the bottom edge (first left, last right, the rest in the middle; menu, mode, toolbox, share, zoom, \
+addpage, recognize are its buttons). Pen, eraser and undo always stay. Validated; the teacher is asked like for \
+an edit and can undo it from the AI chip.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -1519,8 +1556,10 @@ whether they must stay), and the named layouts (built-in and the teacher's).",
     }
 
     #[tool(
-        description = "Switch to a named dock layout: \"Left-handed\", \"Minimal teaching\", \"Maths class\", \
-\"Default\" or one the teacher saved.",
+        description = "Switch to a named dock layout: \"Classic\" (three big islands along the bottom, no top \
+bar), \"Default\" (the Modern Smart Dock), \"Left-handed\", \"Minimal teaching\", \"Maths class\" or one the \
+teacher saved. set_setting appearance.layout also switches Modern and Classic, keeping the teacher's own \
+Modern dock.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -1533,6 +1572,46 @@ whether they must stay), and the named layouts (built-in and the teacher's).",
         Parameters(p): Parameters<DockPresetParams>,
     ) -> CallToolResult {
         self.live_call(Op::ApplyDockPreset { name: p.name }).await
+    }
+
+    #[tool(
+        description = "Classic layout: swap the side islands, so the menu island moves to the right and the \
+page island to the left (or back). The teacher does the same with the arrow tab at an island's edge. The \
+teacher is asked like for an edit and can undo it from the AI chip.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn swap_islands(&self, Parameters(p): Parameters<SwapIslandsParams>) -> CallToolResult {
+        self.live_call(Op::SwapIslands { swapped: p.swapped }).await
+    }
+
+    #[tool(
+        description = "Classic layout: move an island so the teacher can write where it was (\"put the \
+toolbar at the top\", \"move the page buttons to the top left\"), fold one to a small pill, or reset them. \
+island: an id, label, number or \"all\"; place: bottom-left, bottom-centre, bottom-right, top-left, \
+top-centre, top-right; edge (with all): top or bottom; collapsed: true or false; reset: true. Returns where \
+every island is. The teacher is asked like for an edit and can undo it from the AI chip.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn move_island(&self, Parameters(p): Parameters<MoveIslandParams>) -> CallToolResult {
+        self.live_call(Op::MoveIsland {
+            mode: p.mode,
+            island: p.island,
+            place: p.place,
+            edge: p.edge,
+            collapsed: p.collapsed,
+            reset: p.reset,
+        })
+        .await
     }
 }
 

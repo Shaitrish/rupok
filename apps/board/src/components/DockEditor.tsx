@@ -14,10 +14,12 @@ import { controller } from "../controller";
 import {
   ALLOWED_TOOLS, CORE_TOOLS, DEFAULT_MODES, DOCK_PRESETS, SHAPE_TOOLS, SHAPES_PIN, TOOLBAR_ITEMS, type DockConfig, type DockGroup, type DockPin,
   type DockPosition, type DockPreset, type DockSize, type Mode, type ToolbarItem, applyDockPreset, dockWarnings, layoutPins, sanitizeMode,
+  CLASSIC_ITEMS,
 } from "../modes";
 import { dockEditor, resetDock, setDockEditor } from "../dock";
 import { mode, modeConfig, prefs, setPrefs, showToast } from "../state";
 import { dockLayout } from "./Dock";
+import { type Layout, layout } from "../layout";
 import { Icon } from "./Icon";
 import type { IconName } from "../icons.generated";
 import "./DockEditor.css";
@@ -70,10 +72,48 @@ export function saveDock(m: EditMode, patch: Partial<DockConfig>) {
 export const savedPresets = (): DockPreset[] => prefs().dockPresets ?? [];
 
 export function applyPreset(p: DockPreset) {
-  setPrefs({ modes: applyDockPreset(prefs().modes, p), ...(p.hand ? { hand: p.hand } : {}) });
+  const toIslands = Object.values(p.modes).some((d) => d?.style === "islands");
+  // Going Classic: keep the Modern docks, so the Layout switch brings them back.
+  const keep = toIslands && layout() === "modern"
+    ? { modernDocks: { prepare: structuredClone(modeConfig("prepare").dock), teach: structuredClone(modeConfig("teach").dock) } }
+    : {};
+  setPrefs({ modes: applyDockPreset(prefs().modes, p), ...(p.hand ? { hand: p.hand } : {}), ...keep });
   resetDock("prepare");
   resetDock("teach");
   controller.updateInsets(mode() === "teach");
+}
+
+/** Switch between the Modern and the Classic layout (layout.ts). Classic
+ * applies the "Classic" preset; Modern brings back the teacher's own
+ * Modern docks (else the default dock). One prefs change, undoable. */
+export function setLayout(to: Layout, opts: { chosen?: boolean } = {}) {
+  if (opts.chosen !== false) setPrefs({ layoutChosen: true });
+  if (to === layout() && to === "modern") return;
+  if (to === "classic") return applyPreset(DOCK_PRESETS.find((p) => p.name === "Classic")!);
+  const kept = prefs().modernDocks;
+  const modes = { ...prefs().modes };
+  for (const m of ["prepare", "teach"] as const) {
+    const cur = modeConfig(m);
+    const dock = kept?.[m] ?? DEFAULT_MODES[m].dock;
+    // The islands' own buttons leave with them, unless the Modern dock has them too.
+    const pins = new Set<string>([...dock.pinned, ...layoutPins(dock)]);
+    const tools = cur.tools.filter((t) => !CLASSIC_ITEMS.includes(t) || pins.has(t));
+    modes[m] = sanitizeMode(m, { chrome: cur.chrome, tools, dock: { ...dock, style: "dock" } });
+  }
+  setPrefs({ modes });
+  resetDock("prepare");
+  resetDock("teach");
+  controller.updateInsets(true);
+}
+
+/** Classic: every island back to its place by order, unfolded, sides not swapped. */
+export function resetIslands(modes: EditMode[] = ["prepare", "teach"]) {
+  setPrefs({ islandSwap: false });
+  for (const m of modes) {
+    const d = modeConfig(m).dock;
+    if (d.style !== "islands") continue;
+    saveDock(m, { position: "bottom", groups: (d.groups ?? []).map(({ place: _p, collapsed: _c, ...g }) => g) });
+  }
 }
 
 /** Save the current docks as a named layout (replacing one of that name). */
@@ -105,6 +145,7 @@ export function DockEditor() {
 function Editor(props: { mode: EditMode }) {
   const [m, setM] = createSignal<EditMode>(props.mode);
   const cfg = () => modeConfig(m());
+  const isles = () => cfg().dock.style === "islands";
   const groups = createMemo(() => groupsOf(m()));
   const [picked, setPicked] = createSignal<Slot | null>(null);
   const [drag, setDrag] = createSignal<{ pin: DockPin; x: number; y: number; from: Slot | null } | null>(null);
@@ -361,7 +402,7 @@ function Editor(props: { mode: EditMode }) {
     <div class="de-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <div class="de-sheet" ref={sheet} role="dialog" aria-modal="true" aria-labelledby="de-title">
         <header class="de-head">
-          <h2 id="de-title">Customize dock</h2>
+          <h2 id="de-title">{isles() ? "Customize islands" : "Customize dock"}</h2>
           <div class="seg" role="radiogroup" aria-label="Mode">
             <For each={[["prepare", "Prepare"], ["teach", "Teach"]] as const}>
               {([v, l]) => (
@@ -378,8 +419,11 @@ function Editor(props: { mode: EditMode }) {
         <div class="de-body">
           <section class="de-sec" aria-labelledby="de-buttons">
             <h3 id="de-buttons">Buttons</h3>
-            <p class="de-hint">Drag buttons to arrange them, or press Enter on one and move it with the arrow keys. A separator starts a new group.</p>
-            <div class="de-dock-label">Dock</div>
+            <p class="de-hint">
+              Drag buttons to arrange them, or press Enter on one and move it with the arrow keys. A separator starts a new group
+              <Show when={isles()}>: each group is an island, the first at the left, the last at the right, the others in the middle</Show>.
+            </p>
+            <div class="de-dock-label">{isles() ? "Islands" : "Dock"}</div>
             <Groups dock="main" />
             <Show when={splitOn()}>
               <div class="de-dock-label">Second dock · {SPLIT_POS.find((p) => p.v === cfg().dock.split?.position)?.label ?? "Right"}</div>
@@ -456,9 +500,26 @@ function Editor(props: { mode: EditMode }) {
           <section class="de-sec" aria-labelledby="de-where">
             <h3 id="de-where">Where</h3>
             <div class="de-row">
-              <span class="de-label">Dock</span>
+              <span class="de-label">Look</span>
+              <div class="seg" role="radiogroup" aria-label="Dock style">
+                <For each={[["dock", "One dock"], ["islands", "Islands (Classic)"]] as const}>
+                  {([v, l]) => (
+                    <button
+                      role="radio"
+                      aria-checked={(cfg().dock.style ?? "dock") === v}
+                      classList={{ on: (cfg().dock.style ?? "dock") === v }}
+                      onClick={() => saveDock(m(), v === "islands" ? { style: "islands", position: "bottom", split: null, groups: cfg().dock.groups ?? groupsOf(m()).main } : { style: "dock" })}
+                    >
+                      {l}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+            <div class="de-row">
+              <span class="de-label">{isles() ? "Islands" : "Dock"}</span>
               <div class="seg" role="radiogroup" aria-label="Dock position">
-                <For each={POSITIONS}>
+                <For each={isles() ? POSITIONS.filter((p) => p.v === "bottom" || p.v === "top") : POSITIONS}>
                   {(p) => (
                     <button role="radio" aria-checked={cfg().dock.position === p.v} classList={{ on: cfg().dock.position === p.v }} onClick={() => saveDock(m(), { position: p.v })}>
                       {p.label}
@@ -467,7 +528,7 @@ function Editor(props: { mode: EditMode }) {
                 </For>
               </div>
             </div>
-            <div class="de-row">
+            <div class="de-row" hidden={isles()}>
               <label class="check">
                 <input type="checkbox" checked={splitOn()} onChange={(e) => toggleSplit(e.currentTarget.checked)} />
                 <span>Second dock</span>
@@ -530,3 +591,6 @@ function Editor(props: { mode: EditMode }) {
     </div>
   );
 }
+
+// For the console and e2e tests: rupokLayout.set("classic").
+if (typeof window !== "undefined") (window as any).rupokLayout = { set: setLayout, get: layout };

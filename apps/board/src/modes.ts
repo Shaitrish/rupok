@@ -14,7 +14,13 @@ export type Mode = "prepare" | "teach" | "view";
 export type ToolbarItem =
   | Tool | "smartink" | "undo" | "redo" | "pager" | "replay" | "exit"
   /** Action buttons a teacher (or their AI) may put on the dock. */
-  | "celebrate" | "pages" | "solve" | "settings";
+  | "celebrate" | "pages" | "solve" | "settings"
+  /** The Classic layout's buttons (components/classic/), placeable on any dock:
+   * ☰ main menu, mode, the tools box, share, zoom, a new page, and
+   * recognise ink (Smart shapes, To text, Solve this). */
+  | "menu" | "mode" | "toolbox" | "share" | "zoom" | "addpage" | "recognize"
+  /** Ask AI: Connect AI, or the chat with the teacher's agent (one tap). */
+  | "ai";
 
 /** Chrome elements a mode can show or hide. */
 export type ChromeKey =
@@ -42,14 +48,25 @@ export type DockOrientation = "auto" | "horizontal" | "vertical";
 /** A dock pin: a toolbar entry, or "shapes" for the one Shapes button
  * (the Shapes picker, components/ShapesPicker.tsx, and the Smart shapes toggle). */
 export type DockPin = ToolbarItem | "shapes";
+/** How the dock is drawn: one bar (the Smart Dock, "dock") or "islands",
+ * the Classic layout: each group is its own island along one edge, the
+ * first at the left, the last at the right, the others in the middle. */
+export type DockStyle = "dock" | "islands";
 /** Button size: small, medium (default), large. */
 export type DockSize = "s" | "m" | "l";
 export const DOCK_SIZES: DockSize[] = ["s", "m", "l"];
+/** Where a Classic island sits: an edge and a third of it. */
+export type IslandPlace = "bottom-left" | "bottom-centre" | "bottom-right" | "top-left" | "top-centre" | "top-right";
+export const ISLAND_PLACES: IslandPlace[] = ["bottom-left", "bottom-centre", "bottom-right", "top-left", "top-centre", "top-right"];
 /** A group of dock buttons, in order; groups are separated on the dock. */
 export interface DockGroup {
   id: string;
   label?: string;
   items: DockPin[];
+  /** Islands only: where it sits (else by its order: first left, last right). */
+  place?: IslandPlace;
+  /** Islands only: folded to a small pill at its edge. */
+  collapsed?: boolean;
 }
 /** A second dock, e.g. the pager and undo on the other edge of a big board. */
 export interface DockSplit {
@@ -75,9 +92,15 @@ export interface DockConfig {
   sizes?: Partial<Record<DockPin, DockSize>>;
   /** Large icons, for low vision. */
   large?: boolean;
+  /** "islands": the Classic layout (absent means the Smart Dock). */
+  style?: DockStyle;
 }
 /** Always on the dock in Prepare and Teach; a config cannot remove them. */
 export const CORE_TOOLS: ToolbarItem[] = ["pen", "highlighter", "eraser", "laser", "undo"];
+/** The Classic layout's own buttons (they also fit on a Modern dock). */
+export const CLASSIC_ITEMS: ToolbarItem[] = ["menu", "mode", "toolbox", "share", "zoom", "addpage", "recognize", "ai"];
+/** Islands keep fewer: highlighter and laser live in the pen panel and the tools box. */
+export const ISLAND_CORE: ToolbarItem[] = ["pen", "eraser", "undo"];
 export const SHAPE_TOOLS: ToolbarItem[] = ["shape", "rect", "ellipse", "line", "arrow"];
 const hasCore = (m: Mode) => m !== "view";
 
@@ -102,7 +125,7 @@ export const TOOLBAR_ITEMS: { id: ToolbarItem; icon: IconName; label: string; ke
   { id: "ellipse", icon: "ellipse", label: "Ellipse", key: "O", kind: "tool" },
   { id: "line", icon: "line", label: "Line", key: "N", kind: "tool" },
   { id: "arrow", icon: "arrow", label: "Arrow", key: "A", kind: "tool" },
-  { id: "hand", icon: "hand", label: "Pan", key: "Space", kind: "tool" },
+  { id: "hand", icon: "hand", label: "Hand", key: "Hold Space", kind: "tool" },
   { id: "interact", icon: "interact", label: "Use Smart Objects", key: "I", kind: "tool" },
   { id: "smartink", icon: "smartink", label: "Smart shapes", key: "M", kind: "action" },
   { id: "undo", icon: "undo", label: "Undo", key: "Ctrl Z", kind: "action" },
@@ -114,6 +137,14 @@ export const TOOLBAR_ITEMS: { id: ToolbarItem; icon: IconName; label: string; ke
   { id: "pages", icon: "pages", label: "Pages", key: "G", kind: "action" },
   { id: "solve", icon: "totext", label: "Solve this", kind: "action" },
   { id: "settings", icon: "settings", label: "Settings", kind: "action" },
+  { id: "menu", icon: "menu", label: "Main menu", kind: "action" },
+  { id: "mode", icon: "monitor", label: "Mode", key: "F5", kind: "action" },
+  { id: "toolbox", icon: "toolbox", label: "Tools", kind: "action" },
+  { id: "share", icon: "share", label: "Share", kind: "action" },
+  { id: "zoom", icon: "search", label: "Zoom", key: "+ −", kind: "action" },
+  { id: "addpage", icon: "plus", label: "New page", kind: "action" },
+  { id: "recognize", icon: "recognize", label: "Recognise ink", key: "M", kind: "action" },
+  { id: "ai", icon: "ai", label: "Ask AI", kind: "action" },
 ];
 /** "shapes" is a dock pin, not a toolbar entry: the Shapes button. */
 export const SHAPES_PIN = { id: "shapes" as const, icon: "rect" as IconName, label: "Shapes and tables" };
@@ -144,7 +175,7 @@ export const CHROME_ITEMS: { id: ChromeKey; label: string }[] = [
 export const ALLOWED_TOOLS: Record<Mode, ToolbarItem[]> = {
   prepare: TOOLBAR_ITEMS.map((t) => t.id).filter((t) => t !== "exit"),
   teach: TOOLBAR_ITEMS.map((t) => t.id),
-  view: ["pager", "hand", "interact", "replay", "voice"],
+  view: ["pager", "hand", "interact", "replay", "voice", "menu", "mode", "zoom"],
 };
 /** Chrome each mode may show (the student view has no editing chrome). */
 export const ALLOWED_CHROME: Record<Mode, ChromeKey[]> = {
@@ -172,6 +203,29 @@ export const DEFAULT_MODES: ModesConfig = {
     tools: ["pager", "hand", "interact", "replay"],
     dock: { position: "bottom", orientation: "auto", minimized: false, pinned: ["pager", "hand", "interact", "replay"] },
   },
+};
+
+/** The Classic layout: three islands along the bottom, big buttons
+ * (DOCK_PRESETS → "Classic"). A starting point: every island, button and
+ * size stays editable (Customize dock, set_dock_layout). */
+export const CLASSIC_DOCK: Partial<DockConfig> = {
+  style: "islands",
+  position: "bottom",
+  size: "l",
+  groups: [
+    { id: "left", label: "Menu", items: ["menu", "mode", "toolbox", "ai"] },
+    { id: "centre", label: "Tools", items: ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] },
+    { id: "right", label: "Pages", items: ["addpage", "pager"] },
+  ],
+};
+/** The Student view's islands when the board uses the Classic layout (its dock is fixed). */
+export const CLASSIC_VIEW_DOCK: DockConfig = {
+  style: "islands", position: "bottom", orientation: "auto", minimized: false, size: "l", pinned: [],
+  groups: [
+    { id: "left", items: ["menu", "zoom"] },
+    { id: "centre", items: ["hand", "interact", "replay"] },
+    { id: "right", items: ["pager"] },
+  ],
 };
 
 const isMode = (m: unknown): m is Mode => m === "prepare" || m === "teach" || m === "view";
@@ -213,10 +267,10 @@ export function sanitizeMode(m: Mode, raw: unknown): ModeConfig {
 export function dockWarnings(m: Mode, c: ModeConfig): string[] {
   const w: string[] = [];
   const has = (t: ToolbarItem) => c.tools.includes(t);
-  if (m === "teach" && !has("exit") && !has("settings") && !c.chrome.settings) {
+  if (m === "teach" && !has("exit") && !has("settings") && !has("menu") && !has("mode") && !c.chrome.settings) {
     w.push("There is no button back to Prepare or Settings in Teach (Esc still leaves Teach).");
   }
-  if (m === "prepare" && !c.chrome.settings && !has("settings")) {
+  if (m === "prepare" && !c.chrome.settings && !has("settings") && !has("menu")) {
     w.push("There is no Settings button: add Settings to the dock or show it in the top bar.");
   }
   return w;
@@ -233,9 +287,10 @@ export interface DockPreset {
   hand?: "left" | "right";
 }
 
-/** Named layouts. "Default" resets both modes' docks. */
+/** Named layouts. "Default" resets both modes' docks (the Modern layout). */
 export const DOCK_PRESETS: DockPreset[] = [
   { name: "Default", hint: "The dock as Rupok ships it", modes: {} },
+  { name: "Classic", hint: "Three big islands along the bottom: menu, tools, pages", modes: { prepare: CLASSIC_DOCK, teach: CLASSIC_DOCK } },
   {
     name: "Left-handed", hint: "Tools on the left edge, popovers open to the right", hand: "left",
     modes: {
@@ -334,7 +389,10 @@ function cleanGroups(m: Mode, raw: unknown, seen: Set<DockPin>): DockGroup[] {
     if (!items.length) continue;
     const id = typeof r.id === "string" && /^[a-z0-9-]{1,24}$/.test(r.id) && !out.some((x) => x.id === r.id) ? r.id : `g${i + 1}`;
     const label = typeof r.label === "string" && r.label.trim() ? r.label.trim().slice(0, 24) : undefined;
-    out.push(label ? { id, label, items } : { id, items });
+    const grp: DockGroup = label ? { id, label, items } : { id, items };
+    if (typeof r.place === "string" && (ISLAND_PLACES as string[]).includes(r.place)) grp.place = r.place as IslandPlace;
+    if (r.collapsed === true) grp.collapsed = true;
+    out.push(grp);
   }
   return out;
 }
@@ -357,6 +415,8 @@ const cleanOrientation = (o: unknown): DockOrientation | null => (o === "auto" |
 function sanitizeLayout(m: Mode, d: Record<string, unknown>, out: DockConfig) {
   if (typeof d.size === "string" && (DOCK_SIZES as string[]).includes(d.size)) out.size = d.size as DockSize;
   if (typeof d.large === "boolean") out.large = d.large;
+  if (d.style === "islands") out.style = "islands";
+  else if (d.style === "dock") delete out.style;
   if (d.sizes && typeof d.sizes === "object") {
     const sizes: Partial<Record<DockPin, DockSize>> = {};
     for (const [k, v] of Object.entries(d.sizes as Record<string, unknown>)) {
@@ -375,9 +435,12 @@ function sanitizeLayout(m: Mode, d: Record<string, unknown>, out: DockConfig) {
     if (sg.length) split = { position: cleanPosition(s.position) ?? "right", orientation: cleanOrientation(s.orientation) ?? "auto", groups: sg };
   }
   if (hasCore(m)) {
-    const missing = CORE_TOOLS.filter((t) => !seen.has(t));
+    const islands = out.style === "islands";
+    const missing = (islands ? ISLAND_CORE : CORE_TOOLS).filter((t) => !seen.has(t));
     if (missing.length) {
-      if (groups.length) groups[0] = { ...groups[0], items: [...missing, ...groups[0].items] };
+      // Islands: into the island with the pen (else the middle one), not the menu island.
+      const at = islands ? Math.max(0, groups.findIndex((g) => g.items.includes("pen")) >= 0 ? groups.findIndex((g) => g.items.includes("pen")) : Math.floor(groups.length / 2)) : 0;
+      if (groups.length) groups[at] = { ...groups[at], items: islands ? [...groups[at].items, ...missing] : [...missing, ...groups[at].items] };
       else groups.push({ id: "core", items: missing });
     }
   }
@@ -414,6 +477,7 @@ function sanitizeDock(m: Mode, d: Record<string, unknown>, legacy: ToolbarItem[]
   } else {
     out.pinned = out.pinned.filter((x) => (x === "shapes" ? tools.some((t) => SHAPE_TOOLS.includes(t)) : tools.includes(x)));
   }
+  if (d.style === "islands" && !Array.isArray(d.groups)) d = { ...d, groups: CLASSIC_DOCK.groups };
   sanitizeLayout(m, d, out);
   if (out.groups || out.split) {
     // A custom layout says what is on the dock; `pinned` mirrors it.
@@ -450,7 +514,7 @@ export interface UiConfigFile {
   format: typeof UI_CONFIG_FORMAT;
   version: number;
   modes?: Partial<ModesConfig>;
-  appearance?: { theme?: string; accent?: string; iconStyle?: string; toolbar?: string; density?: string; hand?: string };
+  appearance?: { theme?: string; accent?: string; iconStyle?: string; toolbar?: string; density?: string; hand?: string; layout?: string; islandSwap?: boolean };
   /** Classroom touch gestures (gestures.ts → GestureConfig). */
   gestures?: Record<string, unknown>;
   /** The teacher's saved dock layouts ("My layouts"), by name. */

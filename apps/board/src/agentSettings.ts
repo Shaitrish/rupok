@@ -11,7 +11,7 @@ import { allSettings, settingById, type SettingDef } from "./settings";
 
 export const AGENT_SETTINGS: readonly string[] = [
   // Appearance
-  "appearance.theme", "appearance.accent", "appearance.density", "appearance.dockSide", "appearance.iconStyle",
+  "appearance.layout", "appearance.islandSwap", "appearance.theme", "appearance.accent", "appearance.density", "appearance.dockSide", "appearance.iconStyle",
   "appearance.pagesPanel", "appearance.pagesPinned",
   // Pen and ink
   "pen.style", "pen.markerOpacity", "pen.pressure", "pen.smoothing", "pen.hand", "pen.eraserMode", "pen.keepInkOnPage",

@@ -44,6 +44,9 @@ import DonateCard from "./components/DonateCard";
 import SpeedTestLayer from "./components/SpeedTest";
 import { resumeSpeedTest } from "./speedTest";
 import { startDonateCard } from "./donate";
+import { objectDialog, setObjectDialog } from "./components/classic/requests";
+import { LayoutChoice } from "./components/classic/LayoutChoice";
+import { attachEdgeSwipe } from "./components/classic/edge";
 
 const OverlayApp = lazy(() => import("./overlay/OverlayApp"));
 
@@ -58,7 +61,7 @@ export default function App() {
   let eraser!: HTMLDivElement;
   const [ready, setReady] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
-  const [objectDialog, setObjectDialog] = createSignal(false);
+  // The Smart Object dialog opens from Insert ▾, the ☰ menu and the tools box.
   // Settings deep links (settings/open.ts): popovers open the exact setting.
   registerSettingsOpener(openSettings);
   const [dragging, setDragging] = createSignal(false);
@@ -95,6 +98,8 @@ export default function App() {
     try {
       await controller.init(root, canvas, world, wet);
       controller.attachInput(input);
+      attachEdgeSwipe(root); // Classic: swipe in from a screen edge for the slide panel
+      if (navigator.webdriver) void import("./agentControl"); // e2e: window.rupokBoardOp
       controller.attachKeys();
       initShapes();
       controller.eraserCursor = (x, y, show) => {
@@ -202,6 +207,7 @@ export default function App() {
         <LibraryRoot />
         <UpdateNotice />
         <Tour />
+        <LayoutChoice />
         <DonateCard />
         {/* The board speed test: its progress card and its report (speedTest.ts). */}
         <SpeedTestLayer />
