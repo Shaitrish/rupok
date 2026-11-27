@@ -2,7 +2,8 @@
 //!
 //! Raw pointer samples flow through: [`filter::OneEuro`] smoothing →
 //! [`pressure::PressureCurve`] → [`builder::StrokeBuilder`] (accumulation,
-//! wet-stroke state) → [`simplify`] (on finish) → [`codec`] (compact storage).
+//! wet-stroke state) → [`curve`] (a smooth line through sparse samples) →
+//! [`simplify`] (on finish) → [`codec`] (compact storage).
 //!
 //! Everything here is allocation-light and `no_std`-friendly in spirit, so the
 //! same code runs in the webview (WASM) on the pen hot path and natively.
@@ -10,6 +11,7 @@
 pub mod brush;
 pub mod builder;
 pub mod codec;
+pub mod curve;
 pub mod filter;
 pub mod math;
 pub mod pressure;

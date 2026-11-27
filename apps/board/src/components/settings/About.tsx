@@ -7,6 +7,10 @@ import { controller } from "../../controller";
 import { graphicsAdapter } from "../../inkLatency";
 
 export const VERSION = "0.2.4";
+/** The commit this build was made from, with the branch when it is not main
+ * (vite.config.ts `buildId`): tells a test build from a release. */
+declare const __RUPOK_BUILD__: string | undefined;
+export const BUILD: string = typeof __RUPOK_BUILD__ === "string" ? __RUPOK_BUILD__ : "";
 const REPO = "https://github.com/shaitrish/rupok";
 
 export function AboutSection(props: SettingProps) {
@@ -16,7 +20,7 @@ export function AboutSection(props: SettingProps) {
         <Mark size={40} />
         <div>
           <div class="st-about-name" id={props.labelId}>{APP_NAME}</div>
-          <div class="st-help" id={props.descId}>Version {VERSION} · pre-alpha · the open-source whiteboard for teachers</div>
+          <div class="st-help" id={props.descId}>Version {VERSION}{BUILD ? ` (build ${BUILD})` : ""} · pre-alpha · the open-source whiteboard for teachers</div>
         </div>
       </div>
       <dl class="st-facts">

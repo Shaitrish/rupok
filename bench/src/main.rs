@@ -122,6 +122,8 @@ fn main() {
         pts as f64 / n as f64
     );
 
+    curve_report(&mut budgets);
+
     // ------------------------------------------------------------- document
     let mut lesson = Lesson::new("Bench", 0.0);
     let page = lesson.page_id_at(0).unwrap();
@@ -556,6 +558,101 @@ fn main() {
     });
 
     report(&budgets, check);
+}
+
+/// What the curve through sparse samples costs (`rupok_ink::curve`): the
+/// same 13 600 px of loops written by a mouse at 34 Hz (a fast hand, 40 px
+/// between samples), a touch screen and a pen at 240 Hz, each built with
+/// the curve and with straight joins.
+fn curve_report(budgets: &mut Vec<Budget>) {
+    use rupok_ink::filter::OneEuroParams;
+    const LENGTH: f32 = 13_600.0;
+    // (ms between samples, px between samples)
+    let run = |dt: f64, step: f32, smooth: bool| {
+        let r = 115.0f32;
+        let n = (LENGTH / step) as usize;
+        let at = |i: usize| {
+            let s = i as f32 * step;
+            let a = s / r;
+            InputPoint {
+                // Loops that drift, so the line never retraces itself.
+                x: 400.0 + s * 0.05 + r * a.cos(),
+                y: 400.0 + r * (a * 1.03).sin(),
+                pressure: 0.5,
+                t_ms: i as f64 * dt,
+            }
+        };
+        let cfg = BuilderConfig {
+            filter: OneEuroParams::from_smoothing(0.0),
+            smooth,
+            ..Default::default()
+        };
+        let mut b = StrokeBuilder::begin(StrokeStyle::default(), cfg, at(0), false);
+        let mut wet = Vec::new();
+        let mut times = Vec::with_capacity(n);
+        for i in 1..n {
+            let t = Instant::now();
+            b.push(at(i));
+            b.wet(&[], &mut wet);
+            times.push(ms(t.elapsed()));
+        }
+        let samples = b.points().len();
+        let wet_points = wet.len();
+        let t = Instant::now();
+        let stored = b.finish().len();
+        let finish = ms(t.elapsed());
+        (
+            samples,
+            wet_points,
+            stored,
+            percentile(&mut times, 0.99),
+            finish,
+        )
+    };
+    println!("curve through the samples, one 13 600 px line (straight joins in brackets)");
+    let mut per_span = 0.0;
+    let mut dense_extra = 0.0;
+    let mut sparse_stored = 0.0;
+    let mut pen_stored = 1.0;
+    for (name, dt, step) in [
+        ("34 Hz mouse, 40 px apart", 1000.0 / 34.0, 40.0f32),
+        ("60 Hz touch, 15 px apart", 1000.0 / 60.0, 15.0),
+        ("240 Hz pen, 1.5 px apart", 1000.0 / 240.0, 1.5),
+    ] {
+        let (samples, wet, stored, p99, finish) = run(dt, step, true);
+        let (_, wet0, stored0, p990, finish0) = run(dt, step, false);
+        println!(
+            "  {name}: {samples} samples → {wet} wet points [{wet0}], {stored} stored [{stored0}]; \
+             push + wet p99 {p99:.3} ms [{p990:.3}], pen-up {finish:.2} ms [{finish0:.2}]"
+        );
+        if step == 40.0 {
+            per_span = (wet - 1) as f64 / (samples - 1) as f64;
+            sparse_stored = stored as f64;
+        }
+        if step == 1.5 {
+            dense_extra = (wet as f64 / wet0 as f64 - 1.0) * 100.0;
+            pen_stored = stored as f64;
+        }
+    }
+    budgets.push(Budget {
+        name: "curve pieces per 40 px span (34 Hz mouse)",
+        value: per_span,
+        limit: 8.0,
+        unit: "",
+    });
+    budgets.push(Budget {
+        name: "curve: extra wet points, 240 Hz pen",
+        value: dense_extra,
+        limit: 5.0,
+        unit: "%",
+    });
+    // A mouse stroke is stored no more densely than a pen leaves the line.
+    budgets.push(Budget {
+        name: "curve: mouse stroke stored vs the pen's",
+        value: sparse_stored / pen_stored * 100.0,
+        limit: 110.0,
+        unit: "%",
+    });
 }
 
 /// A 10 s, 240 Hz pen stroke through the engine (rupok-wasm's `Engine`, the

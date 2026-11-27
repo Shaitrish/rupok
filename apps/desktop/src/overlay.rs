@@ -113,6 +113,7 @@ fn ensure_windows(app: &AppHandle) -> tauri::Result<(WebviewWindow, WebviewWindo
                 .build()?;
             #[cfg(target_os = "macos")]
             macos::float_everywhere(&win, macos::INK_LEVEL);
+            crate::pen_input::tune(&win);
             win
         }
     };

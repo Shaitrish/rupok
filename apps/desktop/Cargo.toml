@@ -40,6 +40,7 @@ app = [
   "dep:percent-encoding",
   "dep:rupok-cli",
   "dep:webkit2gtk",
+  "dep:gtk",
   "dep:objc2",
   "dep:windows",
   "dep:windows-numerics",
@@ -81,6 +82,9 @@ x11rb = { version = "0.14", optional = true }
 # Grants the board's microphone request (voice input) in WebKitGTK, which
 # denies getUserMedia unless the app answers its permission request.
 webkit2gtk = { version = "2.0", optional = true, features = ["v2_8"] }
+# The web view's GDK window: every pointer sample for the pen (pen_input.rs).
+# The version Tauri and webkit2gtk already build.
+gtk = { version = "0.18", optional = true }
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 xcap = { version = "0.9", optional = true }

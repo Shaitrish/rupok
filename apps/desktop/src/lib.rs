@@ -38,6 +38,8 @@ mod native_ink;
 #[cfg(feature = "app")]
 mod native_ink_cmd;
 #[cfg(feature = "app")]
+mod pen_input;
+#[cfg(feature = "app")]
 mod voice_cmd;
 
 #[cfg(feature = "app")]
