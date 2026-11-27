@@ -5,14 +5,30 @@ notes come after each list. Downloads are on
 [rupok.app/download](https://rupok.app/download/) and on
 [GitHub Releases](https://github.com/Shaitrish/rupok/releases).
 
-## Unreleased
+## v0.2.6 (27 November 2026)
 
 ### For teachers
+
+- **New Classic layout, now the default:** big buttons in three islands
+  along the bottom, a ☰ menu, a page counter with a page grid, and floating
+  pen and shape panels. It will feel familiar if you have used classroom
+  whiteboard software. The first time you open Rupok you can pick Classic
+  (recommended) or Modern; change it any time in Settings → Appearance →
+  Layout. If you already chose Modern, you keep it.
+- **Move the toolbar out of the way:** press and hold an empty spot on an
+  island and drag it to the top or bottom. Tap the island twice to flip
+  every island between top and bottom, so you can write at the bottom of the
+  board. The arrow tabs at the outer edges swap the left and right islands,
+  and "Hide toolbar" in ☰ folds an island into a small pill.
+- **Clearer buttons:** new icons drawn for a board seen from across the
+  room, tooltips in plain words with the key shown separately (for example
+  "Hand: move the board" · Hold Space), and pen, shape, eraser and page
+  panels with the same sizes and spacing.
 
 - **Voice typing works in the desktop app** on Windows, Linux and macOS. The
   first time you tap the mic, Rupok offers "Download offline voice (base,
   ~148 MB)". After that, speech becomes text on your computer, in English
-  and বাংলা, even without internet. Audio never leaves the computer.
+  and Bangla, even without internet. Audio never leaves the computer.
 - **When the microphone does not work, Rupok says why and how to fix it:**
   blocked for the site (with the steps in Chrome or Edge), blocked by
   Windows, macOS or Linux privacy settings, no microphone, or the microphone
@@ -23,6 +39,12 @@ notes come after each list. Downloads are on
 
 ### For developers
 
+- Classic layout: `apps/board/src/layout.ts`; islands, swap and fold are
+  saved in the layout setting (`appearance.islandSwap`, per-island `place`
+  and `collapsed`). New live ops and MCP tools `move_island` and
+  `swap_islands`; `set_dock_layout` / `get_dock_layout` carry island
+  placement. One shared panel spec (padding, rows, segmented controls,
+  52 px tiles).
 - The installers are built with `--features whisper` (`metal` on macOS) and
   `GGML_NATIVE=OFF`; `voice_status` reports `cpu_ok` / `cpu_note`.
 - `voice_cmd::on_permission` grants the board window the microphone in

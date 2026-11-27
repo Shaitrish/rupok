@@ -6,7 +6,7 @@ import { Mark } from "../Icon";
 import { controller } from "../../controller";
 import { graphicsAdapter } from "../../inkLatency";
 
-export const VERSION = "0.2.5";
+export const VERSION = "0.2.6";
 /** The commit this build was made from, with the branch when it is not main
  * (vite.config.ts `buildId`): tells a test build from a release. */
 declare const __RUPOK_BUILD__: string | undefined;
