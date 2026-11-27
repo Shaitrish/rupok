@@ -111,8 +111,9 @@ test.describe("Classic layout", () => {
     await expect(panel.getByRole("button", { name: "Star page" })).toHaveCount(1);
     // The swipe drew nothing: undo has nothing to take back.
     await expect(island(page, "centre").getByRole("button", { name: "Undo" })).toBeDisabled();
-    // Synthetic touches (the same in every browser) have no real pointer to capture.
-    expect(errors.filter((e) => !e.includes("setPointerCapture"))).toEqual([]);
+    // Synthetic touches have no real pointer to capture (Chromium: "setPointerCapture…",
+    // WebKit: "The object can not be found here.").
+    expect(errors.filter((e) => !/setPointerCapture|can not be found/.test(e))).toEqual([]);
   });
 
   test("a selection gets the upright toolbar beside it", async ({ page }) => {

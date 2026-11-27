@@ -1473,7 +1473,7 @@ size, large icons, the groups of buttons in order, and the optional second (spli
         description = "Customise the Smart Dock for the teacher (\"pen, highlighter and eraser on the left, undo \
 and next page on the right, bigger buttons\"): position (left, right, top, bottom, corners), orientation, \
 groups of buttons (ids from list_dock_items, each group separated), a split second dock on another edge, button \
-size (small, medium, large) and large icons. `style: "islands"` is the Classic layout: each group is a big \
+size (small, medium, large) and large icons. `style: \"islands\"` is the Classic layout: each group is a big \
 island along the bottom edge (first left, last right, the rest in the middle; menu, mode, toolbox, share, zoom, \
 addpage, recognize are its buttons). Pen, eraser and undo always stay. Validated; the teacher is asked like for \
 an edit and can undo it from the AI chip.",

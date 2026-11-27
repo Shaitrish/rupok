@@ -225,7 +225,17 @@ export function SelectionOverlay() {
   const vertical = () => isClassic();
   /** The toolbar's measured size (it changes with what the selection holds). */
   const [barSize, setBarSize] = createSignal({ w: 0, h: 0 });
-  const ro = new ResizeObserver(() => bar && setBarSize({ w: bar.offsetWidth, h: bar.offsetHeight }));
+  // Read in the next frame: moving the bar inside the observer's callback is a resize loop.
+  let measure = 0;
+  const ro = new ResizeObserver(() => {
+    cancelAnimationFrame(measure);
+    measure = requestAnimationFrame(() => {
+      if (!bar) return;
+      const w = bar.offsetWidth, h = bar.offsetHeight;
+      if (w !== barSize().w || h !== barSize().h) setBarSize({ w, h });
+    });
+  });
+  onCleanup(() => cancelAnimationFrame(measure));
   onCleanup(() => ro.disconnect());
   /** Floating toolbar: centred above the frame, else below it, else inside
    * its top edge; always on screen and clear of the top bar. */
