@@ -320,13 +320,15 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 // Ink sharpness is fixed at 100 %: "Auto" resizes the canvas when frames are
 // slow (they are, under SwiftShader), in the middle of the pixel comparisons.
-const prefs = { theme: "light", smartShapes: flag("smart") ? "auto" : "off", showPages: FOURK, renderScale: "100", ...JSON.parse(opt("prefs", "{}")) };
+// layoutChosen: the Modern layout, so numbers stay comparable with earlier
+// releases (Classic, the default since v0.2.6, uses the same canvas and ink).
+const prefs = { theme: "light", layoutChosen: true, smartShapes: flag("smart") ? "auto" : "off", showPages: FOURK, renderScale: "100", ...JSON.parse(opt("prefs", "{}")) };
 if (SMOOTHING !== null) prefs.smoothing = Number(SMOOTHING);
 if (BRUSH !== null) prefs.penBrush = BRUSH;
 await page.addInitScript((v) => { if (window === window.top) localStorage.setItem("rupok.prefs", v); }, JSON.stringify(prefs));
 await page.addInitScript(probe);
 await page.goto(`http://127.0.0.1:${port}/board/`, { waitUntil: "load" });
-await page.waitForSelector(".toolbar, .dock", { timeout: 60000 });
+await page.waitForSelector(".toolbar, .dock, .islands", { timeout: 60000 });
 await page.waitForFunction(() => !document.querySelector(".loading"), null, { timeout: 60000 });
 await sleep(Number(opt("settle", 3000)));
 // The Library home may open over a fresh board: close it.
