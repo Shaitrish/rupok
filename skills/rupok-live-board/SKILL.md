@@ -294,6 +294,10 @@ teachers coming from classroom whiteboard software.
   `recognize`, `ai` (Ask AI) (they also fit on a Modern dock).
 - "Put the menu on the right": `swap_islands(swapped: true)` (left out, it
   toggles; `false` puts it back on the left).
+- "I need to write at the bottom": `move_island(island: "all", edge: "top")`,
+  and `edge: "bottom"` to bring them back. One island: `move_island(island:
+  "right", place: "top-right")`; fold one: `collapsed: true`; everything
+  back: `reset: true`. `get_dock_layout` lists each island's place.
 
 ```text
 set_dock_layout(mode: "teach", layout: {style: "islands", size: "l", groups: [

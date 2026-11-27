@@ -111,6 +111,13 @@ rearrange it like any dock.
 
 - Each group of `groups` is one island. The first sits at the left, the
   last at the right, the others in the middle (one group: in the middle).
+  An island's own `place` (`bottom-left`, `bottom-centre`, `bottom-right`,
+  `top-left`, `top-centre`, `top-right`) puts it there instead, and
+  `collapsed: true` folds it to a small pill (tap it to show it again). The
+  teacher moves an island by pressing and holding its background, then
+  dragging it to one of the six spots; a double tap on the background moves
+  every island to the other edge; ☰ → Toolbar at top / bottom and Hide
+  toolbar do the same for all of them.
   `appearance.islandSwap` (the arrow tab at a side island's outer edge,
   Settings → Appearance, or the agent's `swap_islands`) trades the first
   and last islands' sides; they slide across.
@@ -141,6 +148,10 @@ rearrange it like any dock.
 The **Classic** dock preset sets it for Prepare and Teach;
 **Settings → Appearance → Layout** (`appearance.layout`) switches between
 Modern and Classic and brings back the teacher's own Modern dock.
+Classic is the default on the teacher board: a new board starts in it, and
+the first-run "Which layout do you prefer?" has Classic preselected
+(dismissing it keeps Classic). A teacher who picked Modern keeps Modern. The
+student view, share links and the overlay keep their own chrome.
 
 ```json
 "teach": {
@@ -177,7 +188,7 @@ Settings → Teaching modes) resets that memory, so the config takes effect.
 | `voice` | Voice text: speak and the words go on the board; hold for push-to-talk ([Voice on the board](ai-agents.md#voice-on-the-board)) | prepare, teach; view only with Settings → Voice on the board → "Students may ask the AI by voice" (Ask AI only) |
 | `shape` | The Shapes picker's tool: every shape and table (key `S` opens the picker) | prepare, teach |
 | `rect`, `ellipse`, `line`, `arrow` | Single shape tools (keys `R`, `O`, `N`, `A`) | prepare, teach |
-| `hand` | Pan | all |
+| `hand` | Hand: move the board (hold Space) | all |
 | `interact` | Use Smart Objects | all |
 | `smartink` | Smart shapes on/off: switches between Off and the last on-mode (Auto by default; set in Settings → Pen & ink → Smart shapes). Key `M` | prepare, teach |
 | `undo`, `redo` | Undo / redo buttons | prepare, teach |
@@ -421,6 +432,17 @@ student view gets no pages panel.
             },
             "orientation": { "enum": ["auto", "horizontal", "vertical"] },
             "style": { "enum": ["dock", "islands"] },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" }, "label": { "type": "string" }, "items": { "type": "array" },
+                  "place": { "enum": ["bottom-left", "bottom-centre", "bottom-right", "top-left", "top-centre", "top-right"] },
+                  "collapsed": { "type": "boolean" }
+                }
+              }
+            },
             "minimized": { "type": "boolean" },
             "pinned": {
               "type": "array",

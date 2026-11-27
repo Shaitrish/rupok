@@ -850,6 +850,24 @@ pub enum Op {
         #[serde(default)]
         swapped: Option<bool>,
     },
+    /// The Classic layout: move an island (`island`: its id, label or
+    /// 1-based number, or "all") to a `place` (`bottom-left` … `top-right`)
+    /// or every island to an `edge` (top, bottom), fold it (`collapsed`), or
+    /// `reset` them all to the bottom.
+    MoveIsland {
+        #[serde(default)]
+        mode: Option<String>,
+        #[serde(default)]
+        island: Option<serde_json::Value>,
+        #[serde(default)]
+        place: Option<String>,
+        #[serde(default)]
+        edge: Option<String>,
+        #[serde(default)]
+        collapsed: Option<bool>,
+        #[serde(default)]
+        reset: Option<bool>,
+    },
 
     // ------------------------------------------------- voice (live only)
     /// Start "Voice text" on the board: the teacher's speech appears as text
@@ -965,6 +983,7 @@ impl Op {
             Op::SaveDockPreset { .. } => "save_dock_preset",
             Op::ApplyDockPreset { .. } => "apply_dock_preset",
             Op::SwapIslands { .. } => "swap_islands",
+            Op::MoveIsland { .. } => "move_island",
             Op::ShowProgress(_) => "show_progress",
         }
     }
@@ -1039,6 +1058,7 @@ impl Op {
                 | Op::SaveDockPreset { .. }
                 | Op::ApplyDockPreset { .. }
                 | Op::SwapIslands { .. }
+                | Op::MoveIsland { .. }
                 | Op::StartVoiceText { .. }
                 | Op::StopVoiceText { .. }
                 | Op::ShowProgress(_)
@@ -1114,6 +1134,7 @@ impl Op {
             Op::SaveDockPreset { .. } => "saved a dock layout",
             Op::ApplyDockPreset { .. } => "changed the dock",
             Op::SwapIslands { .. } => "swapped the islands",
+            Op::MoveIsland { .. } => "moved an island",
             Op::ShowProgress(_) => "showed its progress",
         }
     }

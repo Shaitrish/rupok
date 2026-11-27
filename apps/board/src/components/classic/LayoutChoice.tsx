@@ -8,6 +8,7 @@ import { libraryOpen } from "../../library/session";
 import { type Layout, layout } from "../../layout";
 import { setLayout } from "../DockEditor";
 import { Icon } from "../Icon";
+import { tipLang } from "./tips";
 
 /** Should the question show by itself? Never for students or automated
  * browsers (e2e suites ask for it with /board/?layout). */
@@ -46,15 +47,24 @@ function Preview(props: { kind: Layout }) {
 }
 
 const CHOICES: { id: Layout; title: string; text: string }[] = [
-  { id: "modern", title: "Modern", text: "A top bar for the lesson and one dock that moves to your hand." },
   { id: "classic", title: "Classic", text: "Big buttons in three islands along the bottom, a ☰ menu. Familiar from classroom whiteboard software." },
+  { id: "modern", title: "Modern", text: "A top bar for the lesson and one dock that moves to your hand." },
 ];
+const RECOMMENDED = { en: "Recommended", bn: "প্রস্তাবিত" };
 
 export function LayoutChoice() {
   const [open, setOpen] = createSignal(false);
-  const [pick, setPick] = createSignal<Layout>(layout());
+  const [pick, setPick] = createSignal<Layout>("classic");
   onMount(() => {
+    // Classic is the teacher board's default: a new board (no dock of its
+    // own yet) starts in it, before and without the question (an agent or a
+    // kiosk start). Students and viewers keep their own chrome.
+    if (!studentEntry && !prefs().layoutChosen && !prefs().modes?.prepare && !prefs().modes?.teach && layout() === "modern") {
+      setLayout("classic", { chosen: false });
+    }
     if (!wanted()) return;
+    const esc = (e: KeyboardEvent) => open() && e.key === "Escape" && done("classic");
+    window.addEventListener("keydown", esc);
     // After the Library home, on the board.
     let tries = 0;
     const t = setInterval(() => {
@@ -72,7 +82,7 @@ export function LayoutChoice() {
   };
   return (
     <Show when={open()}>
-      <div class="scrim lc-scrim">
+      <div class="scrim lc-scrim" onClick={(e) => e.target === e.currentTarget && done("classic")}>
       <div class="dialog lc-dialog" role="dialog" aria-modal="true" aria-labelledby="lc-title">
         <div class="badge"><Icon name="monitor" size={24} active /></div>
         <h2 id="lc-title">Which layout do you prefer?</h2>
@@ -90,7 +100,10 @@ export function LayoutChoice() {
                 onDblClick={() => done(c.id)}
               >
                 <Preview kind={c.id} />
-                <span class="lc-name">{c.title}</span>
+                <span class="lc-name">
+                  {c.title}
+                  <Show when={c.id === "classic"}><span class="lc-badge">{RECOMMENDED[tipLang()]}</span></Show>
+                </span>
                 <span class="lc-text">{c.text}</span>
               </button>
             )}

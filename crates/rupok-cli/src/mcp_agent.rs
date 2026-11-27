@@ -583,6 +583,31 @@ pub struct SwapIslandsParams {
     pub swapped: Option<bool>,
 }
 
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MoveIslandParams {
+    /// `prepare` or `teach`. Default: the mode on screen.
+    #[serde(default)]
+    pub mode: Option<String>,
+    /// The island: its id (`left`, `centre`, `right` in the Classic
+    /// layout), its label, its 1-based number, or "all". Default: all.
+    #[serde(default)]
+    pub island: Option<Value>,
+    /// Where it goes: bottom-left, bottom-centre, bottom-right, top-left,
+    /// top-centre or top-right (another island alone there takes its place).
+    #[serde(default)]
+    pub place: Option<String>,
+    /// With "all": every island to the `top` or `bottom` edge.
+    #[serde(default)]
+    pub edge: Option<String>,
+    /// Fold the island to a small pill (true) or show it again (false).
+    #[serde(default)]
+    pub collapsed: Option<bool>,
+    /// Every island back along the bottom, unfolded.
+    #[serde(default)]
+    pub reset: Option<bool>,
+}
+
 // ------------------------------------------------------------------- tools
 
 fn live_or(path: &Option<String>) -> Option<String> {
@@ -1562,6 +1587,31 @@ teacher is asked like for an edit and can undo it from the AI chip.",
     )]
     async fn swap_islands(&self, Parameters(p): Parameters<SwapIslandsParams>) -> CallToolResult {
         self.live_call(Op::SwapIslands { swapped: p.swapped }).await
+    }
+
+    #[tool(
+        description = "Classic layout: move an island so the teacher can write where it was (\"put the \
+toolbar at the top\", \"move the page buttons to the top left\"), fold one to a small pill, or reset them. \
+island: an id, label, number or \"all\"; place: bottom-left, bottom-centre, bottom-right, top-left, \
+top-centre, top-right; edge (with all): top or bottom; collapsed: true or false; reset: true. Returns where \
+every island is. The teacher is asked like for an edit and can undo it from the AI chip.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn move_island(&self, Parameters(p): Parameters<MoveIslandParams>) -> CallToolResult {
+        self.live_call(Op::MoveIsland {
+            mode: p.mode,
+            island: p.island,
+            place: p.place,
+            edge: p.edge,
+            collapsed: p.collapsed,
+            reset: p.reset,
+        })
+        .await
     }
 }
 

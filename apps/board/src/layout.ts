@@ -26,3 +26,12 @@ export const isClassic = (m: Mode = mode()): boolean => islandsOf(m) !== null;
 
 /** The layout the board uses (Prepare decides; Teach may differ if arranged so). */
 export const layout = (): Layout => (modeConfig("prepare").dock.style === "islands" ? "classic" : "modern");
+
+// The ☰ menu's "Toolbar at top / bottom" calls the islands' flip (Dock.tsx).
+let flip: (() => void) | null = null;
+export const registerIslandFlip = (f: (() => void) | null) => (flip = f);
+export const flipIslandsNow = () => flip?.();
+let fold: ((hide: boolean) => void) | null = null;
+export const registerIslandFold = (f: ((hide: boolean) => void) | null) => (fold = f);
+/** ☰ → Hide toolbar / Show toolbar: every island folds to a pill (or back). */
+export const foldIslandsNow = (hide: boolean) => fold?.(hide);

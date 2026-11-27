@@ -86,8 +86,8 @@ export function applyPreset(p: DockPreset) {
 /** Switch between the Modern and the Classic layout (layout.ts). Classic
  * applies the "Classic" preset; Modern brings back the teacher's own
  * Modern docks (else the default dock). One prefs change, undoable. */
-export function setLayout(to: Layout) {
-  setPrefs({ layoutChosen: true });
+export function setLayout(to: Layout, opts: { chosen?: boolean } = {}) {
+  if (opts.chosen !== false) setPrefs({ layoutChosen: true });
   if (to === layout() && to === "modern") return;
   if (to === "classic") return applyPreset(DOCK_PRESETS.find((p) => p.name === "Classic")!);
   const kept = prefs().modernDocks;
@@ -104,6 +104,16 @@ export function setLayout(to: Layout) {
   resetDock("prepare");
   resetDock("teach");
   controller.updateInsets(true);
+}
+
+/** Classic: every island back to its place by order, unfolded, sides not swapped. */
+export function resetIslands(modes: EditMode[] = ["prepare", "teach"]) {
+  setPrefs({ islandSwap: false });
+  for (const m of modes) {
+    const d = modeConfig(m).dock;
+    if (d.style !== "islands") continue;
+    saveDock(m, { position: "bottom", groups: (d.groups ?? []).map(({ place: _p, collapsed: _c, ...g }) => g) });
+  }
 }
 
 /** Save the current docks as a named layout (replacing one of that name). */

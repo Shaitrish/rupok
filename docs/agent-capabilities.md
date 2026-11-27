@@ -141,6 +141,7 @@ changes alike (Auto-approve covers them the same way).
 | Layout: Modern or Classic | ✗ | ✅ | `set_setting` `appearance.layout`, or `apply_dock_preset` `Classic` / `Default` | – | ✅ |
 | Rearrange, resize, move the Classic islands | ✗ | ✅ | `set_dock_layout` with `style: "islands"` (each group is an island), `get_dock_layout` | – | ✅ |
 | Swap the side islands (menu island left or right) | ✗ | ✅ | `swap_islands` (`swapped`: true, false, or toggle), `set_setting` `appearance.islandSwap` | – | ✅ |
+| Move an island (bottom or top, left, centre, right), all islands to the top or bottom, fold one to a pill, reset | ✗ | ✅ | `move_island` (`island`, `place`, `edge`, `collapsed`, `reset`), or `set_dock_layout` groups with `place` and `collapsed` | – | ✅ |
 
 ## Library, export, save, sharing
 
@@ -197,7 +198,7 @@ board and on files; **board** operations run in the board app
 | `undo` | board | write |
 | `start_voice_text`, `stop_voice_text` | board (`voice/board.ts`, the microphone) | write |
 | `library_list`, `get_settings`, `get_dock_layout`, `list_dock_items` | board | read |
-| `library_create_lesson`, `library_move`, `library_rename`, `library_trash`, `set_setting`, `set_dock_layout`, `save_dock_preset`, `apply_dock_preset`, `swap_islands` | board | write |
+| `library_create_lesson`, `library_move`, `library_rename`, `library_trash`, `set_setting`, `set_dock_layout`, `save_dock_preset`, `apply_dock_preset`, `swap_islands`, `move_island` | board | write |
 
 ## Settings
 
@@ -210,6 +211,7 @@ the AI chip's Undo puts it back.
 |---|---|---|
 | `appearance.layout` | agent | `set_setting` |
 | `appearance.islandSwap` | agent | `set_setting`, or `swap_islands` |
+| `appearance.islandsReset` | agent | `move_island` with `reset: true` (this entry is a button) |
 | `appearance.theme` | agent | `set_setting` |
 | `appearance.accent` | agent | `set_setting` |
 | `appearance.density` | agent | `set_setting` |

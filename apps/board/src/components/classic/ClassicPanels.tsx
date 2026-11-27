@@ -40,6 +40,14 @@ import { celebrate } from "../../stamps";
 import { openDockEditor } from "../../dock";
 import { setLayout } from "../DockEditor";
 import { openPagesPanel } from "./edge";
+import { flipIslandsNow, foldIslandsNow, islandsOf } from "../../layout";
+import { islandsAtTop } from "../../islands";
+
+const allFolded = () => !!islandsOf()?.groups?.every((g) => g.collapsed);
+const atTop = () => {
+  const d = islandsOf();
+  return !!d && islandsAtTop(d, prefs().islandSwap);
+};
 import { toggleAi, aiConnected } from "../AiStatus";
 
 /** 15 ink colours, 3 × 5, chosen to read from the back of a classroom on
@@ -223,23 +231,15 @@ export function InkPanel(props: {
           </button>
         </div>
         <Show when={props.kind === "highlighter"}>
-          <div class="seg cl-seg" role="radiogroup" aria-label="Highlighter style">
-            <For each={TOOL_BRUSHES.highlighter}>
-              {(id) => (
-                <button
-                  role="radio"
-                  aria-checked={brushOf("highlighter") === id}
-                  classList={{ on: brushOf("highlighter") === id }}
-                  onClick={() => {
-                    setBrushOf("highlighter", id);
-                    controller.applyPrefs();
-                  }}
-                >
-                  {brushInfo(id).label}
-                </button>
-              )}
-            </For>
-          </div>
+          <Segmented
+            label="Highlighter style"
+            value={brushOf("highlighter")}
+            options={TOOL_BRUSHES.highlighter.map((id) => [id, brushInfo(id).label] as const)}
+            onPick={(id) => {
+              setBrushOf("highlighter", id as BrushId);
+              controller.applyPrefs();
+            }}
+          />
         </Show>
         <MarkerOpacity />
       </div>
@@ -280,6 +280,7 @@ export function MainMenu(props: { onClose: () => void }) {
         { id: "open", label: "Open", icon: "open", key: "Ctrl O", run: go(() => controller.openFile()) },
         { id: "save", label: "Save", icon: "save", key: "Ctrl S", run: go(() => void controller.saveFile()), hidden: view() },
         { id: "save-as", label: "Save as…", icon: "download", run: go(() => { controller.fileHandle = null; void controller.saveFile(); }), hidden: view() },
+        { id: "share-file", label: "Share", icon: "share", run: go(() => void shareLesson()), hidden: view() },
         { id: "library", label: "Library", icon: "library", run: go(() => void openLibrary()), hidden: studentEntry },
       ],
     },
@@ -303,6 +304,14 @@ export function MainMenu(props: { onClose: () => void }) {
       ],
     },
     { id: "print", label: "Print", icon: "print", run: go(openExport) },
+    {
+      id: "toolbar", label: atTop() ? "Toolbar at bottom" : "Toolbar at top", icon: atTop() ? "down" : "up",
+      run: go(flipIslandsNow), hidden: view(),
+    },
+    {
+      id: "hide-toolbar", label: allFolded() ? "Show toolbar" : "Hide toolbar", icon: allFolded() ? "eye" : "down",
+      run: go(() => foldIslandsNow(!allFolded())), hidden: view(),
+    },
     { id: "settings", label: "Settings", icon: "settings", run: go(() => openSettings()), hidden: view() },
     {
       id: "help", label: "Help", icon: "help", sub: [
@@ -475,47 +484,99 @@ export function ZoomPanel(props: { onClose: () => void }) {
 
 export function RecognizePanel(props: { onClose: () => void }) {
   const smart = () => prefs().smartShapes;
+  const on = () => smart() !== "off";
   const inkSelected = () => selectionIds().length > 0 && selectionMeta().strokes > 0;
   return (
     <Panel title="Recognise ink" onClose={props.onClose} class="cl-recog">
-      <button
-        class="cl-row"
-        classList={{ on: smart() !== "off" }}
-        role="menuitemcheckbox"
-        aria-checked={smart() !== "off"}
-        title="Smart shapes: rough circles, boxes, arrows and graphs become neat shapes  ·  M"
-        onClick={() => controller.toggleSmartInk()}
-      >
-        <Icon name="smartink" size={28} active={smart() !== "off"} />
-        <span class="grow">Smart shapes<small>Rough shapes become neat ones</small></span>
-        <span class="dock-check" classList={{ on: smart() !== "off" }} />
-      </button>
-      <Show when={smart() !== "off"}>
-        <div class="seg cl-seg" role="radiogroup" aria-label="When shapes snap">
-          <For each={[["auto", "When I lift the pen"], ["hold", "When I hold still"]] as const}>
-            {([v, l]) => (
-              <button role="radio" aria-checked={smart() === v} classList={{ on: smart() === v }} onClick={() => { setPrefs({ smartShapes: v, smartLast: v }); controller.applyPrefs(); }}>
-                {l}
+      <div class="cl-stack">
+        <button
+          class="cl-row"
+          classList={{ on: on() }}
+          role="menuitemcheckbox"
+          aria-checked={on()}
+          title="Smart shapes: rough circles, boxes, arrows and graphs become neat shapes  ·  M"
+          onClick={() => controller.toggleSmartInk()}
+        >
+          <Icon name="smartink" size={28} active={on()} />
+          <span class="grow">Smart shapes<small>Rough shapes become neat ones</small></span>
+          <span class="dock-check" classList={{ on: on() }} />
+        </button>
+        {/* A child of Smart shapes: when they snap (greyed while they are off). */}
+        <Segmented
+          label="When shapes snap"
+          disabled={!on()}
+          value={on() ? smart() : prefs().smartLast}
+          options={[["auto", "When I lift the pen"], ["hold", "When I hold still"]]}
+          onPick={(v) => {
+            setPrefs({ smartShapes: v as "auto" | "hold", smartLast: v as "auto" | "hold" });
+            controller.applyPrefs();
+          }}
+        />
+        <div class="cl-hr" />
+        <Show
+          when={inkSelected()}
+          fallback={
+            <button class="cl-row" onClick={() => { props.onClose(); controller.setTool("lasso"); }} title="Select handwriting first, then turn it into text">
+              <Icon name="totext" size={28} />
+              <span class="grow">To text<small>Select handwriting first: tap here, then circle it</small></span>
+              <Icon name="next" size={20} />
+            </button>
+          }
+        >
+          <div class="cl-recog-actions">
+            <ToTextButton />
+            <SolveButton />
+          </div>
+        </Show>
+      </div>
+    </Panel>
+  );
+}
+
+/** The Classic segmented control: full width, equal segments, one height. */
+export function Segmented(props: { label: string; value: string; options: (readonly [string, string])[]; onPick: (v: string) => void; disabled?: boolean }) {
+  return (
+    <div class="cl-seg" classList={{ off: !!props.disabled }} role="radiogroup" aria-label={props.label} aria-disabled={props.disabled}>
+      <For each={props.options}>
+        {([v, l]) => (
+          <button role="radio" aria-checked={props.value === v} classList={{ on: props.value === v }} disabled={props.disabled} onClick={() => props.onPick(v)}>
+            {l}
+          </button>
+        )}
+      </For>
+    </div>
+  );
+}
+
+/** The eraser: what it removes, its size as tiles, and Clear page. */
+export function EraserPanel(props: {
+  mode: "partial" | "stroke"; onMode: (m: "partial" | "stroke") => void;
+  sizes: number[]; size: number; onSize: (w: number) => void;
+  armed: boolean; onClear: () => void; canClear: boolean; onClose: () => void;
+}) {
+  return (
+    <Panel title="Eraser" onClose={props.onClose} class="cl-eraser">
+      <div class="cl-stack">
+        <span class="cl-label">Removes</span>
+        <Segmented label="What the eraser removes" value={props.mode} options={[["partial", "What it rubs"], ["stroke", "Whole strokes"]]} onPick={(v) => props.onMode(v as "partial")} />
+        <span class="cl-label">Size</span>
+        <div class="cl-tiles-row" role="radiogroup" aria-label="Eraser size">
+          <For each={props.sizes}>
+            {(w, i) => (
+              <button class="cl-tile-s" classList={{ on: props.size === w }} role="radio" aria-checked={props.size === w} title={`Size ${w}`} aria-label={`Size ${w}`} onClick={() => props.onSize(w)}>
+                <span class="cl-ring" style={{ width: `${10 + i() * 8}px`, height: `${10 + i() * 8}px` }} />
               </button>
             )}
           </For>
         </div>
-      </Show>
-      <div class="dock-hr" />
-      <Show
-        when={inkSelected()}
-        fallback={
-          <button class="cl-row" onClick={() => { props.onClose(); controller.setTool("lasso"); }} title="Select handwriting first, then turn it into text">
-            <Icon name="totext" size={28} />
-            <span class="grow">To text<small>Select handwriting first: tap here, then circle it</small></span>
+        <Show when={props.canClear}>
+          <div class="cl-hr" />
+          <button class="cl-row danger" classList={{ armed: props.armed }} aria-live="polite" onClick={props.onClear}>
+            <Icon name="broom" size={28} />
+            <span class="grow">{props.armed ? "Tap again to clear the page" : "Clear page"}<small>Undo brings it back</small></span>
           </button>
-        }
-      >
-        <div class="cl-recog-actions">
-          <ToTextButton />
-          <SolveButton />
-        </div>
-      </Show>
+        </Show>
+      </div>
     </Panel>
   );
 }

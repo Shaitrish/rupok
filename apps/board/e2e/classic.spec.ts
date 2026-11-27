@@ -19,7 +19,8 @@ async function openClassic(page: Page) {
   await page.goto("/board/");
   await expect(page.locator(".loading")).toHaveCount(0, { timeout: 30_000 });
   await expect(page.locator("canvas.ink")).toBeVisible();
-  await page.evaluate(() => (window as any).rupokLayout.set("classic"));
+  // Classic is the default on a new board; set it only if it is not on yet.
+  await page.evaluate(() => (window as any).rupokLayout.get() !== "classic" && (window as any).rupokLayout.set("classic"));
   await expect(page.locator(".island")).toHaveCount(3);
 }
 
@@ -39,10 +40,10 @@ test.describe("Classic layout", () => {
     const errors = trackErrors(page);
     await openClassic(page);
     await expect(page.locator(".topbar")).toHaveCount(0);
-    for (const name of ["Main menu", "Mode", "Tools", "Share", "Zoom", "Ask AI"]) await expect(island(page, "left").getByRole("button", { name })).toBeVisible();
+    for (const name of ["Main menu", "Mode", "Tools", "Zoom", "Ask AI"]) await expect(island(page, "left").getByRole("button", { name })).toBeVisible();
     // The AI is on the island, not floating over the slide.
     await expect(page.locator(".ai-float")).toHaveCount(0);
-    for (const name of ["Select & move", "Pen", "Eraser", "Shapes", "Pan", "Recognise ink", "Stamps", "Undo", "Redo"]) {
+    for (const name of ["Select & move", "Pen", "Eraser", "Shapes", "Hand", "Recognise ink", "Stamps", "Undo", "Redo"]) {
       await expect(island(page, "centre").getByRole("button", { name, exact: true })).toBeVisible();
     }
     for (const name of ["New page", "Previous page", "Next page"]) await expect(island(page, "right").getByRole("button", { name })).toBeVisible();
@@ -64,6 +65,59 @@ test.describe("Classic layout", () => {
     const r = await page.evaluate(() => (window as any).rupokBoardOp({ op: "swap_islands", swapped: false }));
     expect(r.menu_island).toBe("left");
     await expect.poll(async () => (await leftOf("left")) < (await leftOf("right"))).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test("a new board starts in Classic, without asking under automation", async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.addInitScript(() => {
+      try { localStorage.setItem("rupok.tour", "1"); } catch { /* storage blocked */ }
+    });
+    await page.goto("/board/");
+    await expect(page.locator(".loading")).toHaveCount(0, { timeout: 30_000 });
+    await expect(page.locator(".island")).toHaveCount(3);
+    await expect(page.locator(".topbar")).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test("the picker recommends Classic and Esc keeps it", async ({ page }) => {
+    await page.addInitScript(() => {
+      try { localStorage.setItem("rupok.tour", "1"); } catch { /* storage blocked */ }
+    });
+    await page.goto("/board/?layout");
+    const dialog = page.locator(".lc-dialog");
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await expect(dialog.locator(".lc-option").first()).toHaveAttribute("data-layout", "classic");
+    await expect(dialog.locator('[data-layout="classic"]')).toHaveAttribute("aria-checked", "true");
+    await expect(dialog.locator(".lc-badge")).toHaveText("Recommended");
+    await expect(dialog.getByRole("button", { name: "Use Classic" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator(".island")).toHaveCount(3);
+  });
+
+  test("hold an island's background to move it; the agent moves and folds them", async ({ page }) => {
+    const errors = trackErrors(page);
+    await openClassic(page);
+    const right = island(page, "right");
+    const b = (await right.boundingBox())!;
+    // Press the island's own padding (not a button), hold, drag up, let go.
+    await page.mouse.move(b.x + b.width / 2, b.y + 2);
+    await page.mouse.down();
+    await page.waitForTimeout(600);
+    await expect(page.locator(".isl-target")).toHaveCount(6);
+    await page.mouse.move(b.x + b.width / 2, 60, { steps: 8 });
+    await page.mouse.up();
+    await expect(page.locator(".islands-row.top .island[data-island=\"right\"]")).toHaveCount(1);
+    // All to the bottom, then fold one.
+    let r = await page.evaluate(() => (window as any).rupokBoardOp({ op: "move_island", island: "all", edge: "bottom" }));
+    expect(r.islands.every((i: any) => i.place.startsWith("bottom"))).toBe(true);
+    r = await page.evaluate(() => (window as any).rupokBoardOp({ op: "move_island", island: "centre", collapsed: true }));
+    await expect(page.locator('.isl-pill[data-island="centre"]')).toBeVisible();
+    await page.locator('.isl-pill[data-island="centre"]').click();
+    await expect(island(page, "centre")).toBeVisible();
+    r = await page.evaluate(() => (window as any).rupokBoardOp({ op: "move_island", reset: true }));
+    expect(r.reset).toBe(true);
     expect(errors).toEqual([]);
   });
 

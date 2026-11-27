@@ -27,7 +27,7 @@ Keep the controls of a complex feature in its own component under
 | Id | Sidebar | What goes there |
 |---|---|---|
 | `general` | General | Role (Teacher/Student), your name, where lessons live |
-| `appearance` | Appearance | Theme, accent, button size, dock side, icons, panels |
+| `appearance` | Appearance | Layout (Classic by default on the teacher board; Modern), the Classic islands, theme, accent, button size, dock side, icons, panels |
 | `pen` | Pen & ink | Pressure, smoothing, writing hand; group "Smart ink" |
 | `touch` | Touch & gestures | Finger touches, palm eraser, swipes, taps |
 | `modes` | Teaching modes | The mode editor and the Smart Dock |

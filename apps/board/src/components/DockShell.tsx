@@ -280,6 +280,7 @@ export function DockPopover(props: DockPopoverProps) {
     if (!props.vertical) {
       const above = dr.top + dr.height / 2 > H / 2;
       top = above ? dr.top - GAP - ph : dr.bottom + GAP;
+      el.dataset.side = above ? "above" : "below";
       left = props.align === "center" ? ar.left + ar.width / 2 - pw / 2 : props.hand === "right" ? ar.right - pw : ar.left;
       left = clamp(left, M, W - pw - M);
       top = clamp(top, M, H - ph - M);

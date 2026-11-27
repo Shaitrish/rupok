@@ -18,7 +18,12 @@ function trackErrors(page: Page): string[] {
 async function openBoard(page: Page) {
   // The first-run tour stays out of these flows (docs/offline.md).
   await page.addInitScript(() => {
-    try { localStorage.setItem("rupok.tour", "1"); } catch { /* storage blocked */ }
+    try {
+      localStorage.setItem("rupok.tour", "1");
+      // These flows use the Modern layout (Classic, the default, has classic.spec.ts).
+      const p = JSON.parse(localStorage.getItem("rupok.prefs") || "{}");
+      if (!p.layoutChosen) localStorage.setItem("rupok.prefs", JSON.stringify({ ...p, layoutChosen: true }));
+    } catch { /* storage blocked */ }
   });
   await page.goto("/board/");
   await expect(page.locator(".loading")).toHaveCount(0, { timeout: 30_000 });

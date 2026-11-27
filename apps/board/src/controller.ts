@@ -914,10 +914,14 @@ export class Controller {
     const dock = cfg.tools.length > 0;
     if (!dock || side === "none") bottom = safe.bottom + inset;
     else if (classic) {
-      // The islands' real height (their size grows on very large screens: classic.css).
-      const h = document.querySelector<HTMLElement>(".islands .island")?.offsetHeight || tb;
-      if (side === "top") top += h + gap;
-      else bottom += h;
+      // The islands' real height on each edge (they grow on very large screens,
+      // a folded island is a small pill, and islands may sit on both edges).
+      const rowH = (edge: string) =>
+        Math.max(0, ...Array.from(document.querySelectorAll<HTMLElement>(`.islands-row.${edge} .island, .islands-row.${edge} .isl-pill`), (n) => n.offsetHeight));
+      const hb = document.querySelector(".islands") ? rowH("bottom") : tb, ht = rowH("top");
+      if (hb) bottom += hb;
+      else bottom = safe.bottom + inset;
+      if (ht) top += ht + gap;
     } else if (side === "bottom") bottom += tb;
     else if (side === "top") top += tb + gap;
     else if (side === "left") left += tb + gap;

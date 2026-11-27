@@ -15,6 +15,7 @@ import { type JSX, For, Match, Show, Switch, createEffect, createMemo, createSig
 import { controller } from "../controller";
 import {
   CORE_TOOLS, TOOLBAR_ITEMS, type DockConfig, type DockGroup, type DockSize, type ModeConfig, type ToolbarItem, layoutPins,
+  ISLAND_PLACES, type IslandPlace, sanitizeMode,
 } from "../modes";
 import {
   type DomItem, HL_COLORS, PEN_COLORS, WIDTHS, type Tool, camera, canRedo, canUndo, color, editingText, hex, hlColor, isView, items,
@@ -41,8 +42,10 @@ import { brushInfo, brushOf } from "../brushes";
 import { celebrate, currentStamp } from "../stamps";
 import { dockClickConsumed, dockPress, dockRelease, pickVoiceTool, voiceListening } from "../voice/board";
 import { openAiPanel, setComposerDraft } from "../chat";
-import { islandsOf } from "../layout";
-import { InkPanel, MainMenu, ModeMenu, PageGrid, RecognizePanel, ShapesPanel, ToolsBox, ZoomPanel } from "./classic/ClassicPanels";
+import { islandsOf, registerIslandFlip, registerIslandFold } from "../layout";
+import { type Edge, type Slot, bakePlaces, flipIslands, islandPlaces, islandsAtTop, moveIsland, placeOf, splitPlace as placeParts } from "../islands";
+import { EraserPanel, InkPanel, MainMenu, ModeMenu, PageGrid, RecognizePanel, ShapesPanel, ToolsBox, ZoomPanel } from "./classic/ClassicPanels";
+import { ClassicTips } from "./classic/ClassicTips";
 import { shareLesson } from "./Header";
 import { aiConnected, aiStatusText, toggleAi } from "./AiStatus";
 import { liveEditing } from "../live";
@@ -360,7 +363,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   createEffect(
     on(
       (): "bottom" | "top" | "left" | "right" | "none" =>
-        islands() ? (islands()!.position === "top" ? "top" : "bottom") : minimized() || place().edge === "float" ? "none" : place().edge as "bottom" | "top" | "left" | "right",
+        islands() ? (islandsAtTop(islands()!, prefs().islandSwap) ? "top" : "bottom") : minimized() || place().edge === "float" ? "none" : place().edge as "bottom" | "top" | "left" | "right",
       (side) => {
         setDockSide(side);
         // CSS keeps the zoom chip clear of a bottom dock on phones (styles.css).
@@ -1111,99 +1114,272 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
   const armedNow = () => clearArmed() > 0;
 
   // ------------------------------------------------------------ islands
-  // The Classic layout (layout.ts): each group is its own island along the
-  // bottom (or top) edge, the first at the left, the last at the right.
-  // Replay and text editing take the place of the middle island.
-  // Settings → Appearance → "Menu island on the right" (or the arrow tabs,
-  // or the agent's swap_islands) trades the first and last islands' sides.
-  const slotOf = (i: number, n: number) => {
-    if (n === 1) return "centre";
-    const swap = prefs().islandSwap;
-    return i === 0 ? (swap ? "right" : "left") : i === n - 1 ? (swap ? "left" : "right") : "centre";
+  // The Classic layout (layout.ts): each group is its own island, on the
+  // bottom or top edge, in its left, centre or right third (islands.ts:
+  // its own place, else by order). A grip at each island's outer edge drags
+  // it (finger or mouse; never the pen) and snaps it to the nearest spot,
+  // a tap folds it to a pill, a double tap moves every island to the other
+  // edge. Replay and text editing take the place of the island with the pen.
+  const places = () => (islands() ? islandPlaces(islands()!, prefs().islandSwap) : []);
+  /** Save island places or folds in the mode's dock (validated). */
+  const saveIslands = (groups: DockGroup[]) => {
+    const m = mode();
+    if (m === "view") return;
+    const cur = modeConfig(m);
+    setPrefs({ modes: { ...prefs().modes, [m]: sanitizeMode(m, { chrome: cur.chrome, tools: cur.tools, dock: { ...cur.dock, groups } }) }, islandSwap: false });
+    requestAnimationFrame(() => controller.updateInsets(false));
+  };
+  const flipAll = () => islands() && saveIslands(flipIslands(islands()!, prefs().islandSwap));
+  registerIslandFlip(flipAll);
+  registerIslandFold((hide) => islands() && saveIslands(bakePlaces(islands()!, prefs().islandSwap).map((g) => ({ ...g, collapsed: hide || undefined }))));
+  const setCollapsed = (i: number, c: boolean) => {
+    const d = islands();
+    if (!d) return;
+    saveIslands(bakePlaces(d, prefs().islandSwap).map((g, j) => (j === i ? { ...g, collapsed: c || undefined } : g)));
   };
   const Islands = () => {
     const list = () => isles()?.islands ?? [];
-    const inSlot = (slot: string) => list().map((g, i) => ({ g, i })).filter(({ i }) => slotOf(i, list().length) === slot);
-    // The side islands slide to their new side (from the mirror of where they are now).
+    const groups = () => islands()?.groups ?? [];
+    const at = (edge: Edge, slot: Slot) => list().map((g, i) => ({ g, i })).filter(({ i }) => places()[i] === placeOf(edge, slot));
+    const penIsland = () => Math.max(0, list().findIndex((g) => g.entries.some((e) => e.id === "pen")));
+    // The side islands slide to their new side when they swap.
     createEffect(on(() => prefs().islandSwap, () => {
       if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       requestAnimationFrame(() => {
-        for (const n of Array.from(el?.querySelectorAll<HTMLElement>(".island-slot.left .island, .island-slot.right .island") ?? [])) {
+        for (const n of Array.from(document.querySelectorAll<HTMLElement>(".island-slot.left .island, .island-slot.right .island"))) {
           const r = n.getBoundingClientRect();
           const dx = window.innerWidth - 2 * r.left - r.width;
           n.animate?.([{ transform: `translateX(${dx}px)` }, { transform: "none" }], { duration: 280, easing: "cubic-bezier(0.2, 0, 0, 1)" });
         }
       });
     }, { defer: true }));
-    /** The arrow tab at a side island's outer edge: tap it (or swipe it inward) to swap sides. */
-    const SwapTab = (p: { side: "left" | "right" }) => {
-      // Captured, so a swipe that slides off the tab still ends in its click.
+
+    // ------------------------------------------------- dragging an island
+    const [drag, setDrag] = createSignal<{ i: number; dx: number; dy: number; target: IslandPlace | null } | null>(null);
+    const [targets, setTargets] = createSignal<{ place: IslandPlace; x: number; y: number; w: number; h: number }[]>([]);
+    const snapTargets = (w: number, h: number) => {
+      const W = window.innerWidth, H = window.innerHeight, m = 12;
+      const xs: Record<Slot, number> = { left: m, centre: (W - w) / 2, right: W - m - w };
+      const ys: Record<Edge, number> = { top: m, bottom: H - m - h };
+      return ISLAND_PLACES.map((p) => {
+        const [e, sl] = placeParts(p);
+        return { place: p, x: xs[sl], y: ys[e], w, h };
+      });
+    };
+    /** The slim arrow tab at a side island's outer edge: swaps the side islands. */
+    const SwapTab = (p: { side: "left" | "right" }) => (
+      <button
+        class={`isl-swap ${p.side}`}
+        aria-label="Swap the side islands"
+        aria-pressed={prefs().islandSwap}
+        onPointerDown={(e) => e.currentTarget.setPointerCapture?.(e.pointerId)}
+        onClick={() => setPrefs({ islandSwap: !prefs().islandSwap })}
+      >
+        <svg viewBox="0 0 12 24" width="12" height="24" aria-hidden="true">
+          <path d={p.side === "left" ? "M4 6l5 6-5 6" : "M8 6l-5 6 5 6"} fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    );
+    // Press and hold an island's background (not a button) to move it: it
+    // lifts, the spots it can land on show, and it snaps where it is let go.
+    // Held without moving: a small menu (hide, flip, arrange). Two taps on
+    // the background: every island to the other edge.
+    const [menuAt, setMenuAt] = createSignal<{ i: number; x: number; y: number } | null>(null);
+    let lastBgTap = 0;
+    const holdHandlers = (i: () => number) => {
+      let start: { x: number; y: number; id: number } | null = null;
+      let timer = 0;
+      let held = false, moved = false;
+      let box: DOMRect | null = null;
+      let node: HTMLElement | null = null;
+      const end = () => {
+        clearTimeout(timer);
+        start = null;
+        held = false;
+        document.documentElement.classList.remove("isl-moving");
+      };
+      return {
+        onPointerDown: (e: PointerEvent) => {
+          if (isView() || e.button > 0 || (e.target as HTMLElement).closest("button")) return;
+          node = e.currentTarget as HTMLElement;
+          start = { x: e.clientX, y: e.clientY, id: e.pointerId };
+          held = moved = false;
+          box = node.getBoundingClientRect();
+          try { node.setPointerCapture(e.pointerId); } catch { /* gone */ }
+          timer = window.setTimeout(() => {
+            held = true;
+            setPop(null);
+            (navigator as Navigator & { vibrate?: (ms: number) => boolean }).vibrate?.(15);
+            document.documentElement.classList.add("isl-moving");
+            setTargets(snapTargets(box!.width, box!.height));
+            setDrag({ i: i(), dx: 0, dy: 0, target: null });
+          }, 450);
+        },
+        onPointerMove: (e: PointerEvent) => {
+          if (!start || e.pointerId !== start.id || !box) return;
+          const dx = e.clientX - start.x, dy = e.clientY - start.y;
+          if (!held) {
+            if (Math.hypot(dx, dy) > 8) end(); // a slide, not a hold
+            return;
+          }
+          if (Math.hypot(dx, dy) > 8) moved = true;
+          const cx = box.left + box.width / 2 + dx, cy = box.top + box.height / 2 + dy;
+          let best: IslandPlace | null = null, bd = Infinity;
+          for (const t of targets()) {
+            const d = Math.hypot(t.x + t.w / 2 - cx, t.y + t.h / 2 - cy);
+            if (d < bd) { bd = d; best = t.place; }
+          }
+          setDrag({ i: i(), dx, dy, target: best });
+        },
+        onPointerUp: (e: PointerEvent) => {
+          if (!start || e.pointerId !== start.id) return;
+          const wasHeld = held, d = drag();
+          end();
+          setDrag(null);
+          setTargets([]);
+          if (wasHeld && moved) {
+            if (d?.target && islands()) saveIslands(moveIsland(islands()!, prefs().islandSwap, i(), d.target));
+          } else if (wasHeld) {
+            setMenuAt({ i: i(), x: e.clientX, y: e.clientY });
+          } else if (e.timeStamp - lastBgTap < 320) {
+            lastBgTap = 0;
+            flipAll();
+          } else lastBgTap = e.timeStamp;
+        },
+        onPointerCancel: () => {
+          end();
+          setDrag(null);
+          setTargets([]);
+        },
+      };
+    };
+    const Island = (p: { g: { id: string; label?: string; entries: Entry[] }; i: number; slot: Slot }) => {
+      const folded = () => !!groups()[p.i]?.collapsed && !isView();
+      const hold = holdHandlers(() => p.i);
+      const busy = () => p.i === penIsland() && (!!replay() || !!(editingText() && editItem()));
       return (
-        <button
-          class={`isl-swap ${p.side}`}
-          title={`Move this island to the ${p.side === "left" ? "right" : "left"} (the islands swap sides)`}
-          aria-label="Swap the side islands"
-          aria-pressed={prefs().islandSwap}
-          onPointerDown={(e) => e.currentTarget.setPointerCapture?.(e.pointerId)}
-          onClick={() => setPrefs({ islandSwap: !prefs().islandSwap })}
+        <Show
+          when={!folded()}
+          fallback={
+            <button class="isl-pill" data-island={p.g.id} aria-label={`Show the ${p.g.label ?? p.g.id} island`} title="Show this island" onClick={() => setCollapsed(p.i, false)}>
+              <Icon name={iconOf((p.g.entries.find((e) => e.id)?.id ?? "menu") as ToolbarItem)} size={22} />
+              <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </button>
+          }
         >
-          <svg viewBox="0 0 12 24" width="12" height="24" aria-hidden="true">
-            <path d={p.side === "left" ? "M4 6l5 6-5 6" : "M8 6l-5 6 5 6"} fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
+          <div
+            class="island"
+            classList={{ dragging: drag()?.i === p.i }}
+            data-island={p.g.id}
+            role="toolbar"
+            aria-label={p.g.label ?? `${p.g.id[0].toUpperCase()}${p.g.id.slice(1)} buttons`}
+            style={drag()?.i === p.i ? { transform: `translate(${drag()!.dx}px, ${drag()!.dy}px) scale(1.03)` } : undefined}
+            onPointerDown={hold.onPointerDown}
+            onPointerMove={hold.onPointerMove}
+            onPointerUp={hold.onPointerUp}
+            onPointerCancel={hold.onPointerCancel}
+            onContextMenu={(e) => {
+              if (!(e.target as HTMLElement).closest("button")) e.preventDefault();
+            }}
+          >
+            <Show when={p.slot === "left" && list().length > 1}><SwapTab side="left" /></Show>
+            <Show
+              when={busy()}
+              fallback={<For each={p.g.entries}>{(e) => <Cell e={e} />}</For>}
+            >
+              <Switch>
+                <Match when={replay()}><ReplayControls /></Match>
+                <Match when={editingText() && editItem()}><TextControls /></Match>
+              </Switch>
+            </Show>
+            <Show when={p.slot === "right" && list().length > 1}><SwapTab side="right" /></Show>
+          </div>
+        </Show>
       );
     };
-    const Island = (p: { g: { id: string; label?: string; entries: Entry[] }; slot: string }) => (
-      <div
-        class="island"
-        data-island={p.g.id}
-        role="toolbar"
-        aria-label={p.g.label ?? `${p.g.id[0].toUpperCase()}${p.g.id.slice(1)} buttons`}
-        onContextMenu={(e) => {
-          if (isView() || (e.target as HTMLElement).closest("button")) return;
-          e.preventDefault();
-          openDockEditor(mode());
-        }}
-      >
-        <Show when={p.slot === "left" && list().length > 1}><SwapTab side="left" /></Show>
-        <For each={p.g.entries}>{(e) => <Cell e={e} />}</For>
-        <Show when={p.slot === "right" && list().length > 1}><SwapTab side="right" /></Show>
-      </div>
-    );
-    const busy = () => !!replay() || !!(editingText() && editItem());
-    // The page fits above the islands once they have their real height.
+    // The page fits between the islands once they have their real height.
     onMount(() => requestAnimationFrame(() => controller.board && controller.updateInsets(true)));
+    /** One edge's islands. When the three thirds do not fit side by side,
+     * the middle island takes its own line (measured, so they never overlap). */
+    const Row = (p: { edge: Edge }) => {
+      const [stacked, setStacked] = createSignal(false);
+      let row!: HTMLDivElement;
+      const fit = () => {
+        if (!row) return;
+        const slots = Array.from(row.children) as HTMLElement[];
+        const need = slots.reduce((n, sl) => n + Array.from(sl.children).reduce((m, c) => m + (c as HTMLElement).offsetWidth, 0), 0) + 2 * 16;
+        setStacked(need > row.clientWidth);
+      };
+      onMount(() => {
+        const ro = new ResizeObserver(() => requestAnimationFrame(fit));
+        ro.observe(row);
+        for (const sl of Array.from(row.children)) ro.observe(sl);
+        const mo = new MutationObserver(() => requestAnimationFrame(fit));
+        mo.observe(row, { childList: true, subtree: true });
+        onCleanup(() => { ro.disconnect(); mo.disconnect(); });
+        fit();
+      });
+      return (
+        <div class={`islands-row ${p.edge}`} classList={{ stacked: stacked() }} ref={(d) => { row = d; if (p.edge === "bottom") el = d; }}>
+          <For each={["left", "centre", "right"] as const}>
+            {(slot) => (
+              <div class={`island-slot ${slot}`}>
+                <For each={at(p.edge, slot)}>{({ g, i }) => <Island g={g} i={i} slot={slot} />}</For>
+              </div>
+            )}
+          </For>
+        </div>
+      );
+    };
+    // The first time a teacher sees the islands: how to move them.
+    onMount(() => {
+      if (isView()) return;
+      try {
+        if (localStorage.getItem("rupok.hint.islandMove")) return;
+        localStorage.setItem("rupok.hint.islandMove", "1");
+      } catch { return; }
+      setTimeout(() => showToast("Tip: press and hold the toolbar to move it", 6000), 1200);
+    });
     return (
       <div
-        ref={(d) => (el = d)}
         class="islands"
-        classList={{
-          top: islands()?.position === "top",
-          inking: inking(),
-          [`isz-${islandSize()}`]: true,
-          "big-icons": !!islands()?.large,
-        }}
+        classList={{ inking: inking(), [`isz-${islandSize()}`]: true, "big-icons": !!islands()?.large }}
         onPointerDown={() => unfade()}
       >
+        <ClassicTips />
         <IconSet.Provider value="classic">
-        <For each={["left", "centre", "right"] as const}>
-          {(slot) => (
-            <div class={`island-slot ${slot}`}>
-              <Show
-                when={slot === "centre" && busy()}
-                fallback={<For each={inSlot(slot)}>{({ g }) => <Island g={g} slot={slot} />}</For>}
-              >
-                <div class="island" role="toolbar" aria-label={replay() ? "Replay" : "Text"}>
-                  <Switch>
-                    <Match when={replay()}><ReplayControls /></Match>
-                    <Match when={editingText() && editItem()}><TextControls /></Match>
-                  </Switch>
-                </div>
-              </Show>
-            </div>
-          )}
-        </For>
+          <Row edge="bottom" />
+          <Row edge="top" />
         </IconSet.Provider>
+        <Show when={menuAt()}>
+          {(m) => {
+            const close = () => setMenuAt(null);
+            onMount(() => {
+              const out = (e: PointerEvent) => !(e.target as Element).closest?.(".isl-menu") && close();
+              window.addEventListener("pointerdown", out, true);
+              onCleanup(() => window.removeEventListener("pointerdown", out, true));
+            });
+            const top = () => m().y > window.innerHeight / 2;
+            return (
+              <div class="isl-menu" role="menu" aria-label="Island" style={{ left: `${Math.min(m().x, window.innerWidth - 280)}px`, top: `${m().y}px`, transform: top() ? "translate(-24px, calc(-100% - 16px))" : "translate(-24px, 16px)" }}>
+                <button class="cl-row" role="menuitem" onClick={() => { close(); setCollapsed(m().i, true); }}>
+                  <Icon name="down" size={24} /><span class="grow">Hide this island</span>
+                </button>
+                <button class="cl-row" role="menuitem" onClick={() => { close(); flipAll(); }}>
+                  <Icon name={islandsAtTop(islands()!, prefs().islandSwap) ? "down" : "up"} size={24} />
+                  <span class="grow">{islandsAtTop(islands()!, prefs().islandSwap) ? "Toolbar to the bottom" : "Toolbar to the top"}</span>
+                </button>
+                <button class="cl-row" role="menuitem" onClick={() => { close(); openDockEditor(mode()); }}>
+                  <Icon name="settings" size={24} /><span class="grow">Arrange islands…</span>
+                </button>
+              </div>
+            );
+          }}
+        </Show>
+        {/* Where a dragged island can land. */}
+        <For each={targets()}>
+          {(t) => <div class="isl-target" classList={{ on: drag()?.target === t.place }} style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px` }} />}
+        </For>
       </div>
     );
   };
@@ -1380,6 +1556,36 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                   focus={p().focus}
                 />
               </Match>
+              <Match when={islands() && p().kind === "eraser"}>
+                <EraserPanel
+                  mode={prefs().eraserMode}
+                  onMode={(m) => {
+                    setPrefs({ eraserMode: m });
+                    controller.applyPrefs();
+                  }}
+                  sizes={ERASER_WIDTHS}
+                  size={sizes().eraser ?? 64}
+                  onSize={(w) => {
+                    setSizes({ ...sizes(), eraser: w });
+                    if (tool() === "eraser") controller.board.set_width(w);
+                  }}
+                  armed={armedNow()}
+                  canClear={!isView()}
+                  onClear={() => {
+                    const now = Date.now();
+                    if (now - clearArmed() > 3000) {
+                      setClearArmed(now);
+                      window.setTimeout(() => clearArmed() === now && setClearArmed(0), 3000);
+                      return;
+                    }
+                    setClearArmed(0);
+                    controller.board.clear_page();
+                    showToast("Page cleared. Undo brings it back.");
+                    setPop(null);
+                  }}
+                  onClose={() => setPop(null)}
+                />
+              </Match>
               <Match when={p().kind === "menu"}>
                 <MainMenu onClose={() => setPop(null)} />
               </Match>
@@ -1448,7 +1654,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                 </div>
               </Match>
             </Switch>
-            <Show when={(p().kind === "eraser" || (!islands() && (p().kind === "pen" || p().kind === "highlighter"))) && cfg().chrome.sizes}>
+            <Show when={!islands() && (p().kind === "eraser" || p().kind === "pen" || p().kind === "highlighter") && cfg().chrome.sizes}>
               <Show when={p().kind !== "eraser"} fallback={
                 <div class="dock-sizes" role="group" aria-label="Sizes">
                   <For each={sizeOptions()}>
@@ -1510,7 +1716,7 @@ export default function Dock(props: { onSettings?: (section?: string) => void })
                 />
               </label>
             </Show>
-            <Show when={p().kind === "eraser" && !isView()}>
+            <Show when={p().kind === "eraser" && !isView() && !islands()}>
               <button
                 class="dock-row danger"
                 classList={{ armed: armedNow() }}

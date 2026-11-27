@@ -2,7 +2,7 @@
 
 import { ACCENTS } from "../../state";
 import { layout } from "../../layout";
-import { setLayout } from "../../components/DockEditor";
+import { resetIslands, setLayout } from "../../components/DockEditor";
 import { pref } from "../bind";
 import { registerSettings } from "../registry";
 
@@ -14,7 +14,7 @@ registerSettings([
     options: [{ value: "modern", label: "Modern" }, { value: "classic", label: "Classic" }],
     get: layout,
     set: (v: string) => setLayout(v === "classic" ? "classic" : "modern"),
-    default: "modern",
+    default: "classic",
   },
   {
     id: "appearance.islandSwap", category: "appearance", order: 6, type: "toggle", label: "Menu island on the right",
@@ -22,6 +22,14 @@ registerSettings([
     keywords: ["swap", "islands", "left", "right", "mirror", "classic", "ক্লাসিক"],
     when: () => layout() === "classic",
     ...pref("islandSwap"),
+  },
+  {
+    id: "appearance.islandsReset", category: "appearance", order: 7, type: "action", label: "Islands back to the bottom",
+    description: "Classic layout: every island to its place along the bottom edge, unfolded.",
+    keywords: ["reset", "islands", "move", "fold", "collapse", "top", "bottom", "classic"],
+    button: "Reset islands", icon: "restart",
+    when: () => layout() === "classic",
+    run: () => resetIslands(),
   },
   {
     id: "appearance.theme", category: "appearance", order: 10, type: "segmented", label: "Theme",

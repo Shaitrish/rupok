@@ -19,7 +19,7 @@ const DESTRUCTIVE = new Set([
   "replace_items_with_text", "replace_strokes_with_text",
   "set_setting", "set_settings", "set_prefs", "set_mode", "set_app_mode", "set_dock",
   // Agent control (#27): pages, stamps, the Library, the dock.
-  "delete_pages", "delete_stamp", "library_trash", "set_dock_layout", "apply_dock_preset", "save_dock_preset", "swap_islands",
+  "delete_pages", "delete_stamp", "library_trash", "set_dock_layout", "apply_dock_preset", "save_dock_preset", "swap_islands", "move_island",
 ]);
 
 /** Is this op destructive? The app theme (`set_board_theme` with `ui`) is a setting. */
@@ -91,7 +91,7 @@ export function describeOp(op: any): string {
     case "delete_pages": return `delete page${op.pages?.length === 1 ? "" : "s"} ${(op.pages ?? []).join(", ")}`.trim();
     case "delete_stamp": return "delete a custom stamp";
     case "library_trash": return "move a lesson to the trash";
-    case "set_dock_layout": case "apply_dock_preset": case "save_dock_preset": case "swap_islands": return "change your dock";
+    case "set_dock_layout": case "apply_dock_preset": case "save_dock_preset": case "swap_islands": case "move_island": return "change your dock";
     case "delete_page": case "remove_page": return `delete page ${op.page ?? ""}`.trim();
     case "clear_page": case "clear_board": return "clear this page";
     case "replace_items_with_text": return "replace your handwriting with typed text";

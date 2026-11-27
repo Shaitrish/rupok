@@ -55,11 +55,18 @@ export type DockStyle = "dock" | "islands";
 /** Button size: small, medium (default), large. */
 export type DockSize = "s" | "m" | "l";
 export const DOCK_SIZES: DockSize[] = ["s", "m", "l"];
+/** Where a Classic island sits: an edge and a third of it. */
+export type IslandPlace = "bottom-left" | "bottom-centre" | "bottom-right" | "top-left" | "top-centre" | "top-right";
+export const ISLAND_PLACES: IslandPlace[] = ["bottom-left", "bottom-centre", "bottom-right", "top-left", "top-centre", "top-right"];
 /** A group of dock buttons, in order; groups are separated on the dock. */
 export interface DockGroup {
   id: string;
   label?: string;
   items: DockPin[];
+  /** Islands only: where it sits (else by its order: first left, last right). */
+  place?: IslandPlace;
+  /** Islands only: folded to a small pill at its edge. */
+  collapsed?: boolean;
 }
 /** A second dock, e.g. the pager and undo on the other edge of a big board. */
 export interface DockSplit {
@@ -118,7 +125,7 @@ export const TOOLBAR_ITEMS: { id: ToolbarItem; icon: IconName; label: string; ke
   { id: "ellipse", icon: "ellipse", label: "Ellipse", key: "O", kind: "tool" },
   { id: "line", icon: "line", label: "Line", key: "N", kind: "tool" },
   { id: "arrow", icon: "arrow", label: "Arrow", key: "A", kind: "tool" },
-  { id: "hand", icon: "hand", label: "Pan", key: "Space", kind: "tool" },
+  { id: "hand", icon: "hand", label: "Hand", key: "Hold Space", kind: "tool" },
   { id: "interact", icon: "interact", label: "Use Smart Objects", key: "I", kind: "tool" },
   { id: "smartink", icon: "smartink", label: "Smart shapes", key: "M", kind: "action" },
   { id: "undo", icon: "undo", label: "Undo", key: "Ctrl Z", kind: "action" },
@@ -206,7 +213,7 @@ export const CLASSIC_DOCK: Partial<DockConfig> = {
   position: "bottom",
   size: "l",
   groups: [
-    { id: "left", label: "Menu", items: ["menu", "mode", "toolbox", "share", "zoom", "ai"] },
+    { id: "left", label: "Menu", items: ["menu", "mode", "toolbox", "zoom", "ai"] },
     { id: "centre", label: "Tools", items: ["lasso", "pen", "eraser", "shapes", "hand", "recognize", "stamp", "undo", "redo"] },
     { id: "right", label: "Pages", items: ["addpage", "pager"] },
   ],
@@ -382,7 +389,10 @@ function cleanGroups(m: Mode, raw: unknown, seen: Set<DockPin>): DockGroup[] {
     if (!items.length) continue;
     const id = typeof r.id === "string" && /^[a-z0-9-]{1,24}$/.test(r.id) && !out.some((x) => x.id === r.id) ? r.id : `g${i + 1}`;
     const label = typeof r.label === "string" && r.label.trim() ? r.label.trim().slice(0, 24) : undefined;
-    out.push(label ? { id, label, items } : { id, items });
+    const grp: DockGroup = label ? { id, label, items } : { id, items };
+    if (typeof r.place === "string" && (ISLAND_PLACES as string[]).includes(r.place)) grp.place = r.place as IslandPlace;
+    if (r.collapsed === true) grp.collapsed = true;
+    out.push(grp);
   }
   return out;
 }
