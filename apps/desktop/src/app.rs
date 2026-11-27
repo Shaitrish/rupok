@@ -77,6 +77,9 @@ pub fn run() {
         .manage(cloud_cmd::CloudAuthState::default())
         .manage(voice_cmd::VoiceState::default())
         .manage(agent_cmd::AgentState::default())
+        // The board may use the microphone (voice input), without a prompt
+        // from the web engine; the OS still asks where it does (macOS).
+        .on_permission_request(voice_cmd::on_permission)
         .invoke_handler(tauri::generate_handler![
             take_pending_files,
             save_lesson,
@@ -124,7 +127,7 @@ pub fn run() {
             let cwd = std::env::current_dir().unwrap_or_default();
             queue_files(app.handle(), files::paths_from_args(&args, &cwd));
             overlay::register_shortcuts(app.handle());
-            voice_cmd::init(app.handle()); // the board may use the microphone (voice input)
+            voice_cmd::init(app.handle()); // Linux: WebKitGTK exposes getUserMedia (voice input)
             // Linux: every pointer sample reaches the board (pen_input.rs).
             if let Some(w) = app.get_webview_window(MAIN) {
                 pen_input::tune(&w);

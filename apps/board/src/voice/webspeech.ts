@@ -2,7 +2,11 @@
 // Chrome and Edge stream the audio to Google's / Microsoft's service; Safari
 // and WKWebView on macOS recognise on-device on recent versions. Interim
 // results give the live text. The browser asks for the microphone itself on
-// first use. Nothing is recorded or stored.
+// first use: start() runs inside the tap on the mic (MicButton's
+// pointerdown, the voice box's click), so the question appears at once.
+// When the microphone is refused, dictation.ts asks diagnose.ts why (the
+// site setting, the OS, no device) and shows the fix. Nothing is recorded
+// or stored.
 
 import type { DictationSession, SessionHandlers, SessionOptions, VoiceErrorCode, VoiceProvider } from "./types";
 
@@ -14,9 +18,9 @@ export function speechCtor(): Ctor | null {
 }
 
 const ERRORS: Record<string, [VoiceErrorCode, string]> = {
-  "not-allowed": ["not-allowed", "Microphone access was blocked. Allow it in the browser's site settings."],
+  "not-allowed": ["not-allowed", "The microphone was blocked."],
   "service-not-allowed": ["unsupported", "Speech recognition is not available in this browser."],
-  "audio-capture": ["no-mic", "No microphone was found."],
+  "audio-capture": ["no-mic", "No microphone was found, or it could not be opened."],
   network: ["network", "The speech service could not be reached. Check the internet connection."],
   "language-not-supported": ["unsupported", "This language is not supported by the browser's speech service."],
   aborted: ["aborted", "Stopped."],
@@ -61,7 +65,7 @@ export const webSpeechProvider: VoiceProvider = {
     rec.onerror = (e: any) => {
       if (cancelled || e.error === "no-speech") return;
       const [code, message] = ERRORS[e.error] ?? ["other", `Speech recognition error: ${e.error}`];
-      if (code !== "aborted") h.onError({ code, message });
+      if (code !== "aborted") h.onError({ code, message, detail: [e.error, e.message].filter(Boolean).join(": ") });
     };
     rec.onend = () => {
       if (ended) return;

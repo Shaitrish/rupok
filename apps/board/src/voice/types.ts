@@ -13,9 +13,11 @@ export const VOICE_LANGS: { value: VoiceLang; label: string; short: string }[] =
 ];
 
 /** The engines. "hint" is not an engine: it shows how to use the OS's own
- * dictation (Win+H, macOS Dictation), which types into any focused field. */
+ * dictation (Win+H, macOS Dictation), which types into any focused field.
+ * "setup" is not one either: the desktop app can run offline voice but the
+ * model is not downloaded yet, so the mic offers the download. */
 export type ProviderId = "webspeech" | "whisper";
-export type ProviderChoice = ProviderId | "hint";
+export type ProviderChoice = ProviderId | "hint" | "setup";
 /** The Settings value: automatic or a forced choice. */
 export type ProviderPref = "auto" | ProviderId | "os";
 
@@ -23,9 +25,12 @@ export type ProviderPref = "auto" | ProviderId | "os";
 export type AudioPath = "cloud" | "device" | "device-or-cloud";
 
 export type VoiceErrorCode =
-  | "not-allowed" // the microphone was refused
+  | "not-allowed" // the microphone was refused (by the browser, the site setting or the OS)
   | "no-mic"
+  | "busy" // the microphone exists but could not be opened (another app, or the OS)
+  | "no-api" // this web engine cannot capture audio at all
   | "network" // the cloud service could not be reached
+  | "service" // the browser has the speech API but no service behind it (Chromium, Brave…)
   | "unsupported" // the API exists but does not work here (e.g. WebView2)
   | "no-model" // Whisper: the model is not downloaded
   | "aborted"
@@ -34,6 +39,9 @@ export type VoiceErrorCode =
 export interface VoiceError {
   code: VoiceErrorCode;
   message: string;
+  /** The engine's own words ("NotAllowedError: Permission denied by
+   * system"), so the diagnosis can tell the OS from the site setting. */
+  detail?: string;
 }
 
 export interface SessionHandlers {

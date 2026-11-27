@@ -12,8 +12,9 @@ import { isDesktop } from "../platform";
 import { jsonStore } from "../settings/bind";
 import { showToast } from "../state";
 import { caretContext, commitField, type EditableEl, fieldValue, focusForDictation, focusedEditable, insertText, isEditable } from "./insert";
+import { type MicAdvice, gatherMicFacts, micAdvice } from "./diagnose";
 import { joinDictation } from "./punctuation";
-import { type VoiceEnv, audioPathShort, audioPathText, chooseProvider, detectPlatform } from "./select";
+import { type VoiceEnv, audioPathShort, audioPathText, chooseProvider, detectPlatform, lacksSpeechService } from "./select";
 import type { DictationSession, ProviderChoice, ProviderPref, VoiceError, VoiceLang, VoiceProvider } from "./types";
 import { speechCtor, webSpeechProvider } from "./webspeech";
 import { type WhisperStatus, makeWhisperProvider, whisperStatus } from "./whisper";
@@ -70,6 +71,10 @@ export const whisperModel = createMemo(() => {
 });
 
 const plat = typeof navigator !== "undefined" ? detectPlatform(navigator.userAgent, navigator.platform) : { os: "other" as const, engine: "other" as const, edge: false };
+const noSpeechService = typeof navigator !== "undefined" && (
+  !!(navigator as any).brave ||
+  lacksSpeechService(navigator.userAgent, (navigator as any).userAgentData?.brands?.map((b: { brand: string }) => b.brand) ?? null, plat.os)
+);
 
 export const voiceEnv = createMemo<VoiceEnv>(() => ({
   ...plat,
@@ -77,7 +82,9 @@ export const voiceEnv = createMemo<VoiceEnv>(() => ({
   speechApi: typeof window !== "undefined" && !!speechCtor(),
   whisperBuilt: !!whisper()?.built,
   whisperModel: whisperModel(),
+  whisperCpuOk: whisper()?.cpu_ok !== false,
   speechBroken: speechBroken(),
+  noSpeechService,
 }));
 
 /** The provider dictation will use now. */
@@ -129,8 +136,13 @@ const [activeTarget, setActiveTarget] = createSignal<DictationTarget | null>(nul
 const [activeAnchor, setActiveAnchor] = createSignal<HTMLElement | null>(null);
 const [activeLang, setActiveLang] = createSignal<VoiceLang>(voicePrefs.read().lang);
 const [lastError, setLastError] = createSignal<VoiceError | null>(null);
-/** The OS-dictation hint popover, anchored to an element. */
+/** The OS-dictation hint popover, anchored to an element. It also offers
+ * the offline voice download ("setup") and explains a microphone failure
+ * (`problem`). */
 const [hint, setHint] = createSignal<HTMLElement | null>(null);
+/** Why the microphone failed and how to fix it, shown in the hint popover. */
+const [problem, setProblem] = createSignal<MicAdvice | null>(null);
+export { problem as voiceProblem };
 
 /** The live-text bubble is wanted for the running session. */
 const [bubbleOn, setBubbleOn] = createSignal(true);
@@ -139,6 +151,8 @@ export { activeAnchor, activeLang, activeTarget, bubbleOn, hint, interim, lastEr
 
 let session: DictationSession | null = null;
 let sessionOpts: DictationOptions = {};
+/** The last start, for "Try again" in the hint popover. */
+let lastAttempt: { target: DictationTarget; opts: DictationOptions } | null = null;
 let endReason: "stopped" | "cancelled" | "error" = "stopped";
 let valueAtStart = "";
 let unbindBlur: (() => void) | null = null;
@@ -195,10 +209,13 @@ export function startDictation(target?: DictationTarget | null, opts: DictationO
   if (session) cancelDictation();
   const el = targetEl(t);
   if (!isCustom(t)) focusForDictation(t);
+  lastAttempt = { target: t, opts };
   const choice = voiceChoice();
   const prov = provider(choice);
+  setProblem(null);
   if (!prov) {
-    // No engine: the OS's own dictation types into the focused field.
+    // No engine: the OS's own dictation types into the focused field, or
+    // (desktop) the offline voice download is offered.
     setHint(opts.anchor ?? el ?? document.body);
     return false;
   }
@@ -235,16 +252,49 @@ export function startDictation(target?: DictationTarget | null, opts: DictationO
     onError: (err) => {
       endReason = "error";
       setLastError(err);
-      if (err.code === "unsupported" || err.code === "network") {
-        if (choice === "webspeech") setSpeechBroken(err.code === "unsupported");
-      }
-      if (err.code === "unsupported" && choice === "webspeech") setHint(opts.anchor ?? el ?? document.body);
-      else showToast(err.message, 4000);
+      const anchor = opts.anchor ?? el ?? document.body;
+      if (err.code === "unsupported" && choice === "webspeech") {
+        setSpeechBroken(true);
+        setHint(anchor);
+      } else if (err.code === "not-allowed" || err.code === "no-mic" || err.code === "busy" || err.code === "no-api") {
+        // Say exactly why and how to fix it (the site setting, the OS
+        // privacy switch, no device…), next to the mic.
+        void explainFailure(err, anchor);
+      } else if (err.code === "network" && choice === "webspeech") {
+        showToast(navigator.onLine === false
+          ? "No internet: the browser's speech recognition needs it. Reconnect, or use the Rupok desktop app (offline voice)."
+          : "The speech service did not answer. Check the internet connection and tap the mic again.", 5000);
+      } else showToast(err.message, 4000);
     },
     onEnd: () => finish(mine),
   });
   session = mine;
   return true;
+}
+
+/** Find out why the microphone failed and show the fix by the mic. */
+async function explainFailure(err: VoiceError, anchor: HTMLElement) {
+  const facts = await gatherMicFacts({ ...plat, desktop: isDesktop }, err.code, err.detail);
+  setProblem(micAdvice(facts));
+  setHint(anchor.isConnected ? anchor : document.body);
+}
+
+/** "Try again" from the hint popover: runs inside that click, so the
+ * browser may ask for the microphone again. */
+export function retryDictation(): boolean {
+  const a = lastAttempt;
+  setHint(null);
+  setProblem(null);
+  if (!a) return false;
+  const el = targetEl(a.target);
+  if (el && !el.isConnected) return false;
+  return startDictation(a.target, a.opts);
+}
+
+/** Close the hint popover (and any problem it explains). */
+export function closeHint() {
+  setHint(null);
+  setProblem(null);
 }
 
 function finish(s: DictationSession) {

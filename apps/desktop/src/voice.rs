@@ -80,6 +80,8 @@ pub enum VoiceError {
     #[error("this build of Rupok has no offline voice (built without the `whisper` feature)")]
     NotBuilt,
     #[error("{0}")]
+    Cpu(String),
+    #[error("{0}")]
     Engine(String),
     #[error(transparent)]
     Io(#[from] io::Error),
@@ -299,6 +301,47 @@ pub fn clean_transcript(raw: &str) -> String {
     out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// The x86 instruction sets the installers' whisper.cpp is compiled for.
+/// CI builds ggml with `GGML_NATIVE=OFF`, which turns on exactly these (see
+/// `ggml/CMakeLists.txt`, `INS_ENB`), so the binary runs on any x86-64 CPU
+/// from about 2013 on (Intel Haswell, AMD Excavator/Zen) instead of only on
+/// the CI machine's. Older or low-end chips (many Celeron, Pentium and Atom
+/// models) lack AVX: whisper.cpp would crash there, so we refuse instead.
+pub const X86_FEATURES: &[&str] = &["sse4.2", "avx", "avx2", "bmi2", "fma", "f16c"];
+
+/// The CPU features [`X86_FEATURES`] this computer lacks (empty when it can
+/// run offline voice; always empty on ARM).
+pub fn missing_cpu_features() -> Vec<&'static str> {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        let has = |f: &str| match f {
+            "sse4.2" => std::arch::is_x86_feature_detected!("sse4.2"),
+            "avx" => std::arch::is_x86_feature_detected!("avx"),
+            "avx2" => std::arch::is_x86_feature_detected!("avx2"),
+            "bmi2" => std::arch::is_x86_feature_detected!("bmi2"),
+            "fma" => std::arch::is_x86_feature_detected!("fma"),
+            "f16c" => std::arch::is_x86_feature_detected!("f16c"),
+            _ => true,
+        };
+        X86_FEATURES.iter().copied().filter(|f| !has(f)).collect()
+    }
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+    {
+        Vec::new()
+    }
+}
+
+/// Why offline voice cannot run on this processor, in words, or `None`.
+pub fn cpu_problem() -> Option<String> {
+    let missing = missing_cpu_features();
+    (!missing.is_empty()).then(|| {
+        format!(
+            "This computer's processor is too old for offline voice (it lacks {}). Use Chrome or Edge, or the system's dictation.",
+            missing.join(", ").to_uppercase()
+        )
+    })
+}
+
 // ---------------------------------------------------------------- whisper
 
 #[cfg(feature = "whisper")]
@@ -327,17 +370,22 @@ mod engine {
             if rms(samples) < SILENCE_RMS {
                 return Ok(String::new());
             }
+            if let Some(why) = cpu_problem() {
+                return Err(VoiceError::Cpu(why));
+            }
             let mut guard = self.ctx.lock().unwrap_or_else(|e| e.into_inner());
             if guard.as_ref().is_none_or(|(p, _)| p != model_path) {
                 *guard = None;
-                let path = model_path
-                    .to_str()
-                    .ok_or_else(|| VoiceError::Engine("model path is not UTF-8".into()))?;
-                let ctx =
-                    WhisperContext::new_with_params(path, WhisperContextParameters::default())
-                        .map_err(|e| {
-                            VoiceError::Engine(format!("could not load the voice model: {e}"))
-                        })?;
+                // Read the file in Rust and hand whisper.cpp the bytes: its
+                // own fopen takes a narrow path, which breaks on Windows
+                // for user folders with non-ASCII names (e.g. in Bangla).
+                let bytes = fs::read(model_path)?;
+                let ctx = WhisperContext::new_from_buffer_with_params(
+                    &bytes,
+                    WhisperContextParameters::default(),
+                )
+                .map_err(|e| VoiceError::Engine(format!("could not load the voice model: {e}")))?;
+                drop(bytes);
                 *guard = Some((model_path.to_path_buf(), ctx));
             }
             let (_, ctx) = guard.as_ref().expect("loaded above");
@@ -519,6 +567,15 @@ mod tests {
         assert_eq!(resample_to_16k(&s, 48_000).len(), 16_000);
         assert_eq!(resample_to_16k(&s, 16_000).len(), 48_000);
         assert!(resample_to_16k(&[], 8_000).is_empty());
+    }
+
+    #[test]
+    fn cpu_check_names_what_is_missing() {
+        // CI runners and every Mac/ARM machine have these; the check must
+        // agree with itself either way.
+        let missing = missing_cpu_features();
+        assert!(missing.iter().all(|f| X86_FEATURES.contains(f)));
+        assert_eq!(cpu_problem().is_some(), !missing.is_empty());
     }
 
     #[test]

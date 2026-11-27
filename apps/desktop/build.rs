@@ -1,4 +1,13 @@
 fn main() {
+    // whisper.cpp's Metal backend uses Objective-C `@available` checks, which
+    // call `__isPlatformVersionAtLeast` from clang's runtime library. rustc
+    // links with `cc` but not that library, so link it here (feature
+    // `metal`, macOS targets only).
+    if std::env::var_os("CARGO_FEATURE_METAL").is_some()
+        && std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos")
+    {
+        link_clang_runtime();
+    }
     // The Tauri build step only runs for the real app (`--features app`, which
     // `tauri dev` / `tauri build` pass); plain `cargo test` skips it.
     #[cfg(feature = "app")]
@@ -49,4 +58,21 @@ fn main() {
         ]),
     ))
     .expect("tauri-build failed");
+}
+
+/// Add `libclang_rt.osx.a` from the active Xcode clang to the link.
+fn link_clang_runtime() {
+    let out = std::process::Command::new("xcrun")
+        .args(["clang", "--print-resource-dir"])
+        .output()
+        .expect("xcrun clang --print-resource-dir");
+    let dir = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    let lib = std::path::Path::new(&dir).join("lib/darwin");
+    assert!(
+        lib.join("libclang_rt.osx.a").exists(),
+        "libclang_rt.osx.a not found in {}",
+        lib.display()
+    );
+    println!("cargo:rustc-link-search=native={}", lib.display());
+    println!("cargo:rustc-link-lib=static=clang_rt.osx");
 }

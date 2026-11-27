@@ -70,7 +70,14 @@
 .voice-hint-keys { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
 .voice-hint-keys kbd { min-width: 32px; height: 28px; font-size: 12px; }
 .voice-hint-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.voice-hint-actions .btn { height: 36px; padding: 0 12px; }
+.voice-hint-actions .btn, .voice-hint .btn.solid { height: 36px; width: auto; padding: 0 12px; }
+.voice-hint-steps { margin: 0 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font: 450 13px/18px var(--font); color: var(--text); }
+.voice-hint-progress { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font: 500 12px/16px var(--font); color: var(--text-2, var(--gray-11)); font-variant-numeric: tabular-nums; }
+.voice-hint-progress progress { flex: 1; min-width: 80px; height: 8px; accent-color: var(--accent-9); }
+.voice-hint-progress .btn { height: 32px; padding: 0 10px; }
+.voice-hint p.voice-hint-error { color: var(--danger); }
+.voice-hint p.voice-hint-alt { margin: 10px 0 0; font-size: 12px; }
+.voice-hint-alt kbd { height: 20px; min-width: 22px; font-size: 11px; }
 
 /* ---------------------------------------------------- the text-box chip */
 .voice-textchip {
@@ -107,3 +114,15 @@
 .st-search:has(.st-search-clear) .search-mic { right: 38px; }
 .st-search:has(.search-mic) input { padding-right: 40px; }
 .st-search:has(.search-mic):has(.st-search-clear) input { padding-right: 76px; }
+.voice-test { display: flex; flex-direction: column; gap: 10px; }
+.voice-test-head { display: flex; align-items: center; gap: 12px; }
+.voice-test-meter { flex: 1; max-width: 240px; height: 8px; border-radius: 4px; background: var(--gray-4, var(--hairline)); overflow: hidden; }
+.voice-test-meter span { display: block; height: 100%; background: var(--accent-9); transition: width 80ms linear; }
+.voice-test-rows { display: grid; grid-template-columns: minmax(140px, 180px) 1fr; gap: 4px 12px; margin: 0; font: 450 13px/18px var(--font); }
+.voice-test-rows dt { color: var(--text-2, var(--gray-11)); }
+.voice-test-rows dd { margin: 0; color: var(--text); }
+.voice-test-text { overflow-wrap: anywhere; }
+.voice-test-advice { border-radius: 10px; padding: 10px 12px; background: var(--gray-2, var(--surface-solid)); box-shadow: 0 0 0 1px var(--hairline); font: 450 13px/18px var(--font); }
+.voice-test-advice p { margin: 4px 0; color: var(--text-2, var(--gray-11)); }
+.voice-test-advice ol { margin: 4px 0 0; padding-left: 20px; }
+@media (max-width: 640px) { .voice-test-rows { grid-template-columns: 1fr; } }

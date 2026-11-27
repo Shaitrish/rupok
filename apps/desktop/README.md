@@ -107,6 +107,32 @@ board's key flows in **Playwright WebKit** on macOS
 pointer events, ⌘Z, a Smart Object preset, Teach mode, save/open, PDF import
 and the website pages.
 
+### Offline voice (Whisper) in the installers
+
+The installers are built with offline voice input (`--features whisper`;
+`--features metal` on macOS for the GPU), so voice typing works in every
+desktop app: WebView2 (Windows) and WebKitGTK (Linux) have no speech
+recognition of their own. The model is **not** bundled: on first use the
+mic offers "Download offline voice (base, ~148 MB)", downloaded from a fixed
+Hugging Face URL and checked against a pinned SHA-256
+([`src/voice.rs`](src/voice.rs)). A local build needs cmake and a C++
+compiler for it: `bun run bundle -- --features whisper`.
+
+- **CPU:** CI sets `GGML_NATIVE=OFF`, so whisper.cpp is compiled for any
+  x86-64 CPU with AVX2/FMA/F16C (Intel Haswell 2013+, AMD Zen), never for
+  the runner's own CPU. The app checks at run time
+  (`voice::missing_cpu_features`) and, on an older chip (many Celeron,
+  Pentium and Atom models), says so instead of offering the download.
+- **Microphone:** the shell grants its own board window the microphone
+  (`voice_cmd::on_permission`, all three engines) and enables media streams
+  in WebKitGTK. The AppImage bundles GStreamer
+  (`bundle.linux.appimage.bundleMediaFramework`), which WebKitGTK uses to
+  capture audio. The operating system can still refuse (Windows: Settings ›
+  Privacy & security › Microphone › "Let desktop apps access your
+  microphone"; macOS asks once); the board then says exactly that.
+- **Check it:** Settings › General › Voice input › Test microphone shows the
+  provider, the permission, the input level and a 3-second transcript.
+
 ## Icons
 
 The icons are generated from the brand artwork with one command, so a new logo
