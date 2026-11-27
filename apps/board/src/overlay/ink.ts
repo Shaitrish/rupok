@@ -64,7 +64,9 @@ export class OverlayInk {
     this.root = root;
     this.canvas = canvas;
     await init({ module_or_path: wasmUrl });
-    const board = await Board.create(canvas, prefs().forceWebgl);
+    // The overlay window is transparent: it stays on WebGL2, as tested,
+    // unless WebGPU was chosen outright. No wet tile: the whole screen is ink.
+    const board = await Board.create(canvas, prefs().renderer !== "webgpu", undefined);
     this.board = board;
     const p = prefs();
     board.set_smoothing(p.smoothing);

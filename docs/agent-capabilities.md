@@ -303,6 +303,12 @@ the AI chip's Undo puts it back.
 | `about.support` | teacher only | Donations and payments. |
 | `about.renderer` | teacher only | Needs a restart and can leave the board blank on some hardware. |
 | `about.stats` | agent | `set_setting` |
+| `about.speedTest` | teacher only | Takes over the board for a few minutes and needs the teacher to write on it. |
+| `about.renderScale` | agent | `set_setting` |
+| `about.wetLayer` | agent | `set_setting` |
+| `about.inkTrail` | agent | `set_setting` |
+| `about.flatPanels` | agent | `set_setting` |
+| `about.nativeWetInk` | teacher only | An experimental native layer of the Windows app: a failure needs someone at the board. |
 | `about.graphics` | teacher only | Read-only information. |
 
 ## Dock buttons

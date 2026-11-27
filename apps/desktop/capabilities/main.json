@@ -37,6 +37,12 @@
     "allow-voice-model-cancel",
     "allow-voice-model-remove",
     "allow-voice-transcribe",
-    "allow-open-donate-page"
+    "allow-open-donate-page",
+    "allow-save-speed-report",
+    "allow-native-ink-start",
+    "allow-native-ink-begin",
+    "allow-native-ink-points",
+    "allow-native-ink-end",
+    "allow-native-ink-stop"
   ]
 }

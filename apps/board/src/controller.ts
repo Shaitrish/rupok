@@ -18,7 +18,9 @@ import { type DesignDefault, setDesignDefault, setLessonBranding } from "./desig
 import { ObjectHost } from "./objects";
 import { attachTrackpadPinch } from "./pinch";
 import { autosaveLoad, autosaveStore, designDefaultLoad } from "./storage";
-import { noteFrame, noteSamples } from "./inkLatency";
+import { graphicsAdapter, noteFrame, noteSamples, notePen } from "./inkLatency";
+import { gov, markGpuStart, renderScale, resetAutoScale, startOnWebgl, tileSize } from "./perf";
+import { applyNativeInk, nativeInkDown, nativeInkRaw, nativeInkUp } from "./nativeInk";
 import { attachTrail, drawsInk, notePointerDown, notePointerUp, penBusy, predictedFor, setPointerKind, trailAfterMove } from "./wetInk";
 import { APP_NAME, FILE_EXT, LESSON_MIME } from "./brand";
 import { forgetLessonPath, openLessonFiles, openLessonInto, saveLessonBytes } from "./platform";
@@ -59,6 +61,8 @@ export class Controller {
   board!: Board;
   objects = new ObjectHost(this);
   canvas!: HTMLCanvasElement;
+  /** The wet tile's canvas (crates/rupok-render, "wet tile"); absent in the overlay. */
+  wetCanvas: HTMLCanvasElement | null = null;
   root!: HTMLElement;
   world!: HTMLElement;
   private lastRev = -1;
@@ -78,20 +82,44 @@ export class Controller {
     saved?(bytes: Uint8Array, rev: number): void;
   } = {};
 
-  async init(root: HTMLElement, canvas: HTMLCanvasElement, world: HTMLElement) {
+  async init(root: HTMLElement, canvas: HTMLCanvasElement, world: HTMLElement, wetCanvas?: HTMLCanvasElement) {
     attachMedia(this);
     this.root = root;
     this.canvas = canvas;
+    this.wetCanvas = wetCanvas ?? null;
     this.world = world;
     await init({ module_or_path: wasmUrl });
-    this.board = await Board.create(canvas, prefs().forceWebgl);
+    // Auto starts WebGPU where the browser has it; a start that fails, or
+    // never finishes, falls back to WebGL2 (perf.ts).
+    const webgl = await startOnWebgl();
+    const marked = !webgl && prefs().renderer === "auto";
+    if (marked) markGpuStart(false);
+    try {
+      this.board = await Board.create(canvas, webgl, wetCanvas);
+    } catch (e) {
+      if (webgl) throw e;
+      console.warn("WebGPU did not start; using WebGL2", e);
+      this.board = await Board.create(canvas, true, wetCanvas);
+    }
+    if (marked) setTimeout(() => markGpuStart(true), 1500);
+    // No GPU: every frame is drawn by the processor and ink will lag. Say
+    // so once, where the teacher can do something about it.
+    if (!studentEntry && !navigator.webdriver && graphicsAdapter().software) {
+      setTimeout(() => showToast("This computer is drawing without its graphics card, so ink will lag. Update the graphics driver; see Settings → About → Graphics.", 9000), 4000);
+    }
+    // For bench/latency and for support: what the renderer is doing.
+    (window as any).rupokPerf = {
+      stats: () => ({ ...JSON.parse(this.board.stats_json()), scale: this.scale }),
+      frameKind: () => this.board.last_frame_kind(),
+      fullFrame: () => this.board.flush_ink(),
+    };
     void loadMyStamps();
     // A pinch released below fit springs back; instantly with reduced motion.
     const still = matchMedia("(prefers-reduced-motion: reduce)");
     this.board.set_reduced_motion(still.matches);
     still.addEventListener("change", () => this.board.set_reduced_motion(still.matches));
     this.applyPrefs();
-    this.resize();
+    this.applyPerf();
     this.updateInsets(true);
     new ResizeObserver(() => this.resize()).observe(root);
     // The student viewer never reads or writes the teacher's autosave.
@@ -183,12 +211,19 @@ export class Controller {
   }
 
   private lastSize = { w: 0, h: 0 };
+  /** Ink canvas pixels per screen pixel, per axis (perf.ts). */
+  scale = 1;
   resize() {
     const r = this.root.getBoundingClientRect();
     const wasFit = !!this.fitCam && this.board.camera().join(",") === this.fitCam;
     const was = this.lastSize;
     this.lastSize = { w: r.width, h: r.height };
-    this.board.resize(r.width, r.height, window.devicePixelRatio || 1);
+    const dpr = window.devicePixelRatio || 1;
+    // The canvas is drawn at `scale` of the screen's pixels and stretched
+    // to the board by CSS (.ink is 100 % wide and high).
+    this.scale = renderScale(r.width, r.height, dpr);
+    this.board.resize(r.width, r.height, dpr * this.scale);
+    this.applyWetTile();
     // Teach keeps the slide fitted to the screen (window resize, fullscreen).
     // Elsewhere the slide re-fits when the screen turns (portrait ⇄ landscape)
     // or when it was still fitted, but never while text is being typed (an
@@ -253,10 +288,67 @@ export class Controller {
 
   // ------------------------------------------------------------------ loop
 
+  /** Apply the Performance lab settings (render scale, wet-ink layer, flat
+   * panels, native wet ink) now, without a reload. */
+  applyPerf() {
+    resetAutoScale();
+    document.documentElement.toggleAttribute("data-flat-panels", prefs().flatPanels);
+    this.resize();
+    void applyNativeInk((hidden) => this.board.set_wet_hidden(hidden));
+  }
+
+  /** Called at the start of every frame, before the board draws (the speed
+   * test's scripted pen feeds its samples here, as the browser delivers a
+   * real pen's just before the frame). */
+  beforeFrame: ((now: number) => void) | null = null;
+
+  /** Size the wet tile for the canvas, or switch it off (Settings → About →
+   * Performance lab → Wet-ink layer). The renderer moves it; `placeWetTile`
+   * follows with CSS. */
+  applyWetTile() {
+    const c = this.wetCanvas;
+    if (!c) return;
+    if (!this.board.has_wet_tile()) {
+      // The tile could not be set up: everything is drawn in the main canvas.
+      c.style.display = "none";
+      return;
+    }
+    const size = prefs().wetLayer;
+    const on = size !== "off";
+    const [w, h] = this.board.canvas_size();
+    const [tw, th] = tileSize(w, h, on ? size : "medium");
+    this.board.set_wet_tile(on, tw, th);
+    c.style.display = on ? "" : "none";
+    // One tile pixel covers what one main-canvas pixel covers.
+    const k = this.lastSize.w / Math.max(1, w), ky = this.lastSize.h / Math.max(1, h);
+    c.style.width = `${tw * k}px`;
+    c.style.height = `${th * ky}px`;
+    this.tileKey = "";
+  }
+
+  private tileKey = "";
+  /** Move the wet tile's canvas to where the renderer drew it. */
+  private placeWetTile() {
+    const c = this.wetCanvas;
+    if (!c) return;
+    const r = this.board.wet_tile_rect();
+    if (!r.length) return;
+    const key = `${r[0]},${r[1]}`;
+    if (key === this.tileKey) return;
+    this.tileKey = key;
+    const [w, h] = this.board.canvas_size();
+    c.style.transform = `translate(${(r[0] * this.lastSize.w) / Math.max(1, w)}px, ${(r[1] * this.lastSize.h) / Math.max(1, h)}px)`;
+  }
+
   private loop = () => {
     const t0 = performance.now();
+    this.beforeFrame?.(t0);
     const drew = this.board.frame();
-    noteFrame(drew, performance.now() - t0);
+    if (drew) this.placeWetTile();
+    noteFrame(drew, performance.now() - t0, drew ? this.board.last_frame_kind() : 0);
+    // The render scale follows real frame times; it changes between strokes.
+    gov.frame(t0, drew);
+    if (this.pointersDown === 0 && !penBusy(400) && gov.settle()) this.resize();
     this.rect = null;
     this.sync(false);
     const now = performance.now();
@@ -521,11 +613,14 @@ export class Controller {
       el.setPointerCapture(e.pointerId);
       this.pointersDown++;
       notePointerDown();
+      notePen(true);
       setPointerKind(e.pointerType);
       this.rect = null;
       const [x, y] = pos(e);
       this.inking.set(e.pointerId, drawsInk(e, x, y));
       this.board.pointer_down(e.pointerId, x, y, e.pressure, e.timeStamp, e.pointerType, e.button);
+      // Experimental: the Windows app's native layer draws this stroke wet.
+      if (this.inking.get(e.pointerId)) nativeInkDown(e, this.rootRect());
       e.preventDefault();
       this.armQuickMenu(e, x, y);
     });
@@ -546,10 +641,14 @@ export class Controller {
       trailAfterMove(e, this.inking.get(e.pointerId) ?? false, tx, ty);
       this.hover(e);
     });
+    // Raw samples, ahead of the frame: only the native wet-ink layer uses them.
+    el.addEventListener("pointerrawupdate", (e) => nativeInkRaw(e as PointerEvent));
     const released = (e: PointerEvent) => {
       this.inking.delete(e.pointerId);
+      nativeInkUp(e.pointerId);
       notePointerUp();
       this.pointersDown = Math.max(0, this.pointersDown - 1);
+      if (this.pointersDown === 0) notePen(false);
       this.lastNav = performance.now();
     };
     const up = (e: PointerEvent) => {
@@ -571,8 +670,10 @@ export class Controller {
     this.openQuickMenu = (id: number) => {
       if (el.hasPointerCapture(id)) el.releasePointerCapture(id);
       this.inking.delete(id);
+      nativeInkUp(id);
       notePointerUp();
       this.pointersDown = Math.max(0, this.pointersDown - 1);
+      if (this.pointersDown === 0) notePen(false);
       this.board.pointer_cancel(id);
       this.menuPointers.add(id);
     };

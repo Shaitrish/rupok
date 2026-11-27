@@ -46,14 +46,23 @@ let presenter: InkPresenter | null = null;
 let requested = false;
 let trailFailed = false;
 
-/** Delegated ink trail state, for the latency overlay. */
-export function trailState(): "on" | "available" | "unsupported" | "failed" {
+/** Delegated ink trail state, for the latency overlay. "off": switched off
+ * in Settings → About → Performance lab, or the native wet-ink layer leads. */
+export function trailState(): "on" | "available" | "unsupported" | "failed" | "off" {
   if (trailFailed) return "failed";
   if (!ink) return "unsupported";
   // Chromium exposes navigator.ink everywhere, but only Windows draws it.
   if (!windows) return "unsupported";
+  if (!trailWanted()) return "off";
   return presenter ? "on" : "available";
 }
+
+/** Other wet-ink paths that lead the pen themselves (the native layer) switch the OS trail off. */
+let trailBlocked = false;
+export function blockTrail(blocked: boolean) {
+  trailBlocked = blocked;
+}
+const trailWanted = () => prefs().inkTrail && !trailBlocked;
 
 /** Ask for the OS presenter once, over the ink canvas. */
 export function attachTrail(canvas: HTMLCanvasElement) {
@@ -104,7 +113,7 @@ function onPage(x: number, y: number, margin: number): boolean {
 /** After the board took a pen move: hand the OS trail its start point.
  * `x`, `y`: the move's position on the board (CSS px from its corner). */
 export function trailAfterMove(e: PointerEvent, drawing: boolean, x: number, y: number) {
-  if (!presenter || !drawing || !inking() || !trailFits()) return;
+  if (!presenter || !trailWanted() || !drawing || !inking() || !trailFits()) return;
   // Mirror rupok_ink::Brush::radius and the pressure curve, so the trail is
   // as wide as the ink it leads.
   const p = e.pointerType === "pen" && e.pressure > 0 ? Math.pow(Math.min(1, e.pressure), prefs().pressure) : 0.5;
@@ -125,7 +134,7 @@ export function trailAfterMove(e: PointerEvent, drawing: boolean, x: number, y: 
 
 /** The browser's predicted samples to draw for this move. */
 export function predictedFor(e: PointerEvent): PointerEvent[] {
-  if (presenter && inking() && trailFits()) return [];
+  if (presenter && trailWanted() && inking() && trailFits()) return [];
   const list = e.getPredictedEvents ? e.getPredictedEvents() : [];
   return list.filter((p) => p.timeStamp - e.timeStamp <= PREDICT_MS);
 }

@@ -30,7 +30,10 @@
 .save-state:hover { background: var(--hover); color: var(--text); }
 .save-state .save-dot { width: 6px; height: 6px; border-radius: 3px; background: var(--accent-9); flex: none; }
 .save-state.dirty { color: var(--text); }
-.save-state.saving .save-dot { animation: hdr-blink 1s var(--ease) infinite; }
+/* Two steps a second, not a fade: a lesson is "saving" for as long as the
+ * teacher keeps writing, and a fade would have the compositor redraw the
+ * screen from the top bar to the pen on every refresh (docs/performance.md). */
+.save-state.saving .save-dot { animation: hdr-blink 1s steps(1, end) infinite; }
 
 /* ------------------------------------------------------------- AI status */
 .ai-status { display: flex; align-items: center; gap: 2px; }

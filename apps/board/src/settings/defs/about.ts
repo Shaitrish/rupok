@@ -46,15 +46,15 @@ registerSettings([
   },
   {
     id: "about.renderer", category: "about", group: "Troubleshooting", order: 100, type: "segmented", label: "Renderer",
-    description: "Try WebGPU on new devices. Switching reloads the page; your lesson is autosaved.",
+    description: "Auto uses WebGPU on Windows and Linux computers that have it (faster on big screens) and WebGL2 otherwise. If the board stays blank, choose WebGL2. Switching reloads the page; your lesson is autosaved.",
     keywords: ["webgl", "webgpu", "gpu", "graphics", "slow", "blank board"],
-    options: [{ value: "webgl", label: "WebGL2" }, { value: "webgpu", label: "WebGPU · beta" }],
-    get: () => (prefs().forceWebgl ? "webgl" : "webgpu"),
+    options: [{ value: "auto", label: "Auto" }, { value: "webgpu", label: "WebGPU" }, { value: "webgl", label: "WebGL2" }],
+    get: () => prefs().renderer,
     set: (v) => {
-      setPrefs({ forceWebgl: v === "webgl" });
-      location.reload();
+      setPrefs({ renderer: v as "auto" | "webgpu" | "webgl" });
+      void controller.autosave().finally(() => location.reload());
     },
-    default: "webgl",
+    default: "auto",
   },
   {
     id: "about.stats", category: "about", group: "Troubleshooting", order: 110, type: "toggle", label: "Performance and pen latency overlay",

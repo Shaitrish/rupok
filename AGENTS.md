@@ -17,11 +17,11 @@ a Tauri 2 shell (planned). Status: Phase 0, pre-alpha. See
 | `crates/rupok-core` | Lesson document on Loro | `Lesson` (`doc.rs`: all mutations), model types (`model.rs`: `ItemData`, `StrokeData`, `ObjectData`, `PageSpec`…), `Scene` (`scene.rs`: R*-tree hit-test, eraser, lasso), `DOC_FORMAT` |
 | `crates/rupok-format` | `.rpk` package and Smart Object bundles (Apache-2.0) | `Package::{read, write, from_lesson, add_asset, content_markdown}`, `readable` (derived `README.md`/`content.md`/`content.json`), `ObjectBundle::{from_single_html, from_files, from_dir, validate}`, `LIBS`, `safe_path`, `FORMAT_VERSION`, `MIMETYPE`, `media` (embed allowlist, `parse_link`, `embed_url`, `prepare`), `model3d` (3D viewer object) |
 | `crates/rupok-live` | Live agent bridge shared by the board and `rupok mcp --live` | `protocol.rs` (WebSocket protocol v1: channels, ports, origin/host checks), `op.rs` (`Op`), `apply.rs` (`apply`: one attributed commit per agent op), `items.rs` (pages and items: move, align, restyle, scale, draw…), `stamps.rs` (built-in and custom stamps, Smart stamps), `fit.rs` (agent text fitted inside the page), `progress.rs` (`show_progress` working cards), `attribution.rs`, `sync` |
-| `crates/rupok-render` | wgpu ink renderer | `InkRenderer` (SDF capsules, chunk culling, cached dry layer, wet layer), `Camera`, `Gpu::headless`, `ink.wgsl` |
+| `crates/rupok-render` | wgpu ink renderer | `InkRenderer` (SDF capsules, chunk culling, cached dry layer, the wet tile: `plan`, `render_main`, `render_tile`), `Camera`, `Gpu::headless`, `ink.wgsl` |
 | `crates/rupok-wasm` | Board engine and wasm-bindgen API | `engine.rs` (`Engine`: tools, gestures, selection), `lib.rs` (`Board` JS API), `replay.rs`, `shapes.rs` |
 | `crates/rupok-cli` | `rupok` binary: CLI and MCP server | `cli.rs` (clap), `ops.rs` (shared operations), `mcp.rs` + `tools.rs` (lesson tools), `mcp_agent.rs` (agent control: pages, items, stamps, modes, export, library, settings, dock; docs/agent-capabilities.md), `workspace.rs` (path sandbox), `spec.rs`, `live/` (`LiveHub`: loopback WebSocket, pairing, Loro mirror) + `mcp_live.rs` + `mcp_progress.rs` (live tools; docs/ai-agents.md), `chat/` (`rupok agent`: ACP client relaying the in-app chat) + `mcp_http.rs` (MCP over loopback HTTP for it) |
 | `bench/` | Performance harness and budgets | `cargo run -p rupok-bench --release [-- --check]` |
-| `apps/board` | SolidJS board UI (Vite) | `controller.ts`, `objects.ts` (Smart Object host), `media/` + `components/Media*.tsx` (YouTube, video, audio, web embeds), `pdf.ts`, `storage.ts`, `live.ts` + `agentControl.ts` + `snapshot.ts` + `components/LivePanel.tsx` (Connect AI; board-side agent ops), `customStamps.ts` + `stampLib.ts` + `components/StampEditor.tsx` (My stamps), `components/DockEditor.tsx` (Customize dock), `agentSettings.ts` (settings an agent may change), `chat.ts` + `components/ChatPanel.tsx` + `markdown.ts` (AI chat), `voice/` (dictation; `board.ts` + `VoiceBoard.tsx`: Voice on the board), `aiAction/` (AI in action: working cards, class mode, live solve, students ask), `components/` |
+| `apps/board` | SolidJS board UI (Vite) | `controller.ts`, `objects.ts` (Smart Object host), `media/` + `components/Media*.tsx` (YouTube, video, audio, web embeds), `pdf.ts`, `storage.ts`, `live.ts` + `agentControl.ts` + `snapshot.ts` + `components/LivePanel.tsx` (Connect AI; board-side agent ops), `customStamps.ts` + `stampLib.ts` + `components/StampEditor.tsx` (My stamps), `components/DockEditor.tsx` (Customize dock), `agentSettings.ts` (settings an agent may change), `perf.ts` (render scale and its governor, wet tile size, renderer choice), `speedTest.ts` + `components/SpeedTest.tsx` (board speed test), `nativeInk.ts` (native wet-ink layer, Windows app), `chat.ts` + `components/ChatPanel.tsx` + `markdown.ts` (AI chat), `voice/` (dictation; `board.ts` + `VoiceBoard.tsx`: Voice on the board), `aiAction/` (AI in action: working cards, class mode, live solve, students ask), `components/` |
 | `packages/object-sdk` | In-object SDK, `window.rupok` (Apache-2.0) | `sdk.js` (ES2019 IIFE), `index.d.ts`, `test/` |
 | `spec/` | Normative specs (Apache-2.0) | `rupok-format.md`, `smart-object.md` |
 | `examples/objects/` | Validated example Smart Objects | checked by `crates/rupok-format/tests/examples.rs` |
@@ -42,6 +42,7 @@ cargo clippy --workspace -- -D warnings
 cargo build -p rupok-wasm --target wasm32-unknown-unknown --release   # wasm must keep building
 cargo run -p rupok-bench --release                         # performance budgets
 node bench/latency/pen-latency.mjs --swiftshader --check   # pen-to-pixel budgets (board built; docs/performance.md)
+node bench/latency/pen-latency.mjs --swiftshader --writing --check   # writing must not draw or redraw the whole board
 node --test "packages/object-sdk/test/*.test.mjs"        # SDK (Node 22+)
 cargo run -p rupok-cli -- validate examples/objects/binary-counter.html --steps 10
 ```
@@ -86,11 +87,14 @@ The toolchain (1.100, edition 2024) is pinned in `rust-toolchain.toml`.
    `rupok-ink`, `rupok-core`, `rupok-render`, the pointer path in `rupok-wasm`, or
    package I/O: run `cargo run -p rupok-bench --release` before and after, and
    report both budget tables. Budgets: stroke commit p99 ≤ 5 ms, open lesson
-   ≤ 1000 ms, pan frame p99 ≤ 8.3 ms, wet frame p99 ≤ 4 ms, pen move → wet
+   ≤ 1000 ms, pan frame p99 ≤ 8.3 ms, wet frame p99 ≤ 4 ms (also in the wet
+   tile at 4K, with no 4K frame while writing in it), pen move → wet
    update p99 ≤ 0.5 ms, wet vs dry pixels ≤ 0.5 %. Changes to the pen path
    (`controller.ts` pointer handlers, `wetInk.ts`, the stroke builder, the
    ink shader) also run `bench/latency` before and after. Wet and dry ink
    must look identical: see "The wet/dry contract" in docs/performance.md.
+   While the pen writes, nothing drawn or presented per frame may grow with
+   the screen: see "The wet tile" there (`tests/wet_tile.rs`, `--writing`, `--4k`).
 3. **Keep wasm building.** Run the wasm build after touching any crate that
    `rupok-wasm` depends on.
 4. **Respect the license split.** `spec/`, `crates/rupok-format`,

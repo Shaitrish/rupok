@@ -41,6 +41,8 @@ import { UpdateNotice } from "./updates/UpdateNotice";
 import { startUpdateChecks } from "./updates/updates";
 import { Tour } from "./tour/Tour";
 import DonateCard from "./components/DonateCard";
+import SpeedTestLayer from "./components/SpeedTest";
+import { resumeSpeedTest } from "./speedTest";
 import { startDonateCard } from "./donate";
 
 const OverlayApp = lazy(() => import("./overlay/OverlayApp"));
@@ -50,6 +52,7 @@ export default function App() {
   if (overlayRole) return <Suspense><OverlayApp role={overlayRole} /></Suspense>;
   let root!: HTMLDivElement;
   let canvas!: HTMLCanvasElement;
+  let wet!: HTMLCanvasElement;
   let world!: HTMLDivElement;
   let input!: HTMLDivElement;
   let eraser!: HTMLDivElement;
@@ -90,7 +93,7 @@ export default function App() {
 
   onMount(async () => {
     try {
-      await controller.init(root, canvas, world);
+      await controller.init(root, canvas, world, wet);
       controller.attachInput(input);
       controller.attachKeys();
       initShapes();
@@ -118,6 +121,8 @@ export default function App() {
       void import("./solve").then((m) => m.initSolve()); // Solve this: AI handwriting, preview, reveal
       initAiAction(controller); // AI in action: working cards, class mode, live solve, students ask
       startLibrary(controller); // the Library home and saving lessons to their files (before files below arrive)
+      // A board speed test that reloaded to switch renderer carries on.
+      setTimeout(resumeSpeedTest, 2500);
       // Back from a payment page (?billing=…) or sent by the pricing page (?upgrade=pro).
       const billingParams = takeBillingParams();
       if (billingParams.message || billingParams.upgrade)
@@ -166,6 +171,8 @@ export default function App() {
       <div class="board" ref={root}>
         <World ref={(el) => (world = el)} />
         <canvas class="ink" ref={canvas} />
+        {/* The wet tile: the ink being written, a small canvas the renderer moves under the pen. */}
+        <canvas class="ink-wet" ref={wet} width="16" height="16" />
         <div class="input-layer" classList={{ interact: tool() === "interact" }} ref={input} style={{ cursor: cursorFor(tool()) }} />
         <div class="eraser-cursor" ref={eraser} style={{ display: "none", width: `${sizes().eraser ?? 64}px`, height: `${sizes().eraser ?? 64}px` }} />
         <GestureLayer onSettings={openSettings} />
@@ -196,6 +203,8 @@ export default function App() {
         <UpdateNotice />
         <Tour />
         <DonateCard />
+        {/* The board speed test: its progress card and its report (speedTest.ts). */}
+        <SpeedTestLayer />
       </Show>
       <Show when={objectDialog()}>
         <ObjectDialog onClose={() => setObjectDialog(false)} />

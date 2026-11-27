@@ -125,7 +125,20 @@ export interface Prefs {
   smoothing: number;
   pressure: number;
   showStats: boolean;
+  /** The old renderer switch; `renderer` replaced it (kept so saved prefs load). */
   forceWebgl: boolean;
+  /** Which renderer to start: Auto is WebGPU where there is one (perf.ts). */
+  renderer: "auto" | "webgpu" | "webgl";
+  /** Ink canvas pixels per screen pixel: Auto adapts (perf.ts). */
+  renderScale: "auto" | "100" | "75" | "50";
+  /** Draw changing ink in a small canvas under the pen (the wet tile), and its size. */
+  wetLayer: "off" | "small" | "medium" | "large";
+  /** Let Windows draw the ink trail ahead of our frames (wetInk.ts). */
+  inkTrail: boolean;
+  /** Experimental, Windows app: wet ink drawn by a native layer (nativeInk.ts). */
+  nativeWetInk: boolean;
+  /** Panels without the frosted-glass blur (less work for the compositor). */
+  flatPanels: boolean;
   showPages: boolean;
   /** Smart Ink shapes (pen only): off, snap on pen-up, or hold still to snap. */
   smartShapes: SmartShapes;
@@ -168,10 +181,10 @@ export interface Prefs {
   /** The teacher's saved dock layouts (Customize dock → Save layout). */
   dockPresets?: import("./modes").DockPreset[];
 }
-// WebGL2 is the default until WebGPU presentation is verified on real boards (see ROADMAP).
 const defaults: Prefs = {
   theme: "system", accent: "mint", iconStyle: "linear", toolbar: "bottom", density: "comfortable",
   touchMode: "auto", smoothing: 0.25, pressure: 0.8, showStats: false, forceWebgl: true, showPages: true,
+  renderer: "auto", renderScale: "auto", wetLayer: "medium", inkTrail: true, nativeWetInk: false, flatPanels: false,
   smartShapes: "off", smartLast: "auto", scratchOut: true, hand: "right", eraserMode: "partial", keepInkOnPage: true, pagesPinned: false,
   smartGraphs: true, smartFlowchart: true, smartGates: true, smartNumberLine: true,
   smartGeometry: true, smartTables: true, smartScience: false, smartMath: true,
@@ -208,6 +221,12 @@ function loadPrefs(): Prefs {
     saved.stampFavorites = saved.stampFavorites.filter((v: unknown) => typeof v === "string").slice(0, 8);
     saved.stampQuickMenu = saved.stampQuickMenu !== false;
     saved.stampSounds = saved.stampSounds !== false;
+    if (!["auto", "webgpu", "webgl"].includes(saved.renderer)) saved.renderer = "auto";
+    if (!["auto", "100", "75", "50"].includes(saved.renderScale)) saved.renderScale = "auto";
+    if (!["off", "small", "medium", "large"].includes(saved.wetLayer)) saved.wetLayer = "medium";
+    saved.inkTrail = saved.inkTrail !== false;
+    saved.nativeWetInk = saved.nativeWetInk === true;
+    saved.flatPanels = saved.flatPanels === true;
     saved.dockPresets = sanitizeDockPresets(saved.dockPresets);
     saved.modes = sanitizeModes(saved.modes);
     return saved;
